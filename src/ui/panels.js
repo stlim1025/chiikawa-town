@@ -772,7 +772,7 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'apps' },
           app('options', APP_ICON.options, '설정', () => show('options')),
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
-          app('card', APP_ICON.card, '자격증', () => show('licenses')),
+          app('licenses', APP_ICON.card, '자격증', () => show('licenses')), // 'card' 이름표는 전역 .card(흰 카드 테두리)와 겹쳐서 쓰지 않는다
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
           app('quests', APP_ICON.quests, '퀘스트', () => show('quests')),
           app('friends', APP_ICON.friends, '친구', () => show('friends')),
