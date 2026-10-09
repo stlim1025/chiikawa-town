@@ -596,15 +596,29 @@ export function createPanels(ui, handlers) {
           const x = slots[i];
           if (!x) return h('span', { class: 'pocket-slot empty', 'aria-hidden': 'true' });
           const n = x.type === 'item' ? b.items[x.id] : 0, held = x.type === 'weapon' && wp.held === x.id;
-          return h('button', { class: `pocket-slot${same(x, sel) ? ' on' : ''}${held ? ' held' : ''}`, type: 'button', 'data-slot': String(i),
+          const btn = h('button', { class: `pocket-slot${same(x, sel) ? ' on' : ''}${held ? ' held' : ''}`, type: 'button', 'data-slot': String(i),
             'aria-label': `${nameOf(x)}${n > 1 ? ` ${n}개` : ''}${held ? ' (들고 있음)' : ''}`, 'aria-pressed': String(same(x, sel)), onClick: () => pick(x) },
           svgSpan('pocket-ico', artOf(x)),
           n > 1 ? h('b', { class: 'pocket-cnt' }, String(n)) : null,
           held ? h('i', { class: 'pocket-held', 'aria-hidden': 'true' }, '✋') : null);
+          // 마우스를 올리면 그 칸 위에 이름 말풍선
+          btn.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showHover(btn, x); });
+          btn.addEventListener('pointerleave', () => { hover.hidden = true; });
+          return btn;
         }));
-      const wrap = h('div', { class: 'pocket' }, grid);
-      // 고른 칸: 위에 이름 말풍선, 옆에 할 일 메뉴, 아래 띠에 설명
-      let info = h('p', { class: 'pocket-info' }, slots.length ? '칸을 누르면 먹거나 들거나 바닥에 버릴 수 있어요' : '주머니가 비어 있어요. 풀을 뽑거나 열매를 따 봐요!');
+      const hover = h('div', { class: 'pocket-name hover', 'aria-hidden': 'true' });
+      hover.hidden = true;
+      const wrap = h('div', { class: 'pocket' }, grid, hover);
+      function showHover(btn, x) {
+        if (same(x, current.sel)) { hover.hidden = true; return; } // 고른 칸은 이미 이름이 떠 있다
+        const W = wrap.getBoundingClientRect(), r = btn.getBoundingClientRect();
+        hover.textContent = nameOf(x);
+        hover.style.left = `${r.left - W.left + r.width / 2}px`;
+        hover.style.top = `${r.top - W.top - 6}px`;
+        hover.hidden = false;
+      }
+      // 고른 칸: 위에 이름 말풍선, 옆에 할 일 메뉴
+      if (!slots.length) wrap.append(h('p', { class: 'pocket-empty' }, '주머니가 비어 있어요'));
       if (sel) {
         const n = sel.type === 'item' ? b.items[sel.id] : 1, inf = sel.type === 'item' ? itemInfo(sel.id) : null;
         const canDrop = handlers.canDrop ? handlers.canDrop() : true;
@@ -617,8 +631,6 @@ export function createPanels(ui, handlers) {
         else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
         acts.push(act('그만두기', () => {}));
         wrap.append(h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), h('div', { class: 'pocket-menu', role: 'menu' }, acts));
-        const note = sel.type === 'weapon' ? `${WEAPONS[sel.id].note} · 힘 ${'★'.repeat(WEAPONS[sel.id].dmg)}` : inf.note + (inf.kind === 'herb' ? ` 깔끔하게 뽑은 것 ${b.clean[sel.id] || 0}개.` : '');
-        info = h('p', { class: 'pocket-info sel' }, h('b', {}, `${nameOf(sel)}${n > 1 ? ` ×${n}` : ''}`), ' ', note);
         // 그린 뒤에 말풍선 · 메뉴를 고른 칸 옆에 붙인다(칸 자리를 재야 해서)
         current.afterRender = () => {
           const slot = wrap.querySelector('.pocket-slot.on'), menu = wrap.querySelector('.pocket-menu'), bubble = wrap.querySelector('.pocket-name');
@@ -643,11 +655,8 @@ export function createPanels(ui, handlers) {
           menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
         };
       }
-      const pc = pochetteOf(s), wd = wardrobeOf(s);
-      return [head('주머니', s.money), wrap, info,
-        h('div', { class: 'actions' },
-          pc.owned.length || wd.owned.length ? h('p', { class: 'hint' }, '꾸미기 소품은 집 옷장에서 바꿔요') : h('p', { class: 'hint' }, `${slots.length} / ${SLOTS}칸`),
-          closeBtn())];
+      return [head('주머니', s.money), wrap,
+        h('div', { class: 'actions' }, h('p', { class: 'hint' }, `${slots.length} / ${SLOTS}칸`), closeBtn())];
     },
     // 집 옷장: 가진 포셰트 · 소품을 골라 바로 바꿔 단다(집 안의 내 캐릭터가 바로 바뀐다)
     wardrobe(s) {
