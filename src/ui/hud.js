@@ -38,12 +38,15 @@ export function createHud(ui, input) {
     <div class="hud-grade"></div>
     <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>
     <div class="hud-buff" hidden>💪 공격 +1</div>`;
+  // 같이 토벌 중인 친구들 얼굴(돈 · 기운 아래)
+  const partyTag = el('div', 'hud-party');
+  partyTag.hidden = true;
   const job = el('div', 'hud-job');
   job.hidden = true;
   job.innerHTML = '<b></b><span class="n"></span>';
   // 하는 중인 퀘스트(5단계): 일감 칸 아래에 퀘스트마다 쪽지 한 장씩(화면에 띄운 것이 맨 위)
   const quests = el('div', 'hud-quests');
-  dock.append(status, job, quests);
+  dock.append(status, partyTag, job, quests);
   const notes = new Map(); // 퀘스트 id → { el, key }
   // 카드가 날아오는 중인 퀘스트(그동안 그 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
   const incoming = new Map(); // id → 날아오는 카드 수
@@ -289,6 +292,23 @@ export function createHud(ui, input) {
       });
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
+    /** 같이 토벌 중인 친구들. list: [{ name, svg: 얼굴 그림 }] (비면 숨긴다) */
+    setParty(list) {
+      partyTag.hidden = !list.length;
+      partyTag.replaceChildren();
+      if (!list.length) return;
+      const lab = el('span', 'pt-lab');
+      lab.textContent = '같이 토벌';
+      partyTag.appendChild(lab);
+      for (const f of list) {
+        const face = el('i', 'pt-face');
+        face.innerHTML = f.svg;
+        face.title = f.name;
+        face.setAttribute('aria-label', f.name);
+        partyTag.appendChild(face);
+      }
+      partyTag.classList.remove('got'); void partyTag.offsetWidth; partyTag.classList.add('got');
+    },
     setAction(label) {
       action.hidden = !label;
       if (label && action.textContent !== label) action.textContent = label;

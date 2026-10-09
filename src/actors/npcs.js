@@ -193,6 +193,34 @@ export function createNpcs(scene, village, weeds, berries) {
     clearRoute(n);
   }
 
+  /**
+   * 같이 토벌(party): 내 둘레에 몬스터가 있으면 달려가 때린다. 싸울 게 없거나 내가 너무 멀면 false(그러면 따라온다).
+   * 한 번 휘두르면 every 초 동안은 그 자리에서 노려본다.
+   */
+  function partyFight(n, pd0) {
+    const P = n.party;
+    if (pd0 > 12) return false;
+    let m = P.target;
+    if (!m || m.dead || m.dormant || m.under || Math.hypot(m.x - lastPlayer.x, m.z - lastPlayer.z) > P.range + 3) m = P.target = P.find();
+    if (!m) return false;
+    const d = Math.hypot(m.x - n.x, m.z - n.z), reach = m.M.size + 0.75;
+    if (d > reach) {
+      n.state = 'walk';
+      n.tx = m.x + ((n.x - m.x) / d) * (reach - 0.25);
+      n.tz = m.z + ((n.z - m.z) / d) * (reach - 0.25);
+      return true;
+    }
+    n.yaw = Math.atan2(m.x - n.x, m.z - n.z);
+    if (P.cool > 0) { if (n.state === 'walk') clearRoute(n); n.state = 'idle'; n.timer = 99; return true; }
+    P.cool = P.every;
+    clearRoute(n);
+    n.task = { type: 'act', anim: 'train', time: 0.7, quick: true };
+    n.state = 'work';
+    n.workT = 0;
+    if (P.hit(m)) { P.target = null; P.onKill(m); }
+    return true;
+  }
+
   /** 할 일을 시작한다. 시작했으면 true. */
   function startWork(n) {
     const job = WORK[n.kind];
@@ -398,12 +426,30 @@ export function createNpcs(scene, village, weeds, berries) {
       clearRoute(n);
       if (!on) { n.state = 'idle'; n.timer = 1; }
     },
+    /**
+     * 같이 토벌: cfg { find(): 노릴 몬스터 | null, hit(m): 쓰러뜨렸는지, onKill(m), range: 내 둘레 몇 칸까지, every: 휘두르는 간격(초) }
+     * 이면 내 캐릭터를 따라다니다 둘레 몬스터를 친다. null 이면 그만두고 다시 자유롭게.
+     */
+    party(kind, cfg) {
+      const n = list.find((m) => m.kind === kind);
+      if (!n) return;
+      if (n.task) endTask(n);
+      clearRoute(n);
+      n.plan = null;
+      n.party = cfg ? { range: 8, every: 1, ...cfg, cool: 0, target: null } : null;
+      n.follow = !!cfg;
+      n.state = 'idle';
+      n.timer = 1;
+    },
+    /** 같이 토벌 중인 친구 kind 목록. */
+    partyKinds() { return list.filter((n) => n.party).map((n) => n.kind); },
     update(dt, t, player) {
       lastPlayer = player;
       separate(dt);
       for (const n of list) {
         if (n.away) continue; // 집 안에 있다
         if (n.bubble) { n.bubble.t -= dt; if (n.bubble.t <= 0) n.bubble = null; }
+        if (n.party) n.party.cool = Math.max(0, n.party.cool - dt);
         let mode = 'idle', power = 0;
         const pd0 = Math.hypot(player.x - n.x, player.z - n.z);
         // 술래잡기: 내 캐릭터 반대쪽으로 달아난다(멀리 떨어지면 숨을 고르며 약 올린다)
@@ -422,6 +468,8 @@ export function createNpcs(scene, village, weeds, berries) {
           if (dl > 0.3 && pd0 < 6) { n.state = 'walk'; n.tx = n.lead.x; n.tz = n.lead.z; }
           else { n.state = 'idle'; n.timer = 99; n.yaw = Math.atan2(player.x - n.x, player.z - n.z); }
         }
+        // 같이 토벌: 휘두르는 중이면 그대로, 아니면 둘레 몬스터에게 달려간다(없으면 아래 따라다니기)
+        else if (n.party && n.follow && n.talk <= 0 && !n.emote && (n.state === 'work' || partyFight(n, pd0))) { /* 싸우는 중 */ }
         // 따라다니기: 멀어지면 내 캐릭터 옆(조금 뒤)으로 걸어오고, 가까우면 서서 바라본다. 너무 멀면 옆에 나타난다.
         else if (n.follow && n.talk <= 0 && !n.emote) {
           const d = pd0;
@@ -459,8 +507,8 @@ export function createNpcs(scene, village, weeds, berries) {
               mode = 'pull';
               if (n.workT >= WEED_PULL_SECONDS) {
                 weeds.remove(w, 'clean');
-                task.onDone?.(); // 일감으로 뽑았으면 센다
-                if (Math.random() < 0.5) say(n, pick(WORK[n.kind].lines));
+                if (task.onDone) task.onDone(); // 일감으로 뽑았으면 센다(한마디는 일감 쪽에서 그 친구 말투로)
+                else if (Math.random() < 0.5) say(n, pick(WORK[n.kind].lines));
                 endTask(n);
               }
             }

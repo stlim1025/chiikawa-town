@@ -1035,10 +1035,11 @@ export function createMonsters(scene, village, random = Math.random) {
      * → 쓰러뜨렸는지
      */
     npcHit(m, dmg, fromX, fromZ) {
-      if (m.dead || m.under || m.dormant) return false;
+      if (m.dead || m.under || m.dormant || m.airY > 0.7) return false;
       m.hp -= dmg;
       m.flash = 0.13;
-      m.stun = Math.max(m.stun, 0.35);
+      m.engaged = true;
+      if (!m.M.boss) m.stun = Math.max(m.stun, 0.35); // 왕버섯은 친구가 때려도 멈칫하지 않는다(같이 때려서 묶어 둘 수 없게)
       if (m.state === 'wander') { m.goal = null; m.yaw = Math.atan2(fromX - m.x, fromZ - m.z); }
       poof(m.x, 0.3 + m.mesh.hover, m.z, 0.12, 3);
       if (m.hp > 0) return false;

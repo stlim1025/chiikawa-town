@@ -75,6 +75,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-energy .sv { min-width: 1.8em; text-align: right; color: var(--ink-soft); }
 .hud-job { display: flex; align-items: center; gap: 8px; padding: 5px 10px 7px 10px; border-radius: 20px 22px 20px 18px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
 .hud-job b { font-weight: inherit; }
+.hud-party { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 12px; border-radius: 999px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-size: 16px; }
+.hud-party .pt-lab { margin-right: 4px; color: var(--ink-soft); white-space: nowrap; }
+.hud-party .pt-face { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #f3d9a8; overflow: hidden; }
+.hud-party .pt-face svg { width: 34px; height: 34px; }
+.hud-party.got { animation: party-got 0.6s ease-out; transform-origin: left center; }
+@keyframes party-got { 0% { scale: 1.15; } 50% { scale: 0.97; } 100% { scale: 1; } }
 .hud-job .n { padding: 0 10px 1px; border-radius: 999px; background: #e3f4e8; color: #2f6b45; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-job.done .n { background: #fff; color: #9a5a1a; }
 .hud-job::before { content: ""; flex: 0 0 auto; width: 24px; height: 24px; background: no-repeat center / contain var(--leaf); }

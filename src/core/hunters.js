@@ -1,5 +1,7 @@
 import { MONSTERS, WEAPONS, weaponOf } from './combat.js';
 import { trySpend } from './state.js';
+import { friendOf, hearts } from './friends.js';
+import { villagerOf, TIRED } from './villagers.js';
 
 /**
  * 토벌꾼 기록과 랭킹(랭커). 나와 마을 친구들이 몬스터를 쓰러뜨리면 점수(그 몬스터의 체력만큼)가 쌓이고,
@@ -24,6 +26,8 @@ export const RANKER_TOP = 3, RANKER_MIN = 60;
 export const ENGRAVE_PRICE = 1000;
 /** 왕버섯을 쓰러뜨리면 덤으로. */
 export const BOSS_BONUS = 100;
+/** 같이 토벌: 하트가 이만큼 쌓인 친구를 데려갈 수 있고, 한 번에 이만큼까지. */
+export const PARTY_HEARTS = 3, PARTY_MAX = 2;
 
 const EMPTY = { license: null, tries: 0, tryDay: -1, kills: 0, points: 0 };
 /** 그 사람의 기록(me 는 내 기록: 자격증은 state.licenses 를 따른다). */
@@ -42,12 +46,37 @@ export function licensed(state, who) {
   return who === 'me' ? meLicensed(state) : hunterOf(state, who).license !== null;
 }
 
-/** 쓰러뜨린 몬스터 하나를 기록한다(점수 = 그 몬스터 체력, 왕버섯은 덤). */
-export function addKill(state, who, species) {
+/** 그 몬스터 한 마리의 토벌 점수(체력, 왕버섯은 덤). split 명이 같이 잡았으면 나눈 몫(반올림, 적어도 1). */
+export function killPoints(species, split = 1) {
   const M = MONSTERS[species];
-  if (!M || species === 'dummy') return state;
+  if (!M || species === 'dummy') return 0;
+  return Math.max(1, Math.round((M.hp + (M.boss ? BOSS_BONUS : 0)) / Math.max(1, split)));
+}
+/** 쓰러뜨린 몬스터 하나를 기록한다. split 명이 같이 잡았으면 점수는 나눠 갖고, 쓰러뜨린 수는 모두 하나씩. */
+export function addKill(state, who, species, split = 1) {
+  const pts = killPoints(species, split);
+  if (!pts) return state;
   const r = hunterOf(state, who);
-  return setHunter(state, who, { ...r, kills: r.kills + 1, points: r.points + M.hp + (M.boss ? BOSS_BONUS : 0) });
+  return setHunter(state, who, { ...r, kills: r.kills + 1, points: r.points + pts });
+}
+
+/**
+ * 그 친구를 토벌에 데려갈 수 있는지. → { ok, reason }
+ * reason: 'hunter'(토벌을 안 하는 친구) · 'hearts'(하트 모자람) · 'myLicense'(내 토벌 자격증) · 'license'(친구 자격증)
+ *   · 'night'(잘 시간) · 'tired'(기운 모자람) · 'full'(벌써 꽉 찼다) · 'already'(벌써 같이 다닌다)
+ * opt: { day, night: 잘 시간인지, party: 지금 데려가는 친구 kind 목록 }
+ */
+export function partyCheck(state, kind, { day, night = false, party = [] } = {}) {
+  const no = (reason) => ({ ok: false, reason });
+  if (!HUNTER_PROFILES[kind]) return no('hunter');
+  if (party.includes(kind)) return no('already');
+  if (hearts(friendOf(state, kind)) < PARTY_HEARTS) return no('hearts');
+  if (!licensed(state, 'me')) return no('myLicense');
+  if (!licensed(state, kind)) return no('license');
+  if (night) return no('night');
+  if (villagerOf(state, kind, day).energy < TIRED + 15) return no('tired');
+  if (party.length >= PARTY_MAX) return no('full');
+  return { ok: true, reason: null };
 }
 
 /** 오늘 시험을 볼 수 있는지(자격증이 없고, 오늘 아직 안 봤다). */
