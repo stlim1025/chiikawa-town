@@ -95,11 +95,15 @@ export function buildVillage(scene) {
   // 집도 나무처럼, 카메라와 내 캐릭터 사이를 가리면 반투명해진다. 그래서 집마다 재질을 따로 둔다.
   const houses = [];
   const windows = []; // 밤에 불이 들어오는 창(집마다 재질)
-  function house(x, z, roofCol, s, extra, yaw = 0) {
+  function house(x, z, roofCol, s, extra, yaw = 0, wall = '#fff4de') {
     const W = 2.2 * s, H = 1.6 * s, D = 1.8 * s;
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.rotation.y = yaw + (rand() - 0.5) * 0.12;
+    // 가게 앞 소품도 막는다(집 기준 자리 → 마을 자리)
+    const block = (lx, lz, r) => { const a = g.rotation.y; obstacles.push({ x: x + Math.cos(a) * lx + Math.sin(a) * lz, z: z - Math.sin(a) * lx + Math.cos(a) * lz, r }); };
+    // 밤에 불이 들어오는 등 · 진열창(그 색 재질을 창문 목록에 넣는다)
+    const glow = (mesh) => { windows.push(mesh.material); return mesh; };
     const mats = new Map(), meshes = [];
     const mat = (c) => {
       if (!mats.has(c)) { const m = toonMaterial(c, { unique: true }); m.transparent = true; mats.set(c, m); }
@@ -107,7 +111,7 @@ export function buildVillage(scene) {
     };
     /** 이 집 전용 재질로 만든 만화풍 메시(extra 에서도 쓴다). */
     const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
-    part(GEO.box, '#fff4de', { position: [0, H / 2, 0], scale: [W, H, D], receive: true, shell: true });
+    part(GEO.box, wall, { position: [0, H / 2, 0], scale: [W, H, D], receive: true, shell: true });
     part(ROOF, roofCol, { position: [0, H, 0], scale: [W + 0.45, 1.05 * s, D + 0.55], shell: true });
     part(GEO.box, roofCol, { position: [W * 0.28, H + 0.75 * s, -D * 0.15], scale: [0.28 * s, 0.7 * s, 0.28 * s], shell: true });
     part(GEO.box, '#a8795a', { position: [-W * 0.2, 0.47 * s, D / 2 + 0.02], scale: [0.55 * s, 0.94 * s, 0.06], shell: true, shadow: false });
@@ -118,7 +122,7 @@ export function buildVillage(scene) {
     ['#ffd6e2', '#fff1a8', '#ffffff', '#d9ccff'].forEach((c, i) => {
       part(GEO.dot, c, { position: [W * 0.22 - 0.24 * s + i * 0.16 * s, H * 0.3 + 0.1, D / 2 + 0.14], scale: [0.07, 0.07, 0.07], outline: false, shadow: false });
     });
-    if (extra) extra(g, W, H, D, s, part);
+    if (extra) extra(g, W, H, D, s, part, { block, glow });
     world.add(g);
     obstacles.push({ x, z, r: Math.max(W, D) * 0.78 });
     houses.push({ x, z, half: Math.max(W, D) * 0.6, mats: [...mats.values()], meshes, fade: 1 });
@@ -269,115 +273,273 @@ export function buildVillage(scene) {
   function pub(lot) {
     const { x, z } = lot, g = new THREE.Group(), wood = '#b98a5e', dark = '#8a6240';
     g.position.set(x, 0, z);
+    // 집처럼 내 캐릭터를 가리면 반투명해진다(재질을 따로 둔다)
+    const mats = new Map(), meshes = [];
+    const mat = (c) => { if (!mats.has(c)) { const m = toonMaterial(c, { unique: true }); m.transparent = true; mats.set(c, m); } return mats.get(c); };
+    const pp = (parent, geo, c, opts) => { const m = place(parent, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
     // 카운터(앞판은 진한 나무, 위는 밝은 상판)
-    place(g, toonMesh(GEO.box, dark, { position: [0, 0.45, 0.1], scale: [2.3, 0.9, 0.5], shell: true }));
-    place(g, toonMesh(GEO.box, '#d8b48c', { position: [0, 0.94, 0.12], scale: [2.45, 0.08, 0.66], shell: true }));
-    [-0.75, 0, 0.75].forEach((px) => place(g, toonMesh(GEO.box, '#a77a52', { position: [px, 0.45, 0.36], scale: [0.04, 0.8, 0.02], outline: false, shadow: false })));
+    pp(g, GEO.box, dark, { position: [0, 0.45, 0.1], scale: [2.3, 0.9, 0.5], shell: true });
+    pp(g, GEO.box, '#d8b48c', { position: [0, 0.94, 0.12], scale: [2.45, 0.08, 0.66], shell: true });
+    [-0.75, 0, 0.75].forEach((px) => pp(g, GEO.box, '#a77a52', { position: [px, 0.45, 0.36], scale: [0.04, 0.8, 0.02], outline: false, shadow: false }));
     // 뒤 기둥 · 앞 기둥 · 차양 지붕
-    [[-1.15, -0.55], [1.15, -0.55], [-1.15, 0.45], [1.15, 0.45]].forEach(([px, pz]) => place(g, toonMesh(GEO.box, wood, { position: [px, 1.15, pz], scale: [0.09, 2.3, 0.09], shell: true })));
-    place(g, toonMesh(ROOF, lot.roof || '#e9884f', { position: [0, 2.25, -0.05], scale: [2.75, 0.55, 1.45], shell: true }));
+    [[-1.15, -0.55], [1.15, -0.55], [-1.15, 0.45], [1.15, 0.45]].forEach(([px, pz]) => pp(g, GEO.box, wood, { position: [px, 1.15, pz], scale: [0.09, 2.3, 0.09], shell: true }));
+    pp(g, ROOF, lot.roof || '#e9884f', { position: [0, 2.25, -0.05], scale: [2.75, 0.55, 1.45], shell: true });
     // 차양 끝 흰 줄무늬(노렌 느낌)
-    [-0.9, -0.3, 0.3, 0.9].forEach((px) => place(g, toonMesh(GEO.box, '#fff3e0', { position: [px, 2.0, 0.66], scale: [0.48, 0.34, 0.03], shell: true, outline: 0.015, shadow: false })));
+    [-0.9, -0.3, 0.3, 0.9].forEach((px) => pp(g, GEO.box, '#fff3e0', { position: [px, 2.0, 0.66], scale: [0.48, 0.34, 0.03], shell: true, outline: 0.015, shadow: false }));
     // 뒤 선반: 맥주잔 줄 · 맥주통
-    place(g, toonMesh(GEO.box, wood, { position: [0, 1.35, -0.5], scale: [2.1, 0.06, 0.28], shell: true, shadow: false }));
+    pp(g, GEO.box, wood, { position: [0, 1.35, -0.5], scale: [2.1, 0.06, 0.28], shell: true, shadow: false });
     [-0.75, -0.4, -0.05, 0.3].forEach((px) => {
-      place(g, toonMesh(GEO.cylinder, '#f6c453', { position: [px, 1.38, -0.5], scale: [0.09, 0.2, 0.09], outline: 0.012, shadow: false }));
-      place(g, toonMesh(GEO.sphere, '#ffffff', { position: [px, 1.6, -0.5], scale: [0.1, 0.06, 0.1], outline: 0.01, shadow: false }));
+      pp(g, GEO.cylinder, '#f6c453', { position: [px, 1.38, -0.5], scale: [0.09, 0.2, 0.09], outline: 0.012, shadow: false });
+      pp(g, GEO.sphere, '#ffffff', { position: [px, 1.6, -0.5], scale: [0.1, 0.06, 0.1], outline: 0.01, shadow: false });
     });
-    place(g, toonMesh(GEO.cylinder, '#b07a4a', { position: [0.82, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.26, 0.5, 0.26], outline: 0.02, shadow: false }));
-    [0.66, 0.98].forEach((px) => place(g, toonMesh(GEO.cylinder, '#5a5560', { position: [px, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.27, 0.04, 0.27], outline: false, shadow: false })));
+    pp(g, GEO.cylinder, '#b07a4a', { position: [0.82, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.26, 0.5, 0.26], outline: 0.02, shadow: false });
+    [0.66, 0.98].forEach((px) => pp(g, GEO.cylinder, '#5a5560', { position: [px, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.27, 0.04, 0.27], outline: false, shadow: false }));
     // 카운터 위 생맥주 꼭지
-    place(g, toonMesh(GEO.cylinder, '#c9ced6', { position: [-0.55, 0.98, -0.02], scale: [0.05, 0.32, 0.05], outline: 0.012, shadow: false }));
-    place(g, toonMesh(GEO.box, '#c9ced6', { position: [-0.55, 1.3, 0.04], scale: [0.06, 0.05, 0.16], outline: 0.012, shadow: false }));
+    pp(g, GEO.cylinder, '#c9ced6', { position: [-0.55, 0.98, -0.02], scale: [0.05, 0.32, 0.05], outline: 0.012, shadow: false });
+    pp(g, GEO.box, '#c9ced6', { position: [-0.55, 1.3, 0.04], scale: [0.06, 0.05, 0.16], outline: 0.012, shadow: false });
     // 앞 동그란 의자 셋
     [-0.8, 0, 0.8].forEach((px) => {
-      place(g, toonMesh(GEO.cylinder, '#e9884f', { position: [px, 0.42, 0.95], scale: [0.22, 0.08, 0.22], outline: 0.02 }));
-      place(g, toonMesh(GEO.cylinder, dark, { position: [px, 0, 0.95], scale: [0.05, 0.42, 0.05], outline: 0.012, shadow: false }));
+      pp(g, GEO.cylinder, '#e9884f', { position: [px, 0.42, 0.95], scale: [0.22, 0.08, 0.22], outline: 0.02 });
+      pp(g, GEO.cylinder, dark, { position: [px, 0, 0.95], scale: [0.05, 0.42, 0.05], outline: 0.012, shadow: false });
     });
     // 처마 끝 빨간 등 둘(밤에 불이 들어온다)
-    const lantern = toonMaterial('#f2604f', { unique: true });
+    const lantern = mat('#f2604f');
     windows.push(lantern);
     [-1.25, 1.25].forEach((px) => {
-      place(g, toonMesh(GEO.box, dark, { position: [px, 1.92, 0.62], scale: [0.03, 0.18, 0.03], outline: false, shadow: false }));
-      place(g, toonMesh(GEO.sphere, null, { material: lantern, position: [px, 1.68, 0.62], scale: [0.17, 0.24, 0.17], outline: 0.018, shadow: false }));
-      place(g, toonMesh(GEO.cylinder, '#3a3236', { position: [px, 1.42, 0.62], scale: [0.1, 0.04, 0.1], outline: false, shadow: false }));
+      pp(g, GEO.box, dark, { position: [px, 1.92, 0.62], scale: [0.03, 0.18, 0.03], outline: false, shadow: false });
+      pp(g, GEO.sphere, '#f2604f', { position: [px, 1.68, 0.62], scale: [0.17, 0.24, 0.17], outline: 0.018, shadow: false });
+      pp(g, GEO.cylinder, '#3a3236', { position: [px, 1.42, 0.62], scale: [0.1, 0.04, 0.1], outline: false, shadow: false });
     });
     // 지붕 위 커다란 맥주잔 간판
     const sign = new THREE.Group();
     sign.position.set(0, 2.62, 0.1);
-    place(sign, toonMesh(GEO.cylinder, '#f6c453', { position: [0, 0, 0], scale: [0.3, 0.55, 0.3], outline: 0.025 }));
-    place(sign, toonMesh(GEO.sphere, '#ffffff', { position: [0, 0.58, 0], scale: [0.36, 0.17, 0.36], outline: 0.02 }));
-    place(sign, toonMesh(GEO.sphere, '#ffffff', { position: [0.16, 0.64, 0.1], scale: [0.16, 0.12, 0.16], outline: 0.015 }));
-    place(sign, toonMesh(new THREE.TorusGeometry(0.17, 0.05, 8, 20, Math.PI), '#f6c453', { position: [0.3, 0.28, 0], rotation: [0, 0, -Math.PI / 2], scale: [1, 1, 1], outline: 0.015 }));
+    pp(sign, GEO.cylinder, '#f6c453', { position: [0, 0, 0], scale: [0.3, 0.55, 0.3], outline: 0.025 });
+    pp(sign, GEO.sphere, '#ffffff', { position: [0, 0.58, 0], scale: [0.36, 0.17, 0.36], outline: 0.02 });
+    pp(sign, GEO.sphere, '#ffffff', { position: [0.16, 0.64, 0.1], scale: [0.16, 0.12, 0.16], outline: 0.015 });
+    pp(sign, new THREE.TorusGeometry(0.17, 0.05, 8, 20, Math.PI), '#f6c453', { position: [0.3, 0.28, 0], rotation: [0, 0, -Math.PI / 2], scale: [1, 1, 1], outline: 0.015 });
     g.add(sign);
     world.add(g);
     obstacles.push({ x, z: z - 0.05, r: lotRadius(lot) });
+    houses.push({ x, z, half: 1.4, mats: [...mats.values()], meshes, fade: 1 });
     labels.push({ x, y: 3.6, z, text: lot.label });
   }
 
   // ---------- 마을 건물: layout 의 자리(LOTS)마다 남쪽(카메라 쪽)을 보고 짓는다 ----------
   // 건물마다 덧붙이는 모양(가게 간판 · 친구 집의 특징)
+  // 건물마다 하는 일이 보이게: 지붕 위 큰 간판(멀리서도 보인다) + 가게 앞 소품. 소품은 막아서 지나가지 않게 한다
+  const TORUS = new THREE.TorusGeometry(1, 0.28, 8, 20);
+  const WALLS = { ramen: '#fbe9d0', furniture: '#f3fbf6', books: '#f6e7cf', tools: '#eef2f6', realty: '#fdf7ff', exam: '#ffffff' };
   const EXTRA = {
-    furniture: (g, W, H, D, s, part) => {
-      // 가구점: 처마 위 간판과 가게 앞에 내놓은 의자·화분
-      part(GEO.box, '#fff4de', { position: [0, H + 0.15, D / 2 + 0.3], scale: [1.3 * s, 0.38 * s, 0.06], shell: true, shadow: false });
-      part(GEO.box, '#e2b77f', { position: [W * 0.45, 0.22, D / 2 + 0.75], scale: [0.4, 0.06, 0.4], shell: true });
-      part(GEO.box, '#e2b77f', { position: [W * 0.45, 0.42, D / 2 + 0.58], scale: [0.4, 0.4, 0.06], shell: true });
-      part(GEO.cylinder, '#d8a47f', { position: [-W * 0.55, 0, D / 2 + 0.6], scale: [0.16, 0.28, 0.16], outline: 0.02 });
-      part(GEO.sphere, '#6cc77e', { position: [-W * 0.55, 0.42, D / 2 + 0.6], scale: [0.2, 0.2, 0.2], outline: 0.02 });
+    ramen: (g, W, H, D, s, part, { block, glow }) => {
+      // 라멘 로우: 지붕 위 김 나는 라멘 그릇 간판, 문 앞 남색 노렌, 빨간 초롱 둘, 입간판 메뉴판, 손님 의자
+      const R = H + 1.05 * s, bx = -W * 0.12;
+      part(GEO.sphere, '#d9473b', { position: [bx, R + 0.12, 0.15], scale: [0.5, 0.3, 0.5], outline: 0.03 });
+      part(GEO.cylinder, '#ffffff', { position: [bx, R + 0.38, 0.15], scale: [0.5, 0.02, 0.5], outline: 0.02, shadow: false });
+      part(GEO.cylinder, '#f3cf6b', { position: [bx, R + 0.4, 0.15], scale: [0.44, 0.03, 0.44], outline: false, shadow: false });
+      part(GEO.cylinder, '#ffffff', { position: [bx + 0.15, R + 0.43, 0.25], scale: [0.11, 0.03, 0.11], outline: 0.01, shadow: false });
+      part(GEO.dot, '#f28fb0', { position: [bx + 0.15, R + 0.465, 0.25], scale: [0.04, 0.01, 0.04], outline: false, shadow: false });
+      part(GEO.sphere, '#3f8a4f', { position: [bx - 0.18, R + 0.43, 0.08], scale: [0.12, 0.02, 0.08], outline: 0.01, shadow: false });
+      [[0.18, -0.35], [0.28, -0.6]].forEach(([dx, rz]) => part(GEO.box, '#c69a64', { position: [bx + dx, R + 0.7, 0.1], rotation: [0, 0, rz], scale: [0.035, 0.75, 0.035], outline: 0.012, shadow: false }));
+      [[0, 0.75, 0.13], [0.1, 0.98, 0.1], [-0.05, 1.18, 0.08]].forEach(([dx, dy, r]) => part(GEO.sphere, '#fffaf0', { position: [bx + dx - 0.15, R + dy, 0.1], scale: [r, r, r], outline: 0.012, shadow: false }));
+      // 노렌: 막대 + 남색 천 셋(가운데에 흰 동그라미)
+      const dx0 = -W * 0.2;
+      part(GEO.cylinder, '#8a6240', { position: [dx0 - 0.36 * s, 1.0 * s, D / 2 + 0.09], rotation: [0, 0, -Math.PI / 2], scale: [0.025, 0.72 * s, 0.025], outline: false, shadow: false });
+      [-0.22, 0, 0.22].forEach((fx, i) => {
+        part(GEO.box, '#34436e', { position: [dx0 + fx * s, 0.83 * s, D / 2 + 0.09], scale: [0.2 * s, 0.32 * s, 0.02], shell: true, outline: 0.012, shadow: false });
+        if (i === 1) part(GEO.dot, '#ffffff', { position: [dx0, 0.86 * s, D / 2 + 0.11], scale: [0.06, 0.06, 0.01], outline: false, shadow: false });
+      });
+      // 문 위 나무 간판
+      part(GEO.box, '#e9c48a', { position: [dx0, 1.15 * s, D / 2 + 0.07], scale: [0.8 * s, 0.18 * s, 0.05], shell: true, outline: 0.015, shadow: false });
+      // 빨간 초롱 둘(밤에 켜진다)
+      [-0.75, 0.42].forEach((fx) => {
+        part(GEO.box, '#5a4030', { position: [dx0 + fx * s, H * 0.78, D / 2 + 0.2], scale: [0.03, 0.12, 0.03], outline: false, shadow: false });
+        glow(part(GEO.sphere, '#ee5a4a', { position: [dx0 + fx * s, H * 0.62, D / 2 + 0.2], scale: [0.14, 0.2, 0.14], outline: 0.018, shadow: false }));
+        part(GEO.cylinder, '#3a3236', { position: [dx0 + fx * s, H * 0.62 - 0.22, D / 2 + 0.2], scale: [0.08, 0.03, 0.08], outline: false, shadow: false });
+      });
+      // 입간판 메뉴판(오른쪽 앞)
+      const mx = W * 0.5, mz = D / 2 + 0.65;
+      [0.22, -0.22].forEach((rx) => part(GEO.box, '#4a3b33', { position: [mx, 0.36, mz + rx * 0.35], rotation: [rx, 0, 0], scale: [0.46, 0.72, 0.04], shell: true, outline: 0.015 }));
+      [0.5, 0.4, 0.3].forEach((y, i) => part(GEO.box, '#f5ead2', { position: [mx - (i === 0 ? 0.05 : 0), y, mz + 0.1], rotation: [0.22, 0, 0], scale: [i === 0 ? 0.24 : 0.3, 0.03, 0.01], outline: false, shadow: false }));
+      block(mx, mz, 0.35);
+      // 손님 기다리는 긴 의자(왼쪽 앞)
+      part(GEO.box, '#c49a6c', { position: [-W * 0.55, 0.25, D / 2 + 0.6], scale: [0.7, 0.08, 0.3], shell: true });
+      [-0.28, 0.28].forEach((fx) => part(GEO.box, '#a77a52', { position: [-W * 0.55 + fx, 0.11, D / 2 + 0.6], scale: [0.06, 0.22, 0.24], shell: true, shadow: false }));
+      block(-W * 0.55, D / 2 + 0.6, 0.42);
     },
-    realty: (g, W, H, D, s, part) => {
-      // 부동산: 문 옆에 집 그림 간판
-      part(GEO.box, '#ffffff', { position: [W * 0.45, 0.85 * s, D / 2 + 0.05], scale: [0.5 * s, 0.5 * s, 0.04], shell: true, shadow: false });
-      part(ROOF, '#f4a091', { position: [W * 0.45, 0.95 * s, D / 2 + 0.08], scale: [0.36 * s, 0.14 * s, 0.03], outline: false, shadow: false });
+    furniture: (g, W, H, D, s, part, { block, glow }) => {
+      // 가구점: 지붕 위 큰 의자 간판, 민트 줄무늬 차양, 가게 앞에 내놓은 분홍 소파 · 스탠드 · 화분
+      const R = H + 1.05 * s;
+      const cx = -W * 0.05;
+      part(GEO.box, '#e2b77f', { position: [cx, R + 0.32, 0.15], scale: [0.62, 0.1, 0.5], shell: true, outline: 0.02 });
+      part(GEO.box, '#9fd8c4', { position: [cx, R + 0.4, 0.17], scale: [0.54, 0.07, 0.42], shell: true, outline: 0.015, shadow: false });
+      part(GEO.box, '#e2b77f', { position: [cx, R + 0.72, -0.07], scale: [0.62, 0.72, 0.1], shell: true, outline: 0.02 });
+      part(GEO.box, '#9fd8c4', { position: [cx, R + 0.74, -0.01], scale: [0.48, 0.52, 0.04], shell: true, outline: 0.012, shadow: false });
+      [[-0.25, 0.35], [0.25, 0.35], [-0.25, -0.05], [0.25, -0.05]].forEach(([lx, lz]) => part(GEO.box, '#c49a6c', { position: [cx + lx, R + 0.13, lz], scale: [0.07, 0.3, 0.07], shell: true, outline: 0.012, shadow: false }));
+      // 줄무늬 차양(진열창 위)
+      for (let i = 0; i < 5; i++) part(GEO.box, i % 2 ? '#ffffff' : '#7fcdb2', { position: [W * 0.22 - 0.36 * s + i * 0.18 * s, H * 0.86, D / 2 + 0.2], rotation: [0.55, 0, 0], scale: [0.18 * s, 0.05, 0.45], shell: true, outline: 0.012, shadow: false });
+      // 가게 앞 진열: 깔개 위 분홍 소파 · 스탠드(밤에 켜진다)
+      const sx = W * 0.42, sz = D / 2 + 0.72;
+      part(GEO.cylinder, '#cdb8f0', { position: [sx, 0.01, sz], scale: [0.62, 0.02, 0.42], outline: 0.015, receive: true, shadow: false });
+      part(GEO.box, '#f7a8c4', { position: [sx, 0.24, sz], scale: [0.78, 0.22, 0.38], shell: true, outline: 0.02 });
+      part(GEO.box, '#f7a8c4', { position: [sx, 0.48, sz - 0.16], scale: [0.78, 0.36, 0.1], shell: true, outline: 0.02 });
+      [-0.38, 0.38].forEach((fx) => part(GEO.box, '#e5788f', { position: [sx + fx, 0.36, sz], scale: [0.1, 0.24, 0.38], shell: true, outline: 0.015, shadow: false }));
+      part(GEO.cylinder, '#8f8174', { position: [sx + 0.62, 0, sz - 0.05], scale: [0.025, 0.85, 0.025], outline: 0.01, shadow: false });
+      glow(part(GEO.cone, '#fff1a8', { position: [sx + 0.62, 0.78, sz - 0.05], scale: [0.2, 0.24, 0.2], outline: 0.015, shadow: false }));
+      block(sx + 0.1, sz, 0.55);
+      // 화분(왼쪽)
+      part(GEO.cylinder, '#d8a47f', { position: [-W * 0.58, 0, D / 2 + 0.55], scale: [0.16, 0.28, 0.16], outline: 0.02 });
+      part(GEO.sphere, '#6cc77e', { position: [-W * 0.58, 0.44, D / 2 + 0.55], scale: [0.22, 0.24, 0.22], outline: 0.02 });
+      block(-W * 0.58, D / 2 + 0.55, 0.25);
     },
-    ramen: (g, W, H, D, s, part) => {
-      // 라멘 로우: 문 위 간판, 빨간 초롱, 가게 앞 긴 의자
-      part(GEO.box, '#ffffff', { position: [-W * 0.2, 0.98 * s, D / 2 + 0.08], scale: [0.8 * s, 0.32 * s, 0.03], shell: true, shadow: false });
-      part(GEO.sphere, '#e0524f', { position: [W * 0.47, H * 0.78, D / 2 + 0.18], scale: [0.13, 0.17, 0.13], outline: 0.02 });
-      part(GEO.box, '#c49a6c', { position: [W * 0.1, 0.25, D / 2 + 0.75], scale: [1.2, 0.08, 0.35], shell: true });
+    books: (g, W, H, D, s, part, { block }) => {
+      // 카니 헌책방: 지붕 위 펼친 책 간판, 처마에 매단 집게발 간판, 가게 앞 책 수레 둘 · 책 더미
+      const R = H + 1.05 * s;
+      [-1, 1].forEach((side) => {
+        part(GEO.box, '#8a5a3a', { position: [side * 0.27, R + 0.42, 0.1], rotation: [0, 0, -side * 0.35], scale: [0.56, 0.7, 0.06], shell: true, outline: 0.02 });
+        part(GEO.box, '#fffaf0', { position: [side * 0.25, R + 0.45, 0.15], rotation: [0, 0, -side * 0.35], scale: [0.5, 0.64, 0.05], shell: true, outline: 0.015, shadow: false });
+        [0.12, 0.02, -0.08].forEach((ly) => part(GEO.box, '#c9b48e', { position: [side * 0.25 + side * ly * 0.35, R + 0.48 + ly, 0.18], rotation: [0, 0, -side * 0.35], scale: [0.32, 0.025, 0.01], outline: false, shadow: false }));
+      });
+      // 집게발 간판(오른쪽 처마)
+      const cx = W * 0.52, cy = H * 0.9;
+      part(GEO.box, '#8a6240', { position: [cx, cy + 0.1, D / 2 + 0.2], scale: [0.05, 0.05, 0.45], shell: true, shadow: false });
+      part(GEO.sphere, '#e8604f', { position: [cx, cy - 0.15, D / 2 + 0.42], scale: [0.18, 0.22, 0.08], outline: 0.018, shadow: false });
+      part(GEO.sphere, '#e8604f', { position: [cx + 0.1, cy + 0.04, D / 2 + 0.42], rotation: [0, 0, -0.5], scale: [0.07, 0.15, 0.06], outline: 0.012, shadow: false });
+      part(GEO.sphere, '#e8604f', { position: [cx - 0.1, cy + 0.05, D / 2 + 0.42], rotation: [0, 0, 0.5], scale: [0.07, 0.15, 0.06], outline: 0.012, shadow: false });
+      // 책 수레(선반 + 알록달록 책등)
+      const COLORS = ['#c0504d', '#6f94bb', '#e0b53c', '#7fbf7f', '#b58ad6', '#f28fb0', '#8a6240'];
+      [[-W * 0.62, D / 2 + 0.5], [W * 0.5, D / 2 + 0.5]].forEach(([bx, bz], k) => {
+        part(GEO.box, '#a77d5a', { position: [bx, 0.32, bz], scale: [0.62, 0.06, 0.36], shell: true, outline: 0.015 });
+        part(GEO.box, '#a77d5a', { position: [bx, 0.32, bz - 0.15], scale: [0.62, 0.56, 0.05], shell: true, outline: 0.015, shadow: false });
+        [-0.28, 0.28].forEach((fx) => part(GEO.box, '#8a6240', { position: [bx + fx, 0.16, bz], scale: [0.05, 0.32, 0.34], shell: true, outline: 0.012, shadow: false }));
+        for (let i = 0; i < 6; i++) part(GEO.box, COLORS[(i + k * 3) % COLORS.length], { position: [bx - 0.23 + i * 0.09, 0.48 + (i % 3) * 0.015, bz - 0.04], scale: [0.07, 0.26 + (i % 3) * 0.03, 0.2], shell: true, outline: 0.01, shadow: false });
+        block(bx, bz, 0.38);
+      });
     },
-    exam: (g, W, H, D, s, part) => {
-      // 제초 검정소: 지붕 위 깃발, 앞에 간판
-      part(GEO.cylinder, '#b88c66', { position: [-W * 0.3, H + 0.3, 0], scale: [0.04, 1.1, 0.04], outline: 0.02 });
-      part(GEO.box, '#ffd6e2', { position: [-W * 0.3 + 0.24, H + 1.18, 0], scale: [0.42, 0.26, 0.03], shell: true, shadow: false });
-      [-0.32, 0.32].forEach((px) => part(GEO.box, '#a77d5a', { position: [W * 0.3 + px, 0.4, D / 2 + 0.7], scale: [0.07, 0.8, 0.07], shell: true }));
-      part(GEO.box, '#f5ead2', { position: [W * 0.3, 0.72, D / 2 + 0.7], scale: [0.86, 0.42, 0.06], shell: true, shadow: false });
+    tools: (g, W, H, D, s, part, { block, glow }) => {
+      // 도구점: 지붕 위 엇갈린 망치 · 렌치 간판, 처마 끝 랜턴 줄(밤에 켜진다), 문 옆 무기 꽂힌 통, 모루
+      const R = H + 1.05 * s;
+      const tool = new THREE.Group();
+      tool.position.set(0, R + 0.5, 0.15);
+      g.add(tool);
+      const tp = (geo, c, o) => { const m = part(geo, c, o); tool.add(m); return m; };
+      tp(GEO.box, '#b88c66', { position: [0, 0, 0], rotation: [0, 0, 0.7], scale: [0.09, 0.95, 0.09], shell: true, outline: 0.015 });
+      tp(GEO.box, '#8e98a6', { position: [-0.3, 0.33, 0], rotation: [0, 0, 0.7], scale: [0.34, 0.2, 0.2], shell: true, outline: 0.02 });
+      tp(GEO.box, '#aab4c2', { position: [0, 0, 0.02], rotation: [0, 0, -0.7], scale: [0.09, 0.85, 0.07], shell: true, outline: 0.015 });
+      tp(TORUS, '#aab4c2', { position: [0.29, 0.3, 0.02], rotation: [0, 0, -0.7], scale: [0.13, 0.13, 0.1], outline: 0.015 });
+      // 처마 랜턴 줄
+      part(GEO.box, '#5a4030', { position: [W * 0.18, H * 0.92, D / 2 + 0.28], scale: [W * 0.62, 0.03, 0.03], outline: false, shadow: false });
+      [-0.45, 0, 0.45].forEach((fx) => {
+        part(GEO.box, '#5a4030', { position: [W * 0.18 + fx * s, H * 0.84, D / 2 + 0.28], scale: [0.02, 0.14, 0.02], outline: false, shadow: false });
+        glow(part(GEO.sphere, '#ffe08a', { position: [W * 0.18 + fx * s, H * 0.72, D / 2 + 0.28], scale: [0.1, 0.13, 0.1], outline: 0.014, shadow: false }));
+        part(GEO.cylinder, '#3a3236', { position: [W * 0.18 + fx * s, H * 0.72 + 0.12, D / 2 + 0.28], scale: [0.07, 0.03, 0.07], outline: false, shadow: false });
+      });
+      // 무기 꽂힌 통(왼쪽 앞): 분홍 사스마타 자루 · 목검
+      const bx = -W * 0.6, bz = D / 2 + 0.5;
+      part(GEO.cylinder, '#a77a52', { position: [bx, 0, bz], scale: [0.24, 0.5, 0.24], outline: 0.02 });
+      [0.12, 0.38].forEach((y) => part(GEO.cylinder, '#5a5560', { position: [bx, y, bz], scale: [0.25, 0.03, 0.25], outline: false, shadow: false }));
+      part(GEO.cylinder, '#f3a6b8', { position: [bx - 0.06, 0.3, bz], rotation: [0, 0, 0.15], scale: [0.03, 1.0, 0.03], outline: 0.01, shadow: false });
+      part(GEO.box, '#d8b48c', { position: [bx + 0.08, 0.55, bz + 0.03], rotation: [0, 0, -0.12], scale: [0.06, 0.7, 0.03], shell: true, outline: 0.01, shadow: false });
+      part(GEO.box, '#8a6240', { position: [bx + 0.06, 0.6, bz + 0.03], rotation: [0, 0, -0.12], scale: [0.16, 0.04, 0.05], shell: true, outline: 0.01, shadow: false });
+      block(bx, bz, 0.3);
+      // 모루(오른쪽 앞): 그루터기 위 쇳덩이
+      const ax = W * 0.52, az = D / 2 + 0.6;
+      part(GEO.cylinder, '#a77a52', { position: [ax, 0, az], scale: [0.22, 0.3, 0.22], outline: 0.02 });
+      part(GEO.box, '#5f6670', { position: [ax, 0.38, az], scale: [0.42, 0.14, 0.22], shell: true, outline: 0.02 });
+      part(GEO.box, '#5f6670', { position: [ax + 0.24, 0.41, az], scale: [0.14, 0.08, 0.14], shell: true, outline: 0.015, shadow: false });
+      block(ax, az, 0.3);
     },
-    books: (g, W, H, D, s, part) => {
-      // 헌책방: 처마 간판과 가게 앞 책 더미
-      part(GEO.box, '#fff4de', { position: [0, H + 0.12, D / 2 + 0.3], scale: [1.2 * s, 0.34 * s, 0.06], shell: true, shadow: false });
-      ['#c0504d', '#6f94bb', '#e0b53c'].forEach((c, i) => part(GEO.box, c, { position: [W * 0.48, 0.09 + i * 0.13, D / 2 + 0.6], rotation: [0, i * 0.3, 0], scale: [0.42, 0.12, 0.3], shell: true }));
+    realty: (g, W, H, D, s, part, { block }) => {
+      // 부동산: 지붕 위 작은 집 모형 간판, 처마에 매단 황금 열쇠, 가게 앞 매물 게시판 · 꽃밭
+      const R = H + 1.05 * s;
+      part(GEO.box, '#ffffff', { position: [0, R + 0.3, 0.12], scale: [0.6, 0.48, 0.42], shell: true, outline: 0.02 });
+      part(ROOF, '#f4a091', { position: [0, R + 0.54, 0.12], scale: [0.78, 0.36, 0.56], shell: true, outline: 0.02 });
+      part(GEO.box, '#a8795a', { position: [-0.1, R + 0.22, 0.34], scale: [0.14, 0.26, 0.02], outline: false, shadow: false });
+      part(GEO.box, '#c6e7f5', { position: [0.15, R + 0.34, 0.34], scale: [0.14, 0.13, 0.02], outline: false, shadow: false });
+      // 황금 열쇠(오른쪽 처마)
+      const kx = W * 0.52, ky = H * 0.75;
+      part(GEO.box, '#8a6240', { position: [kx, ky + 0.3, D / 2 + 0.2], scale: [0.04, 0.04, 0.42], shell: true, shadow: false });
+      part(TORUS, '#f6c453', { position: [kx, ky + 0.12, D / 2 + 0.4], scale: [0.09, 0.09, 0.07], outline: 0.012, shadow: false });
+      part(GEO.box, '#f6c453', { position: [kx, ky - 0.1, D / 2 + 0.4], scale: [0.05, 0.3, 0.04], shell: true, outline: 0.01, shadow: false });
+      [-0.16, -0.06].forEach((y) => part(GEO.box, '#f6c453', { position: [kx + 0.05, ky + y, D / 2 + 0.4], scale: [0.07, 0.04, 0.04], outline: false, shadow: false }));
+      // 매물 게시판(왼쪽 앞): 집 그림 셋
+      const bx = -W * 0.6, bz = D / 2 + 0.55;
+      [-0.3, 0.3].forEach((fx) => part(GEO.box, '#a77d5a', { position: [bx + fx, 0.42, bz], scale: [0.05, 0.84, 0.05], shell: true, outline: 0.012 }));
+      part(GEO.box, '#fff8ea', { position: [bx, 0.62, bz + 0.01], scale: [0.66, 0.4, 0.04], shell: true, outline: 0.015, shadow: false });
+      ['#f4a091', '#9fd8c4', '#c4b4e8'].forEach((c, i) => {
+        part(GEO.box, '#ffffff', { position: [bx - 0.2 + i * 0.2, 0.58, bz + 0.04], scale: [0.12, 0.1, 0.01], outline: false, shadow: false });
+        part(ROOF, c, { position: [bx - 0.2 + i * 0.2, 0.63, bz + 0.045], scale: [0.15, 0.08, 0.02], outline: false, shadow: false });
+      });
+      block(bx, bz, 0.4);
+      // 꽃밭(오른쪽 앞)
+      part(GEO.box, '#c49a6c', { position: [W * 0.45, 0.06, D / 2 + 0.35], scale: [0.8, 0.12, 0.28], shell: true, shadow: false });
+      ['#f7a8c4', '#fff1a8', '#d9ccff', '#ffffff', '#f7a8c4'].forEach((c, i) => part(GEO.sphere, c, { position: [W * 0.45 - 0.3 + i * 0.15, 0.19, D / 2 + 0.35], scale: [0.07, 0.07, 0.07], outline: 0.01, shadow: false }));
     },
-    tools: (g, W, H, D, s, part) => {
-      // 도구점: 문 옆 처마에 매단 랜턴 간판
-      part(GEO.box, '#a77d5a', { position: [W * 0.5, 1.2 * s, D / 2 + 0.25], scale: [0.06, 0.06, 0.5], shell: true, shadow: false });
-      part(GEO.sphere, '#ffe08a', { position: [W * 0.5, 1.0 * s, D / 2 + 0.45], scale: [0.14, 0.18, 0.14], outline: 0.02, shadow: false });
+    exam: (g, W, H, D, s, part, { block }) => {
+      // 검정소: 지붕 위 금메달 간판, 문 앞 하얀 기둥 둘 · 삼각 지붕 현관 · 계단, 지붕 깃발, 앞 안내판
+      const R = H + 1.05 * s;
+      part(GEO.box, '#f28fb0', { position: [-0.12, R + 0.18, 0.12], rotation: [0, 0, 0.25], scale: [0.14, 0.42, 0.03], shell: true, outline: 0.012, shadow: false });
+      part(GEO.box, '#7fb6e2', { position: [0.12, R + 0.18, 0.12], rotation: [0, 0, -0.25], scale: [0.14, 0.42, 0.03], shell: true, outline: 0.012, shadow: false });
+      part(GEO.cylinder, '#f6c453', { position: [0, R + 0.55, 0.18], rotation: [Math.PI / 2, 0, 0], scale: [0.32, 0.08, 0.32], outline: 0.025 });
+      part(GEO.cylinder, '#ffe08a', { position: [0, R + 0.55, 0.25], rotation: [Math.PI / 2, 0, 0], scale: [0.22, 0.02, 0.22], outline: false, shadow: false });
+      part(GEO.box, '#d9a520', { position: [0, R + 0.55, 0.27], scale: [0.04, 0.16, 0.01], outline: false, shadow: false });
+      // 현관: 기둥 둘 + 삼각 지붕 + 계단
+      const dx0 = -W * 0.2;
+      [-0.46, 0.46].forEach((fx) => part(GEO.cylinder, '#ffffff', { position: [dx0 + fx * s, 0, D / 2 + 0.38], scale: [0.08, 1.2 * s, 0.08], outline: 0.015 }));
+      part(GEO.box, '#ffffff', { position: [dx0, 1.22 * s, D / 2 + 0.22], scale: [1.2 * s, 0.08, 0.5], shell: true, outline: 0.015 });
+      part(ROOF, '#7fa7d9', { position: [dx0, 1.26 * s, D / 2 + 0.22], scale: [1.3 * s, 0.3 * s, 0.56], shell: true, outline: 0.015 });
+      part(GEO.box, '#e7e1d6', { position: [dx0, 0.05, D / 2 + 0.45], scale: [0.9 * s, 0.1, 0.4], shell: true, receive: true, shadow: false });
+      part(GEO.box, '#e7e1d6', { position: [dx0, 0.13, D / 2 + 0.32], scale: [0.8 * s, 0.08, 0.22], shell: true, receive: true, shadow: false });
+      [-0.46, 0.46].forEach((fx) => block(dx0 + fx * s, D / 2 + 0.38, 0.12));
+      // 지붕 깃발 · 앞 안내판(예전 것)
+      part(GEO.cylinder, '#b88c66', { position: [W * 0.32, H + 0.3, -0.1], scale: [0.04, 1.1, 0.04], outline: 0.02 });
+      part(GEO.box, '#ffd6e2', { position: [W * 0.32 + 0.24, H + 1.18, -0.1], scale: [0.42, 0.26, 0.03], shell: true, shadow: false });
+      [-0.32, 0.32].forEach((px) => part(GEO.box, '#a77d5a', { position: [W * 0.4 + px, 0.4, D / 2 + 0.75], scale: [0.07, 0.8, 0.07], shell: true }));
+      part(GEO.box, '#f5ead2', { position: [W * 0.4, 0.72, D / 2 + 0.75], scale: [0.86, 0.42, 0.06], shell: true, shadow: false });
+      block(W * 0.4, D / 2 + 0.75, 0.42);
     },
-    usagi: (g, W, H, D, s, part) => {
-      // 우사기네: 문 앞 노란 깃발
+    usagi: (g, W, H, D, s, part, { block }) => {
+      // 우사기네: 문 앞 노란 깃발, 작은 당근 밭
       part(GEO.cylinder, '#b88c66', { position: [W * 0.55, 0, D / 2 + 0.5], scale: [0.03, 1.1, 0.03], outline: 0.015 });
       part(GEO.box, '#f8e7a6', { position: [W * 0.55 + 0.18, 0.95, D / 2 + 0.5], scale: [0.34, 0.22, 0.02], shell: true, shadow: false });
+      part(GEO.box, '#b98a5e', { position: [-W * 0.55, 0.05, D / 2 + 0.45], scale: [0.7, 0.1, 0.36], shell: true, shadow: false });
+      [-0.22, 0, 0.22].forEach((fx) => {
+        part(GEO.cone, '#f08a3c', { position: [-W * 0.55 + fx, 0.04, D / 2 + 0.45], rotation: [Math.PI, 0, 0], scale: [0.06, 0.1, 0.06], outline: 0.01, shadow: false });
+        part(GEO.cone, '#5aa544', { position: [-W * 0.55 + fx, 0.08, D / 2 + 0.45], scale: [0.07, 0.16, 0.05], outline: 0.01, shadow: false });
+      });
+      block(-W * 0.55, D / 2 + 0.45, 0.4);
     },
-    kurimanju: (g, W, H, D, s, part) => {
-      // 쿠리만쥬네: 굴뚝과 문 옆 술병 상자
+    kurimanju: (g, W, H, D, s, part, { block }) => {
+      // 쿠리만쥬네: 굴뚝, 문 옆 병맥주 상자
       part(GEO.cylinder, '#8f8174', { position: [-W * 0.3, H + 0.2, -D * 0.1], scale: [0.16, 0.8, 0.16], outline: 0.02 });
       part(GEO.box, '#c49a6c', { position: [W * 0.5, 0.18, D / 2 + 0.45], scale: [0.5, 0.36, 0.36], shell: true });
+      [[-0.12, -0.08], [0.12, -0.08], [-0.12, 0.08], [0.12, 0.08]].forEach(([bx, bz]) => {
+        part(GEO.cylinder, '#7a4a20', { position: [W * 0.5 + bx, 0.3, D / 2 + 0.45 + bz], scale: [0.05, 0.2, 0.05], outline: 0.01, shadow: false });
+        part(GEO.cylinder, '#f6c453', { position: [W * 0.5 + bx, 0.5, D / 2 + 0.45 + bz], scale: [0.025, 0.04, 0.025], outline: false, shadow: false });
+      });
+      block(W * 0.5, D / 2 + 0.45, 0.32);
     },
     momonga: (g, W, H, D, s, part) => {
-      // 모몽가네: 문 위 별 스티커
+      // 모몽가네: 문 위 별 스티커, 처마에 별 장식 줄, 반짝이는 하트
       part(GEO.sphere, '#fcd95b', { position: [-W * 0.2, 1.05 * s, D / 2 + 0.05], scale: [0.16, 0.16, 0.04], outline: 0.015, shadow: false });
+      for (let i = 0; i < 6; i++) part(GEO.dot, i % 2 ? '#fcd95b' : '#f7a8c4', { position: [-W * 0.45 + i * W * 0.18, H * 0.96 - (i % 2) * 0.06, D / 2 + 0.22], scale: [0.07, 0.07, 0.07], outline: 0.01, shadow: false });
+      part(GEO.sphere, '#f28fb0', { position: [W * 0.22, H * 0.9, D / 2 + 0.06], scale: [0.14, 0.12, 0.04], outline: 0.012, shadow: false });
     },
-    rakko: (g, W, H, D, s, part) => {
-      // 랏코네: 벽에 건 나무칼 간판
+    rakko: (g, W, H, D, s, part, { block }) => {
+      // 랏코네: 벽에 건 나무칼 간판, 문 옆 짚 과녁
       part(GEO.box, '#e3e9ef', { position: [W * 0.25, H * 0.75, D / 2 + 0.05], rotation: [0, 0, 0.6], scale: [0.05, 0.6, 0.02], shell: true, shadow: false });
+      const tx = W * 0.55, tz = D / 2 + 0.5;
+      part(GEO.cylinder, '#a77a52', { position: [tx, 0, tz], scale: [0.04, 0.5, 0.04], outline: 0.01 });
+      part(GEO.cylinder, '#e8c36a', { position: [tx, 0.62, tz], rotation: [Math.PI / 2, 0, 0], scale: [0.26, 0.08, 0.26], outline: 0.02 });
+      part(GEO.cylinder, '#e0524f', { position: [tx, 0.62, tz + 0.05], rotation: [Math.PI / 2, 0, 0], scale: [0.15, 0.01, 0.15], outline: false, shadow: false });
+      part(GEO.cylinder, '#ffffff', { position: [tx, 0.62, tz + 0.06], rotation: [Math.PI / 2, 0, 0], scale: [0.06, 0.01, 0.06], outline: false, shadow: false });
+      block(tx, tz, 0.3);
     }
   };
   const homes = {};
   for (const lot of LOTS) {
     if (lot.kind === 'house') {
-      const d = house(lot.x, lot.z, lot.roof, lot.s, EXTRA[lot.id], lot.yaw || 0);
-      labels.push({ x: lot.x, y: d.H + 1.7, z: lot.z, text: lot.label });
+      const d = house(lot.x, lot.z, lot.roof, lot.s, EXTRA[lot.id], lot.yaw || 0, WALLS[lot.id]);
+      labels.push({ x: lot.x, y: d.H + (WALLS[lot.id] ? 2.9 : 1.7), z: lot.z, text: lot.label }); // 가게는 지붕 간판 위에 이름
     } else if (lot.kind === 'dome') {
       const d = dome(lot.x, lot.z, lot.s, lot.yaw || 0);
       labels.push({ x: lot.x, y: d.R + 0.9, z: lot.z, text: lot.label });
