@@ -43,6 +43,7 @@ import { FRIENDS, CHATS, friendOf, hearts, befriend, rps, canBorrow, loanOptions
 import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
+import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
 import { openRamenShop } from './ui/ramenshop.js';
 import { openQuiz, openHighball } from './ui/exams.js';
@@ -809,10 +810,11 @@ function boot() {
     }
     opts.push(['bye', '아무것도 아니야']);
     const poor = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).money < 60;
-    askAs(n, poor ? BROKE[n.kind] : npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
+    const h = hearts(friendOf(state, n.kind)); // 친밀도에 따라 인사 · 이야기가 달라진다
+    askAs(n, poor ? BROKE[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
       const k = opts[i][0];
       if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
-      else if (k === 'chat') sayAs(n, pick(CHATS[n.kind]), () => reward(n, 'talk'));
+      else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
       else if (k === 'study') {
         const i = (state.liquorLesson || 0) % LIQUOR_LESSONS.length;
