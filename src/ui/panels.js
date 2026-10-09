@@ -218,8 +218,7 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'board-sum-top' },
           h('span', { class: 'lab' }, '남은 일감'), h('b', {}, String(remain)), h('span', { class: 'of' }, `/ ${Math.max(total, remain)}건`)),
         h('div', { class: 'board-bar', role: 'progressbar', 'aria-label': '오늘 남은 일감', 'aria-valuemin': '0', 'aria-valuemax': String(Math.max(total, remain)), 'aria-valuenow': String(remain) },
-          h('i', { style: `width: ${pct}%` })),
-        h('p', { class: 'who' }, '친구들은 게시판까지 직접 와야 일감을 받아 가요')));
+          h('i', { style: `width: ${pct}%` }))));
       const mult = PAY_MULT[s.license.grade];
       if (s.job) {
         const type = JOB_TYPES[s.job.typeId], done = isComplete(s.job);
@@ -244,7 +243,6 @@ export function createPanels(ui, handlers) {
               h('div', { class: 'd' }, `${won(Math.round(type.base * (type.hunt ? 1 : mult)))}부터 · ${type.where}`)),
             h('button', { class: 'btn primary', type: 'button', disabled: n <= 0, onClick: after(() => handlers.acceptJob(type.id)) }, n > 0 ? '받기' : '오늘 마감')));
         });
-        if (s.tutorial !== 'board' && !hasLicense(s, 'hunter')) out.push(h('p', { class: 'note' }, '검정소에서 토벌 자격증을 따면 마을 밖 몬스터 토벌 일감도 받을 수 있어요.'));
       }
       // 전리품 팔기: 가방의 몬스터 전리품을 한꺼번에
       const drops = Object.keys(DROPS).filter((id) => bagOf(s).items[id] > 0);
@@ -255,11 +253,7 @@ export function createPanels(ui, handlers) {
           h('div', {}, h('div', { class: 't' }, '전리품 팔기'), h('div', { class: 'd' }, drops.map((id) => `${DROPS[id].name} ×${bagOf(s).items[id]}`).join(' · '))),
           h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.sellDrops) }, `${won(total)} 받기`)));
       }
-      // 지금 급수 · 보수 배율과 승급 안내를 각각 다른 줄에(한 줄에 몰리면 읽기 어렵다)
-      out.push(h('div', { class: 'row' },
-        h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${mult}배`))));
-      const nextJobs = s.license.grade > 1 ? Object.values(JOB_TYPES).filter((j) => j.needGrade === s.license.grade - 1) : [];
-      out.push(h('p', { class: 'note' }, nextJobs.length ? `${s.license.grade - 1}급이 되면 ${nextJobs.map((j) => WEED_KINDS[j.kind]?.name || j.title).join(' · ')} 일감도 받을 수 있어요. 승급 시험은 동쪽 검정소에서 봐요.` : '최고 급수라 모든 일감을 받을 수 있어요.'));
+      // 급수 · 승급 안내는 검정소와 마을폰 자격증 앱에서 본다(게시판은 일감만 간단히)
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
