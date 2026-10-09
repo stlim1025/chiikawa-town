@@ -709,7 +709,7 @@ export function createPanels(ui, handlers) {
       const own = hasTool(s, 'map'), T = TOOLS.map;
       return [head('카니 헌책방', s.money), h('p', { class: 'sub' }, '…딱딱.'),
         h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
-          own ? h('span', { class: 'lic-badge done' }, ico('check'), '가짐 · 마을폰에서')
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), '가짐')
             : priceBtn(T.price, s.money, after(() => handlers.buyTool('map')))),
         h('div', { class: 'actions' }, closeBtn())];
     },
