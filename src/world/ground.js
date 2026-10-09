@@ -16,9 +16,6 @@ function textureOf(key, svg) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   textures.set(key, tex);
-  let src = svg.replace(/<ellipse cx="32" cy="5[5-8]"[^>]*fill="#e6d8b8"\/>/, ''); // 그림 속 바닥 그림자(진짜 그림자를 따로 깐다)
-  if (!/xmlns=/.test(src)) src = src.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
-  src = src.replace('<svg ', `<svg width="${SIZE}" height="${SIZE}" `);
   const img = new Image();
   img.onload = () => {
     const c = canvas.getContext('2d'), pad = 10, s = SIZE - pad * 2;
@@ -35,8 +32,24 @@ function textureOf(key, svg) {
     c.drawImage(img, pad, pad, s, s);
     tex.needsUpdate = true;
   };
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  img.src = svgDataUrl(svg, true);
   return tex;
+}
+/**
+ * SVG 글을 그림 주소(data URL)로. 화면 그림(innerHTML)은 같은 속성이 두 번 있어도(예: stroke-width) 너그럽게 그리지만
+ * 그림 파일로 읽을 때는 한 글자만 어긋나도 아예 안 그려지므로, HTML 처럼 한 번 읽어 바로잡은 뒤 다시 적는다.
+ * noShadow 면 그림 속 바닥 그림자 타원(#e6d8b8)을 뺀다(진짜 그림자를 따로 깐다).
+ */
+export function svgDataUrl(svg, noShadow = false) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = svg.trim();
+  const el = tpl.content.querySelector('svg');
+  if (!el) return '';
+  if (noShadow) el.querySelectorAll('ellipse[fill="#e6d8b8"]').forEach((e) => { if (+e.getAttribute('cy') >= 54) e.remove(); });
+  el.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  el.setAttribute('width', SIZE);
+  el.setAttribute('height', SIZE);
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(el));
 }
 const shadowGeo = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
 const shadowMat = new THREE.MeshBasicMaterial({ color: 0x2b2224, transparent: true, opacity: 0.18, depthWrite: false });
