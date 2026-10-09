@@ -114,7 +114,7 @@ export const lotRadius = (lot) => RADIUS[lot.kind](lot);
 const FRONT = { house: (l) => 1.716 * l.s + 0.65, stall: () => 1.8, board: () => 1.65, bench: () => 1.7, dojo: () => 2.6 };
 /** 건물 앞(문 앞) 지점: 말 걸기 · 들어가기 대상이 되는 자리. 돔은 오른쪽 현관 혹 앞. */
 export function doorSpot(lot) {
-  if (lot.kind === 'dome') { const R = 1.4 * lot.s; return { x: lot.x + R * 0.35, z: lot.z + R * 1.05 + 0.7 }; }
+  if (lot.kind === 'dome') { const R = 1.4 * lot.s; return { x: lot.x + R * 0.62, z: lot.z + R * 0.62 + 0.42 * lot.s + 0.8 }; } // 현관 혹의 문 바로 앞
   return { x: lot.x, z: lot.z + FRONT[lot.kind](lot) };
 }
 export const lotById = (id) => LOTS.find((l) => l.id === id);

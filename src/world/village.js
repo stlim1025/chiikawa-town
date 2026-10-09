@@ -43,6 +43,18 @@ function roofGeometry() {
 }
 const ROOF = roofGeometry();
 
+/** 둥근 문(아래는 평평, 위는 반원): 폭 1 · 높이 1.75 · 두께 1(가운데 기준), 원점은 문 아래 가운데. */
+function archDoorGeometry() {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.5, 0);
+  sh.lineTo(0.5, 0);
+  sh.lineTo(0.5, 1.25);
+  sh.absarc(0, 1.25, 0.5, 0, Math.PI, false);
+  sh.lineTo(-0.5, 0);
+  return new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 14 }).translate(0, 0, -0.5);
+}
+const ARCH_DOOR = archDoorGeometry();
+
 function rng(seed) {
   return function () {
     seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
@@ -161,9 +173,17 @@ export function buildVillage(scene) {
     const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
     const R = 1.4 * s;
     part(GEO.sphere, '#fbfaf5', { scale: [R, R * 0.9, R], receive: true, outline: 0.05 }); // 아래 반은 땅에 묻혀 반구가 된다
-    // 현관 혹(앞 오른쪽): 키 큰 반달 모양, 안쪽에 문
-    part(GEO.sphere, '#fbfaf5', { position: [R * 0.62, 0, R * 0.62], scale: [0.42 * s, 0.95 * s, 0.42 * s], outline: 0.04 });
-    part(GEO.sphere, '#a8795a', { position: [R * 0.62 + 0.2 * s, 0, R * 0.62 + 0.27 * s], rotation: [0, Math.PI / 4, 0], scale: [0.2 * s, 0.6 * s, 0.05], outline: 0.02, shadow: false });
+    // 현관 혹(앞 오른쪽): 키 큰 반달 모양. 문은 혹 앞면(카메라 쪽)에 둥근 나무문으로 붙인다
+    const bx = R * 0.62, bz = R * 0.62, rz = 0.42 * s, ry = 0.95 * s;
+    part(GEO.sphere, '#fbfaf5', { position: [bx, 0, bz], scale: [rz, ry, rz], outline: 0.04 });
+    // 문은 혹 겉면을 따라 살짝 뒤로 기울인다(위로 갈수록 혹이 좁아져서): 아래 · 위 끝이 겉면 바로 앞에 오게
+    const dw = 0.33 * s, dh = dw * 1.75, dt = 0.06, surf = (y) => rz * Math.sqrt(1 - (y / ry) ** 2);
+    const tilt = Math.atan((surf(0) - surf(dh)) / dh), dz = bz + surf(0) + dt / 2 + 0.012;
+    part(ARCH_DOOR, '#a8795a', { position: [bx, 0, dz], rotation: [-tilt, 0, 0], scale: [dw, dw, dt], shell: true, outline: 0.022, shadow: false });
+    // 문 위 가로 나뭇결 · 손잡이 · 문 앞 디딤돌
+    part(GEO.box, '#946546', { position: [bx, dh * 0.42, dz + dt / 2 - Math.sin(tilt) * dh * 0.42 + 0.004], rotation: [-tilt, 0, 0], scale: [dw * 0.78, 0.018, 0.01], outline: false, shadow: false });
+    part(GEO.dot, '#fcd95b', { position: [bx + dw * 0.28, dh * 0.4, dz + dt / 2 - Math.sin(tilt) * dh * 0.4 + 0.02], scale: [0.035 * s, 0.035 * s, 0.035 * s], outline: 0.012, shadow: false });
+    part(GEO.cylinder, '#e7e1d6', { position: [bx, 0, dz + 0.3 * s], scale: [0.3 * s, 0.05, 0.2 * s], outline: 0.02, shadow: false, receive: true });
     // 십자 창(앞 왼쪽 위): 흰 틀 + 진한 십자
     const el = 0.62, az = -0.42; // 높이각, 옆으로 돌린 각
     const wx = Math.sin(az) * Math.cos(el) * R * 1.01, wy = Math.sin(el) * R * 0.9, wz = Math.cos(az) * Math.cos(el) * R * 1.01;
@@ -172,11 +192,11 @@ export function buildVillage(scene) {
     part(GEO.box, '#3a3236', { position: [wx * 1.005, wy, wz * 1.005], rotation: [-el * 0.8, az, 0], scale: [0.34 * s, 0.04 * s, 0.05], outline: false, shadow: false });
     world.add(g);
     obstacles.push({ x, z, r: R * 1.05 });
+    // 현관 혹도 막는다(문에 파고들지 않게)
+    obstacles.push({ x: x + Math.cos(yaw) * bx + Math.sin(yaw) * bz, z: z - Math.sin(yaw) * bx + Math.cos(yaw) * bz, r: rz + 0.12 });
     houses.push({ x, z, half: R, mats: [...mats.values()], meshes, fade: 1 });
     windows.push(mats.get('#c6e7f5'));
-    // 현관(혹) 앞 지점: 몸통 앞에서 오른쪽(혹 쪽)으로 조금 비켜
-    const d = R * 1.05 + 0.7;
-    return { R, door: { x: x + Math.sin(yaw) * d + Math.cos(yaw) * R * 0.35, z: z + Math.cos(yaw) * d - Math.sin(yaw) * R * 0.35 } };
+    return { R };
   }
 
   /** 포셰트 가게 노점: lot 자리에서 남쪽(카메라 쪽)을 본다. */
