@@ -361,6 +361,28 @@ const warnMat = toonMaterial('#ff9a8a', { emissive: '#ff5a4a', emissiveIntensity
 /** 나방 달무늬(밤에 빛난다). */
 const glowMat = toonMaterial('#fff1b0', { unique: true });
 glowMat.emissive.setRGB(1, 0.85, 0.4).multiplyScalar(0.3);
+/**
+ * 가려진 몬스터 실루엣: 숲 나무 · 바위 · 집 뒤에 숨어도 가려진 부분만 붉은 그림자로 비친다(어디 있는지 늘 보이게).
+ * 반투명 나무 · 집까지 다 그린 뒤에(renderOrder) 두 번 더 그린다.
+ * 1) 표시(markMat): 몸 · 얼굴 · 날개가 실제로 보이는 곳(깊이가 제 몸과 같은 곳)에만 스텐실 1 을 남긴다(색은 안 칠한다).
+ * 2) 실루엣(ghostMat): '무언가 뒤(깊이가 더 먼 곳)'이면서 스텐실이 1 이 아닌 곳에만 칠하고 1 을 남긴다.
+ * 그래서 몸이 보이는 곳 · 제 몸에 가린 곳(갓 뒤 기둥 같은)은 물들지 않고, 겹친 곳도 한 번만 칠해진다.
+ */
+const markMat = new THREE.MeshBasicMaterial({
+  colorWrite: false, transparent: true, depthWrite: false, depthFunc: THREE.LessEqualDepth, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2,
+  stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp
+});
+const ghostMat = new THREE.MeshBasicMaterial({
+  color: 0xff5470, transparent: true, opacity: 0.55, depthWrite: false, depthFunc: THREE.GreaterDepth,
+  stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.ReplaceStencilOp
+});
+/** 실루엣용 덧그림(표시 4 → 실루엣 5 순서). */
+function overlay(geo, mat, order) {
+  const o = new THREE.Mesh(geo, mat);
+  o.renderOrder = order;
+  o.raycast = () => {};
+  return o;
+}
 
 function modelOf(species) {
   if (!MODELS.has(species)) {
@@ -383,7 +405,9 @@ export function monsterMesh(species) {
   body.castShadow = true;
   addOutline(body, species === 'kingcap' ? 0.04 : 0.025);
   inner.add(body);
-  if (M.flat) inner.add(new THREE.Mesh(M.flat, flatMat));
+  const ghost = overlay(M.body, ghostMat, 5);
+  inner.add(overlay(M.body, markMat, 4), ghost);
+  if (M.flat) inner.add(new THREE.Mesh(M.flat, flatMat), overlay(M.flat, markMat, 4));
   const wings = [];
   if (M.wing) {
     [-1, 1].forEach((sd) => {
@@ -394,7 +418,7 @@ export function monsterMesh(species) {
       const w = new THREE.Mesh(M.wing, bodyMat);
       w.castShadow = true;
       addOutline(w, 0.02);
-      pivot.add(w);
+      pivot.add(w, overlay(M.wing, markMat, 4));
       for (const gl of M.glow) {
         const d = new THREE.Mesh(GEO.dot, glowMat);
         d.position.set(...gl.position);
@@ -406,7 +430,7 @@ export function monsterMesh(species) {
     });
   }
   inner.position.y = M.hover || 0;
-  return { root, inner, body, wings, height: M.height, hover: M.hover || 0 };
+  return { root, inner, body, ghost, wings, height: M.height, hover: M.hover || 0 };
 }
 
 // ---------- 공격 예고(바닥의 빨간 표시) · 탄 · 충격파 ----------
@@ -1008,6 +1032,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i], M = m.M, root = m.mesh.root;
         const dp = Math.hypot(m.x - p.x, m.z - p.z);
+        m.mesh.ghost.visible = dp < 13; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
         if (m.dead) {
           m.deadT += dt;
           const k = m.deadT / 0.35;

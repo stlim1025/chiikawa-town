@@ -30,7 +30,7 @@ export const MONSTERS = {
   hopper: { name: '풀잎 메뚜기', region: 'fields', hp: 2, dmg: 8, speed: 2.8, aggro: 7.5, drop: 'leafwing', size: 0.4, attack: 'leap', atk: '멀리서 뛰어들기', note: '긴 뒷다리로 멀리서 훌쩍 뛰어든다. 내려앉을 자리를 피하자.' },
   mole: { name: '흙두더지', region: 'fields', hp: 5, dmg: 10, speed: 1.8, aggro: 6.5, drop: 'sweetroot', size: 0.48, attack: 'burrow', atk: '땅속 기습', note: '땅속으로 숨어 발밑까지 파고든다. 흙이 들썩이면 얼른 비키자.' },
   beetle: { name: '도토리 뿔벌레', region: 'forest', hp: 4, dmg: 10, speed: 2.5, aggro: 7, drop: 'horn', size: 0.45, attack: 'charge', atk: '뿔 돌진', note: '도토리 껍데기를 쓴 벌레. 뿔을 겨누고 일직선으로 돌진한다.' },
-  shroom: { name: '보라 독버섯', region: 'forest', hp: 3, dmg: 7, speed: 1.7, aggro: 7.5, drop: 'spore', size: 0.42, attack: 'shoot', atk: '포자 세 갈래', note: '숲 그늘의 꼬마 버섯. 거리를 두고 포자를 세 갈래로 뿜는다.' },
+  shroom: { name: '보라 독버섯', region: 'forest', hp: 3, dmg: 7, speed: 1.7, aggro: 7.5, drop: 'spore', size: 0.5, attack: 'shoot', atk: '포자 세 갈래', note: '숲 그늘의 꼬마 버섯. 거리를 두고 포자를 세 갈래로 뿜는다.' },
   stump: { name: '그루터기 장군', region: 'forest', hp: 7, dmg: 13, speed: 1.5, aggro: 5.5, drop: 'bark', size: 0.55, attack: 'slam', atk: '쿵! 내려찍기', note: '걸어 다니는 그루터기. 펄쩍 뛰어 둘레를 쿵 내려찍는다.' },
   slime: { name: '물방울 슬라임', region: 'river', hp: 3, dmg: 8, speed: 1.9, aggro: 7, drop: 'jelly', size: 0.48, attack: 'spit', atk: '물방울 뱉기', note: '강가에서 뽀글뽀글 생긴다. 떨어져서 커다란 물방울을 뱉는다.' },
   frog: { name: '연잎 개구리', region: 'river', hp: 3, dmg: 9, speed: 2.4, aggro: 7, drop: 'lilypad', size: 0.42, attack: 'tongue', atk: '혀 채찍', note: '연잎 모자를 쓴 개구리. 긴 혀를 일직선으로 쭉 뻗는다.' },

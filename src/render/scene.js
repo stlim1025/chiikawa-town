@@ -3,7 +3,7 @@ import * as THREE from 'three';
 /** 렌더러, 장면, 빛을 만든다. 휴대폰이면 그림자와 해상도를 낮춘다. */
 export function createScene(canvas) {
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true }); // stencil: 가려진 몬스터 실루엣
   const pixelRatio = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;

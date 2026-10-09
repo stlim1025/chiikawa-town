@@ -246,7 +246,7 @@ function boot() {
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 멨어요!`, 3400, { chips: [{ text: '소매치기 피해 ½' }] });
+      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 장착했어요!`, 3400, { chips: [{ text: '소매치기 피해 ½' }] });
     },
     wearPochette(id) {
       commit(wearPochette(state, id));
@@ -254,7 +254,7 @@ function boot() {
       if (mode === 'home') interior.setPlayer(myLook(), true);
       else if (mode === 'visit') rooms.setPlayer(myLook()); // 모몽가네 거울 앞에서 갈아입을 때
       sound.play('click');
-      hud.toast(id ? `${POCHETTES[id].name}을(를) 멨어요` : '포셰트를 벗었어요');
+      hud.toast(id ? `${josa(POCHETTES[id].name, '을/를')} 장착했어요` : '포셰트를 뺐어요');
     },
     // 꾸미기 소품(포셰트 가게에서 사고, 집 옷장에서 바꿔 단다)
     buyAccessory(id) {
@@ -264,7 +264,7 @@ function boot() {
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(ACCESSORY_ITEMS[id].name, '을/를')} 달았어요!`, 3400);
+      hud.toast(`${josa(ACCESSORY_ITEMS[id].name, '을/를')} 장착했어요!`, 3400);
     },
     wearAccessory(id) {
       commit(wearAccessory(state, id));
@@ -297,12 +297,12 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요!`, 3600, { icon: weaponSvg(id), chips: [{ text: `${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘두르기` }] });
+      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 3600, { icon: weaponSvg(id), chips: [{ text: `${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘두르기` }] });
     },
     holdWeapon(id) {
       commit(holdWeapon(state, id));
       sound.play('click');
-      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600, id ? { icon: weaponSvg(id) } : null);
+      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 장착했어요` : '무기를 뺐어요', 1600, id ? { icon: weaponSvg(id) } : null);
     },
     trackQuest(id) { commit({ ...state, questTrack: id }); },
     // 주머니에서 버리기: 마을을 돌아다닐 때만(집 · 친구 집 안에서는 안 된다). 발 앞에 나뭇잎 꾸러미로 떨어진다

@@ -635,11 +635,11 @@ export function createPanels(ui, handlers) {
         const own = pc.owned.includes(id), on = wearing === id;
         let btn;
         if (!own) btn = priceBtn(P.price, s.money, after(() => handlers.buyPochette(id)));
-        else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.wearPochette(id)) }, '메기');
-        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.wearPochette(null)) }, '벗기');
+        else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.wearPochette(id)) }, '장착');
+        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.wearPochette(null)) }, '빼기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` },
           svgSpan('pochette-art', pochetteSvg(id, P)),
-          h('div', {}, h('div', { class: 't' }, P.name, on ? h('span', { class: 'weed-count' }, '메는 중') : null), h('div', { class: 'd' }, P.note)),
+          h('div', {}, h('div', { class: 't' }, P.name, on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, P.note)),
           btn));
       });
       // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
@@ -649,7 +649,7 @@ export function createPanels(ui, handlers) {
         const own = wd.owned.includes(id);
         out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
           h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
-          own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '다는 중' : '가짐')
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
             : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)))));
       });
       out.push(h('div', { class: 'actions' }, closeBtn()));
@@ -705,7 +705,7 @@ export function createPanels(ui, handlers) {
         const act = (label, fn, opts = {}) => h('button', { class: `pocket-act${opts.main ? ' main' : ''}`, type: 'button', disabled: !!opts.disabled, onClick: () => { current.sel = null; fn(); if (current) render(); } }, label);
         const acts = [];
         if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
-        if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('넣어 두기', () => handlers.holdWeapon(null)) : act('들기', () => handlers.holdWeapon(sel.id), { main: true }));
+        if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('빼기', () => handlers.holdWeapon(null)) : act('장착', () => handlers.holdWeapon(sel.id), { main: true }));
         if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
         else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
         else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
@@ -745,10 +745,10 @@ export function createPanels(ui, handlers) {
       const none = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>';
       const out = [head('옷장'), h('p', { class: 'sub' }, '고르면 바로 바뀌어요')];
       out.push(h('h3', { class: 'shop-sec' }, '포셰트'));
-      out.push(h('div', { class: 'bag-grid' }, tile(!pc.wear, none, '안 메기', () => handlers.wearPochette(null)),
+      out.push(h('div', { class: 'bag-grid' }, tile(!pc.wear, none, '없음', () => handlers.wearPochette(null)),
         pc.owned.map((id) => tile(pc.wear === id, pochetteSvg(id, POCHETTES[id]), POCHETTES[id].name, () => handlers.wearPochette(id)))));
       out.push(h('h3', { class: 'shop-sec' }, '머리 장식'));
-      out.push(h('div', { class: 'bag-grid' }, tile(wd.wear === 'none', none, '안 달기', () => handlers.wearAccessory('none')),
+      out.push(h('div', { class: 'bag-grid' }, tile(wd.wear === 'none', none, '없음', () => handlers.wearAccessory('none')),
         wd.owned.map((id) => tile(wd.wear === id, accessorySvg(id), ACCESSORY_ITEMS[id].name, () => handlers.wearAccessory(id)))));
       if (!pc.owned.length && !wd.owned.length) out.push(h('p', { class: 'note' }, '포셰트 가게에서 사 와요'));
       out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onClick: () => close() }, '다 골랐어요')));
@@ -770,7 +770,7 @@ export function createPanels(ui, handlers) {
         const T = TOOLS[id], own = hasTool(s, id), held = lightOf(s) === id;
         out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
           !own ? priceBtn(T.price, s.money, after(() => handlers.buyTool(id)))
-            : held ? h('span', { class: 'lic-badge done' }, ico('check'), '드는 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '들기')));
+            : held ? h('span', { class: 'lic-badge done' }, ico('check'), '장착 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '장착')));
       }
       // 무기(4단계): 사면 바로 들고, 가진 무기는 바꿔 들거나 넣어 둔다
       const wp = weaponOf(s);
@@ -779,10 +779,10 @@ export function createPanels(ui, handlers) {
         const W = WEAPONS[id], own = wp.owned.includes(id), on = wp.held === id;
         let btn;
         if (!own) btn = priceBtn(W.price, s.money, after(() => handlers.buyWeapon(id)));
-        else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '들기');
-        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '넣기');
+        else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '장착');
+        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '빼기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', weaponSvg(id)),
-          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg)), on ? h('span', { class: 'weed-count' }, '드는 중') : null), h('div', { class: 'd' }, W.note)),
+          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg)), on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, W.note)),
           btn));
       }
       out.push(h('div', { class: 'actions' }, closeBtn()));
