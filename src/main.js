@@ -42,6 +42,8 @@ import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotat
 import { FRIENDS, CHATS, friendOf, hearts, befriend, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
+import { addItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
+import { ACCESSORY_ITEMS, buyAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
 import { openRamenShop } from './ui/ramenshop.js';
 import { openQuiz, openHighball } from './ui/exams.js';
 import {
@@ -151,11 +153,13 @@ function boot() {
       // 게시판 일감은 하루에 정해진 수만큼: 친구들이 먼저 받아 가면 마감
       const r = takeFromBoard(state, typeId, state.clock.day);
       if (!r.ok) { hud.toast('그 일감은 오늘 마감됐어요. 다른 일감을 골라요'); return; }
-      commit({ ...r.state, job: acceptJob(typeId) });
+      const before = { ...r.state, job: acceptJob(typeId) }, sub = submitToJob(before);
+      commit(sub.state);
       sound.play('job');
       const T = JOB_TYPES[typeId];
       panels.close();
-      hud.announce({ kicker: '새 일감!', title: T.title, sub: `${T.where} · 보수 ${won(Math.round(T.base * PAY_MULT[state.license.grade]))}부터` });
+      hud.announce({ kicker: '새 일감!', title: T.title, sub: sub.moved ? `가방에 있던 ${sub.moved}개를 바로 냈어요 · ${state.job.count} / ${T.target}` : `${T.where} · 보수 ${won(Math.round(T.base * PAY_MULT[state.license.grade]))}부터` });
+      celebrateIfDone(before.job, state.job);
     },
     quitJob() { commit({ ...returnToBoard(state, state.job.typeId, state.clock.day), job: null }); hud.toast('일감을 그만뒀어요. 게시판에 다시 걸렸어요'); },
     reportJob() {
@@ -223,8 +227,33 @@ function boot() {
     wearPochette(id) {
       commit(wearPochette(state, id));
       refreshLook();
+      if (mode === 'home') interior.setPlayer(myLook(), true);
       sound.play('click');
       hud.toast(id ? `${POCHETTES[id].name}을(를) 멨어요` : '포셰트를 벗었어요');
+    },
+    // 꾸미기 소품(포셰트 가게에서 사고, 집 옷장에서 바꿔 단다)
+    buyAccessory(id) {
+      const r = buyAccessory(state, id);
+      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 소품이에요'); return; }
+      commit(r.state);
+      refreshLook();
+      sound.play('coin');
+      player.cheerTime = 1.2;
+      hud.toast(`${ACCESSORY_ITEMS[id].name}을(를) 달았어요! 집 옷장에서 바꿔 달 수 있어요`, 3400);
+    },
+    wearAccessory(id) {
+      commit(wearAccessory(state, id));
+      refreshLook();
+      if (mode === 'home') interior.setPlayer(myLook(), true);
+      sound.play('click');
+    },
+    // 가방
+    eatItem(id) {
+      const r = eatItem(state, id, MAX_STAMINA);
+      if (!r.ok) { hud.toast(r.reason === 'full' ? '지금은 배불러요' : '먹을 수 없어요'); return; }
+      commit(r.state);
+      sound.play('eat');
+      hud.toast(`${itemInfo(id).name}을(를) 먹었어요 · 기운 +${r.gain}`);
     },
     // 헌책방 · 도구점 · 지도 앱
     buyTool(id) {
@@ -288,7 +317,7 @@ function boot() {
     const next = rolled.state;
     playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day) }, () => commit(next), () => sound.play('morning')).then(() => {
       sleeping = false;
-      if (mode === 'play') input.setEnabled(true);
+      if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
       homeUI.refresh();
       hud.toast(how === 'rough' ? '바닥에서 잤더니 온몸이 쑤셔요… 기운이 조금밖에 안 찼어요' : how === 'lodge' ? '친구 집에서 푹 잤어요. 기운이 가득해요!' : '푹 잤어요. 기운이 가득해요!', 3400);
       announce(rolled.events);
@@ -343,7 +372,8 @@ function boot() {
     });
   }
   /** 내 모습 + 멘 포셰트. */
-  const myLook = () => ({ ...state.profile.look, pochette: worn(state) });
+  // 내 모습: 만들 때 고른 몸 · 얼굴에 지금 단 소품과 멘 포셰트(옷장에서 바꾼다)
+  const myLook = () => ({ ...state.profile.look, accessory: wardrobeOf(state).wear, pochette: worn(state) });
   const refreshLook = () => { player.setModel(buildChibi(myLook())); };
 
   /** 내 집 마련! */
@@ -353,18 +383,6 @@ function boot() {
     player.cheerTime = 1.8;
   }
   /** 모습 바꾸기(집 안 거울). */
-  function editLook() {
-    input.setEnabled(false);
-    const back = () => { if (mode === 'play') input.setEnabled(true); };
-    openCreator(ui, (profile) => {
-      commit({ ...state, profile });
-      refreshLook();
-      interior.setPlayer(myLook());
-      back();
-      hud.toast('새 모습이 마음에 들어요!');
-    }, state.profile, back);
-  }
-
   // ---------- 집 안 ----------
   const interior = createInterior();
   const INDOOR_LIGHT = new THREE.Color(1, 1, 1); // 집 안 캐릭터는 밤에도 밝게
@@ -385,7 +403,8 @@ function boot() {
       return r;
     },
     sleep: () => doSleep(),
-    look: () => editLook(),
+    wardrobe: () => { interior.faceCamera(); panels.openWardrobe(); },
+    onDecor: (on) => { if (mode === 'home') input.setEnabled(!on && !panels.isOpen()); }, // 꾸미기 중에는 걷지 않는다
     exit: () => exitHome(),
     showGrid: (on) => interior.showGrid(on),
     highlight: (cell) => interior.highlight(cell),
@@ -397,7 +416,7 @@ function boot() {
     cancelPull();
     mode = 'home';
     setCinematic(true);
-    input.setEnabled(false);
+    document.body.classList.add('in-home');
     hud.setAction(null);
     interior.setHome(homeOf(state));
     interior.setPlayer(myLook());
@@ -410,6 +429,8 @@ function boot() {
     homeUI.close();
     mode = 'play';
     setCinematic(false);
+    document.body.classList.remove('in-home');
+    interior.setCue(null);
     input.setEnabled(true);
     const s = village.spots.home;
     player.setPosition(s.x, s.z);
@@ -448,6 +469,12 @@ function boot() {
     drag = null;
   });
 
+  // 가방: 오른쪽 위 버튼 또는 I · B 키
+  const openBag = () => { if (state && (mode === 'play' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
+  hud.onBag(openBag);
+  window.addEventListener('keydown', (e) => {
+    if ((e.code === 'KeyI' || e.code === 'KeyB') && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) openBag();
+  });
   hud.onSettings(() => { if (state && mode === 'play' && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); });
   input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
   // 등불 버튼: 가진 불만 끔 → 랜턴 → 손전등
@@ -490,9 +517,19 @@ function boot() {
   }
 
   function pickBerry(bush) {
-    if (jobKind() !== 'berry') { hud.toast('노동 접수에서 \'열매 따기\' 일감을 받아 와요'); return; }
-    if (isComplete(state.job)) { hud.toast('다 땄어요! 노동 접수에서 보수를 받아요'); return; }
     if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요. 라멘을 먹거나 집에서 쉬어요'); return; }
+    if (jobKind() !== 'berry' || isComplete(state.job)) {
+      // 일감이 아니면 가방에(먹거나, 나중에 열매 일감에 낸다)
+      const a = addItem(useStamina(state, WORK_STAMINA).state, 'berry', 1, 1);
+      if (!a.added) { hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)'); return; }
+      berries.pick(bush);
+      commit(a.state);
+      sound.play('clean');
+      player.face(bush.x, bush.z);
+      hud.bagBump();
+      hud.toast(`빨간 열매를 가방에 넣었어요 (${countOf(state, 'berry')}개)`, 1600);
+      return;
+    }
     const before = state.job;
     berries.pick(bush);
     commit({ ...useStamina(state, WORK_STAMINA).state, job: recordPull(state.job, 'berry', 'clean') });
@@ -568,7 +605,14 @@ function boot() {
       ...next, license: gainXp(next.license, result, weed.kind), weedLog: { ...log, [weed.kind]: (log[weed.kind] || 0) + 1 },
       stats: { pulled: next.stats.pulled + 1, clean: next.stats.clean + (result === 'clean' ? 1 : 0) }
     };
-    if (next.job) next = { ...next, job: recordPull(next.job, weed.kind, result) };
+    const counted = next.job && JOB_TYPES[next.job.typeId].kind === weed.kind && !isComplete(next.job);
+    if (counted) next = { ...next, job: recordPull(next.job, weed.kind, result) };
+    else {
+      // 일감에 안 세는 풀은 가방에 모아 둔다(일감을 받으면 바로 낼 수 있다)
+      const a = addItem(next, weed.kind, 1, result === 'clean' ? 1 : 0);
+      next = a.state;
+      if (a.added) hud.bagBump(); else hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)');
+    }
     weeds.remove(weed, result);
     if (first && weed.kind !== 'weed') hud.banner('새 풀!', `${josa(W.name, '을/를')} 처음 뽑았어요 · 마을폰 풀 도감에 적었어요`, 2600);
     else if (!(W.poison && step === 'snapped')) hud.toast(result === 'clean' ? `깔끔하게 뽑았다! (${W.name})` : `앗, 끊어졌다… (${W.name})`, 1400);
@@ -591,9 +635,9 @@ function boot() {
     }
     celebrateIfDone(state.job, next.job);
     state = next;
-    if (!state.job && !state.exam && !seen('nojob')) {
-      markSeen('nojob');
-      hud.toast('일감 없이 뽑으면 보수가 없어요. 노동 접수에서 일감을 받아요', 3800);
+    if (!counted && !state.exam && !seen('bag-herb')) {
+      markSeen('bag-herb');
+      hud.toast('뽑은 풀은 가방에 모여요. 같은 일감을 받으면 바로 낼 수 있어요', 4000);
     }
     if (canTakeExam(state.license) && !state.exam && !seen('exam-' + state.license.grade)) {
       markSeen('exam-' + state.license.grade);
@@ -657,7 +701,14 @@ function boot() {
     return null;
   }
 
+  let homeTarget = null; // 집 안에서 지금 누르면 할 일
   input.onAction((down) => {
+    if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating) {
+      if (homeTarget.type === 'bed') doSleep();
+      else if (homeTarget.type === 'wardrobe') { interior.faceCamera(); panels.openWardrobe(); }
+      else if (homeTarget.type === 'door') exitHome();
+      return;
+    }
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
     if (!down) {
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -1317,11 +1368,17 @@ function boot() {
       berries.update(dt);
       npcs.update(dt, t, player.position);
       interior.resize(aspect);
+      // 집 안을 걷는다(꾸미기 · 창 · 잠자기 중에는 멈춘다). 침대 · 옷장 · 문 앞이면 행동 안내
+      const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay;
+      if (free) interior.walk(dt, input.vector(), homeOf(state));
+      homeTarget = free ? interior.target(homeOf(state)) : null;
+      interior.setCue(homeTarget, t);
+      hud.setAction(homeTarget ? homeTarget.label : null);
       interior.update(dt, t);
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
       if (!skipRender) gfx.renderer.render(interior.scene, interior.camera);
-      hud.placeLabels([], cam.camera);
+      hud.placeLabels(homeTarget ? [{ id: 'prompt:h' + homeTarget.type, x: homeTarget.x, y: homeTarget.type === 'wardrobe' ? 2.3 : 1.2, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' }] : [], interior.camera);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
       return;

@@ -8,6 +8,8 @@ import { isValidPochette } from './pochette.js';
 import { isValidExplored } from './explore.js';
 import { isValidTools } from './tools.js';
 import { isValidWeedLog } from './weeding.js';
+import { isValidBag } from './inventory.js';
+import { isValidWardrobe } from './wardrobe.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -41,6 +43,8 @@ export function isValidState(s) {
   if (s.explored !== undefined && !isValidExplored(s.explored)) return false; // 예전 저장에는 없다
   if (s.tools !== undefined && !isValidTools(s.tools)) return false;
   if (s.weedLog !== undefined && !isValidWeedLog(s.weedLog)) return false; // 풀 도감(2단계부터)
+  if (s.bag !== undefined && !isValidBag(s.bag)) return false; // 가방
+  if (s.wardrobe !== undefined && !isValidWardrobe(s.wardrobe)) return false; // 꾸미기 소품
   return true;
 }
 

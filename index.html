@@ -88,6 +88,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* 마을폰(설정) · 확대 */
 .hud-phone { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 58px; height: 58px; padding: 7px; border-radius: 50%; background: var(--paper-soft); box-shadow: var(--lift); }
 .hud-phone svg { width: 100%; height: 100%; display: block; }
+.hud-bag { position: absolute; top: max(14px, calc(env(safe-area-inset-top) + 4px)); right: max(82px, calc(env(safe-area-inset-right) + 70px)); width: 50px; height: 50px; padding: 6px; border-radius: 50%; background: var(--paper-soft); box-shadow: var(--lift); }
+.hud-bag svg { width: 100%; height: 100%; display: block; }
+.hud-bag:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.hud-bag.bump { animation: bag-bump 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes bag-bump { 40% { scale: 1.2; } }
 .hud-zoom { position: absolute; top: calc(max(10px, env(safe-area-inset-top)) + 72px); right: max(19px, calc(env(safe-area-inset-right) + 7px)); display: flex; flex-direction: column; gap: 8px; }
 /* 행동 버튼: 노란 동그라미가 퐁 하고 나타난다 */
 .hud-action { position: absolute; right: max(22px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); width: 92px; height: 92px; padding: 0 8px; border-radius: 50%; background: var(--yellow); font-size: 22px; line-height: 1.05;
@@ -347,6 +352,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   .hud-time small { font-size: 19px; }
   .hud-action { width: 80px; height: 80px; font-size: 20px; }
   .hud-phone { width: 52px; height: 52px; }
+  .hud-bag { width: 46px; height: 46px; right: max(74px, calc(env(safe-area-inset-right) + 64px)); }
   .hud-zoom { top: calc(max(10px, env(safe-area-inset-top)) + 64px); right: max(16px, calc(env(safe-area-inset-right) + 4px)); }
   .toast { font-size: 17px; }
   .guide-choice { font-size: 18px; padding: 3px 16px 4px 30px; }
@@ -705,7 +711,21 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .app.map .app-ico { background: #7fb6e2; }
 
 /* 풀 도감(마을폰): 급수 머리표 + 풀 칸(그림 · 이름 · 뽑은 수 · 자라는 곳 · 요령). 아직 못 뽑는 급수는 흐리게 */
-.app.weeds .app-ico { background: #8cc46d; } .app.dev .app-ico { background: #a59bd8; }
+.app.weeds .app-ico { background: #8cc46d; }
+/* 가방 · 옷장: 물건 칸(그림 + 이름 + 개수). 고른 칸은 노랗게 */
+.panel-bag, .panel-wardrobe { --tab: #e9b26b; }
+.backdrop.side { justify-content: flex-end; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
+.backdrop.side .panel { pointer-events: auto; width: min(400px, 100%); }
+.shop-sec { margin: 14px 4px 4px; font-size: 19px; }
+.bag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.bag-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 8px; border-radius: 18px; background: var(--paper-2); font-size: 15px; line-height: 1.15; text-align: center; }
+.bag-tile[aria-pressed="true"] { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.bag-tile.static { cursor: default; }
+.bag-ico { width: 54px; height: 54px; border-radius: 14px; background: var(--paper); }
+.bag-ico svg { width: 100%; height: 100%; display: block; }
+.bag-tile .cnt { position: absolute; top: 2px; right: 4px; padding: 0 7px 1px; border-radius: 999px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); font-size: 14px; font-variant-numeric: tabular-nums; }
+.bag-empty { margin: 16px 4px; font-size: 19px; color: var(--ink-soft); text-align: center; }
+.panel .row.bag-detail { margin-top: 14px; background: var(--butter); } .app.dev .app-ico { background: #a59bd8; }
 /* 테스트 도구(숨은 앱) */
 .panel .row.dev-row { flex-wrap: wrap; }
 .dev-btns { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -766,6 +786,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @keyframes hc-new { from { scale: 0; filter: grayscale(1) opacity(0.35); } 60% { scale: 1.45; } to { scale: 1; filter: none; } }
 .heart-card small { font-size: 16px; color: #c2405f; }
 @media (prefers-reduced-motion: reduce) { .heart-fx .hf, .hf-plus, .heart-card .row i.new { animation-duration: 0.01s; } }
+/* 집 안: 걸어 다닐 수 있으니 터치에서는 조이스틱과 행동 버튼을 보인다(다른 HUD 는 숨긴 채) */
+[data-input="touch"] .cinematic.in-home .hud-action:not([hidden]) { display: block !important; }
+[data-input="touch"] .cinematic.in-home .stick:not([hidden]) { display: block !important; }
+.in-home .home-bar { bottom: max(14px, env(safe-area-inset-bottom)); }
+[data-input="touch"] .in-home .home-bar { left: auto; right: 130px; transform: none; width: auto; max-width: calc(100% - 300px); justify-content: flex-end; }
 /* PC(키보드 · 마우스): 조이스틱과 행동 버튼 없이 키보드로. 할 수 있는 행동은 위의 안내로 보인다 */
 [data-input="desk"] .hud-action, [data-input="desk"] .stick { display: none !important; } .app.card .app-ico { background: #f2a7bb; }
 .weed-grade { display: flex; align-items: center; gap: 8px; margin: 14px 4px 0; font-size: 19px; }

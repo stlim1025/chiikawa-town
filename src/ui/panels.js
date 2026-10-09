@@ -17,6 +17,9 @@ import { REGION_NAMES, regionAt } from '../core/layout.js';
 import { createMapView } from './mapapp.js';
 import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core/weeding.js';
 import { weedSvg } from './weedart.js';
+import { pochetteSvg, itemSvg, accessorySvg } from './itemart.js';
+import { bagOf, itemInfo } from '../core/inventory.js';
+import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -61,27 +64,6 @@ function leftPill(n, max) {
   return h('span', { class: `left-pill${cls}` }, dots, n <= 0 ? '마감' : n === 1 ? '마지막 1건' : `${n}건 남음`);
 }
 
-/** 포셰트 그림: 끈(고리) · 몸통 · 덮개 · 단추. 별밤 포셰트는 별 단추. */
-function pochetteSvg(id, P) {
-  const line = '#5a4431';
-  const star = (cx, cy, R, r) => Array.from({ length: 10 }, (_, i) => {
-    const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r : R;
-    return `${(cx + k * Math.cos(a)).toFixed(1)},${(cy + k * Math.sin(a)).toFixed(1)}`;
-  }).join(' ');
-  const button = id === 'night'
-    ? `<polygon points="${star(32, 44, 7, 3)}" fill="${P.accent}" stroke="${line}" stroke-width="2" stroke-linejoin="round"/>`
-    : `<circle cx="32" cy="44" r="4.6" fill="${P.accent}" stroke="${line}" stroke-width="2.4"/>`;
-  return `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <path d="M15 30Q32 -10 49 30" fill="none" stroke="${line}" stroke-width="6.5" stroke-linecap="round"/>
-    <path d="M15 30Q32 -10 49 30" fill="none" stroke="${P.accent}" stroke-width="3" stroke-linecap="round"/>
-    <rect x="9" y="25" width="46" height="32" rx="13" fill="${P.color}" stroke="${line}" stroke-width="3"/>
-    <path d="M9 38Q9 25 22 25H42Q55 25 55 38Q32 52 9 38Z" fill="${P.color}" stroke="${line}" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M14 35Q32 43 50 35" fill="none" stroke="${P.accent}" stroke-width="1.8" stroke-dasharray="3 3" stroke-linecap="round"/>
-    <ellipse cx="20" cy="31" rx="5" ry="2.4" fill="#fff" opacity="0.45"/>
-    ${button}
-  </svg>`;
-}
-
 /**
  * 게시판(노동 접수), 제초 검정소, 라멘 로우, 가구점, 부동산, 포셰트 가게, 설정 창. (집 안은 ui/homeui.js)
  * handlers: { getState, acceptJob(typeId), quitJob(), reportJob(), startExam(), buy(itemId), toTitle(),
@@ -119,7 +101,8 @@ export function createPanels(ui, handlers) {
     }
     close(true);
     current = { kind, extra: phone ? phoneExtra : extra };
-    const backdrop = h('div', { class: phone ? 'backdrop phone-backdrop' : 'backdrop' });
+    // 옷장은 내 캐릭터가 보이게 옆에 붙여 띄운다(어둡게 덮지 않는다)
+    const backdrop = h('div', { class: phone ? 'backdrop phone-backdrop' : kind === 'wardrobe' ? 'backdrop side' : 'backdrop' });
     backdrop.addEventListener('pointerdown', (e) => { if (e.target === backdrop) close(); });
     let panel, body;
     if (phone) {
@@ -397,7 +380,64 @@ export function createPanels(ui, handlers) {
           btn));
       });
       out.push(h('p', { class: 'note' }, wearing ? `지금 ${POCHETTES[wearing].name}를 메고 있어요. 지갑이 든든해요!` : '지금은 포셰트를 안 메고 있어요. 소매치기를 당하면 그대로 빼앗겨요.'));
+      // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
+      const wd = wardrobeOf(s);
+      out.push(h('h3', { class: 'shop-sec' }, '꾸미기 소품'));
+      Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
+        const own = wd.owned.includes(id), short = s.money < A.price;
+        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
+          h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, `${won(A.price)} · ${A.note}`)),
+          own ? h('div', { class: 'd' }, wd.wear === id ? '달고 있어요' : '가지고 있어요 · 집 옷장에서')
+            : h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyAccessory(id)) }, short ? '돈이 부족해요' : `${won(A.price)}에 사기`)));
+      });
       out.push(h('div', { class: 'actions' }, closeBtn()));
+      return out;
+    },
+    // 가방: 모아 둔 풀 · 열매 · 전리품 · 물건. 고르면 아래에 설명과 할 수 있는 일(먹기)
+    bag(s) {
+      const b = bagOf(s), ids = Object.keys(b.items).filter((id) => b.items[id] > 0 && itemInfo(id));
+      const KIND = [['herb', '풀'], ['food', '먹을 것'], ['drop', '전리품'], ['quest', '물건']];
+      const out = [head('가방', s.money), h('p', { class: 'sub' }, '일감 없이 뽑은 풀과 딴 열매가 여기 모여요. 일감을 받으면 같은 것을 바로 내요.')];
+      if (!ids.length) out.push(h('p', { class: 'bag-empty' }, '아직 비어 있어요. 풀을 뽑거나 열매를 따 봐요!'));
+      if (current.sel && !b.items[current.sel]) current.sel = null;
+      for (const [k, label] of KIND) {
+        const list = ids.filter((id) => itemInfo(id).kind === k);
+        if (!list.length) continue;
+        out.push(h('h3', { class: 'shop-sec' }, label));
+        out.push(h('div', { class: 'bag-grid' }, list.map((id) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(current.sel === id), onClick: () => { current.sel = id; render(); } },
+          svgSpan('bag-ico', itemSvg(id)), h('span', { class: 'nm' }, itemInfo(id).name), h('span', { class: 'cnt' }, `×${b.items[id]}`)))));
+      }
+      if (current.sel) {
+        const id = current.sel, info = itemInfo(id), n = b.items[id], c = b.clean[id] || 0;
+        out.push(h('div', { class: 'row bag-detail' }, svgSpan('pochette-art', itemSvg(id)),
+          h('div', {}, h('div', { class: 't' }, `${info.name} ×${n}`), h('div', { class: 'd' }, info.note + (info.kind === 'herb' ? ` 깔끔하게 뽑은 것 ${c}개.` : ''))),
+          info.eat ? h('button', { class: 'btn primary', type: 'button', disabled: s.stamina >= MAX_STAMINA, onClick: after(() => handlers.eatItem(id)) }, s.stamina >= MAX_STAMINA ? '배불러요' : '먹기') : null));
+      }
+      // 꾸미기: 가진 것만 보여 주고, 바꾸는 건 집 옷장에서
+      const pc = pochetteOf(s), wd = wardrobeOf(s);
+      if (pc.owned.length || wd.owned.length) {
+        out.push(h('h3', { class: 'shop-sec' }, '꾸미기 · 집 옷장에서 바꿔요'));
+        out.push(h('div', { class: 'bag-grid' },
+          pc.owned.map((id) => h('div', { class: 'bag-tile static', 'aria-pressed': String(pc.wear === id) }, svgSpan('bag-ico', pochetteSvg(id, POCHETTES[id])), h('span', { class: 'nm' }, POCHETTES[id].name))),
+          wd.owned.map((id) => h('div', { class: 'bag-tile static', 'aria-pressed': String(wd.wear === id) }, svgSpan('bag-ico', accessorySvg(id)), h('span', { class: 'nm' }, ACCESSORY_ITEMS[id].name)))));
+      }
+      out.push(h('div', { class: 'actions' }, closeBtn()));
+      return out;
+    },
+    // 집 옷장: 가진 포셰트 · 소품을 골라 바로 바꿔 단다(집 안의 내 캐릭터가 바로 바뀐다)
+    wardrobe(s) {
+      const pc = pochetteOf(s), wd = wardrobeOf(s);
+      const tile = (on, art, name, fn) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(on), onClick: after(fn) }, svgSpan('bag-ico', art), h('span', { class: 'nm' }, name));
+      const none = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>';
+      const out = [head('옷장'), h('p', { class: 'sub' }, '고르면 바로 바뀌어요. 새 소품은 포셰트 가게에서 사요.')];
+      out.push(h('h3', { class: 'shop-sec' }, '포셰트'));
+      out.push(h('div', { class: 'bag-grid' }, tile(!pc.wear, none, '안 메기', () => handlers.wearPochette(null)),
+        pc.owned.map((id) => tile(pc.wear === id, pochetteSvg(id, POCHETTES[id]), POCHETTES[id].name, () => handlers.wearPochette(id)))));
+      out.push(h('h3', { class: 'shop-sec' }, '머리 장식'));
+      out.push(h('div', { class: 'bag-grid' }, tile(wd.wear === 'none', none, '안 달기', () => handlers.wearAccessory('none')),
+        wd.owned.map((id) => tile(wd.wear === id, accessorySvg(id), ACCESSORY_ITEMS[id].name, () => handlers.wearAccessory(id)))));
+      if (!pc.owned.length && !wd.owned.length) out.push(h('p', { class: 'note' }, '아직 가진 꾸미기 아이템이 없어요. 마을 포셰트 가게에 가 봐요!'));
+      out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onClick: () => close() }, '다 골랐어요')));
       return out;
     },
     // 카니 헌책방: 마을 지도
@@ -518,6 +558,8 @@ export function createPanels(ui, handlers) {
     openFurniture: () => show('furniture'),
     openRealty: () => show('realty'),
     openPochette: () => show('pochette'),
+    openBag: () => show('bag'),
+    openWardrobe: () => show('wardrobe'),
     openBooks: () => show('books'),
     openTools: () => show('tools'),
     openMap: () => show('map'),

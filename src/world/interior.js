@@ -7,6 +7,10 @@ import { HOME_GRID } from '../core/home.js';
 const CELL = 1.1;
 const X0 = -(HOME_GRID.cols * CELL) / 2, Z0 = -2.9; // 칸 격자의 왼쪽 안쪽 모서리
 const ROOM_R = 4.4;
+/** 문간(나가기) · 옷장 자리. 깔개와 방석은 밟고 지나갈 수 있다. */
+const DOOR = { x: 0, z: 2.9 };
+const WARDROBE = { x: -3.2, z: -1.0 };
+const WALKABLE = new Set(['rug', 'cushion']);
 
 /** 칸 (cx, cz) 의 바닥 가운데. */
 export const cellCenter = (cx, cz) => ({ x: X0 + (cx + 0.5) * CELL, z: Z0 + (cz + 0.5) * CELL });
@@ -117,6 +121,37 @@ export function createInterior() {
   const cellOf = new Map(); // 모델 → 칸 { cx, cz }(가구를 눌렀을 때 어느 칸인지)
   let ghostModel = null, ghostId = null; // 목록에서 끌어 오는 가구 미리보기
   let me = null;
+  // 집 안을 걷는 내 캐릭터: 자리 · 바라보는 방향 · 걸음
+  const pos = { x: DOOR.x, z: DOOR.z - 0.5 };
+  let yaw = Math.PI, phase = 0, moving = false;
+
+  // 옷장(늘 왼쪽 벽에 붙어 있다): 나무 장 + 문 두 짝 + 거울
+  {
+    const g = new THREE.Group();
+    g.position.set(WARDROBE.x, 0, WARDROBE.z);
+    g.rotation.y = Math.PI / 2 - 0.35;
+    g.add(toonMesh(GEO.box, '#c99a6a', { position: [0, 0.95, 0], scale: [1.3, 1.9, 0.55], shell: true, outline: 0.03 }));
+    g.add(toonMesh(GEO.box, '#d8ad7d', { position: [-0.32, 0.95, 0.29], scale: [0.6, 1.72, 0.04], shell: true, outline: 0.02 }));
+    g.add(toonMesh(GEO.box, '#cfe7f2', { position: [0.32, 1.05, 0.29], scale: [0.5, 1.2, 0.04], shell: true, outline: 0.02 }));
+    g.add(toonMesh(GEO.box, '#ffffff', { position: [0.24, 1.3, 0.315], scale: [0.08, 0.5, 0.01], outline: false, shadow: false }));
+    [-0.06, 0.06].forEach((x) => g.add(toonMesh(GEO.dot, '#8a5a30', { position: [x, 1.0, 0.33], scale: [0.04, 0.04, 0.04], outline: false })));
+    g.add(toonMesh(GEO.box, '#a87b4c', { position: [0, 1.93, 0], scale: [1.4, 0.08, 0.62], shell: true, outline: 0.02 }));
+    scene.add(g);
+  }
+  // 대상 발밑의 노란 고리(집 안 행동 안내)
+  const cue = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfcd95b, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+  cue.rotation.x = -Math.PI / 2;
+  cue.visible = false;
+  scene.add(cue);
+  const blocked = (home, x, z, r) => {
+    if (Math.hypot(x, z) > ROOM_R - 0.55) return true;
+    if (Math.hypot(x - WARDROBE.x, z - WARDROBE.z) < 0.75 + r) return true;
+    return home.placed.some((p) => {
+      if (WALKABLE.has(p.id)) return false;
+      const c = cellCenter(p.cx, p.cz);
+      return Math.abs(x - c.x) < CELL * 0.45 + r && Math.abs(z - c.z) < CELL * 0.45 + r;
+    });
+  };
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
   camera.position.set(0, 7.4, 8.6);
@@ -175,14 +210,50 @@ export function createInterior() {
       ray.setFromCamera({ x: nx, y: ny }, camera);
       return ray.ray.intersectPlane(floor, hit) ? { x: hit.x, z: hit.z } : null;
     },
-    /** 집 안에 서 있는 내 캐릭터(문간). */
-    setPlayer(look) {
+    /** 집 안의 내 캐릭터. keep 이 아니면 문간에서 방 쪽을 보고 선다(옷을 갈아입을 때는 keep). */
+    setPlayer(look, keep = false) {
       if (me) scene.remove(me.root);
       me = buildChibi(look);
-      me.root.position.set(2.2, 0, 2.2);
-      me.root.rotation.y = -0.45;
+      if (!keep) { pos.x = DOOR.x; pos.z = DOOR.z - 0.5; yaw = Math.PI; }
+      me.root.position.set(pos.x, 0, pos.z);
+      me.root.rotation.y = yaw;
       scene.add(me.root);
     },
+    /** 입력 방향 v = { x, y }(y 는 화면 위가 +)로 걷는다. 벽 · 가구 · 옷장은 비켜 간다. */
+    walk(dt, v, home) {
+      const len = Math.min(1, Math.hypot(v.x, v.y));
+      moving = false;
+      if (len < 0.12) return;
+      const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y), step = 2.6 * len * dt, r = 0.3;
+      const nx = pos.x + dx * step, nz = pos.z + dz * step;
+      if (!blocked(home, nx, pos.z, r)) { pos.x = nx; moving = true; }
+      if (!blocked(home, pos.x, nz, r)) { pos.z = nz; moving = true; }
+      let d = Math.atan2(dx, dz) - yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
+      if (moving) phase += dt * 2.6 * len * 3.2;
+    },
+    /** 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null */
+    target(home) {
+      const opts = [];
+      for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
+      opts.push({ type: 'wardrobe', x: WARDROBE.x, z: WARDROBE.z, r: 0.85, label: '옷장', reach: 1.5 });
+      opts.push({ type: 'door', x: DOOR.x, z: DOOR.z, r: 0.6, label: '나가기', reach: 0.9 });
+      let best = null, bd = Infinity;
+      for (const o of opts) { const d = Math.hypot(o.x - pos.x, o.z - pos.z); if (d < o.reach && d < bd) { bd = d; best = o; } }
+      return best;
+    },
+    /** 행동 안내 고리(null 이면 숨긴다). */
+    setCue(t, time = 0) {
+      cue.visible = !!t;
+      if (!t) return;
+      cue.position.set(t.x, 0.03, t.z);
+      cue.scale.setScalar(t.r * (1 + 0.07 * Math.sin(time * 6)));
+    },
+    get playerPos() { return pos; },
+    /** 옷장을 열 때: 카메라(앞) 쪽을 보고 서서 바뀐 모습이 보이게. */
+    faceCamera() { yaw = 0; moving = false; },
     showGrid(on) { tiles.forEach((t) => { t.visible = on; t.material = tileMat; }); },
     /** 칸 하나를 분홍으로(null 이면 모두 원래대로). */
     highlight(cell) { tiles.forEach((t) => { t.material = cell && t.userData.cx === cell.cx && t.userData.cz === cell.cz ? hotMat : tileMat; }); },
@@ -198,6 +269,11 @@ export function createInterior() {
       camera.fov = aspect < 1 ? 62 : 38;
       camera.updateProjectionMatrix();
     },
-    update(dt, t) { if (me) animateChibi(me, 'idle', t, {}); }
+    update(dt, t) {
+      if (!me) return;
+      me.root.position.set(pos.x, 0, pos.z);
+      me.root.rotation.y = yaw;
+      animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
+    }
   };
 }

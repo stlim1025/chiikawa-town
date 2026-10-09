@@ -41,6 +41,10 @@ export function createHud(ui, input) {
   dock.append(status, job);
   const clock = el('div', 'hud-clock');
   clock.innerHTML = '<div class="hud-date"><span class="dl"></span><span class="sk"></span></div><div class="hud-time"><b class="hm"></b><small class="ap"></small></div>';
+  // 가방(마을폰 왼쪽): 모아 둔 풀 · 열매 · 물건
+  const bagBtn = el('button', 'hud-bag', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 14q0-8 7-8t7 8" fill="none" stroke="#8a5a30" stroke-width="3" stroke-linecap="round"/><rect x="7" y="13" width="26" height="22" rx="7" fill="#e9b26b" stroke="#8a5a30" stroke-width="2.6"/><path d="M7 21h26" stroke="#8a5a30" stroke-width="2.4"/><rect x="16" y="18" width="8" height="7" rx="2" fill="#fcd95b" stroke="#8a5a30" stroke-width="2"/></svg>');
+  bagBtn.type = 'button';
+  bagBtn.setAttribute('aria-label', '가방');
   const gear = el('button', 'hud-phone', PHONE);
   gear.type = 'button';
   gear.setAttribute('aria-label', '마을폰(설정)');
@@ -63,7 +67,7 @@ export function createHud(ui, input) {
   timer.setAttribute('role', 'timer');
   const labelLayer = el('div');
   labelLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
-  ui.append(labelLayer, dock, clock, gear, zoom, action, meter, timer, toasts);
+  ui.append(labelLayer, dock, clock, bagBtn, gear, zoom, action, meter, timer, toasts);
 
   const q = (root, sel) => root.querySelector(sel);
   const press = (down) => (e) => { e.preventDefault(); if (down) action.setPointerCapture?.(e.pointerId); input.setAction(down); };
@@ -91,6 +95,9 @@ export function createHud(ui, input) {
     /** 왼쪽 위 기둥(하치와레의 할 일 쪽지를 여기에 붙인다). */
     dock,
     onSettings(fn) { gear.addEventListener('click', fn); },
+    onBag(fn) { bagBtn.addEventListener('click', fn); },
+    /** 가방에 무언가 들어갔을 때 가방 버튼이 톡 튄다. */
+    bagBump() { bagBtn.classList.remove('bump'); void bagBtn.offsetWidth; bagBtn.classList.add('bump'); },
     /** 등불 버튼을 누르면(끔 → 랜턴 → 손전등). */
     onLight(fn) { lightBtn.addEventListener('click', fn); },
     /** 등불 버튼 모양. mode 가 null 이면 버튼을 숨긴다(불이 하나도 없을 때). */
