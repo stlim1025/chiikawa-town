@@ -1,59 +1,78 @@
 import * as THREE from 'three';
-import { toonMaterial, addOutline, GEO } from '../render/toon.js';
-import { part, mergeParts } from '../render/merge.js';
 
 /**
- * 바닥에 떨어진 물건 그리기: 동물의 숲처럼 초록 나뭇잎 꾸러미가 발밑에서 살랑살랑. 물건 종류마다 잎 위 구슬 색이 다르다.
+ * 바닥에 떨어진 물건 그리기: 가방에서 보던 그 물건 그림이 바닥에 서서 살랑살랑 떠 있다(잡초면 잡초, 열매면 열매, 무기면 무기).
+ * 그림은 늘 카메라를 보는 판(스프라이트)이고, 테두리를 하얗게 둘러 풀밭에서도 잘 보이게 한다. 발밑에는 동그란 그림자.
  * sync(state.ground) 로 목록에 맞춰 만들고 지우고, nearest 로 주울 것을 찾는다.
+ * artOf(e): 그 물건의 그림(SVG 문자열). 물건마다 한 번만 그려 두고 같이 쓴다.
  */
-const DOT = { herb: '#8fd16a', food: '#f0566a', drop: '#c9a8ff', quest: '#ffd94a', weapon: '#9fd3f4' };
-
-let leafGeo = null;
-function leafGeometry() {
-  if (leafGeo) return leafGeo;
-  const root = new THREE.Group();
-  // 잎 한 장(앞뒤로 뾰족) + 가운데 잎맥 + 짧은 꼭지
-  part(root, GEO.sphere, '#79c25a', { position: [0, 0.07, 0], rotation: [0.25, 0, 0], scale: [0.2, 0.05, 0.3] });
-  part(root, GEO.cone, '#79c25a', { position: [0, 0.075, 0.26], rotation: [Math.PI / 2 + 0.25, 0, 0], scale: [0.09, 0.14, 0.03] });
-  part(root, GEO.box, '#5aa544', { position: [0, 0.105, 0.02], rotation: [0.25, 0, 0], scale: [0.018, 0.012, 0.42] });
-  part(root, GEO.cylinder, '#8a6a3c', { position: [0, 0.03, -0.27], rotation: [-1.2, 0, 0], scale: [0.018, 0.12, 0.018] });
-  leafGeo = mergeParts(root, 'all');
-  return leafGeo;
+const SIZE = 128;
+const textures = new Map(); // 그림 열쇠 → CanvasTexture
+/** SVG 그림을 판 그림(텍스처)으로: 바닥 그림자 타원은 빼고, 하얀 테두리를 둘러 그린다. 다 그려지면 텍스처가 바뀐다. */
+function textureOf(key, svg) {
+  if (textures.has(key)) return textures.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = SIZE;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  textures.set(key, tex);
+  let src = svg.replace(/<ellipse cx="32" cy="5[5-8]"[^>]*fill="#e6d8b8"\/>/, ''); // 그림 속 바닥 그림자(진짜 그림자를 따로 깐다)
+  if (!/xmlns=/.test(src)) src = src.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+  src = src.replace('<svg ', `<svg width="${SIZE}" height="${SIZE}" `);
+  const img = new Image();
+  img.onload = () => {
+    const c = canvas.getContext('2d'), pad = 10, s = SIZE - pad * 2;
+    c.clearRect(0, 0, SIZE, SIZE);
+    // 하얀 테두리: 그림을 둘레로 조금씩 밀어 하얗게 찍은 뒤 그 위에 진짜 그림
+    const white = document.createElement('canvas');
+    white.width = white.height = SIZE;
+    const w = white.getContext('2d');
+    w.drawImage(img, pad, pad, s, s);
+    w.globalCompositeOperation = 'source-in';
+    w.fillStyle = '#ffffff';
+    w.fillRect(0, 0, SIZE, SIZE);
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; c.drawImage(white, Math.cos(a) * 4, Math.sin(a) * 4); }
+    c.drawImage(img, pad, pad, s, s);
+    tex.needsUpdate = true;
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  return tex;
 }
-const leafMat = toonMaterial('#ffffff', { vertexColors: true });
+const shadowGeo = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x2b2224, transparent: true, opacity: 0.18, depthWrite: false });
 
-export function createGround(scene) {
-  const items = new Map(); // g → { e, root, leaf, born }
+export function createGround(scene, artOf) {
+  const items = new Map(); // g → { e, root, pic, born }
   let t = 0;
 
-  function build(e, kind) {
+  function build(e) {
     const root = new THREE.Group();
-    const leaf = new THREE.Mesh(leafGeometry(), leafMat);
-    leaf.castShadow = true;
-    addOutline(leaf, 0.02);
-    root.add(leaf);
-    const dot = new THREE.Mesh(GEO.dot, toonMaterial(DOT[kind] || '#ffffff'));
-    dot.position.set(0, 0.16, 0.0);
-    dot.scale.setScalar(0.06);
-    addOutline(dot, 0.012);
-    root.add(dot);
+    const key = (e.weapon ? 'w:' : 'i:') + e.id;
+    const pic = new THREE.Sprite(new THREE.SpriteMaterial({ map: textureOf(key, artOf(e)), alphaTest: 0.2 }));
+    pic.center.set(0.5, 0.12); // 그림 아래쪽이 바닥 가까이
+    pic.scale.set(0.72, 0.72, 1);
+    root.add(pic);
+    const sh = new THREE.Mesh(shadowGeo, shadowMat);
+    sh.position.y = 0.02;
+    sh.scale.setScalar(0.24);
+    sh.renderOrder = 1;
+    root.add(sh);
     root.position.set(e.x, 0, e.z);
-    root.rotation.y = (e.g * 2.399) % (Math.PI * 2); // 꾸러미마다 다른 방향
     scene.add(root);
-    return { e, root, leaf, born: 0 };
+    return { e, root, pic, sh, born: 0 };
   }
 
   return {
-    /** 목록(state.ground)에 맞춘다. kindOf(e): 'herb' | 'food' | 'drop' | 'quest' | 'weapon' */
-    sync(list, kindOf) {
+    /** 목록(state.ground)에 맞춘다. */
+    sync(list) {
       const seen = new Set();
       for (const e of list) {
         seen.add(e.g);
         const it = items.get(e.g);
         if (it) { it.e = e; continue; }
-        items.set(e.g, build(e, kindOf(e)));
+        items.set(e.g, build(e));
       }
-      for (const [g, it] of items) if (!seen.has(g)) { scene.remove(it.root); items.delete(g); }
+      for (const [g, it] of items) if (!seen.has(g)) { scene.remove(it.root); it.pic.material.dispose(); items.delete(g); }
     },
     /** (x, z) 에서 maxDist 안의 가장 가까운 떨어진 물건. */
     nearest(x, z, maxDist) {
@@ -64,20 +83,22 @@ export function createGround(scene) {
       }
       return best;
     },
-    /** 살랑살랑 · 떨어질 때 톡 튀며 나타난다. focus 에서 먼 것은 그리지 않는다. */
+    /** 둥실둥실 · 떨어질 때 톡 튀며 나타난다. focus 에서 먼 것은 그리지 않는다. */
     update(dt, focus) {
       t += dt;
       for (const it of items.values()) {
         const far = focus && Math.hypot(it.e.x - focus.x, it.e.z - focus.z) > 50;
         it.root.visible = !far;
         if (far) continue;
+        let y = 0.06 + Math.sin(t * 2.4 + it.e.g) * 0.04, k = 1;
         if (it.born < 1) {
           it.born = Math.min(1, it.born + dt * 3);
-          const k = it.born;
-          it.root.position.y = Math.sin(k * Math.PI) * 0.45;
-          it.root.scale.setScalar(0.4 + 0.6 * k);
-        } else it.root.position.y = 0;
-        it.leaf.rotation.z = Math.sin(t * 2.2 + it.e.g) * 0.06;
+          k = 0.4 + 0.6 * it.born;
+          y += Math.sin(it.born * Math.PI) * 0.45;
+        }
+        it.pic.position.y = y;
+        it.pic.scale.set(0.72 * k, 0.72 * k, 1);
+        it.sh.scale.setScalar(0.24 * (1 - y * 0.6));
       }
     }
   };

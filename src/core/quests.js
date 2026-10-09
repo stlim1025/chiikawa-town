@@ -266,16 +266,30 @@ export function goalText(state, id) {
   if (!step) return '';
   const p = progressOf(state, id);
   if (stepReady(state, id) && step.type !== 'talk') return `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`;
-  return p ? `${step.goal} · ${p.have} / ${p.need}` : step.goal;
+  return p ? `${step.goal} (지금 ${p.have} / ${p.need})` : step.goal;
 }
 
-/** 화면 왼쪽 위 쪽지용 짧은 목표: 괄호 속 안내는 빼고, 진행 숫자는 따로. → { goal, n: '0 / 3' | '' } */
+/** 구역 이름(토벌 목표의 '어디서'). */
+const REGION_AT = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '마을 밖' };
+/**
+ * 화면 왼쪽 위 쪽지 · 마을폰용 짧은 목표: 한 마디 글(괄호 속 안내 · '·' 로 이은 말 없이) + 물건 · 몬스터마다 그림 꼬리표.
+ * → { goal, n: '', parts: [{ kind: 'item' | 'monster', id, have, need }] }
+ */
 export function shortGoal(state, id) {
   const step = stepOf(state, id);
-  if (!step) return { goal: '', n: '' };
-  if (stepReady(state, id) && step.type !== 'talk') return { goal: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, n: '' };
+  if (!step) return { goal: '', n: '', parts: [] };
+  if (stepReady(state, id) && step.type !== 'talk') return { goal: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, n: '', parts: [] };
+  if (step.type === 'bring') {
+    const b = bagOf(state).items;
+    return { goal: `${FRIENDS[reportTo(id, step)].name}에게 건네주기`, n: '', parts: Object.entries(step.items).map(([it, n]) => ({ kind: 'item', id: it, have: Math.min(n, b[it] || 0), need: n })) };
+  }
   const p = progressOf(state, id);
-  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n: p ? `${p.have} / ${p.need}` : '' };
+  if (step.type === 'hunt') {
+    const M = MONSTERS[step.species];
+    return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '에서 ' : ''}${M.name} 토벌`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
+  }
+  if (step.type === 'pull') return { goal: `${WEED_KINDS[step.kind].name} 뽑기`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
+  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').replace(/\s*·\s*/g, ', ').trim(), n: p ? `${p.have} / ${p.need}` : '', parts: [] };
 }
 
 /** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */

@@ -183,7 +183,8 @@ export function createHud(ui, input) {
      * 목표나 진행이 바뀐 쪽지는 톡 튄다(카드가 날아오는 중이면 꽂힐 때 반짝인다).
      */
     setQuests(list) {
-      const key = list.map((q) => q.id + ':' + q.goal + ':' + (q.n || '')).join('|');
+      const chipKey = (q) => (q.chips || []).map((c) => c.text + (c.done ? '!' : '')).join(',');
+      const key = list.map((q) => q.id + ':' + q.goal + ':' + (q.n || '') + ':' + chipKey(q)).join('|');
       if (shown.quests === key) return;
       shown.quests = key;
       const keep = new Set(list.map((q) => q.id));
@@ -206,7 +207,21 @@ export function createHud(ui, input) {
         const sm = e.querySelector('small');
         sm.textContent = q.n || '';
         sm.hidden = !q.n;
-        const k = q.goal + '|' + (q.n || '');
+        // 물건 · 몬스터 그림 꼬리표(다 모은 것은 초록)
+        let cs = e.querySelector('.q-chips');
+        if (!cs) { cs = el('span', 'q-chips'); e.querySelector('span').appendChild(cs); }
+        const ck = chipKey(q);
+        if (cs.dataset.k !== ck) {
+          cs.dataset.k = ck;
+          cs.replaceChildren(...(q.chips || []).map((c) => {
+            const ch = el('span', 'q-chip' + (c.done ? ' done' : ''));
+            ch.innerHTML = c.icon + '<span class="q-n"></span>';
+            ch.querySelector('.q-n').textContent = c.text;
+            return ch;
+          }));
+        }
+        cs.hidden = !(q.chips && q.chips.length);
+        const k = q.goal + '|' + (q.n || '') + '|' + ck;
         if (nt.key && nt.key !== k && !incoming.has(q.id)) { e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); }
         nt.key = k;
       });
@@ -331,7 +346,7 @@ export function createHud(ui, input) {
         const row = el('div', 'banner-chips');
         chips.forEach((c) => {
           const ch = el('i', 'banner-chip');
-          ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon === 'heart' ? HEART_SVG : c.icon || '') + '<em></em>';
+          ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon === 'heart' ? HEART_SVG : c.icon === 'energy' ? HEART : c.icon || '') + '<em></em>';
           ch.querySelector('em').textContent = c.text;
           row.appendChild(ch);
         });
@@ -341,10 +356,22 @@ export function createHud(ui, input) {
       setTimeout(() => b.classList.add('out'), ms - 400);
       setTimeout(() => b.remove(), ms);
     },
-    /** 잠깐 뜨는 알림. */
-    toast(text, ms = 2400) {
-      const t = el('div', 'toast');
-      t.textContent = text;
+    /**
+     * 잠깐 뜨는 알림. 글은 짧은 한 마디만, 덧붙일 것은 opts 로:
+     * opts.icon: 맨 앞 그림(물건 그림 SVG, 없으면 나뭇잎), opts.chips: [{ icon: 'coin' | 'energy' | SVG, text }] 뒤에 붙는 작은 알약.
+     */
+    toast(text, ms = 2400, opts = null) {
+      const t = el('div', 'toast' + (opts && opts.icon ? ' has-icon' : ''));
+      if (opts && opts.icon) { const i = el('span', 't-ico'); i.innerHTML = opts.icon; t.appendChild(i); }
+      const s = el('span', 't-text');
+      s.textContent = text;
+      t.appendChild(s);
+      for (const c of (opts && opts.chips) || []) {
+        const ch = el('i', 't-chip');
+        ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon === 'energy' ? HEART : c.icon || '') + '<em></em>';
+        ch.querySelector('em').textContent = c.text;
+        t.appendChild(ch);
+      }
       toasts.appendChild(t);
       while (toasts.children.length > 3) toasts.firstChild.remove();
       setTimeout(() => t.remove(), ms);

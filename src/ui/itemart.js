@@ -38,8 +38,22 @@ const ACC = {
 };
 export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="3.5" fill="#e6d8b8"/>${ACC[id] || ''}</svg>`;
 
-/** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). */
-const EXTRA = {};
+/** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */
+const EXTRA = {
+  // 우사기 주먹밥: 커다란 세모 주먹밥 + 김 띠
+  riceball: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
+    <path d="M32 9q6 0 14 15t8 20q0 8-10 9H20q-10-1-10-9t8-20 14-15z" fill="#fffdf6" ${S}/>
+    <path d="M20 40h24v13H20z" fill="#3e5a46" ${S}/><circle cx="26" cy="25" r="1.5" fill="#e3d8c2"/><circle cx="36" cy="21" r="1.5" fill="#e3d8c2"/><circle cx="38" cy="31" r="1.5" fill="#e3d8c2"/><circle cx="29" cy="33" r="1.5" fill="#e3d8c2"/></svg>`,
+  // 젤리 구이: 꼬치에 꿴 파란 젤리 두 개, 노릇한 구운 자국
+  jellybake: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="4" fill="#e6d8b8"/>
+    <path d="M10 54L54 10" stroke="${L}" stroke-width="5.4" stroke-linecap="round"/><path d="M10 54L54 10" stroke="#e2c49a" stroke-width="2.8" stroke-linecap="round"/>
+    <rect x="16" y="32" width="17" height="17" rx="5" transform="rotate(-45 24.5 40.5)" fill="#6fb2e4" ${S}/><rect x="31" y="17" width="17" height="17" rx="5" transform="rotate(-45 39.5 25.5)" fill="#6fb2e4" ${S}/>
+    <path d="M20 38l6 6M24 34l6 6M35 23l6 6M39 19l6 6" stroke="#b8743d" stroke-width="2.4" stroke-linecap="round"/><circle cx="21" cy="42" r="1.6" fill="#fff" opacity=".8"/><circle cx="36" cy="27" r="1.6" fill="#fff" opacity=".8"/></svg>`,
+  // 병맥주: 갈색 병 · 금빛 뚜껑 · 흰 라벨
+  bottlebeer: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="12" ry="3.5" fill="#e6d8b8"/>
+    <path d="M27 9h10v10q8 6 8 16v17q0 4-4 4H23q-4 0-4-4V35q0-10 8-16z" fill="#a8622a" ${S}/><rect x="26" y="5" width="12" height="5" rx="1.5" fill="#f6c453" ${S}/>
+    <path d="M21 35h22v12H21z" fill="#fff4dc" ${S}/><path d="M26 41h12" stroke="#d9473b" stroke-width="2.4" stroke-linecap="round"/><path d="M25 22q-2.5 6-2.5 11" stroke="#ffd9b0" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>`
+};
 export function registerItemArt(map) { Object.assign(EXTRA, map); }
 export function itemSvg(id) {
   if (WEED_KINDS[id]) return weedSvg(id);

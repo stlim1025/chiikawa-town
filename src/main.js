@@ -54,7 +54,7 @@ import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
 import { openRamenShop } from './ui/ramenshop.js';
 import { itemSvg, accessorySvg } from './ui/itemart.js';
-import { weaponSvg } from './ui/monsterart.js';
+import { weaponSvg, monsterSvg } from './ui/monsterart.js';
 import { openQuiz, openHighball } from './ui/exams.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, decide, villagerTakesJob, payVillager, villagerSpend, villagerPay,
@@ -126,7 +126,7 @@ function boot() {
   const berries = createBerries(scene, village); // 잡초보다 먼저 심어서 잡초가 덤불을 피해 자란다
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
-  const ground = createGround(scene); // 주머니에서 버린 물건(바닥의 나뭇잎 꾸러미)
+  const ground = createGround(scene, (e) => (e.weapon ? weaponSvg(e.id) : itemSvg(e.id))); // 주머니에서 버린 물건(그 물건 그림 그대로 바닥에)
   const groundKind = (e) => (e.weapon ? 'weapon' : (itemInfo(e.id) || { kind: 'quest' }).kind);
   const npcs = createNpcs(scene, village, weeds, berries);
   const input = createInput(ui, canvas);
@@ -217,7 +217,7 @@ function boot() {
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast(`${FURNITURE[id].name}을(를) 샀어요! 집에서 '꾸미기'로 놓아요`, 3000);
+      hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 3000, { chips: [{ text: '집 꾸미기에서 놓기' }] });
     },
     // 부동산
     dayLabel: (day) => dateLabel(state.startDate, day),
@@ -227,7 +227,7 @@ function boot() {
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast(isEvicted(state) ? '밀린 집세를 냈어요 · 이제 다시 세 들 수 있어요' : '밀린 집세를 다 냈어요!', 3000);
+      hud.toast('밀린 집세를 다 냈어요!', 3000, isEvicted(state) ? { chips: [{ text: '다시 세 들 수 있어요' }] } : null);
     },
     rentAgain() {
       const r = rentAgain(state);
@@ -244,7 +244,7 @@ function boot() {
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 멨어요! 소매치기 피해 절반`, 3400);
+      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 멨어요!`, 3400, { chips: [{ text: '소매치기 피해 ½' }] });
     },
     wearPochette(id) {
       commit(wearPochette(state, id));
@@ -277,7 +277,7 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'full' ? '지금은 배불러요' : '먹을 수 없어요'); return; }
       commit(r.state);
       sound.play('eat');
-      hud.toast(`${itemInfo(id).name}을(를) 먹었어요 · 기운 +${r.gain}`);
+      hud.toast(`${itemInfo(id).name} 냠냠!`, 2200, { icon: itemSvg(id), chips: [{ icon: 'energy', text: `기운 +${r.gain}` }] });
     },
     // 헌책방 · 도구점 · 지도 앱
     buyTool(id) {
@@ -285,7 +285,7 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가지고 있어요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast(id === 'map' ? '마을 지도를 샀어요! 마을폰에서 봐요' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 3200);
+      hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 3200, id === 'map' ? { chips: [{ text: '마을폰에서 보기' }] } : null);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
     // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
@@ -295,12 +295,12 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요! ${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘둘러요`, 3600);
+      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요!`, 3600, { icon: weaponSvg(id), chips: [{ text: `${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘두르기` }] });
     },
     holdWeapon(id) {
       commit(holdWeapon(state, id));
       sound.play('click');
-      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600);
+      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600, id ? { icon: weaponSvg(id) } : null);
     },
     trackQuest(id) { commit({ ...state, questTrack: id }); },
     // 주머니에서 버리기: 마을을 돌아다닐 때만(집 · 친구 집 안에서는 안 된다). 발 앞에 나뭇잎 꾸러미로 떨어진다
@@ -314,14 +314,14 @@ function boot() {
       ground.sync(groundOf(state), groundKind);
       sound.play('drop');
       const name = sel.type === 'weapon' ? WEAPONS[sel.id].name : itemInfo(sel.id).name;
-      hud.toast(`${r.n > 1 ? `${name} ${r.n}개를` : josa(name, '을/를')} 바닥에 떨어뜨렸어요 · 다시 주울 수 있어요`, 2400);
+      hud.toast(`${name}${r.n > 1 ? ` ${r.n}개` : ''} 버렸어요`, 1800, { icon: sel.type === 'weapon' ? weaponSvg(sel.id) : itemSvg(sel.id) });
     },
     sellDrops() {
       const r = sellDrops(state);
       if (!r.sold) return;
       commit(r.state);
       sound.play('coin');
-      hud.toast(`전리품 ${r.sold}개를 팔아 ${won(r.earned)}을 받았어요!`, 3000);
+      hud.toast(`전리품 ${r.sold}개를 팔았어요!`, 3000, { chips: [{ icon: 'coin', text: `+${won(r.earned)}` }] });
     },
     playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
     mapLabels: () => village.labels.map((l) => ({ x: l.x, z: l.z, text: l.text })),
@@ -418,7 +418,7 @@ function boot() {
   function announce(events) {
     for (const e of events) {
       if (e.type === 'rentPaid') { hud.toast(`월요일이라 집세 ${won(e.amount)}을 냈어요`, 3200); sound.play('coin'); }
-      else if (e.type === 'rentUnpaid') hud.toast(`집세를 못 냈어요(${won(e.unpaid)}) · 월요일까지 내요!`, 4800);
+      else if (e.type === 'rentUnpaid') hud.toast('집세를 못 냈어요!', 4800, { chips: [{ icon: 'coin', text: won(e.unpaid) }, { text: '월요일까지' }] });
       else if (e.type === 'evicted') evicted(e.unpaid);
       else if (e.type === 'rentSoon') hud.toast(`내일(월)은 집세 ${won(RENT)}을 내는 날이에요`, 3200);
       else if (e.type === 'lotteryWon') { hud.banner('청약 당첨!', `일주일 안에 부동산에서 ${won(LOTTERY_PRICE)}에 사요`, 3600); sound.play('done'); }
@@ -611,7 +611,7 @@ function boot() {
       sound.play('clean');
       player.face(bush.x, bush.z);
       hud.bagBump();
-      hud.toast(`빨간 열매를 가방에 넣었어요 (${countOf(state, 'berry')}개)`, 1600);
+      hud.toast('빨간 열매 +1', 1600, { icon: itemSvg('berry'), chips: [{ text: `가방에 ${countOf(state, 'berry')}개` }] });
       return;
     }
     const before = state.job;
@@ -822,7 +822,7 @@ function boot() {
     else if (target.type === 'furniture') panels.openFurniture();
     else if (target.type === 'realty') panels.openRealty();
     else if (target.type === 'home') {
-      if (isEvicted(state)) hud.toast('쫓겨나서 못 들어가요 · 부동산으로', 3400);
+      if (isEvicted(state)) hud.toast('쫓겨나서 못 들어가요', 3400, { chips: [{ text: '부동산으로' }] });
       else enterHome();
     } else if (target.type === 'pochette') panels.openPochette();
     else if (target.type === 'pub') panels.openPub();
@@ -925,7 +925,7 @@ function boot() {
       const k = opts[i][0];
       if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
       else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
-      else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`${QUESTS[id].title} · ${goalText(state, id)}`, n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
+      else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`「${QUESTS[id].title}」`, goalText(state, id), n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
@@ -1073,7 +1073,7 @@ function boot() {
       hud.banner('이야기 완료!', Q.title, 5200, chips);
       npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, 'cheer', 3); });
     } else hud.banner('부탁 완료!', Q.title, 4200, chips);
-    if (reward.gifts.length) setTimeout(() => hud.toast(`선물 받음: ${reward.gifts.map((g) => FURNITURE[g].name).join(' · ')}`, 3000), 4400);
+    if (reward.gifts.length) setTimeout(() => hud.toast('선물을 받았어요!', 3000, { chips: reward.gifts.map((g) => ({ text: FURNITURE[g].name })) }), 4400);
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
@@ -1148,7 +1148,9 @@ function boot() {
     sound.play('clean');
     hud.bagBump();
     const name = groundName(e);
-    hud.toast(r.refund ? `이미 가진 무기 · ${won(r.refund)} 받았어요` : r.left > 0 ? `${name} ${r.n}개 주웠어요 (${r.left}개 남음)` : `${name}${r.n > 1 ? ` ${r.n}개` : ''} 주웠어요`, 1800);
+    const icon = e.weapon ? weaponSvg(e.id) : itemSvg(e.id);
+    if (r.refund) hud.toast('이미 있는 무기예요', 2200, { icon, chips: [{ icon: 'coin', text: `+${won(r.refund)}` }] });
+    else hud.toast(`${name}${r.n > 1 ? ` ${r.n}개` : ''} 주웠어요`, 1800, { icon, chips: r.left > 0 ? [{ text: `${r.left}개 남음` }] : null });
   }
 
   /** 돈 빌리기: 친구 지갑의 절반까지, 갚기 전에는 한 번만. */
@@ -1178,7 +1180,7 @@ function boot() {
     const pass = () => {
       commit(grant(state, id, state.clock.day));
       endOverlay();
-      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '이제 생맥주 · 하이볼을 마셔요' : id === 'hunter' ? '이제 토벌 일감을 받아요' : '이제 라멘 로우에서 알바해요', 3600);
+      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '이제 생맥주와 하이볼을 마셔요' : id === 'hunter' ? '이제 토벌 일감을 받아요' : '이제 라멘 로우에서 알바해요', 3600);
       sound.play('done');
       player.cheerTime = 1.8;
     };
@@ -1207,7 +1209,7 @@ function boot() {
         const pay = res.completed ? shiftPay(res) : res.earned;
         commit(addMoney(state, pay));
         endOverlay();
-        if (pay > 0) { hud.banner('알바 끝!', `${pay.toLocaleString('ko-KR')}원을 받았어요 · 손님 ${res.served}명`, 3200); sound.play('coin'); }
+        if (pay > 0) { hud.banner('알바 끝!', '', 3200, [{ icon: 'coin', text: `+${won(pay)}` }, { text: `손님 ${res.served}명` }]); sound.play('coin'); }
         else hud.toast('오늘은 한 그릇도 못 냈어요…');
       }
     });
@@ -1314,7 +1316,7 @@ function boot() {
         hud.curtain(false);
         fainting = false;
         if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true);
-        hud.banner('기절했어요…', r.lost ? `마을 입구에서 깼어요 · −${won(r.lost)}` : '마을 입구에서 깼어요', 3600);
+        hud.banner('기절했어요…', '마을 입구에서 깼어요', 3600, r.lost ? [{ icon: 'coin', text: `−${won(r.lost)}` }] : null);
       }, 700);
     }, 1500);
   }
@@ -1403,7 +1405,7 @@ function boot() {
     }
     if (r.gift) {
       sayAs(n, [n.kind === 'momonga' ? '흥! 이거 남아서 주는 거야. 착각하지 마!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
-        hud.banner('선물을 받았어요!', `${FURNITURE[r.gift].name} · 집에서 '꾸미기'로 놓아요`, 3400);
+        hud.banner('선물을 받았어요!', FURNITURE[r.gift].name, 3400, [{ text: '집 꾸미기에서 놓기' }]);
         sound.play('done');
         endTalk();
       });
@@ -1543,7 +1545,7 @@ function boot() {
     sound.play('job');
     const F = FRIENDS[kind];
     if (lodge) { setTimeout(() => { if (mode === 'visit') doSleep('lodge', exitVisit); }, 900); return; }
-    hud.toast(`${kind === 'hachiware' ? '하치와레네 동굴' : `${F.name}네 집`} · ✨ ${HOME_ACTS[kind] ? HOME_ACTS[kind].label : '놀러 왔어요'}`, 2600);
+    hud.toast(`${kind === 'hachiware' ? '하치와레네 동굴' : `${F.name}네 집`}에 왔어요`, 2600, HOME_ACTS[kind] ? { chips: [{ text: `✨ ${HOME_ACTS[kind].label}` }] } : null);
   }
   function exitVisit() {
     if (!visit) return;
@@ -1594,7 +1596,7 @@ function boot() {
       const got = gainStamina(S.gain);
       commit(markDay(state, n.kind, 'snack', state.clock.day));
       sound.play('eat');
-      hud.toast(got ? `냠냠 · 기운 +${got}` : '냠냠 · 배불러요', 2200);
+      hud.toast('냠냠!', 2200, { chips: [got ? { icon: 'energy', text: `기운 +${got}` } : { text: '배불러요' }] });
       endTalk();
     });
   }
@@ -1618,7 +1620,7 @@ function boot() {
           const got = gainStamina(40);
           hud.curtain(false);
           overlay = false;
-          sayAs(n, ['…잘 잤다…♪', '{name}이랑 자니까 꿈도 좋았어…!'], () => { hud.toast(`푹 잤어요 · 기운 +${got} · 한 시간 반이 지났어요`, 3000); reward(n, 'home'); });
+          sayAs(n, ['…잘 잤다…♪', '{name}이랑 자니까 꿈도 좋았어…!'], () => { hud.toast('푹 잤어요', 3000, { chips: [{ icon: 'energy', text: `기운 +${got}` }, { text: '1시간 30분 지남' }] }); reward(n, 'home'); });
         }, 2200);
       });
     } else if (kind === 'usagi') {
@@ -1628,7 +1630,7 @@ function boot() {
         s = addItem(s, 'clover', 2, 2).state;
         commit(s);
         hud.bagBump();
-        hud.toast('잡초 4개 · 토끼풀 2개를 받았어요', 2800);
+        hud.toast('풀을 받았어요!', 2800, { chips: [{ icon: itemSvg('weed'), text: '잡초 4' }, { icon: itemSvg('clover'), text: '토끼풀 2' }] });
         reward(n, 'home');
       });
     } else if (kind === 'kurimanju') {
@@ -1637,14 +1639,14 @@ function boot() {
         sayAs(n, ['오~ 말랑 젤리 있네! 이리 줘 봐~', '(화로에 젤리를 굽는다… 치익—)', '젤리 구이 완성~! 두 개 챙겨 가. 하아~'], () => {
           commit(addItem(takeItem(state, 'jelly', 1).state, 'jellybake', 2).state);
           hud.bagBump();
-          hud.toast('말랑 젤리 1개 → 젤리 구이 2개', 2800);
+          hud.toast('젤리 구이 2개!', 2800, { icon: itemSvg('jellybake'), chips: [{ icon: itemSvg('jelly'), text: '말랑 젤리 −1' }] });
           reward(n, 'home');
         });
       } else {
         sayAs(n, ['하아~ 풋콩이나 구워 먹자~', '(화로에 풋콩을 굽는다… 톡톡)', '짭짤하지? 말랑 젤리 가져오면 구워 줄게~'], () => {
           const got = gainStamina(20);
           sound.play('eat');
-          hud.toast(got ? `냠냠 · 기운 +${got}` : '냠냠 · 배불러요', 2400);
+          hud.toast('냠냠!', 2400, { chips: [got ? { icon: 'energy', text: `기운 +${got}` } : { text: '배불러요' }] });
           reward(n, 'home');
         });
       }
@@ -1670,7 +1672,7 @@ function boot() {
           overlay = false;
           const got = gainStamina(15);
           beginTalk(n);
-          sayAs(n, ['같이 부르니까 훨씬 좋다~!', '{name} 목소리 예쁘다~ 또 같이 하자!'], () => { hud.toast(`기분이 좋아졌어요${got ? ` · 기운 +${got}` : ''}`, 2600); reward(n, 'home'); });
+          sayAs(n, ['같이 부르니까 훨씬 좋다~!', '{name} 목소리 예쁘다~ 또 같이 하자!'], () => { hud.toast('기분이 좋아졌어요', 2600, got ? { chips: [{ icon: 'energy', text: `기운 +${got}` }] } : null); reward(n, 'home'); });
         }, 3000);
       });
     }
@@ -1704,7 +1706,7 @@ function boot() {
     beginTalk(n);
     if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '오늘은 네 무기에 힘이 더 실릴 거다.', '몬스터 앞에서 써 봐라.'], () => {
       rooms.hostPose('cheer', 1.2);
-      hud.banner('수련 성공!', `오늘 하루 공격 +${DRILL.bonus} · 기운 −${DRILL.cost}`, 2800);
+      hud.banner('수련 성공!', '오늘 하루 무기가 더 세져요', 2800, [{ text: `💪 공격 +${DRILL.bonus}` }, { icon: 'energy', text: `기운 −${DRILL.cost}` }]);
       sound.play('done');
       reward(n, 'home');
     });
@@ -2290,7 +2292,12 @@ function boot() {
       hud.render(state);
       // 하는 중인 퀘스트를 모두(화면에 띄우기로 고른 것이 맨 위)
       const qt = pickTrack(state), qs = activeQuests(state);
-      hud.setQuests((qt ? [qt, ...qs.filter((id) => id !== qt)] : qs).map((id) => ({ id, title: QUESTS[id].title, story: !!QUESTS[id].story, ...shortGoal(state, id) })));
+      hud.setQuests((qt ? [qt, ...qs.filter((id) => id !== qt)] : qs).map((id) => {
+        const g = shortGoal(state, id);
+        // 물건 · 몬스터는 그림 꼬리표로(몇 개 남았는지 한눈에)
+        const chips = g.parts.map((pt) => ({ icon: pt.kind === 'monster' ? monsterSvg(pt.id) : itemSvg(pt.id), text: `${pt.have}/${pt.need}`, done: pt.have >= pt.need }));
+        return { id, title: QUESTS[id].title, story: !!QUESTS[id].story, goal: g.goal, n: g.n, chips };
+      }));
       // 불: 등불 버튼 모양, 손에 든 모습, 따라다니는 빛
       const lightMode = lightOf(state);
       hud.setLight(hasTool(state, 'lantern') || hasTool(state, 'flashlight') ? lightMode : null);

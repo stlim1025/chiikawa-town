@@ -113,6 +113,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-toasts { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(440px, 50vw); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; z-index: 3; }
 .toast { display: flex; align-items: center; gap: 8px; padding: 5px 18px 7px 10px; border-radius: 999px; background: var(--paper); box-shadow: var(--lift); font-size: 19px; line-height: 1.25; text-align: center; animation: toast-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1); }
 .toast::before { content: ""; flex: 0 0 auto; width: 22px; height: 22px; background: no-repeat center / contain var(--leaf); }
+.toast.has-icon::before { display: none; }
+.toast .t-ico { flex: 0 0 auto; width: 36px; height: 36px; margin: -7px -2px -7px -4px; }
+.toast .t-ico svg { display: block; width: 100%; height: 100%; }
+.toast .t-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 10px 2px 6px; border-radius: 999px; background: #fff6dc; box-shadow: 0 1px 0 #e8c97a; font-style: normal; font-size: 16px; white-space: nowrap; }
+.toast .t-chip svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.toast .t-chip em { font-style: normal; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-14px) scale(0.9); } to { opacity: 1; transform: none; } }
 /* 큰 소식(노동 완료, 내 집 마련, 청약 당첨) */
 .hud-banner { position: absolute; left: 50%; top: 32%; padding: 12px 36px 16px; text-align: center; color: var(--ink); background: var(--dots), var(--paper); border-radius: var(--r);
@@ -934,17 +940,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-quest i { grid-row: span 2; align-self: center; padding: 1px 8px 2px; border-radius: 999px; font-style: normal; font-size: 13px; color: #8a5a10; background: #ffd77a; }
 .hud-quest.story i { color: #fff; background: #c0473c; }
 .hud-quest b { font-size: 16px; }
-.hud-quest span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink-soft); font-size: 15px; }
+.hud-quest > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink-soft); font-size: 15px; }
 .hud-quest em { font-style: normal; }
 .hud-quest small { padding: 0 8px 1px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-size: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-quests { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.hud-quest, .toast { word-break: keep-all; } /* 한국어는 낱말 단위로 줄바꿈 */
+.hud-quest .q-chips { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
+.hud-quest .q-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 9px 1px 3px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hud-quest .q-chip svg { width: 24px; height: 24px; margin: -4px 0; flex: 0 0 auto; }
+.hud-quest .q-chip.done { background: #c9eccf; color: #2f6b3c; }
 .hud-quests:empty { display: none; }
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
   .hud-quest { grid-template-columns: 1fr; padding: 4px 12px 6px 10px; }
   .hud-quest i { grid-row: auto; justify-self: start; padding: 0 7px 1px; font-size: 12px; }
   .hud-quest b { font-size: 15px; }
-  .hud-quest span { font-size: 14px; }
+  .hud-quest > span { font-size: 14px; }
 }
 .panel .t .power { white-space: nowrap; }
 .hud-quest.got { animation: q-got 1.2s ease-out; }
@@ -991,7 +1002,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 [data-input="desk"] .hud-quest { max-width: min(520px, 46vw); gap: 2px 10px; padding: 7px 20px 9px 12px; }
 [data-input="desk"] .hud-quest i { padding: 2px 10px 3px; font-size: 16px; }
 [data-input="desk"] .hud-quest b { font-size: 20px; }
-[data-input="desk"] .hud-quest span { font-size: 18px; }
+[data-input="desk"] .hud-quest > span { font-size: 18px; }
 
 /* ---------- 주머니(동물의 숲처럼): 동그란 칸 · 개수 · 이름 말풍선 · 할 일 메뉴 ---------- */
 .panel-bag { width: min(760px, 100%); --tab: #f6c453; }
