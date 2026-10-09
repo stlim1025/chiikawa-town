@@ -100,12 +100,12 @@ function svgSpan(cls, html) {
 const head = (title, money) => h('div', { class: 'panel-head' }, h('h2', {}, title),
   money == null ? null : h('div', { class: 'wallet' }, svgSpan('wallet-ico', COIN), won(money)));
 
-/** 게시판 일감 한 종류의 남은 건수: 하루 몫만큼 동그라미(남은 만큼 채운다) + 글씨. 1건이면 주황, 0건이면 회색 '마감'. */
-function leftPill(n, max) {
-  const cls = n <= 0 ? ' out' : n === 1 ? ' last' : '';
-  const dots = h('span', { class: 'dots', 'aria-hidden': 'true' }, Array.from({ length: max }, (_, i) => h('i', { class: i < n ? 'on' : '' })));
-  return h('span', { class: `left-pill${cls}` }, dots, n <= 0 ? '마감' : n === 1 ? '마지막 1건' : `${n}건 남음`);
-}
+/** 노동 접수 창에서 고른 탭(마을 일 · 토벌 · 전리품). 창을 다시 열어도 그대로. */
+let boardTab = 'work';
+/** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
+const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
+/** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
+const jobArt = (type) => (type.hunt ? monsterSvg(type.kind) : type.kind === 'sticker' ? STICKER_ART : itemSvg(type.kind));
 
 /** 하트 2개부터 집(동굴)에 놀러 가서 같이 놀 수 있는 친구. */
 const HOME_VISIT = new Set(['chiikawa', 'hachiware', 'usagi', 'kurimanju', 'momonga', 'rakko']);
@@ -236,6 +236,43 @@ export function createPanels(ui, handlers) {
   });
   const closeBtn = () => h('button', { class: 'btn', type: 'button', onClick: () => close() }, '닫기');
   const after = (fn) => () => { fn(); if (current) render(); };
+  /**
+   * 노동 접수 일감 한 줄(장부처럼 줄마다 점선으로 나눈다): 그림 | 이름 + 어디서 | 보수 + 남은 건수 | 받기.
+   * 보수는 오른쪽 한 칸에 모아 숫자끼리 줄이 맞게, 남은 건수는 그 밑 작은 글씨로. 다 나가면 흐리게 하고 '마감' 도장.
+   */
+  function jobRow(type, n, mult) {
+    const pay = won(Math.round(type.base * mult));
+    return h('div', { class: `job-row${n > 0 ? '' : ' soldout'}` },
+      svgSpan('job-art', jobArt(type)),
+      h('div', { class: 'job-main' }, h('b', { class: 'job-name' }, type.title), h('span', { class: 'job-where' }, ico('pin'), type.where)),
+      h('div', { class: 'job-pay' }, h('b', {}, svgSpan('coin', COIN), `${pay}~`),
+        h('small', { class: n === 1 ? 'last' : '' }, n <= 0 ? '오늘 마감' : n === 1 ? '마지막 1건' : `${n}건 남음`)),
+      n > 0 ? h('button', { class: 'btn primary take', type: 'button', onClick: after(() => handlers.acceptJob(type.id)) }, '받기')
+        : h('span', { class: 'job-stamp' }, '마감'));
+  }
+  /** 하는 중인 일감: 그림 · 이름 · 진행 막대(동물의 숲 마일 목록처럼) · 깔끔하게 뽑은 수, 다 하면 보수 받기. */
+  function jobNow(s) {
+    const type = JOB_TYPES[s.job.typeId], done = isComplete(s.job), pct = Math.min(100, Math.round((s.job.count / type.target) * 100));
+    return h('div', { class: `job-now${done ? ' done' : ''}` },
+      svgSpan('job-art', jobArt(type)),
+      h('div', { class: 'job-main' },
+        h('span', { class: 'job-kicker' }, done ? '다 했어요!' : '하는 중'),
+        h('b', { class: 'job-name' }, type.title),
+        h('div', { class: 'job-prog' }, h('i', { class: 'bar' }, h('i', { style: `width: ${pct}%` })), h('b', {}, `${s.job.count} / ${type.target}`)),
+        h('span', { class: 'job-where' }, ico('star'), `깔끔하게 ${s.job.clean}번`)),
+      done ? h('button', { class: 'btn primary take', type: 'button', onClick: after(handlers.reportJob) }, '보수 받기', h('small', {}, won(payout(s.job, s.license.grade))))
+        : h('button', { class: 'btn take quiet', type: 'button', onClick: after(handlers.quitJob) }, '그만두기'));
+  }
+  /** 전리품 팔기: 가방 칸처럼 네모 칸에 그림, 오른쪽 아래 개수. 밑에 모두 판 값과 버튼. */
+  function sellBox(s, drops) {
+    const items = bagOf(s).items, total = drops.reduce((a, id) => a + items[id] * DROPS[id].price, 0);
+    return h('div', { class: 'sell-box' },
+      h('div', { class: 'slots' }, drops.map((id) => h('span', { class: 'slot', title: DROPS[id].name, 'aria-label': `${DROPS[id].name} ${items[id]}개` },
+        svgSpan('art', dropSvg(id)), h('em', {}, `×${items[id]}`)))),
+      h('div', { class: 'sell-foot' },
+        h('span', { class: 'sum' }, '모두 팔면', h('b', {}, svgSpan('coin', COIN), won(total))),
+        h('button', { class: 'btn pink take', type: 'button', onClick: after(handlers.sellDrops) }, '모두 팔기')));
+  }
   // 마을폰 앱 화면 위 막대: 홈으로(‹) · 앱 이름 · (지도면) 지금 있는 곳
   const appBar = (title, tag) => h('div', { class: 'phone-bar' },
     h('button', { class: 'phone-back', type: 'button', 'aria-label': '홈으로', onClick: () => show('settings') }, '‹'),
@@ -262,55 +299,49 @@ export function createPanels(ui, handlers) {
 
   const BUILD = {
     board(s) {
-      const left = boardOf(s, s.clock.day).left, mine = availableJobs(s.license.grade, licensesOf(s));
+      const left = boardOf(s, s.clock.day).left, tutorial = s.tutorial === 'board';
+      // 하치와레 안내 중(첫 일감)에는 풀 뽑기만 보여 준다
+      const mine = tutorial ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s));
       const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
-      const out = [head('노동 접수'), h('p', { class: 'sub' }, remain > 0 ? '날마다 새 일감이 올라와요' : '오늘 일감은 다 나갔어요')];
-      // 오늘 남은 일감: 큰 숫자 + 남은 만큼 찬 막대(한눈에 보이게). 적게 남으면 주황, 다 나가면 회색
-      const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;
-      out.push(h('div', { class: `board-sum${remain <= 0 ? ' out' : remain / total <= 0.25 ? ' low' : ''}` },
-        h('div', { class: 'board-sum-top' },
-          h('span', { class: 'lab' }, '남은 일감'), h('b', {}, String(remain)), h('span', { class: 'of' }, `/ ${Math.max(total, remain)}건`)),
-        h('div', { class: 'board-bar', role: 'progressbar', 'aria-label': '오늘 남은 일감', 'aria-valuemin': '0', 'aria-valuemax': String(Math.max(total, remain)), 'aria-valuenow': String(remain) },
-          h('i', { style: `width: ${pct}%` }))));
       const mult = PAY_MULT[s.license.grade];
+      const items = bagOf(s).items, drops = Object.keys(DROPS).filter((id) => items[id] > 0);
+      const out = [head('노동 접수', s.money)];
+      // 오늘 남은 일감: 제목 밑 얇은 막대 한 줄(상자 없이)
+      if (!tutorial) {
+        const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;
+        out.push(h('div', { class: `board-meter${remain <= 0 ? ' out' : remain / total <= 0.25 ? ' low' : ''}` },
+          h('span', { class: 'lab' }, remain > 0 ? '오늘 남은 일감' : '오늘 일감은 다 나갔어요'),
+          h('span', { class: 'num' }, h('b', {}, String(remain)), ` / ${Math.max(total, remain)}`),
+          h('i', { class: 'bar', role: 'progressbar', 'aria-label': '오늘 남은 일감', 'aria-valuemin': '0', 'aria-valuemax': String(Math.max(total, remain)), 'aria-valuenow': String(remain) },
+            h('i', { style: `width: ${pct}%` }))));
+      }
       if (s.job) {
-        const type = JOB_TYPES[s.job.typeId], done = isComplete(s.job);
-        out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, type.title), chipLine(chip('check', '', `진행 ${s.job.count} / ${type.target}`), chip('star', '', `깔끔하게 ${s.job.clean}번`))),
-          done
-            ? h('button', { class: 'btn primary', type: 'button', onClick: after(handlers.reportJob) }, `보수 받기 ${won(payout(s.job, s.license.grade))}`)
-            : h('button', { class: 'btn', type: 'button', onClick: after(handlers.quitJob) }, '그만두기')));
+        out.push(jobNow(s));
+        if (drops.length) out.push(h('h3', { class: 'shop-sec' }, '전리품 팔기'), sellBox(s, drops));
       } else {
-        // 하치와레 안내 중(첫 일감)에는 풀 뽑기만 보여 준다
-        const jobs = s.tutorial === 'board' ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s));
-        let huntHead = false;
-        jobs.forEach((type) => {
-          // 토벌 일감은 따로 제목을 달고 몬스터 얼굴을 붙인다
-          if (type.hunt && !huntHead) { huntHead = true; out.push(h('h3', { class: 'shop-sec' }, '토벌 일감')); }
-          // 남은 건수는 제목 옆 알약(하루 몫만큼 동그라미)으로 크게
-          const n = left[type.id] ?? 0, max = Math.max(DAILY_JOBS[type.id] ?? 0, n);
-          out.push(h('div', { class: `row job${n > 0 ? '' : ' soldout'}${type.hunt ? ' hunt' : ''}` },
-            type.hunt ? svgSpan('job-ico', monsterSvg(type.kind)) : null,
-            h('div', {},
-              h('div', { class: 'job-title' }, h('span', { class: 't' }, type.title), leftPill(n, max)),
-              chipLine(chip('coin', '', `${won(Math.round(type.base * (type.hunt ? 1 : mult)))}부터`), chip('pin', '', type.where))),
-            h('button', { class: 'btn primary', type: 'button', disabled: n <= 0, onClick: after(() => handlers.acceptJob(type.id)) }, n > 0 ? '받기' : '오늘 마감')));
-        });
-      }
-      // 전리품 팔기: 가방의 몬스터 전리품을 한꺼번에
-      const drops = Object.keys(DROPS).filter((id) => bagOf(s).items[id] > 0);
-      if (drops.length) {
-        const total = drops.reduce((a, id) => a + bagOf(s).items[id] * DROPS[id].price, 0);
-        // 위: 제목과 받기 버튼, 아래: 전리품마다 그림 + 개수 꼬리표(많아져도 줄을 바꿔 쌓인다)
-        out.push(h('div', { class: 'row sell' },
-          h('div', { class: 'sell-head' }, h('div', { class: 't' }, '전리품 팔기'),
-            h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.sellDrops) }, `${won(total)} 받기`)),
-          h('div', { class: 'sell-chips' }, drops.map((id) => {
-            const n = bagOf(s).items[id];
-            return h('span', { class: 'chip drop', title: DROPS[id].name, 'aria-label': `${DROPS[id].name} ${n}개` }, svgSpan('ico', dropSvg(id)), h('b', {}, `×${n}`));
+        // 탭(몬스터 헌터 퀘스트 카운터 · 동물의 숲 마일 목록처럼): 마을 일 | 토벌 | 전리품 — 한 번에 한 묶음만
+        const tabs = [{ id: 'work', label: '마을 일', list: mine.filter((t) => !t.hunt) }];
+        const hunts = mine.filter((t) => t.hunt);
+        if (hunts.length) tabs.push({ id: 'hunt', label: '토벌', list: hunts });
+        if (drops.length && !tutorial) tabs.push({ id: 'sell', label: '전리품', n: drops.reduce((a, id) => a + items[id], 0) });
+        if (!tabs.some((t) => t.id === boardTab)) boardTab = 'work';
+        if (tabs.length > 1) {
+          // 탭 줄은 목록을 내려도 창 위에 붙어 있다(휴대폰에서 다른 탭으로 바로)
+          out.push(h('div', { class: 'board-tabs-wrap' }, h('div', { class: 'board-tabs', role: 'tablist' }, tabs.map((t) => {
+            const n = t.n ?? t.list.reduce((a, j) => a + (left[j.id] ?? 0), 0);
+            return h('button', { class: 'board-tab', type: 'button', role: 'tab', 'aria-selected': String(t.id === boardTab),
+              onClick: () => { if (boardTab === t.id) return; boardTab = t.id; render(); current.panel.scrollTop = 0; } },
+            t.label, h('span', { class: 'n' }, String(n)));
           }))));
+        }
+        const tab = tabs.find((t) => t.id === boardTab);
+        if (tab.id === 'sell') out.push(sellBox(s, drops));
+        else {
+          // 마감된 일감은 아래로(받을 수 있는 것부터 보이게, 순서는 그대로)
+          const open = (t) => ((left[t.id] ?? 0) > 0 ? 0 : 1);
+          out.push(h('div', { class: 'ledger' }, [...tab.list].sort((a, c) => open(a) - open(c)).map((type) => jobRow(type, left[type.id] ?? 0, type.hunt ? 1 : mult))));
+        }
       }
-      // 급수 · 승급 안내는 검정소와 마을폰 자격증 앱에서 본다(게시판은 일감만 간단히)
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
