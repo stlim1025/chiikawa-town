@@ -1784,7 +1784,7 @@ function boot() {
   const setCinematic = (on) => document.body.classList.toggle('cinematic', on);
   setCinematic(true);
 
-  /** 저장된(또는 새) 상태로 마을 입구에서 입장한다. */
+  /** 새 캐릭터는 마을 입구에서 걸어 들어오고(입장 연출), 이어하기는 저장된 자리에서 바로 시작한다. */
   function beginSession(next, fresh) {
     lastRegion = null; // 다시 시작해도 구역 알림이 잘못 뜨지 않게
     // 예전 저장에는 시작 날짜가 없다: 지금 날이 오늘이 되도록 거꾸로 맞춘다
@@ -1798,6 +1798,18 @@ function boot() {
       player = createPlayer(scene, chibi, village);
       intro = createIntro(ui, { player, cam, npcs, village, sound });
     } else player.setModel(chibi);
+    // 이어하기: 입장 연출 없이 지난번에 있던 자리에서 바로 시작한다(처음 만든 캐릭터만 마을 입구로 걸어 들어온다)
+    if (!fresh) {
+      player.walkTo = null;
+      player.setPosition(state.player.x, state.player.z);
+      cam.snap(player.position);
+      mode = 'play';
+      setCinematic(false);
+      input.setEnabled(true);
+      hud.toast(`다시 왔네요, ${state.profile.name}!`, 2600);
+      if (tutorialActive(state.tutorial)) enterTutorial(state.tutorial, null);
+      return;
+    }
     mode = 'intro';
     input.setEnabled(false);
     setCinematic(true);
