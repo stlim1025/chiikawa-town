@@ -201,30 +201,34 @@ export function bond(state, kind, pts) {
   return { state: s, up: hearts(next) > hearts(f), hearts: hearts(next), gift };
 }
 
-/** 보상을 준다. → { state, got: [글자], gifts: [가구 id], up: 하트가 늘었는지 } */
+/**
+ * 보상을 준다. → { state, got: [글자], parts: [{ kind, id?, n?, text }] (화면 꼬리표용), gifts: [가구 id], up: 하트가 늘었는지 }
+ * parts.kind: 'money' | 'bond' | 'village' | 'item' | 'accessory' | 'weapon' | 'furniture' | 'truce'
+ */
 export function giveReward(state, id, day) {
-  const Q = QUESTS[id], R = Q.reward || {}, got = [], gifts = [];
+  const Q = QUESTS[id], R = Q.reward || {}, got = [], parts = [], gifts = [];
+  const add = (part) => { parts.push(part); got.push(part.long || part.text); };
   let s = state, up = false;
-  if (R.money) { s = { ...s, money: s.money + R.money }; got.push(`${R.money.toLocaleString('ko-KR')}원`); }
-  if (R.bond) { const b = bond(s, Q.giver, R.bond); s = b.state; up = b.up; if (b.gift) gifts.push(b.gift); got.push(`${FRIENDS[Q.giver].name} 친밀도 +${R.bond}`); }
+  if (R.money) { s = { ...s, money: s.money + R.money }; add({ kind: 'money', n: R.money, text: `${R.money.toLocaleString('ko-KR')}원` }); }
+  if (R.bond) { const b = bond(s, Q.giver, R.bond); s = b.state; up = b.up; if (b.gift) gifts.push(b.gift); add({ kind: 'bond', id: Q.giver, n: R.bond, text: `${FRIENDS[Q.giver].name} +${R.bond}`, long: `${FRIENDS[Q.giver].name} 친밀도 +${R.bond}` }); }
   if (R.village) {
     for (const k of ['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko', 'shisa', 'kani']) { const b = bond(s, k, R.village); s = b.state; if (b.gift) gifts.push(b.gift); }
-    got.push('마을 친구들 모두와 친밀도 +' + R.village);
+    add({ kind: 'village', n: R.village, text: `마을 친구 모두 +${R.village}`, long: '마을 친구들 모두와 친밀도 +' + R.village });
   }
-  if (R.items) for (const [it, n] of Object.entries(R.items)) { s = addItem(s, it, n).state; got.push(`${itemInfo(it).name} ×${n}`); }
+  if (R.items) for (const [it, n] of Object.entries(R.items)) { s = addItem(s, it, n).state; add({ kind: 'item', id: it, n, text: `${itemInfo(it).name} ×${n}` }); }
   if (R.accessory) {
     const w = wardrobeOf(s);
-    if (!w.owned.includes(R.accessory)) { s = { ...s, wardrobe: { owned: [...w.owned, R.accessory], wear: w.wear } }; got.push(`${ACCESSORY_ITEMS[R.accessory].name}(옷장)`); }
-    else { s = { ...s, money: s.money + 300 }; got.push('300원(이미 가진 소품 대신)'); }
+    if (!w.owned.includes(R.accessory)) { s = { ...s, wardrobe: { owned: [...w.owned, R.accessory], wear: w.wear } }; add({ kind: 'accessory', id: R.accessory, text: ACCESSORY_ITEMS[R.accessory].name, long: `${ACCESSORY_ITEMS[R.accessory].name}(옷장)` }); }
+    else { s = { ...s, money: s.money + 300 }; add({ kind: 'money', n: 300, text: '300원', long: '300원(이미 가진 소품 대신)' }); }
   }
   if (R.weapon) {
     const w = weaponOf(s);
-    if (!w.owned.includes(R.weapon)) { s = { ...s, weapon: { owned: [...w.owned, R.weapon], held: w.held || R.weapon } }; got.push(`${WEAPONS[R.weapon].name}(무기)`); }
-    else { const m = Math.round(WEAPONS[R.weapon].price / 2); s = { ...s, money: s.money + m }; got.push(`${m.toLocaleString('ko-KR')}원(이미 가진 무기 대신)`); }
+    if (!w.owned.includes(R.weapon)) { s = { ...s, weapon: { owned: [...w.owned, R.weapon], held: w.held || R.weapon } }; add({ kind: 'weapon', id: R.weapon, text: WEAPONS[R.weapon].name, long: `${WEAPONS[R.weapon].name}(무기)` }); }
+    else { const m = Math.round(WEAPONS[R.weapon].price / 2); s = { ...s, money: s.money + m }; add({ kind: 'money', n: m, text: `${m.toLocaleString('ko-KR')}원`, long: `${m.toLocaleString('ko-KR')}원(이미 가진 무기 대신)` }); }
   }
-  if (R.furniture) { const home = homeOf(s); s = { ...s, home: { ...home, owned: { ...home.owned, [R.furniture]: (home.owned[R.furniture] || 0) + 1 } } }; got.push(`${FURNITURE[R.furniture].name}(가구)`); }
-  if (R.truce) { s = { ...s, truce: day + R.truce - 1 }; got.push(`모몽가가 ${R.truce}일 동안 소매치기 안 하기`); }
-  return { state: s, got, gifts, up };
+  if (R.furniture) { const home = homeOf(s); s = { ...s, home: { ...home, owned: { ...home.owned, [R.furniture]: (home.owned[R.furniture] || 0) + 1 } } }; add({ kind: 'furniture', id: R.furniture, text: FURNITURE[R.furniture].name, long: `${FURNITURE[R.furniture].name}(가구)` }); }
+  if (R.truce) { s = { ...s, truce: day + R.truce - 1 }; add({ kind: 'truce', n: R.truce, text: `모몽가 휴전 ${R.truce}일`, long: `모몽가가 ${R.truce}일 동안 소매치기 안 하기` }); }
+  return { state: s, got, parts, gifts, up };
 }
 
 /**
@@ -263,6 +267,15 @@ export function goalText(state, id) {
   const p = progressOf(state, id);
   if (stepReady(state, id) && step.type !== 'talk') return `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`;
   return p ? `${step.goal} · ${p.have} / ${p.need}` : step.goal;
+}
+
+/** 화면 왼쪽 위 쪽지용 짧은 목표: 괄호 속 안내는 빼고, 진행 숫자는 따로. → { goal, n: '0 / 3' | '' } */
+export function shortGoal(state, id) {
+  const step = stepOf(state, id);
+  if (!step) return { goal: '', n: '' };
+  if (stepReady(state, id) && step.type !== 'talk') return { goal: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, n: '' };
+  const p = progressOf(state, id);
+  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n: p ? `${p.have} / ${p.need}` : '' };
 }
 
 /** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */

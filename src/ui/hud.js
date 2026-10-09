@@ -38,16 +38,18 @@ export function createHud(ui, input) {
     <div class="hud-grade"></div>
     <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>`;
   const job = el('div', 'hud-job');
-  // 지금 하는 퀘스트(5단계): 일감 칸 아래 두루마리 쪽지
-  const quest = el('div', 'hud-quest');
-  quest.hidden = true;
-  quest.innerHTML = '<i></i><b></b><span></span>';
-  dock.append(status, job, quest);
-  // 퀘스트 쪽지로 날아가는 카드 수(그동안 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
-  let questFly = 0;
+  job.hidden = true;
+  job.innerHTML = '<b></b><span class="n"></span>';
+  // 하는 중인 퀘스트(5단계): 일감 칸 아래에 퀘스트마다 쪽지 한 장씩(화면에 띄운 것이 맨 위)
+  const quests = el('div', 'hud-quests');
+  dock.append(status, job, quests);
+  const notes = new Map(); // 퀘스트 id → { el, key }
+  // 카드가 날아오는 중인 퀘스트(그동안 그 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
+  const incoming = new Map(); // id → 날아오는 카드 수
   const STAR = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0Q11.2 8.8 20 10Q11.2 11.2 10 20Q8.8 11.2 0 10Q8.8 8.8 10 0Z" fill="currentColor"/></svg>';
   /** 퀘스트 쪽지가 톡 튀며 반짝: 빛이 한 번 쓸고 지나가고, 둘레에서 별이 튄다. */
-  function shineQuest() {
+  function shineQuest(quest) {
+    if (!quest) return;
     quest.classList.remove('got', 'shine');
     void quest.offsetWidth;
     quest.classList.add('shine');
@@ -146,14 +148,23 @@ export function createHud(ui, input) {
         bar.firstChild.style.width = (state.stamina / MAX_STAMINA) * 100 + '%';
         bar.classList.toggle('low', state.stamina <= 25);
       }
-      let text;
+      // 일감 칸: 일감(또는 승급 시험)이 있을 때만. 이름 + 진행 숫자만 짧게
+      let title = null, n = '';
       const done = !state.exam && !!state.job && isComplete(state.job);
-      if (state.exam) text = `승급 시험 ${state.exam.streak} / ${state.exam.need || 5} · 깔끔하게 연속으로`;
+      if (state.exam) { title = '승급 시험'; n = `연속 ${state.exam.streak} / ${state.exam.need || 5}`; }
       else if (state.job) {
         const type = JOB_TYPES[state.job.typeId];
-        text = done ? `${type.title} 완료! · 노동 접수에서 보수 받기` : `${type.title} ${state.job.count} / ${type.target}${type.id === 'weed8' ? '' : ' · ' + type.where}`;
-      } else text = '일감 없음 · 노동 접수에서 받아요';
-      if (text !== lastText) { job.textContent = text; lastText = text; job.classList.toggle('done', done); }
+        title = type.title;
+        n = done ? '보수 받으러 가요!' : `${state.job.count} / ${type.target}`;
+      }
+      const text = title ? title + '|' + n : '';
+      if (text !== lastText) {
+        lastText = text;
+        job.hidden = !title;
+        job.querySelector('b').textContent = title || '';
+        job.querySelector('.n').textContent = n;
+        job.classList.toggle('done', done);
+      }
       // 시각은 동물의 숲처럼 12시간제 큰 숫자 + 오전/오후
       const minutes = Math.round(hourOf(state.clock) * 60) % 1440, h24 = Math.floor(minutes / 60);
       setText('date', dateEl, dateLabel(state.startDate || todayISO(), state.clock.day));
@@ -162,20 +173,38 @@ export function createHud(ui, input) {
       const phase = phaseOf(state.clock);
       if (shown.phase !== phase) { shown.phase = phase; skyEl.innerHTML = SKY_ICON[phase]; }
     },
-    /** 지금 하는 퀘스트 { title, goal, story } | null. */
-    setQuest(q) {
-      const key = q ? q.title + '|' + q.goal : '';
-      if (shown.quest === key) return;
-      shown.quest = key;
-      quest.hidden = !q;
-      if (!q) return;
-      quest.classList.toggle('story', !!q.story);
-      quest.querySelector('i').textContent = q.story ? '이야기' : '부탁';
-      quest.querySelector('b').textContent = q.title;
-      quest.querySelector('span').textContent = q.goal;
-      // 새 부탁 쪽지가 날아오는 중이면 반짝임은 쪽지가 꽂힐 때(announce) 한다
-      if (questFly) return;
-      quest.classList.remove('got'); void quest.offsetWidth; quest.classList.add('got');
+    /**
+     * 하는 중인 퀘스트 쪽지들 [{ id, title, goal, n?: '0 / 3', story }] (위에서부터 이 순서로). 빈 목록이면 모두 숨긴다.
+     * 목표나 진행이 바뀐 쪽지는 톡 튄다(카드가 날아오는 중이면 꽂힐 때 반짝인다).
+     */
+    setQuests(list) {
+      const key = list.map((q) => q.id + ':' + q.goal + ':' + (q.n || '')).join('|');
+      if (shown.quests === key) return;
+      shown.quests = key;
+      const keep = new Set(list.map((q) => q.id));
+      for (const [id, nt] of notes) if (!keep.has(id)) { nt.el.remove(); notes.delete(id); }
+      list.forEach((q, i) => {
+        let nt = notes.get(q.id);
+        if (!nt) {
+          const e = el('div', 'hud-quest');
+          e.innerHTML = '<i></i><b></b><span><em></em><small></small></span>';
+          nt = { el: e, key: '' };
+          notes.set(q.id, nt);
+        }
+        const e = nt.el;
+        if (quests.children[i] !== e) quests.insertBefore(e, quests.children[i] || null);
+        e.classList.toggle('story', !!q.story);
+        e.classList.toggle('incoming', incoming.has(q.id));
+        e.querySelector('i').textContent = q.story ? '이야기' : '부탁';
+        e.querySelector('b').textContent = q.title;
+        e.querySelector('em').textContent = q.goal;
+        const sm = e.querySelector('small');
+        sm.textContent = q.n || '';
+        sm.hidden = !q.n;
+        const k = q.goal + '|' + (q.n || '');
+        if (nt.key && nt.key !== k && !incoming.has(q.id)) { e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); }
+        nt.key = k;
+      });
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
     setAction(label) {
@@ -205,9 +234,9 @@ export function createHud(ui, input) {
      * to: 'job'(일감 칸, 기본) | 'quest'(퀘스트 쪽지 — 쪽지는 카드가 꽂힐 때 나타나며 별이 튄다)
      * { kicker: '새 일감!', title, sub, to }
      */
-    announce({ kicker, title, sub, to = 'job' }) {
-      const toQuest = to === 'quest', target = toQuest ? quest : job;
-      if (toQuest) { questFly++; quest.classList.add('incoming'); }
+    announce({ kicker, title, sub, to = 'job', id = null }) {
+      const toQuest = to === 'quest';
+      if (toQuest && id) { incoming.set(id, (incoming.get(id) || 0) + 1); notes.get(id)?.el.classList.add('incoming'); }
       const card = el('div', 'task-card' + (toQuest ? ' quest' : ''));
       card.setAttribute('role', 'status');
       card.innerHTML = `<span class="task-ico">${NOTE}</span><div class="task-txt"><i></i><b></b><span></span></div>`;
@@ -216,7 +245,12 @@ export function createHud(ui, input) {
       card.querySelector('.task-txt span').textContent = sub || '';
       ui.appendChild(card);
       const glow = () => {
-        if (toQuest) { questFly = Math.max(0, questFly - 1); if (!questFly) quest.classList.remove('incoming'); shineQuest(); return; }
+        if (toQuest) {
+          const left = (incoming.get(id) || 1) - 1, note = notes.get(id)?.el;
+          if (left > 0) incoming.set(id, left); else { incoming.delete(id); note?.classList.remove('incoming'); }
+          shineQuest(note);
+          return;
+        }
         job.classList.remove('got');
         void job.offsetWidth; // 반짝임 다시 시작
         job.classList.add('got');
@@ -224,7 +258,10 @@ export function createHud(ui, input) {
       };
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       setTimeout(() => {
+        const target = toQuest ? (notes.get(id)?.el || quests) : job;
+        if (toQuest) target.style.visibility = 'hidden'; // 자리는 재되 아직 보이지 않게
         const to = target.getBoundingClientRect();
+        if (toQuest) target.style.visibility = '';
         if (still || !card.animate || !to.width) { card.remove(); glow(); return; }
         // 일감 칸(또는 퀘스트 쪽지) 자리로 줄어들며 날아간다
         const from = card.getBoundingClientRect();
@@ -276,12 +313,25 @@ export function createHud(ui, input) {
       fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : kind === 'note' ? 1400 : 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
-    banner(title, sub, ms = 2600) {
-      const b = el('div', 'hud-banner');
+    /**
+     * chips: 보상 꼬리표 [{ icon: 'coin' | 'heart' | SVG 문자열 | null, text }] — 긴 글 대신 아이콘 + 짧은 글로 한 줄에.
+     */
+    banner(title, sub, ms = 2600, chips = null) {
+      const b = el('div', 'hud-banner' + (chips && chips.length ? ' has-chips' : ''));
       b.setAttribute('role', 'status');
       b.innerHTML = '<b></b><span></span>';
       b.querySelector('b').textContent = title;
       b.querySelector('span').textContent = sub || '';
+      if (chips && chips.length) {
+        const row = el('div', 'banner-chips');
+        chips.forEach((c) => {
+          const ch = el('i', 'banner-chip');
+          ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon === 'heart' ? HEART_SVG : c.icon || '') + '<em></em>';
+          ch.querySelector('em').textContent = c.text;
+          row.appendChild(ch);
+        });
+        b.appendChild(row);
+      }
       ui.appendChild(b);
       setTimeout(() => b.classList.add('out'), ms - 400);
       setTimeout(() => b.remove(), ms);

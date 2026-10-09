@@ -8,9 +8,9 @@ export const ACCESSORY_ITEMS = {
   ribbon: { name: '분홍 리본', price: 200, note: '머리 옆에 나비 리본' },
   flower: { name: '하얀 꽃 핀', price: 200, note: '들꽃 한 송이' },
   sprout: { name: '새싹 머리띠', price: 150, note: '머리 위에 새싹 둘' },
-  glasses: { name: '동글 안경', price: 400, note: '책을 읽을 것 같은 동그란 안경' },
-  cap: { name: '빨간 모자', price: 500, note: '햇빛도 가려 주는 둥근 모자' },
-  crown: { name: '반짝 왕관', price: 3000, note: '부자만 쓸 수 있는 황금 왕관' }
+  glasses: { name: '동글 안경', price: 400, note: '똑똑해 보이는 안경' },
+  cap: { name: '빨간 모자', price: 500, note: '햇빛 가리개 모자' },
+  crown: { name: '반짝 왕관', price: 3000, note: '반짝이는 황금 왕관' }
 };
 
 export function wardrobeOf(state) {

@@ -5,9 +5,9 @@ import { trySpend } from './state.js';
  * state.tools = { owned: [도구 id], light: 'off' | 'lantern' | 'flashlight' }
  */
 export const TOOLS = {
-  map: { name: '마을 지도', price: 500, shop: 'books', note: '다녀온 곳이 밝게 보이는 지도' },
-  lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 둥글게 밝힌다' },
-  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '바라보는 쪽을 멀리 밝힌다' }
+  map: { name: '마을 지도', price: 500, shop: 'books', note: '다녀온 곳이 다 보여요' },
+  lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 밝혀요' },
+  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '앞쪽을 멀리 밝혀요' }
 };
 export const LIGHT_ORDER = ['off', 'lantern', 'flashlight'];
 

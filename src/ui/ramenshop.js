@@ -181,9 +181,9 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
   }
   function addIngredient(id) {
     if (INGREDIENTS[id].kind === 'noodle') {
-      if (pot) { say('냄비에 면이 이미 있어요. 고리가 초록일 때 냄비를 눌러요'); return; }
+      if (pot) { say('면이 이미 있어요 · 초록일 때 건져요'); return; }
       pot = { type: id, start: now() };
-      say(`${INGREDIENTS[id].name}을 냄비에 넣었어요. 고리가 초록이 되면 건져요`);
+      say('고리가 초록이 되면 건져요');
       sound?.play('click');
       return;
     }
@@ -194,7 +194,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
   function potClick() {
     const st = potState(pot, now());
     if (st === 'empty') say('왼쪽 면 채반을 누르면 냄비에서 삶아져요');
-    else if (st === 'boiling') say('아직 덜 삶아졌어요. 고리가 초록이 될 때까지 기다려요');
+    else if (st === 'boiling') say('아직 덜 삶아졌어요');
     else if (st === 'soggy') { pot = null; say('면이 퍼져 버렸어요… 버리고 다시 삶아요'); sound?.play('none'); }
     else { const type = pot.type; bowl = addToBowl(bowl, type); pot = null; renderBowl(type); play(bowlEl, 'bump'); sound?.play('click'); }
   }

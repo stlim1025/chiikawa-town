@@ -22,7 +22,7 @@ import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
-import { QUESTS, QUEST_ORDER, questState, goalText, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
+import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
 
@@ -68,6 +68,9 @@ const ICO = {
 const ico = (name, cls = 'ico') => svgSpan(cls, ICO[name]);
 /** 아이콘 + 한 줄 글로 된 짧은 목록(긴 설명 대신). [[아이콘, 글], ...] */
 const facts = (list) => h('ul', { class: 'facts' }, list.filter(Boolean).map(([icon, ...text]) => h('li', {}, ico(icon), h('span', {}, ...text))));
+/** 값이 적힌 사기 버튼(동전 그림 + 값). 돈이 모자라면 눌리지 않는다. */
+const priceBtn = (price, money, onClick, cls = 'btn primary') => h('button', { class: `${cls} price-btn`, type: 'button', disabled: money < price, onClick, 'aria-label': `${won(price)}에 사기${money < price ? ' (돈이 부족해요)' : ''}` },
+  svgSpan('coin-ico', COIN), won(price));
 /** 동글한 알약 꼬리표: 아이콘 + 글. */
 const chip = (icon, cls, ...text) => h('span', { class: `chip${cls ? ' ' + cls : ''}` }, icon ? (typeof icon === 'string' && ICO[icon] ? ico(icon) : icon) : null, ...text);
 
@@ -247,7 +250,7 @@ export function createPanels(ui, handlers) {
     board(s) {
       const left = boardOf(s, s.clock.day).left, mine = availableJobs(s.license.grade, licensesOf(s));
       const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
-      const out = [head('노동 접수'), h('p', { class: 'sub' }, remain > 0 ? '빠른 사람이 임자! 날이 바뀌면 새 일감이 올라와요.' : '오늘 일감은 다 나갔어요. 날이 바뀌면 새로 올라와요.')];
+      const out = [head('노동 접수'), h('p', { class: 'sub' }, remain > 0 ? '날마다 새 일감이 올라와요' : '오늘 일감은 다 나갔어요')];
       // 오늘 남은 일감: 큰 숫자 + 남은 만큼 찬 막대(한눈에 보이게). 적게 남으면 주황, 다 나가면 회색
       const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;
       out.push(h('div', { class: `board-sum${remain <= 0 ? ' out' : remain / total <= 0.25 ? ' low' : ''}` },
@@ -367,18 +370,22 @@ export function createPanels(ui, handlers) {
         const Q = QUESTS[id], st = questState(s, id), p = kind === 'active' ? progressOf(s, id) : null;
         return h('div', { class: `row q-card ${kind}${Q.story ? ' story' : ''}${id === track ? ' tracked' : ''}` }, face(Q.giver),
           h('div', {},
-            h('div', { class: 't' }, Q.title, h('span', { class: 'weed-count' }, Q.story ? '이야기' : FRIENDS[Q.giver].name)),
-            kind === 'active' ? h('div', { class: 'd' }, `${st.step + 1} / ${Q.steps.length}단계 · ${goalText(s, id)}`) : null,
-            p ? h('div', { class: 'q-bar' }, h('i', { style: `width:${Math.round((p.have / p.need) * 100)}%` })) : null,
-            kind === 'done' ? h('div', { class: 'd' }, '다 들어줬어요 ✓') : null),
-          kind === 'active' && id !== track ? h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.trackQuest(id)) }, '화면에 띄우기') : null);
+            h('div', { class: 't' }, Q.title, Q.story ? h('span', { class: 'weed-count' }, '이야기') : null),
+            kind === 'active' ? h('div', { class: 'd' }, shortGoal(s, id).goal) : null,
+            // 단계 · 진행 · 어디서(괄호 속 안내)는 꼬리표로
+            kind === 'active' ? h('div', { class: 'mon-chips' },
+              Q.steps.length > 1 ? chip(null, '', `${st.step + 1} / ${Q.steps.length}단계`) : null,
+              p ? chip(null, 'done', `${p.have} / ${p.need}`) : null,
+              ((Q.steps[st.step].goal.match(/\(([^)]*)\)/) || [])[1]) ? chip('pin', '', Q.steps[st.step].goal.match(/\(([^)]*)\)/)[1]) : null,
+              id !== track ? h('button', { class: 'chip chip-btn', type: 'button', onClick: after(() => handlers.trackQuest(id)) }, '▲ 맨 위로') : null) : null,
+            kind === 'done' ? h('div', { class: 'd' }, '다 들어줬어요 ✓') : null));
       };
       // 받은 부탁만: 하는 중 · 끝낸 것(아직 안 받은 부탁은 친구 머리 위 ! 로 알게 된다)
       const active = QUEST_ORDER.filter((id) => isActive(s, id)), done = QUEST_ORDER.filter((id) => isDone(s, id));
-      const out = [appBar('퀘스트', `끝낸 부탁 ${done.length}`), h('p', { class: 'sub' }, '받은 부탁과 마을 이야기를 여기서 봐요')];
+      const out = [appBar('퀘스트', `끝낸 부탁 ${done.length}`)];
       if (active.length) { out.push(h('h3', { class: 'shop-sec' }, '하는 중')); active.forEach((id) => out.push(card(id, 'active'))); }
       if (done.length) { out.push(h('h3', { class: 'shop-sec' }, '끝낸 부탁')); done.forEach((id) => out.push(card(id, 'done'))); }
-      if (!active.length && !done.length) out.push(h('p', { class: 'bag-empty' }, '아직 받은 부탁이 없어요. 머리 위에 ! 가 뜬 친구에게 말을 걸어 봐요!'));
+      if (!active.length && !done.length) out.push(h('p', { class: 'bag-empty' }, '아직 받은 부탁이 없어요'));
       return out;
     },
     // 마을폰 '친구' 앱: 마을 친구마다 하트 · 다음 하트까지 · 오늘 이야기했는지 · 놀았는지 · 선물 · 빌린 돈
@@ -389,7 +396,7 @@ export function createPanels(ui, handlers) {
       const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
-      const out = [appBar('친구', `하트 ${total}개`), h('p', { class: 'sub' }, '하루에 한 번씩 이야기하고 놀면 하트가 늘어요')];
+      const out = [appBar('친구', `하트 ${total}개`), h('p', { class: 'sub' }, '하루 한 번씩 하트가 늘어요')];
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
         const F = FRIENDS[k], hc = hearts(f), full = hc >= MAX_HEARTS, into = f.pts % HEART_PTS;
@@ -417,27 +424,26 @@ export function createPanels(ui, handlers) {
     monsters(s) {
       const caught = MONSTER_ORDER.filter((k) => (s.hunted || {})[k] > 0).length;
       return [appBar('몬스터 도감', `${caught} / ${MONSTER_ORDER.length}종`),
-        h('p', { class: 'sub' }, '잡은 몬스터는 잡은 수가 적혀요. 검정소 토벌 안내서에도 같은 내용이 있어요.'),
         ...monsterCards(s, true)];
     },
     shop(s) {
       const shop = SHOPS.ramen;
       const out = [head(shop.name, s.money), h('p', { class: 'sub' }, `지금 기운 ${s.stamina} / ${MAX_STAMINA}`)];
       shop.items.forEach((item) => {
-        const cannot = item.needs && !hasLicense(s, item.needs) ? `${LICENSES[item.needs].name} 필요`
-          : s.money < item.price ? '돈이 부족해요' : s.stamina >= MAX_STAMINA ? '배불러요' : null;
+        const lock = item.needs && !hasLicense(s, item.needs), full = s.stamina >= MAX_STAMINA;
         out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `${won(item.price)} · 기운 +${item.stamina}`)),
-          h('button', { class: 'btn primary', type: 'button', disabled: !!cannot, onClick: after(() => handlers.buy(item.id)) }, cannot || '사기')));
+          h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `기운 +${item.stamina}`)),
+          lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
+            : priceBtn(item.price, s.money, after(() => handlers.buy(item.id)))));
       });
       // 알바: 슈퍼 알바이터 자격이 있으면 하루 한 번
       const work = canWorkRamen(s, s.clock.day);
       out.push(h('div', { class: 'row' },
-        h('div', {}, h('div', { class: 't' }, '알바하기'), h('div', { class: 'd' }, `근무 3시간 · 기본급 ${won(SHIFT_BASE)} + 한 그릇에 ${won(BOWL_PAY)}~ · 기운 15`)),
+        h('div', {}, h('div', { class: 't' }, '알바하기'), h('div', { class: 'd' }, `3시간 · ${won(SHIFT_BASE)} + 그릇당 ${won(BOWL_PAY)}~`)),
         work.ok ? h('button', { class: 'btn pink', type: 'button', disabled: s.stamina < 15, onClick: () => { close(true); handlers.workRamen(); } }, s.stamina < 15 ? '기운이 없어요' : '일하기')
-          : h('div', { class: 'd' }, work.reason === 'today' ? '오늘 근무 끝 · 내일 또 와요' : '슈퍼 알바이터 자격 필요')));
+          : h('span', { class: 'lic-badge' }, work.reason === 'today' ? '오늘 근무 끝' : '자격증 필요')));
       out.push(h('div', { class: 'row' },
-        h('div', {}, h('div', { class: 't' }, '레시피 북'), h('div', { class: 'd' }, '라멘 다섯 가지 만드는 법')),
+        h('div', {}, h('div', { class: 't' }, '레시피 북'), h('div', { class: 'd' }, '라멘 다섯 가지')),
         h('button', { class: 'btn', type: 'button', onClick: () => show('recipes') }, '보기')));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
@@ -451,18 +457,18 @@ export function createPanels(ui, handlers) {
       };
       const out = [head(shop.name, s.money), h('p', { class: 'sub' }, `지금 기운 ${s.stamina} / ${MAX_STAMINA}`)];
       shop.items.forEach((item) => {
-        const cannot = item.needs && !hasLicense(s, item.needs) ? `${LICENSES[item.needs].name} 필요`
-          : s.money < item.price ? '돈이 부족해요' : s.stamina >= MAX_STAMINA ? '배불러요' : null;
+        const lock = item.needs && !hasLicense(s, item.needs), full = s.stamina >= MAX_STAMINA;
         out.push(h('div', { class: 'row pub-row' }, svgSpan('lic-ico', ART[item.id]),
-          h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `${won(item.price)} · 기운 +${item.stamina}`)),
-          h('button', { class: 'btn primary', type: 'button', disabled: !!cannot, onClick: after(() => handlers.buy(item.id, 'pub')) }, cannot || (item.id === 'beer' ? '마시기' : '먹기'))));
+          h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `기운 +${item.stamina}`)),
+          lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
+            : priceBtn(item.price, s.money, after(() => handlers.buy(item.id, 'pub')))));
       });
       // 쿠리만쥬와 건배
       const lic = hasLicense(s, 'liquor');
       const side = !lic ? h('span', { class: 'lic-badge' }, '술 자격증 필요')
-        : !info.here ? h('span', { class: 'lic-badge' }, `저녁 ${PUB_HOURS[0]}시 ~ ${PUB_HOURS[1]}시에 와요`)
+        : !info.here ? h('span', { class: 'lic-badge' }, `저녁 ${PUB_HOURS[0]} ~ ${PUB_HOURS[1]}시`)
           : info.cheered ? h('span', { class: 'lic-badge done' }, ico('check'), '오늘 건배함')
-            : h('button', { class: 'btn pink', type: 'button', disabled: s.money < CHEERS_PRICE, onClick: () => { close(true); handlers.cheers(); } }, s.money < CHEERS_PRICE ? '돈이 부족해요' : `건배 ${won(CHEERS_PRICE)}`);
+            : priceBtn(CHEERS_PRICE, s.money, () => { close(true); handlers.cheers(); }, 'btn pink');
       out.push(h('div', { class: `row pub-row cheers${info.here ? ' here' : ''}` },
         svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg('kurimanju')}</svg>`),
         h('div', {}, h('div', { class: 't' }, '쿠리만쥬와 건배'),
@@ -472,17 +478,17 @@ export function createPanels(ui, handlers) {
       return out;
     },
     recipes() {
-      return [head('레시피 북'), h('p', { class: 'sub' }, '수프 · 면 · 토핑이 조금씩 달라요. 개수까지 똑같아야 해요!'), recipeCards(),
+      return [head('레시피 북'), h('p', { class: 'sub' }, '개수까지 똑같이 만들어요'), recipeCards(),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('shop') }, '가게로'), closeBtn())];
     },
     // 마을폰 '자격증' 앱(폰 안 화면: 닫기는 아래 홈 버튼)
     licenses(s) {
-      const out = [appBar('자격증'), h('p', { class: 'sub' }, `${s.profile.name}의 자격증 지갑`)];
+      const out = [appBar('자격증')];
       out.push(h('div', { class: 'row license-card' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${PAY_MULT[s.license.grade]}배 · 풀 ${WEED_ORDER.filter((k) => canPullKind(s.license.grade, k)).length}종 뽑기`))));
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
         out.push(h('div', { class: `row license-card${own ? '' : ' none'}` },
-          h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요 · 검정소에서 시험을 봐요'))));
+          h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요'))));
       }
       return out;
     },
@@ -492,12 +498,12 @@ export function createPanels(ui, handlers) {
       if (!current.sel) current.sel = list[0].id;
       const view = h('div', { class: 'cat-view', 'aria-live': 'polite' });
       const drawView = () => {
-        const f = FURNITURE[current.sel], short = s.money < f.price;
+        const f = FURNITURE[current.sel];
         view.replaceChildren(
           thumbs[f.id] ? h('img', { class: 'cat-img', src: thumbs[f.id], alt: `${f.name} 미리보기` }) : h('div', { class: 'cat-img' }),
           h('div', { class: 'cat-name' }, f.name),
           h('div', { class: 'cat-meta' }, `가진 것 ${home.owned[f.id] || 0}개`),
-          h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyFurniture(f.id)) }, short ? '돈이 부족해요' : `${won(f.price)}에 사기`));
+          priceBtn(f.price, s.money, after(() => handlers.buyFurniture(f.id))));
       };
       const items = list.map((f) => h('button', {
         class: 'cat-item', type: 'button', 'aria-pressed': String(f.id === current.sel),
@@ -524,37 +530,32 @@ export function createPanels(ui, handlers) {
           // 쫓겨난 뒤: 밀린 집세 + 이번 주 집세를 내고 다시 세 든다
           const again = hs.unpaid + RENT;
           out.push(h('div', { class: 'row evict' },
-            h('div', {}, h('div', { class: 't' }, '집에서 쫓겨났어요'),
-              h('div', { class: 'd' }, `집세를 ${EVICT_AFTER}번 연달아 못 내서 집에 들어갈 수 없어요. 밤에는 친구에게 돈을 내고 하룻밤 묵거나(${won(LODGING_PRICE)}) 바닥에서 노숙해야 해요 · 노숙하면 다음 날 기운이 ${ROUGH_REST}만 차요`)),
+            h('div', {}, h('div', { class: 't' }, '쫓겨났어요'),
+              h('div', { class: 'd' }, `밤엔 친구 집(${won(LODGING_PRICE)})이나 노숙`)),
             h('button', { class: 'btn primary', type: 'button', disabled: s.money < again, onClick: after(handlers.rentAgain) }, `다시 세 들기 ${won(again)}`)));
-          out.push(h('p', { class: 'note' }, hs.unpaid > 0
-            ? `다시 세 들면 밀린 집세 ${won(hs.unpaid)}과 이번 주 집세 ${won(RENT)}을 함께 내고 집에 다시 들어가요.`
-            : `다시 세 들면 이번 주 집세 ${won(RENT)}을 내고 집에 다시 들어가요.`));
           // 밀린 집세만 먼저 갚을 수도 있다(쫓겨난 건 그대로지만, 갚아야 집을 살 수 있다)
           if (hs.unpaid > 0) {
             out.push(h('div', { class: 'row' },
-              h('div', {}, h('div', { class: 't' }, '밀린 집세만 내기'), h('div', { class: 'd' }, '내도 쫓겨난 건 그대로예요 · 집을 사려면 먼저 갚아요')),
+              h('div', {}, h('div', { class: 't' }, '밀린 집세만 내기'), h('div', { class: 'd' }, '갚아야 집을 살 수 있어요')),
               h('button', { class: 'btn', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `${won(hs.unpaid)} 내기`)));
           }
         } else {
           // 지금 사는 집(빌린 집)과 집세
           out.push(h('div', { class: 'row' },
-            h('div', {}, h('div', { class: 't' }, '지금은 빌린 집'), h('div', { class: 'd' }, `집세 일주일에 ${won(RENT)} · 다음 집세 ${rentDay}`)),
+            h('div', {}, h('div', { class: 't' }, '빌린 집'), h('div', { class: 'mon-chips' }, chip('coin', '', `집세 ${won(RENT)} / 주`), chip(null, '', `다음 ${rentDay}`))),
             hs.unpaid > 0
               ? h('button', { class: 'btn primary', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `밀린 집세 ${won(hs.unpaid)} 내기`)
               : null));
           // 밀린 집세 경고: 월요일에는 밀린 집세와 그 주 집세를 함께 낸다
           if (hs.unpaid > 0) {
             const lastChance = (hs.missed || 0) + 1 >= EVICT_AFTER;
-            out.push(h('p', { class: 'note warn' },
-              `${lastChance ? '다음 월요일에 밀린 집세까지 못 내면 집에서 쫓겨나요!' : `집세를 ${EVICT_AFTER}번 연달아 못 내면 집에서 쫓겨나요!`} ${rentDay}에는 밀린 집세와 그 주 집세를 합쳐 ${won(hs.unpaid + RENT)}을 내요.`));
+            out.push(h('p', { class: 'note warn' }, lastChance ? '다음 월요일에 못 내면 쫓겨나요!' : `${EVICT_AFTER}번 연달아 못 내면 쫓겨나요!`));
           }
         }
-        if (hs.unpaid > 0) out.push(h('p', { class: 'note' }, '밀린 집세가 있으면 집을 살 수 없어요. 먼저 밀린 집세를 내요.'));
         // 돈 모아 사기
         out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, `${won(HOUSE_PRICE)} · 사면 집세가 없어요`)),
-          h('button', { class: 'btn pink', type: 'button', disabled: s.money < HOUSE_PRICE || hs.unpaid > 0, onClick: after(handlers.buyHouse) }, s.money < HOUSE_PRICE ? '돈이 부족해요' : '사기')));
+          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어져요')),
+          hs.unpaid > 0 ? h('span', { class: 'lic-badge' }, '밀린 집세부터') : priceBtn(HOUSE_PRICE, s.money, after(handlers.buyHouse), 'btn pink')));
         // 청약
         const lot = hs.lottery;
         let lotRow;
@@ -566,8 +567,8 @@ export function createPanels(ui, handlers) {
           lotRow = h('div', { class: 'd' }, `신청 완료 · ${handlers.dayLabel(handlers.nextDay(ANNOUNCE_DAY, lot.applied + 1))} 발표`);
         }
         const lotDesc = lot && lot.won
-          ? `당첨! ${handlers.dayLabel(lot.until)}까지 헐값 ${won(LOTTERY_PRICE)}에 살 수 있어요`
-          : `매주 수요일 발표 · 당첨되면 ${won(LOTTERY_PRICE)}에 집을 살 수 있어요`;
+          ? `당첨! ${handlers.dayLabel(lot.until)}까지`
+          : `수요일 발표 · 당첨되면 ${won(LOTTERY_PRICE)}에 집`;
         out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '주택 청약'), h('div', { class: 'd' }, lotDesc)), lotRow));
       }
       out.push(h('p', { class: 'note' }, `오늘은 ${handlers.dayLabel(day)}`));
@@ -579,28 +580,27 @@ export function createPanels(ui, handlers) {
       const pc = pochetteOf(s), wearing = worn(s);
       const guard = THEFT_GUARD === 0.5 ? '절반만' : `${Math.round(THEFT_GUARD * 100)}%만`;
       const out = [head('포셰트 가게', s.money),
-        h('p', { class: 'sub' }, `포셰트 갑옷 씨가 하나하나 손수 만든 포셰트예요. 지갑을 넣어 메고 다니면 모몽가가 소매치기해도 ${guard} 가져가요.`)];
+        h('p', { class: 'sub' }, `메고 다니면 소매치기 피해 ${guard}`)];
       Object.entries(POCHETTES).forEach(([id, P]) => {
-        const own = pc.owned.includes(id), on = wearing === id, short = s.money < P.price;
+        const own = pc.owned.includes(id), on = wearing === id;
         let btn;
-        if (!own) btn = h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyPochette(id)) }, short ? '돈이 부족해요' : `${won(P.price)}에 사기`);
+        if (!own) btn = priceBtn(P.price, s.money, after(() => handlers.buyPochette(id)));
         else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.wearPochette(id)) }, '메기');
-        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.wearPochette(null)) }, '메는 중 · 벗기');
+        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.wearPochette(null)) }, '벗기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` },
           svgSpan('pochette-art', pochetteSvg(id, P)),
-          h('div', {}, h('div', { class: 't' }, P.name), h('div', { class: 'd' }, `${won(P.price)} · ${P.note}${own ? ' · 가지고 있어요' : ''}`)),
+          h('div', {}, h('div', { class: 't' }, P.name, on ? h('span', { class: 'weed-count' }, '메는 중') : null), h('div', { class: 'd' }, P.note)),
           btn));
       });
-      out.push(h('p', { class: 'note' }, wearing ? `지금 ${POCHETTES[wearing].name}를 메고 있어요. 지갑이 든든해요!` : '지금은 포셰트를 안 메고 있어요. 소매치기를 당하면 그대로 빼앗겨요.'));
       // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
       const wd = wardrobeOf(s);
       out.push(h('h3', { class: 'shop-sec' }, '꾸미기 소품'));
       Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
-        const own = wd.owned.includes(id), short = s.money < A.price;
+        const own = wd.owned.includes(id);
         out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
-          h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, `${won(A.price)} · ${A.note}`)),
-          own ? h('div', { class: 'd' }, wd.wear === id ? '달고 있어요' : '가지고 있어요 · 집 옷장에서')
-            : h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyAccessory(id)) }, short ? '돈이 부족해요' : `${won(A.price)}에 사기`)));
+          h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '다는 중' : '가짐')
+            : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)))));
       });
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
@@ -693,51 +693,48 @@ export function createPanels(ui, handlers) {
       const pc = pochetteOf(s), wd = wardrobeOf(s);
       const tile = (on, art, name, fn) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(on), onClick: after(fn) }, svgSpan('bag-ico', art), h('span', { class: 'nm' }, name));
       const none = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>';
-      const out = [head('옷장'), h('p', { class: 'sub' }, '고르면 바로 바뀌어요. 새 소품은 포셰트 가게에서 사요.')];
+      const out = [head('옷장'), h('p', { class: 'sub' }, '고르면 바로 바뀌어요')];
       out.push(h('h3', { class: 'shop-sec' }, '포셰트'));
       out.push(h('div', { class: 'bag-grid' }, tile(!pc.wear, none, '안 메기', () => handlers.wearPochette(null)),
         pc.owned.map((id) => tile(pc.wear === id, pochetteSvg(id, POCHETTES[id]), POCHETTES[id].name, () => handlers.wearPochette(id)))));
       out.push(h('h3', { class: 'shop-sec' }, '머리 장식'));
       out.push(h('div', { class: 'bag-grid' }, tile(wd.wear === 'none', none, '안 달기', () => handlers.wearAccessory('none')),
         wd.owned.map((id) => tile(wd.wear === id, accessorySvg(id), ACCESSORY_ITEMS[id].name, () => handlers.wearAccessory(id)))));
-      if (!pc.owned.length && !wd.owned.length) out.push(h('p', { class: 'note' }, '아직 가진 꾸미기 아이템이 없어요. 마을 포셰트 가게에 가 봐요!'));
+      if (!pc.owned.length && !wd.owned.length) out.push(h('p', { class: 'note' }, '포셰트 가게에서 사 와요'));
       out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onClick: () => close() }, '다 골랐어요')));
       return out;
     },
     // 카니 헌책방: 마을 지도
     books(s) {
       const own = hasTool(s, 'map'), T = TOOLS.map;
-      return [head('카니 헌책방', s.money), h('p', { class: 'sub' }, '…오래된 책 냄새. 마을 지도도 있어. 딱딱.'),
-        h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, `${won(T.price)} · ${T.note}`)),
-          own ? h('div', { class: 'd' }, '가지고 있어요 · 마을폰 지도 앱')
-            : h('button', { class: 'btn primary', type: 'button', disabled: s.money < T.price, onClick: after(() => handlers.buyTool('map')) }, s.money < T.price ? '돈이 부족해요' : `${won(T.price)}에 사기`)),
-        h('p', { class: 'note' }, '지도가 없어도 다녀온 곳은 기억해요. 지도를 사면 한꺼번에 보여요.'),
+      return [head('카니 헌책방', s.money), h('p', { class: 'sub' }, '…딱딱.'),
+        h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), '가짐 · 마을폰에서')
+            : priceBtn(T.price, s.money, after(() => handlers.buyTool('map')))),
         h('div', { class: 'actions' }, closeBtn())];
     },
     // 도구점: 랜턴 · 손전등(4단계에 무기)
     tools(s) {
-      const out = [head('도구점', s.money), h('p', { class: 'sub' }, '밤에 마을 밖은 아주 어두워요. 불을 들고 다녀요.')];
+      const out = [head('도구점', s.money), h('h3', { class: 'shop-sec' }, '불')];
       for (const id of ['lantern', 'flashlight']) {
         const T = TOOLS[id], own = hasTool(s, id), held = lightOf(s) === id;
-        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, `${won(T.price)} · ${T.note}`)),
-          !own ? h('button', { class: 'btn primary', type: 'button', disabled: s.money < T.price, onClick: after(() => handlers.buyTool(id)) }, s.money < T.price ? '돈이 부족해요' : `${won(T.price)}에 사기`)
-            : held ? h('div', { class: 'd' }, '들고 있어요') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '들기')));
+        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
+          !own ? priceBtn(T.price, s.money, after(() => handlers.buyTool(id)))
+            : held ? h('span', { class: 'lic-badge done' }, ico('check'), '드는 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '들기')));
       }
-      out.push(h('p', { class: 'note' }, '오른쪽 등불 버튼으로 끄고 켜요.'));
       // 무기(4단계): 사면 바로 들고, 가진 무기는 바꿔 들거나 넣어 둔다
       const wp = weaponOf(s);
       out.push(h('h3', { class: 'shop-sec' }, '무기'));
       for (const id of WEAPON_ORDER) {
-        const W = WEAPONS[id], own = wp.owned.includes(id), on = wp.held === id, short = s.money < W.price;
+        const W = WEAPONS[id], own = wp.owned.includes(id), on = wp.held === id;
         let btn;
-        if (!own) btn = h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyWeapon(id)) }, short ? '돈이 부족해요' : `${won(W.price)}에 사기`);
+        if (!own) btn = priceBtn(W.price, s.money, after(() => handlers.buyWeapon(id)));
         else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '들기');
-        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '드는 중 · 넣기');
+        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '넣기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', weaponSvg(id)),
-          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg))), h('div', { class: 'd' }, `${won(W.price)} · ${W.note}${own ? ' · 가지고 있어요' : ''}`)),
+          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg)), on ? h('span', { class: 'weed-count' }, '드는 중') : null), h('div', { class: 'd' }, W.note)),
           btn));
       }
-      out.push(h('p', { class: 'note' }, '무기를 들고 마을 밖 몬스터 가까이에서 버튼(PC 는 스페이스)을 누르면 휘둘러요. 힘이 셀수록 적게 때려도 쓰러져요.'));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
@@ -758,19 +755,19 @@ export function createPanels(ui, handlers) {
       const log = s.weedLog || {}, grade = s.license.grade;
       const found = WEED_ORDER.filter((k) => log[k] > 0).length;
       const out = [appBar('풀 도감', `${found} / ${WEED_ORDER.length}종`),
-        h('p', { class: 'sub' }, `지금 제초 검정 ${grade}급 · 급수가 오르면 뽑을 수 있는 풀이 늘어나요`)];
+        h('p', { class: 'sub' }, `지금 ${grade}급`)];
       for (const g of [5, 4, 3, 2, 1]) {
         const open = grade <= g;
         out.push(h('div', { class: `weed-grade${open ? '' : ' locked'}` }, h('b', {}, `${g}급 풀`), open ? null : h('span', {}, `${g}급부터`)));
         for (const k of kindsOfGrade(g)) {
           const W = WEED_KINDS[k], n = log[k] || 0;
-          const how = [W.stages > 1 ? `${W.stages}번에 나눠 뽑기` : null, W.drift ? '초록 칸이 흔들림' : null, W.poison ? '끊기면 독' : null, W.night ? '밤에만' : null].filter(Boolean).join(' · ');
+          // 자라는 곳 · 뽑는 요령은 꼬리표로(긴 설명 대신)
+          const how = [W.stages > 1 ? `${W.stages}번에 나눠 뽑기` : null, W.drift ? '초록 칸 흔들림' : null, W.poison ? '끊기면 독' : null, W.night ? '밤에만' : null].filter(Boolean);
           out.push(h('div', { class: `row weed-card${open ? '' : ' locked'}${n ? '' : ' unseen'}` },
             svgSpan('weed-ico', weedSvg(k)),
             h('div', {},
-              h('div', { class: 't' }, W.name, h('span', { class: 'weed-count' }, n ? `${n}개 뽑음` : '아직 못 뽑았어요')),
-              h('div', { class: 'd' }, `${W.where}${how ? ' · ' + how : ''}`),
-              h('div', { class: 'd weed-tip' }, W.tip))));
+              h('div', { class: 't' }, W.name, h('span', { class: 'weed-count' }, n ? `${n}개` : '아직')),
+              h('div', { class: 'mon-chips' }, chip('pin', '', W.where), ...how.map((x) => chip(null, 'muted', x))))));
         }
       }
       return out;
@@ -782,7 +779,7 @@ export function createPanels(ui, handlers) {
       return [appBar('지도', p ? REGION_NAMES[regionAt(p.x, p.z)] : null),
         h('div', { class: 'mapview', role: 'group', 'aria-label': '마을과 바깥 지도. 가 본 곳만 밝게 보여요' }),
         // 좁으면 ' · ' 자리에서만 줄을 바꾼다
-        h('p', { class: 'phone-foot' }, h('span', {}, '끌어서 둘러봐요'), ' · ', h('span', {}, '두 손가락이나 휠로 확대'), ' · ', h('b', {}, `가 본 곳 ${pct}%`))];
+        h('p', { class: 'phone-foot' }, h('span', {}, '끌어서 보기 · 휠로 확대'), ' · ', h('b', {}, `가 본 곳 ${pct}%`))];
     },
     // 설정은 동물의 숲 폰처럼: 동그란 앱 아이콘을 누른다
     settings(s) {

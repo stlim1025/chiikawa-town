@@ -142,7 +142,7 @@ export function openHighball(ui, { onDone, sound }) {
     sodaEl.style.height = Math.max(0, Math.min(1.05, total) - whisky) * 100 + '%';
   }
   function guide() {
-    sayEl.textContent = stage === 'whisky' ? '1단계: 위스키를 아래쪽 노란 선 안까지' : '2단계: 탄산수를 위쪽 파란 선 안까지 (넘치면 안 돼요)';
+    sayEl.textContent = stage === 'whisky' ? '1단계: 위스키를 노란 선까지' : '2단계: 탄산수를 파란 선까지';
     s.step.textContent = stage === 'whisky' ? '1단계' : '2단계';
   }
   /** 지금까지 부은 양을 누른 시간으로 맞춘다. */
