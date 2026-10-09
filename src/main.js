@@ -3,7 +3,9 @@
  *  1단계 ✅ 맵 개편: 넓어진 마을 · 집 배치, 마을 밖 네 구역(숲 · 바위산 · 들판 · 강가), 지도(가 본 곳만 밝게), 랜턴 · 손전등
  *  2단계 ✅ 급수별 풀: 5급~1급 풀 10종(core/weeding.js), 구역별로 자람(world/weeds.js), 뽑는 방식(흔들림 · 여러 번 · 독),
  *          급수별 일감, 어려운 풀일수록 경험치 많이, 승급 시험은 지금 급수의 풀로, 마을폰 '풀 도감' 앱
- *  3단계: 마을 생활 — 친구들 기력(일하면 줄고, 모자라면 라멘 · 집에 들어가 잠), 친구 집 · 하치와레 동굴 안에 들어가기, 마을 다듬기
+ *  +    라멘 주방 새 단장 · 알바 필기 강화 · 친밀도 하트 연출 · 가방(미리 캐 두기) · 옷장 · 집 안 걷기 · 친밀도별 대사(core/dialogue.js)
+ *  3단계 ✅ 마을 생활 — 친구들 기운(일하면 줄고, 모자라면 라멘 · 낮잠, 밤 21시~6시 반에는 집에서 잠), 친구 집 · 하치와레 동굴 안(world/rooms.js),
+ *          문 두드리기 · 하트 2개부터 '집에 놀러 가도 돼?' · 쫓겨났을 때 친구 집에서 묵기
  *  4단계: 토벌 — 도구점 무기, 검정소 토벌 자격증, 마을 밖 몬스터(오리지널 디자인), 노동 접수 토벌 일감
  *  5단계: 퀘스트 · 스토리 — 친구마다 고충 퀘스트(친밀도 · 돈 · 가구 · 도구 보상), 마을 스토리라인, 퀘스트 앱
  */
@@ -37,6 +39,7 @@ import { playSleep } from './ui/sleepfx.js';
 import { createBerries } from './world/berries.js';
 import { openSticker } from './ui/sticker.js';
 import { createInterior } from './world/interior.js';
+import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, friendOf, hearts, befriend, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
@@ -49,7 +52,7 @@ import { openRamenShop } from './ui/ramenshop.js';
 import { openQuiz, openHighball } from './ui/exams.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, decide, villagerTakesJob, payVillager, villagerSpend, villagerPay,
-  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft
+  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY
 } from './core/villagers.js';
 import { furnitureThumbs } from './world/thumbs.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
@@ -307,7 +310,7 @@ function boot() {
    * 잠자기: 하루가 지나는 연출. 어두워진 사이에 아침으로 바꾸고, 해가 뜨면 다시 움직인다(집 안이면 집 안 그대로).
    * how: 'home'(내 집) · 'lodge'(친구 집에 돈을 내고) — 기운이 가득 / 'rough'(노숙) — 기운이 조금만 찬다.
    */
-  function doSleep(how = 'home') {
+  function doSleep(how = 'home', after = null) {
     if (sleeping) return;
     sleeping = true;
     cancelPull();
@@ -320,6 +323,7 @@ function boot() {
       sleeping = false;
       if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
       homeUI.refresh();
+      after?.();
       hud.toast(how === 'rough' ? '바닥에서 잤더니 온몸이 쑤셔요… 기운이 조금밖에 안 찼어요' : how === 'lodge' ? '친구 집에서 푹 잤어요. 기운이 가득해요!' : '푹 잤어요. 기운이 가득해요!', 3400);
       announce(rolled.events);
     });
@@ -704,6 +708,11 @@ function boot() {
 
   let homeTarget = null; // 집 안에서 지금 누르면 할 일
   input.onAction((down) => {
+    if (mode === 'visit' && down && homeTarget && state && !sleeping && !panels.isOpen() && !guide.open) {
+      if (homeTarget.type === 'door') exitVisit();
+      else if (homeTarget.type === 'host') talkTo(npcs.byKind(visit.kind));
+      return;
+    }
     if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating) {
       if (homeTarget.type === 'bed') doSleep();
       else if (homeTarget.type === 'wardrobe') { interior.faceCamera(); panels.openWardrobe(); }
@@ -718,6 +727,7 @@ function boot() {
     if (panels.isOpen()) return;
     if (pulling || !target) return;
     if (target.type === 'weed') beginPull(target.weed);
+    else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
     } else if (target.type === 'npc') talkTo(target.npc);
@@ -777,7 +787,7 @@ function boot() {
   function endTalk() {
     if (talking) npcs.hold(talking, false);
     talking = null;
-    if (mode === 'play') input.setEnabled(true);
+    if (mode === 'play' || mode === 'visit') input.setEnabled(true);
   }
   /** 메인으로 나갈 때 하던 놀이를 모두 멈춘다. */
   function resetFun() {
@@ -797,7 +807,9 @@ function boot() {
     const opts = [];
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
-    if (f.play) opts.push(['play', '같이 놀자']);
+    if (f.play && mode !== 'visit') opts.push(['play', '같이 놀자']); // 집 안에서는 뛰어놀 수 없다
+    // 하트 2개부터: 집에 놀러 가기(밤에는 안 된다)
+    if (mode === 'play' && VILLAGERS[n.kind] && friendDoors()[n.kind] && hearts(friendOf(state, n.kind)) >= 2 && !isSleepHour(hourOf(state.clock))) opts.push(['visit', n.kind === 'hachiware' ? '동굴에 놀러 가도 돼?' : '집에 놀러 가도 돼?']);
     // 쿠리만쥬: 술 자격 공부(강의) · 자격을 따면 한 잔
     if (n.kind === 'kurimanju') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : ['study', '술 공부하고 싶어']);
     if (n.kind === 'pochette') opts.push(['shop', '포셰트 구경할래']);
@@ -811,11 +823,20 @@ function boot() {
     opts.push(['bye', '아무것도 아니야']);
     const poor = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).money < 60;
     const h = hearts(friendOf(state, n.kind)); // 친밀도에 따라 인사 · 이야기가 달라진다
-    askAs(n, poor ? BROKE[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
+    const sleepy = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).energy < TIRED + 10; // 기운이 없으면 피곤한 인사
+    askAs(n, poor ? BROKE[n.kind] : sleepy ? TIRED_SAY[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
       const k = opts[i][0];
       if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
+      else if (k === 'visit') {
+        sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : '응! 같이 가자~'], () => {
+          endTalk();
+          npcs.goIn(n);
+          awayInfo[n.kind] = { why: 'visit', until: lifeClock }; // 내가 나오면 같이 나온다
+          enterVisit(n.kind);
+        });
+      }
       else if (k === 'study') {
         const i = (state.liquorLesson || 0) % LIQUOR_LESSONS.length;
         commit({ ...state, liquorLesson: i + 1 });
@@ -906,7 +927,8 @@ function boot() {
     if (r.gained > 0) {
       // 친밀도가 오르면 머리 위로 하트(하트가 늘면 크게 터지고 하트 줄 카드)
       const F = FRIENDS[n.kind];
-      hud.hearts({ x: n.x, y: n.chibi.height + 0.5, z: n.z, gained: r.gained, up: r.up, hearts: r.hearts, name: F.name, tag: F.tag });
+      const at = mode === 'visit' ? rooms.hostAnchor() : { x: n.x, y: n.chibi.height + 0.5, z: n.z };
+      hud.hearts({ ...at, gained: r.gained, up: r.up, hearts: r.hearts, name: F.name, tag: F.tag });
       sound.play(r.up ? 'heartUp' : 'heart');
       npcs.emote(n, 'cheer', r.up ? 1.6 : 0.9);
     }
@@ -1016,7 +1038,78 @@ function boot() {
   let theft = null; // 모몽가가 살금살금 다가오는 중 { n, t }
   Object.keys(VILLAGERS).forEach((k) => { restUntil[k] = 20 + Math.random() * 100; }); // 시작하자마자 우르르 몰려가지 않게
   const boardSpot = () => ({ x: village.spots.board.x + 0.5, z: village.spots.board.z + 0.9 });
-  /** 1.5초마다 친구들이 다음에 할 일을 고른다. */
+  // ---------- 친구 집 · 동굴에 놀러 가기(3단계) ----------
+  const rooms = createRooms();
+  let visit = null; // { kind, lodge }
+  const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
+  /** 문을 두드린다: 집주인이 안에 있으면 들어가고(낮잠 중이면 반겨 준다), 밤잠 중이면 쫓겨났을 때만 재워 달라고 할 수 있다. */
+  function knockHome(kind) {
+    const n = npcs.byKind(kind), F = FRIENDS[kind], a = awayInfo[kind];
+    if (!n || !n.away) { hud.toast(`${josa(F.name, '은/는')} 집에 없어요. 마을 어딘가에 있을 거예요`, 2600); return; }
+    if (a && a.why === 'sleep') {
+      if (isEvicted(state) && bedtime()) {
+        beginTalk(n);
+        askAs(n, '…으음… 누구야…? 이 밤에…', [`하룻밤 재워 줘 (${won(LODGING_PRICE)})`, '미안, 그냥 갈게'], (i) => {
+          if (i !== 0) { endTalk(); return; }
+          if (state.money < LODGING_PRICE) { sayAs(n, ['…돈이 모자란 것 같아…'], endTalk); return; }
+          commit(payVillager({ ...state, money: state.money - LODGING_PRICE }, kind, LODGING_PRICE, state.clock.day));
+          sound.play('coin');
+          sayAs(n, LODGE[kind] || ['…들어와.'], () => { endTalk(); enterVisit(kind, { lodge: true }); });
+        });
+        return;
+      }
+      hud.toast(`${josa(F.name, '은/는')} 쿨쿨 자고 있어요… 쉿!`, 2600);
+      return;
+    }
+    enterVisit(kind);
+  }
+  function enterVisit(kind, { lodge = false } = {}) {
+    cancelPull();
+    visit = { kind, lodge };
+    mode = 'visit';
+    setCinematic(true);
+    document.body.classList.add('in-home');
+    hud.setAction(null);
+    rooms.setRoom(kind, myLook());
+    sound.play('job');
+    const F = FRIENDS[kind];
+    if (lodge) { setTimeout(() => { if (mode === 'visit') doSleep('lodge', exitVisit); }, 900); return; }
+    hud.toast(kind === 'hachiware' ? '하치와레네 동굴에 들어왔어요' : `${F.name}네 집에 놀러 왔어요`, 2400);
+  }
+  function exitVisit() {
+    if (!visit) return;
+    const d = friendDoors()[visit.kind];
+    visit = null;
+    mode = 'play';
+    setCinematic(false);
+    document.body.classList.remove('in-home');
+    rooms.setCue(null);
+    player.setPosition(d.x, d.z + 0.9);
+    player.face(d.x, d.z + 3);
+    cam.snap(player.position);
+    if (!sleeping) input.setEnabled(true);
+    save();
+  }
+
+  // ---------- 친구들의 기운 · 잠(3단계) ----------
+  /** 집에 들어가 있는 친구: kind → { why: 'sleep' | 'nap', until: 낮잠이 끝나는 마을 살림 시각 } */
+  const awayInfo = {};
+  const homeDoor = (kind) => (kind === 'hachiware' ? village.spots.hachiCave : village.homes && village.homes[kind]);
+  const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다.', momonga: '졸려! 나 잘 거야! 흥!' };
+  const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 쉬러 갈 거야!' };
+  const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다.', momonga: '나 일어났어! 귀엽지?' };
+  const tireNpc = (kind, amount) => { state = villagerEnergy(state, kind, -amount, state.clock.day); };
+  /** 집(동굴)으로 걸어가서 들어간다. */
+  function npcGoHome(n, why) {
+    const d = homeDoor(n.kind);
+    if (!d) return;
+    npcs.say(n, why === 'sleep' ? SLEEPY[n.kind] : TIRED_SAY[n.kind]);
+    npcs.plan(n, [{ do: 'walk', x: d.x, z: d.z + 0.3 }, {
+      do: 'call',
+      fn: () => { npcs.goIn(n); awayInfo[n.kind] = { why, until: lifeClock + 45 + Math.random() * 30 }; }
+    }]);
+  }
+  /** 1.5초마다 친구들이 다음에 할 일을 고른다(밤에는 집에 가서 자고, 기운이 모자라면 밥이나 낮잠). */
   function villageLife(dt) {
     lifeClock += dt;
     brainT -= dt;
@@ -1025,9 +1118,29 @@ function boot() {
     const day = state.clock.day, hour = hourOf(state.clock);
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
-      if (!n || npcs.busy(n) || n === talking || (tag && tag.n === n) || (theft && theft.n === n) || lifeClock < restUntil[kind]) continue;
+      if (!n) continue;
+      // 집 안: 밤잠은 아침이 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
+      if (n.away) {
+        const a = awayInfo[kind] || { why: 'sleep', until: 0 };
+        const wake = !isSleepHour(hour) && (a.why === 'sleep' || lifeClock >= a.until);
+        if (wake && !(visit && visit.kind === kind)) {
+          const d = homeDoor(kind);
+          npcs.comeOut(n, d.x, d.z + 0.6);
+          const e = villagerOf(state, kind, day).energy;
+          state = villagerEnergy(state, kind, (a.why === 'sleep' ? 100 : NAP_ENERGY) - e, day);
+          delete awayInfo[kind];
+          npcs.say(n, a.why === 'sleep' ? MORNING[kind] : '…잘 쉬었다!');
+        }
+        continue;
+      }
+      tireNpc(kind, 0.3); // 돌아다니기만 해도 조금씩
+      if (npcs.busy(n) || n === talking || (tag && tag.n === n) || (theft && theft.n === n)) continue;
+      if (kind === 'hachiware' && tutorialActive(state.tutorial)) continue; // 첫날 안내 중에는 하치와레가 집에 가지 않는다
+      const tired = villagerOf(state, kind, day).energy < TIRED;
+      if (lifeClock < restUntil[kind] && !isSleepHour(hour) && !tired) continue;
       const plan = decide(state, kind, day, hour);
-      if (plan.act === 'work') npcWork(n, plan.typeId);
+      if (plan.act === 'sleep' || plan.act === 'nap') npcGoHome(n, plan.act);
+      else if (plan.act === 'work') npcWork(n, plan.typeId);
       else if (plan.act === 'eat') npcEat(n);
       else restUntil[kind] = lifeClock + 25 + Math.random() * 50;
     }
@@ -1055,9 +1168,10 @@ function boot() {
         npcs.say(n, `${T.title}, 내가 할게!`);
       }
     }];
-    if (isWeedJob(T)) steps.push({ do: 'weeds', kind: T.kind, left: T.target, onPull: () => { job.done++; } });
-    else if (T.kind === 'berry') steps.push({ do: 'berries', left: T.target, onPick: () => { job.done++; } });
-    else steps.push({ do: 'walk', x: bench.x, z: bench.z }, { do: 'act', anim: 'read', time: T.target * 1.5, say: '스티커 붙이는 중…' }, { do: 'call', fn: () => { job.done = T.target; } });
+    // 일하면 기운이 준다(풀 하나 6 · 열매 하나 5 · 스티커 한 판 15)
+    if (isWeedJob(T)) steps.push({ do: 'weeds', kind: T.kind, left: T.target, onPull: () => { job.done++; tireNpc(n.kind, 6); } });
+    else if (T.kind === 'berry') steps.push({ do: 'berries', left: T.target, onPick: () => { job.done++; tireNpc(n.kind, 5); } });
+    else steps.push({ do: 'walk', x: bench.x, z: bench.z }, { do: 'act', anim: 'read', time: T.target * 1.5, say: '스티커 붙이는 중…' }, { do: 'call', fn: () => { job.done = T.target; tireNpc(n.kind, 15); } });
     steps.push({ do: 'walk', ...b }, {
       do: 'call',
       fn: () => {
@@ -1080,7 +1194,7 @@ function boot() {
     npcs.plan(n, [{ do: 'walk', x: r.x + 0.4, z: r.z + 1.0 }, { do: 'act', anim: 'drink', time: 4, say: '후루룩~ 라멘 맛있다~' }, {
       do: 'call',
       fn: () => {
-        commit(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), false);
+        commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
         restUntil[n.kind] = lifeClock + 40 + Math.random() * 60;
       }
     }]);
@@ -1091,7 +1205,7 @@ function boot() {
     if (theft || tag || mode !== 'play' || hour < 8 || hour >= 20 || tutorialActive(state.tutorial) || !canSteal(state, day)) return;
     if (funBusy() || panels.isOpen() || guide.open || sleeping || sticker || pulling) return;
     const m = npcs.byKind('momonga');
-    if (!m || npcs.busy(m) || Math.hypot(m.x - player.position.x, m.z - player.position.z) > 5.5) return;
+    if (!m || m.away || npcs.busy(m) || Math.hypot(m.x - player.position.x, m.z - player.position.z) > 5.5) return;
     if (Math.random() > 0.03) return; // 가까이 있을 때 1.5초마다 3%
     theft = { n: m, t: 8, retarget: 0 };
     npcs.say(m, '(살금살금…)');
@@ -1168,6 +1282,11 @@ function boot() {
       if (d < 1.8) options.push({ d: d - 0.6, t: { type: key, label: key === 'home' && isEvicted(state) ? '집(잠김)' : label } });
     }
     // 쫓겨났으면 밤에는 아무 데서나 노숙할 수 있다(가까운 다른 대상이 먼저)
+    // 친구 집 · 하치와레 동굴 문 앞(3단계): 두드리기
+    for (const [kind, d] of Object.entries(friendDoors())) {
+      const dd = Math.hypot(d.x - p.x, d.z - p.z);
+      if (dd < 1.8) options.push({ d: dd - 0.5, t: { type: 'friendHome', kind, label: kind === 'hachiware' ? '동굴 들여다보기' : '문 두드리기' } });
+    }
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
@@ -1185,6 +1304,7 @@ function boot() {
     if (tg.type === 'weed') { const big = tg.weed.kind === 'giantweed'; return { x: tg.weed.x, z: tg.weed.z, r: big ? 0.75 : 0.5, y: big ? 2.0 : 1.05, id: 'w' + tg.weed.id }; }
     if (tg.type === 'berry') return { x: tg.bush.x, z: tg.bush.z, r: 0.75, y: 1.3, id: 'b' + tg.bush.x.toFixed(2) };
     if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
+    if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }
@@ -1338,6 +1458,9 @@ function boot() {
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기
       spots: village.spots,
+      homes: () => friendDoors(),
+      visitRoom: (kind) => enterVisit(kind),
+      leaveRoom: () => exitVisit(),
       free: (x, z, r) => village.isFree(x, z, r),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
@@ -1362,6 +1485,28 @@ function boot() {
     t += dt;
     const aspect = gfx.resize();
     // 집 안: 마을 대신 집 안 장면을 그린다(시간은 흐르고, 마을 친구들도 계속 지낸다)
+    if (mode === 'visit' && state) {
+      if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
+      newDayCheck();
+      villageLife(dt);
+      weeds.update(dt, { night: nightNow, focus: player.position });
+      berries.update(dt);
+      npcs.update(dt, t, player.position);
+      rooms.resize(aspect);
+      const free = !panels.isOpen() && !sleeping && !overlay && !guide.open;
+      if (free) rooms.walk(dt, input.vector());
+      homeTarget = free ? rooms.target() : null;
+      rooms.setCue(homeTarget, t);
+      hud.setAction(homeTarget ? homeTarget.label : null);
+      rooms.update(dt, t, !!talking);
+      setCelLight(INDOOR_LIGHT);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender) gfx.renderer.render(rooms.scene, rooms.camera);
+      hud.placeLabels(homeTarget ? [{ id: 'prompt:v' + homeTarget.type, x: homeTarget.x, y: homeTarget.y, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' }] : [], rooms.camera);
+      saveTimer += dt;
+      if (saveTimer > 10) { saveTimer = 0; save(); }
+      return;
+    }
     if (mode === 'home' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
       newDayCheck();

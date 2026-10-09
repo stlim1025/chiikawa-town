@@ -88,7 +88,7 @@ export function createNpcs(scene, village, weeds, berries) {
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const a = list[i], b = list[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), min = spacing(a, b);
-        if (d >= min) continue;
+        if (d >= min || a.away || b.away) continue;
         const ux = d > 0.001 ? dx / d : 1, uz = d > 0.001 ? dz / d : 0, push = Math.min((min - d) / 2, dt * 2);
         if (village.isFree(a.x - ux * push, a.z - uz * push, 0.3)) { a.x -= ux * push; a.z -= uz * push; }
         if (village.isFree(b.x + ux * push, b.z + uz * push, 0.3)) { b.x += ux * push; b.z += uz * push; }
@@ -288,7 +288,7 @@ export function createNpcs(scene, village, weeds, berries) {
     /** (x, z) 에서 maxDist 안의 가장 가까운 친구. */
     nearest(x, z, maxDist) {
       let best = null, bd = maxDist;
-      for (const n of list) { const d = Math.hypot(n.x - x, n.z - z); if (d < bd) { bd = d; best = n; } }
+      for (const n of list) { if (n.away) continue; const d = Math.hypot(n.x - x, n.z - z); if (d < bd) { bd = d; best = n; } }
       return best;
     },
     /** 말을 건다. 대사를 돌려준다. */
@@ -318,6 +318,10 @@ export function createNpcs(scene, village, weeds, berries) {
       if (on) { if (n.task) endTask(n); n.talk = Infinity; n.bubble = null; n.state = 'idle'; }
       else { n.talk = 0; n.state = 'idle'; n.timer = 2; }
     },
+    /** 집(동굴)에 들어간다: 보이지 않고, 말을 걸 수 없고, 아무것도 하지 않는다(3단계 낮잠 · 밤잠). */
+    goIn(n) { if (n.task) endTask(n); clearRoute(n); n.plan = null; n.bubble = null; n.emote = null; n.away = true; n.state = 'idle'; n.chibi.root.visible = false; },
+    /** 집에서 나온다(문 앞 (x, z)). */
+    comeOut(n, x, z) { const p = nearFree(x, z); n.x = p.x; n.z = p.z; n.away = false; n.state = 'idle'; n.timer = 1.5; n.talk = 0; n.chibi.root.visible = true; },
     /** 몸짓을 sec 초 동안(같이 춤추기 'dance', 이겼다 'cheer'). */
     emote(n, anim, sec) { n.emote = { anim, t: sec }; },
     /** 술래잡기: 내 캐릭터에게서 도망간다. */
@@ -353,6 +357,7 @@ export function createNpcs(scene, village, weeds, berries) {
       lastPlayer = player;
       separate(dt);
       for (const n of list) {
+        if (n.away) continue; // 집 안에 있다
         if (n.bubble) { n.bubble.t -= dt; if (n.bubble.t <= 0) n.bubble = null; }
         let mode = 'idle', power = 0;
         const pd0 = Math.hypot(player.x - n.x, player.z - n.z);
@@ -462,7 +467,7 @@ export function createNpcs(scene, village, weeds, berries) {
     },
     /** 말풍선 라벨. */
     labels() {
-      return list.filter((n) => n.bubble).map((n) => ({ id: 'npc-' + n.kind, x: n.x, y: n.chibi.height + 0.35, z: n.z, text: n.bubble.text, kind: 'bubble' }));
+      return list.filter((n) => n.bubble && !n.away).map((n) => ({ id: 'npc-' + n.kind, x: n.x, y: n.chibi.height + 0.35, z: n.z, text: n.bubble.text, kind: 'bubble' }));
     }
   };
 }

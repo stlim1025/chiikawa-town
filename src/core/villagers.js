@@ -5,7 +5,8 @@ import { JOB_TYPES } from './jobs.js';
  * 친구들은 저마다 지갑이 있어서 돈이 모자라면 일감을 받아 일하고, 넉넉하면 쉬거나 라멘을 사 먹는다. 밤에는 쉰다.
  * 모몽가는 일하지 않고 하루에 한 번쯤 내 지갑을 노린다(잡으면 돌려받는다).
  * state.board = { day, left: { 일감 id: 남은 건수 } }
- * state.villagers = { kind: { money, jobs: 그날 받은 일감 수, day } }
+ * state.villagers = { kind: { money, jobs: 그날 받은 일감 수, day, energy?: 기운 0..100(예전 저장에는 없다 → 100) } }
+ * 기운(3단계): 일하고 돌아다니면 줄고, 라멘을 먹으면 차고, 모자라면 집에 들어가 낮잠, 밤(21시~6시)에는 집에서 잔다.
  * state.theftDay = 모몽가가 마지막으로 소매치기를 노린 날
  */
 export const DAILY_JOBS = {
@@ -26,6 +27,13 @@ export const VILLAGERS = {
   momonga: { start: 30, diligence: 0, jobs: [], eat: 0.3, thief: true }
 };
 export const MAX_JOBS_PER_DAY = 2;
+/** 기운: 이보다 적으면 밥(돈이 있으면) 아니면 낮잠. 라멘 한 그릇 · 낮잠 · 밤잠으로 차는 양. */
+export const TIRED = 25;
+export const MEAL_ENERGY = 45;
+export const NAP_ENERGY = 80;
+/** 밤잠 시간(시): BED 시 이후 ~ WAKE 시 전. */
+export const BED_HOUR = 21, WAKE_HOUR = 6.5;
+export const isSleepHour = (hour) => hour >= BED_HOUR || hour < WAKE_HOUR;
 export const MEAL_PRICE = 80;
 /** 소매치기: 지갑에 minMoney 이상 있을 때만, min~max 원(가진 돈보다 많이는 못 가져간다). */
 export const THEFT = { minMoney: 50, min: 30, max: 90 };
@@ -54,17 +62,26 @@ export function returnToBoard(state, id, day) {
 /** 친구의 지갑과 오늘 받은 일감 수. */
 export function villagerOf(state, kind, day) {
   const v = state.villagers && state.villagers[kind];
-  return { money: v ? v.money : VILLAGERS[kind].start, jobs: v && v.day === day ? v.jobs : 0, day };
+  return { money: v ? v.money : VILLAGERS[kind].start, jobs: v && v.day === day ? v.jobs : 0, day, energy: v && typeof v.energy === 'number' ? v.energy : 100 };
 }
 const setVillager = (state, kind, v) => ({ ...state, villagers: { ...(state.villagers || {}), [kind]: v } });
 
+/** 친구의 기운을 바꾼다(0..100). */
+export function villagerEnergy(state, kind, delta, day) {
+  const v = villagerOf(state, kind, day);
+  return setVillager(state, kind, { ...v, energy: Math.max(0, Math.min(100, v.energy + delta)) });
+}
+
 /**
- * 친구가 다음에 할 일: { act: 'work', typeId } | { act: 'eat' } | { act: 'rest' }.
- * 난수는 밥 → 일 → 일감 고르기 순서로 쓴다. 하치와레의 첫날 안내 중에는 일감을 받지 않는다(내 첫 일감이 남도록).
+ * 친구가 다음에 할 일: { act: 'work', typeId } | { act: 'eat' } | { act: 'nap' } | { act: 'sleep' } | { act: 'rest' }.
+ * 밤에는 집에 가서 자고, 기운이 모자라면 돈이 있으면 라멘, 없으면 낮잠. 그 밖에는 원래대로(난수: 밥 → 일 → 일감 고르기).
+ * 하치와레의 첫날 안내 중에는 일감을 받지 않는다(내 첫 일감이 남도록).
  */
 export function decide(state, kind, day, hour, random = Math.random) {
-  if (hour < 7 || hour >= 20) return { act: 'rest' };
+  if (isSleepHour(hour)) return { act: 'sleep' };
   const spec = VILLAGERS[kind], v = villagerOf(state, kind, day);
+  if (v.energy < TIRED) return v.money >= MEAL_PRICE && hour >= 7 && hour < 20 ? { act: 'eat' } : { act: 'nap' };
+  if (hour < 7 || hour >= 20) return { act: 'rest' };
   const mealtime = (hour >= 11 && hour < 14) || (hour >= 18 && hour < 20);
   if (v.money >= MEAL_PRICE && random() < spec.eat * (mealtime ? 1.4 : 0.5)) return { act: 'eat' };
   const guiding = state.tutorial && state.tutorial !== 'done';
