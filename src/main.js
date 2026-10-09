@@ -509,7 +509,7 @@ function boot() {
   });
 
   // 가방: 오른쪽 위 버튼 또는 I · B 키
-  const openBag = () => { if (state && (mode === 'play' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
+  const openBag = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
   hud.onBag(openBag);
   window.addEventListener('keydown', (e) => {
     if ((e.code === 'KeyI' || e.code === 'KeyB') && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) openBag();

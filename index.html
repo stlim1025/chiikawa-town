@@ -861,6 +861,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-quest.got { animation: q-got 1.2s ease-out; }
 @keyframes q-got { 0% { transform: scale(1.08); box-shadow: 0 3px 0 #e8c97a, 0 0 0 6px rgba(255, 215, 122, 0.8); } 100% { transform: none; } }
 .cinematic .hud-quest { display: none !important; }
+/* 가방 버튼: 타이틀 · 마을 입장 연출 중에는 숨기고, 집 · 친구 집 안에서는 그대로 */
+.cinematic:not(.in-home) .hud-bag { display: none !important; }
 .app.quests .app-ico { background: #e8a83e; }
 .panel .row.q-card { justify-content: flex-start; align-items: flex-start; gap: 10px; }
 .panel .row.q-card > div { flex: 1 1 auto; min-width: 0; }
