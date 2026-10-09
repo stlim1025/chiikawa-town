@@ -9,7 +9,9 @@
  *  4단계 ✅ 토벌 — 도구점 무기 4종(core/combat.js), 검정소 토벌 자격증(필기 + 허수아비 실기), 마을 밖 몬스터 5종 + 보스(오리지널 디자인,
  *          world/monsters.js: 어슬렁 → 쫓기 → 움츠렸다 들이받기), 맞으면 기운 −, 0이면 기절(마을 입구 · 돈 조금), 전리품 → 노동 접수에서 팔기,
  *          토벌 일감 5종, 토벌 안내서 · 몬스터 도감 앱
- *  5단계: 퀘스트 · 스토리 — 친구마다 고충 퀘스트(친밀도 · 돈 · 가구 · 도구 보상), 마을 스토리라인, 퀘스트 앱
+ *  5단계 ✅ 퀘스트 · 스토리 — core/quests.js: 친구 고충 7가지(치이카와 베개 · 우사기 소풍 · 모몽가 보물 · 쿠리만쥬 안주 · 하치와레 동굴 무대 ·
+ *          랏코 수련 · 시사 특훈, 돈 · 친밀도 · 꾸미기 · 무기 · 가구 · 먹을 것 보상), 마을 이야기 「바위산의 수상한 기척」(대장 → 토벌 자격증 →
+ *          랏코 → 카니 그림책 → 바위산 깊은 곳 → 왕버섯 보스전 → 마을 축하), 머리 위 ! · ?, 왼쪽 위 퀘스트 쪽지, 마을폰 퀘스트 앱
  */
 import * as THREE from 'three';
 import { createScene } from './render/scene.js';
@@ -66,6 +68,7 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf } from './core/calendar.js';
 import { WEAPONS, DROPS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { createMonsters } from './world/monsters.js';
+import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, pickTrack, activeQuests, arrived, isDone, isActive, bond } from './core/quests.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -287,6 +290,7 @@ function boot() {
       sound.play('click');
       hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600);
     },
+    trackQuest(id) { commit({ ...state, questTrack: id }); },
     sellDrops() {
       const r = sellDrops(state);
       if (!r.sold) return;
@@ -320,6 +324,9 @@ function boot() {
       cancelPull();
       resetFun();
       endHunterExam();
+      if (bossM) { monsters.clear((m) => m === bossM || m.summoned); bossM = null; }
+      questScene = false;
+      hud.setQuest(null);
       save();
       guide.setGoal(null);
       npcs.setFollow('hachiware', false);
@@ -835,6 +842,11 @@ function boot() {
     if (!f) return;
     beginTalk(n);
     const opts = [];
+    // 퀘스트(5단계): 알리러 왔으면 맨 위, 새 부탁이 있으면 그다음, 아직 덜 했으면 다시 듣기
+    const qs = questsFor(state, n.kind);
+    qs.report.forEach((id) => { const st = stepOf(state, id); opts.push(['qreport:' + id, st.type === 'bring' ? '부탁한 거 가져왔어!' : st.type === 'talk' ? (QUESTS[id].story ? `「${QUESTS[id].title}」 이야기` : '이야기 들으러 왔어') : '다 했어!']); });
+    qs.offer.forEach((id) => opts.push(['qoffer:' + id, QUESTS[id].ask || '무슨 고민 있어?']));
+    qs.waiting.forEach((id) => opts.push(['qhint:' + id, '부탁 다시 듣기']));
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
     if (f.play && mode !== 'visit') opts.push(['play', '같이 놀자']); // 집 안에서는 뛰어놀 수 없다
@@ -856,7 +868,10 @@ function boot() {
     const sleepy = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).energy < TIRED + 10; // 기운이 없으면 피곤한 인사
     askAs(n, poor ? BROKE[n.kind] : sleepy ? TIRED_SAY[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
       const k = opts[i][0];
-      if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
+      if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
+      else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
+      else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`${QUESTS[id].title} · ${goalText(state, id)}`, '부탁해~!'], endTalk); }
+      else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
       else if (k === 'visit') {
@@ -889,6 +904,141 @@ function boot() {
         sayAs(n, LODGE[n.kind], () => { endTalk(); doSleep('lodge'); });
       } else endTalk();
     });
+  }
+
+  // ---------- 퀘스트(5단계): 친구의 고충 · 마을 이야기 ----------
+  const NARRATOR = { kind: null, name: '…', tag: '#e6dccb', ink: '#5a4a34' };
+  /** 부탁을 듣고 받을지 고른다. */
+  function offerQuest(n, id) {
+    const Q = QUESTS[id];
+    sayAs(n, Q.offer, () => askAs(n, Q.story ? '맡아 주겠나?' : '…부탁해도 될까?', ['좋아, 해 볼게!', '지금은 좀…'], (i) => {
+      if (i !== 0) { sayAs(n, ['그래… 마음이 바뀌면 또 말해 줘.'], endTalk); return; }
+      commit(startQuest(state, id));
+      sound.play('job');
+      endTalk();
+      hud.announce({ kicker: Q.story ? '이야기 시작!' : '새 부탁!', title: Q.title, sub: goalText(state, id) });
+    }));
+  }
+  /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
+  function reportQuest(n, id) {
+    const step = stepOf(state, id);
+    finishQuestStep(id, n, step.say);
+  }
+  /**
+   * 퀘스트 단계를 끝낸다: who(친구 · 없으면 해설)가 lines 를 말하고, 다음 단계를 알리거나 보상을 준다.
+   * n 이 null 이면(visit · boss) 대화를 새로 연다.
+   */
+  function finishQuestStep(id, n, lines) {
+    const Q = QUESTS[id], r = completeStep(state, id, state.clock.day);
+    commit(r.state);
+    const say = (ls, then) => (n ? sayAs(n, ls, then) : guide.say(ls.map(fillName), then, lines.speaker ? whoOf(npcs.byKind(lines.speaker)) : NARRATOR));
+    say(lines, () => {
+      if (!r.finished) {
+        if (n) endTalk(); else unlockAfterScene();
+        sound.play('job');
+        hud.announce({ kicker: Q.story ? '이야기가 이어져요' : '다음 할 일', title: Q.title, sub: goalText(state, id) });
+        return;
+      }
+      if (n) endTalk(); else unlockAfterScene();
+      celebrateQuest(id, r.reward, n);
+    });
+  }
+  /** 해설 · 장면(visit · boss)이 끝나면 다시 움직인다. */
+  function unlockAfterScene() { questScene = false; if (mode === 'play') input.setEnabled(true); }
+  let questScene = false;
+  /** 장면으로 끝나는 단계(그곳에 도착 · 왕버섯을 쓰러뜨림): 움직임을 멈추고 대화를 띄운다. */
+  function questSceneStep(id) {
+    const step = stepOf(state, id);
+    if (!step || questScene) return;
+    questScene = true;
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    const lines = [...step.say];
+    lines.speaker = step.speaker;
+    if (step.speaker === 'hachiware') {
+      // 하치와레의 동굴 무대: 동굴 앞에 나와 노래한다
+      const h = npcs.byKind('hachiware'), c = village.spots.hachiCave;
+      player.setPosition(c.x, c.z + 2.6);
+      player.face(c.x, c.z);
+      cam.snap(player.position);
+      if (h) {
+        if (h.away) npcs.comeOut(h, c.x, c.z + 0.2);
+        else { h.x = c.x; h.z = c.z + 0.2; }
+        npcs.hold(h, true);
+        npcs.emote(h, 'dance', 7);
+      }
+      sound.play('heartUp');
+      // 노래하는 동안 음표가 퐁퐁
+      let notes = 0;
+      const sing = setInterval(() => {
+        if (!h || ++notes > 9 || mode !== 'play') { clearInterval(sing); return; }
+        hud.floatText({ x: h.x + (Math.random() - 0.5) * 0.8, y: h.chibi.height + 0.4, z: h.z, text: notes % 2 ? '♪' : '♫', kind: 'note' });
+        if (notes % 3 === 1) sound.play('heart');
+      }, 650);
+      setTimeout(() => { if (h) npcs.hold(h, false); }, 7500);
+    }
+    finishQuestStep(id, null, lines);
+  }
+  /** 부탁을 다 들어줬다: 보상과 축하. 이야기의 끝이면 마을 친구들이 다 같이 기뻐한다. */
+  function celebrateQuest(id, reward, n) {
+    const Q = QUESTS[id], F = FRIENDS[Q.giver];
+    const giver = n || npcs.byKind(Q.giver);
+    if (giver && !giver.away && mode === 'play') hud.hearts({ x: giver.x, y: giver.chibi.height + 0.5, z: giver.z, gained: (Q.reward && Q.reward.bond) || 1, up: reward.up, hearts: hearts(friendOf(state, Q.giver)), name: F.name, tag: F.tag });
+    sound.play('done');
+    player.cheerTime = 2;
+    if (Q.story) {
+      hud.banner('이야기 완료!', `마을에 평화가 찾아왔어요 · ${reward.got.join(' · ')}`, 5200);
+      npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, 'cheer', 3); });
+    } else hud.banner('부탁 완료!', `${Q.title} · ${reward.got.join(' · ')}`, 4200);
+    if (reward.gifts.length) setTimeout(() => hud.toast(`친해진 선물: ${reward.gifts.map((g) => FURNITURE[g].name).join(' · ')} · 집에서 '꾸미기'로 놓아요`, 3600), 4400);
+    refreshLook();
+  }
+  /** 퀘스트에 나오는 곳의 월드 자리. */
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : null;
+  const lairSpot = village.nearestFree(-24, -61, 1.5);
+  let questT = 0, bossM = null, questHint = false;
+  /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
+  function updateQuests(dt) {
+    questT -= dt;
+    if (questT > 0 || !state) return;
+    questT = 0.3;
+    const p = player.position, hour = hourOf(state.clock);
+    const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
+    for (const id of activeQuests(state)) {
+      const step = stepOf(state, id);
+      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour)) {
+        if (step.place === 'lair') commit({ ...state, story: { ...(state.story || {}), bossSeen: true } });
+        questSceneStep(id);
+        return;
+      }
+    }
+    // 왕버섯: 이야기가 바위산 깊은 곳에 이르면 그 자리에 있다. 싸울 차례(boss)가 되기 전에는 잠들어 있다
+    const story = state.quests && state.quests.story, sStep = stepOf(state, 'story');
+    const bossTime = story && !story.done && story.step >= QUESTS.story.steps.findIndex((s) => s.type === 'visit') && !(state.story && state.story.bossDown);
+    if (bossTime && (!bossM || bossM.dead) && Math.hypot(p.x - lairSpot.x, p.z - lairSpot.z) < 46) {
+      monsters.clear((m) => m.species === 'kingcap');
+      bossM = monsters.spawnAt('kingcap', lairSpot.x, lairSpot.z);
+    }
+    if (bossM && !bossM.dead) {
+      bossM.dormant = !(sStep && sStep.type === 'boss');
+      if (!bossTime) { monsters.clear((m) => m === bossM); bossM = null; }
+    }
+    // 처음으로 부탁할 친구가 생기면 한 번 알려 준다
+    if (!questHint && !seen('quest-intro') && !tutorialActive(state.tutorial) && free) {
+      const any = npcs.list.some((m) => markOf(state, m.kind) === '!');
+      if (any) { questHint = true; markSeen('quest-intro'); hud.toast('머리 위에 ! 가 뜬 친구에게 말을 걸어 봐요 · 고민을 들어주면 더 친해져요', 4800); }
+    }
+  }
+  /** 머리 위 ! · ? 표시(가까운 친구만). */
+  function questMarks(focus) {
+    const out = [];
+    for (const m of npcs.list) {
+      if (m.away || m.bubble || Math.hypot(m.x - focus.x, m.z - focus.z) > 26) continue;
+      const mk = markOf(state, m.kind);
+      if (mk) out.push({ id: 'q-' + m.kind, x: m.x, y: m.chibi.height + 0.55, z: m.z, text: mk, kind: mk === '?' ? 'qmark report' : 'qmark' });
+    }
+    return out;
   }
 
   /** 돈 빌리기: 친구 지갑의 절반까지, 갚기 전에는 한 번만. */
@@ -987,6 +1137,7 @@ function boot() {
     sound.play('poof');
     if (m.exam) { examDummyDown(); return; }
     let s = recordHunt(state, m.species);
+    if (m.species === 'kingcap') s = { ...s, story: { ...(s.story || {}), bossSeen: true, bossDown: true } };
     const before = s.job;
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
     const drop = m.M.drop;
@@ -998,6 +1149,13 @@ function boot() {
     if (state.hunted[m.species] === 1) hud.toast(`처음으로 ${josa(m.M.name, '을/를')} 잡았어요! 마을폰 몬스터 도감에 적혔어요`, 3400);
     else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${m.M.name} 토벌 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1500);
     celebrateIfDone(before, state.job);
+    // 이야기 속 왕버섯을 쓰러뜨렸다
+    if (m.species === 'kingcap') {
+      bossM = null;
+      monsters.clear((o) => o.summoned);
+      hud.banner('왕버섯을 쓰러뜨렸다!', '바위산에 조용한 바람이 불어요', 3000);
+      if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
+    }
   }
   /** 몬스터의 들이받기가 닿았다: 기운이 줄고 밀려난다. 잠깐은 다시 안 맞는다. 기운이 0이면 기절. */
   function onMonsterHit(m) {
@@ -1388,6 +1546,7 @@ function boot() {
   // ---------- 소매치기 모몽가: 하루 한 번쯤, 낮은 확률로 살금살금 다가와 지갑을 노린다 ----------
   function maybeSteal(day, hour) {
     if (theft || tag || mode !== 'play' || hour < 8 || hour >= 20 || tutorialActive(state.tutorial) || !canSteal(state, day)) return;
+    if (state.truce && state.truce >= day) return; // 모몽가와 약속(보물 상자 부탁)한 동안은 노리지 않는다
     if (funBusy() || panels.isOpen() || guide.open || sleeping || sticker || pulling) return;
     const m = npcs.byKind('momonga');
     if (!m || m.away || npcs.busy(m) || Math.hypot(m.x - player.position.x, m.z - player.position.z) > 5.5) return;
@@ -1467,7 +1626,8 @@ function boot() {
     const bush = berries.nearestReady(p.x, p.z, 1.4);
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
     const npc = npcs.nearest(p.x, p.z, 1.6);
-    if (npc) options.push({ d: Math.hypot(npc.x - p.x, npc.z - p.z), t: { type: 'npc', npc, label: '말 걸기' } });
+    // 퀘스트 표시(! · ?)가 뜬 친구는 가게 문 앞에 서 있어도 말 걸기가 먼저
+    if (npc) options.push({ d: Math.hypot(npc.x - p.x, npc.z - p.z) - (markOf(state, npc.kind) ? 1.2 : 0), t: { type: 'npc', npc, label: '말 걸기' } });
     for (const [key, label] of PLACES) {
       const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < 1.8) options.push({ d: d - 0.6, t: { type: key, label: key === 'home' && isEvicted(state) ? '집(잠김)' : label } });
@@ -1672,6 +1832,9 @@ function boot() {
       swing: () => doSwing(),
       exam: () => hunterExam && { t: hunterExam.t, left: hunterExam.left },
       iframe: () => iframe,
+      quests: () => ({ quests: state.quests, track: pickTrack(state), story: state.story, boss: bossM && { x: bossM.x, z: bossM.z, hp: bossM.hp, dormant: !!bossM.dormant, state: bossM.state } }),
+      lair: () => lairSpot,
+      marks: () => npcs.list.map((m) => [m.kind, markOf(state, m.kind)]).filter((x) => x[1]),
       flags: () => ({ pulling: !!pulling, panel: panels.isOpen(), guide: guide.open, sleeping, sticker: !!sticker, talking: !!talking, tag: !!tag, dance: !!dance, overlay, fainting, weapon: weaponNow() })
     };
   }
@@ -1751,6 +1914,7 @@ function boot() {
       newDayCheck();
       player.update(dt, input);
       updateCombat(dt);
+      updateQuests(dt);
       if (pulling) {
         const before = pulling.pull.power;
         pulling.pull = chargePull(pulling.pull, dt);
@@ -1767,6 +1931,8 @@ function boot() {
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
       hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
+      const qt = pickTrack(state);
+      hud.setQuest(qt ? { title: QUESTS[qt].title, goal: goalText(state, qt), story: !!QUESTS[qt].story } : null);
       // 불: 등불 버튼 모양, 손에 든 모습, 따라다니는 빛
       const lightMode = lightOf(state);
       hud.setLight(hasTool(state, 'lantern') || hasTool(state, 'flashlight') ? lightMode : null);
@@ -1809,7 +1975,7 @@ function boot() {
     if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
     const bubbles = npcs.labels(), mark = mode === 'play' ? tutorialMarker() : null;
     if (mark) bubbles.push(mark);
-    if (mode === 'play') bubbles.push(...monsters.labels(focus)); // 몬스터 이름 · 체력 줄
+    if (mode === 'play') bubbles.push(...monsters.labels(focus), ...questMarks(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?
     const prompt = mode === 'play' ? showTargetCue(bubbles) : (cue.visible = false, null);
     if (prompt) bubbles.push(prompt);
     // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게)

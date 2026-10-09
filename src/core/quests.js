@@ -1,0 +1,292 @@
+import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from './friends.js';
+import { homeOf, FURNITURE } from './home.js';
+import { hasLicense } from './licenses.js';
+import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.js';
+import { ACCESSORY_ITEMS, wardrobeOf } from './wardrobe.js';
+import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
+import { WEED_KINDS } from './weeding.js';
+
+/**
+ * 퀘스트(5단계): 친구마다 고충(부탁)과 마을 이야기. 친구 머리 위에 ! 가 뜨면 부탁이 있다는 뜻이고,
+ * 말을 걸어 들어 주면 단계(step)를 하나씩 해 나간다. 다 하면 돈 · 친밀도 · 물건 · 꾸미기 · 무기 · 가구를 받는다.
+ * 단계 종류:
+ *   bring   { items: { id: 개수 } }    가방에 모아서 to 에게 건넨다(건네면 가방에서 빠진다)
+ *   hunt    { species, n }             그 몬스터를 n 마리 잡고(단계를 받은 뒤부터 센다) to 에게 알린다
+ *   pull    { kind, n }                그 풀을 n 개 뽑고 to 에게 알린다
+ *   license { id }                     그 자격증을 따고 to 에게 알린다
+ *   talk    { }                        to 에게 말을 건다
+ *   visit   { place, night? }          그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시에만)
+ *   boss    { }                        이야기 속 왕버섯을 쓰러뜨리면 저절로 끝난다
+ * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
+ * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
+ * state.story = { bossSeen?, bossDown? }, state.truce = 모몽가가 소매치기를 쉬는 마지막 날.
+ */
+
+/** 퀘스트에서만 받는 먹을 것. */
+export const QUEST_ITEMS = {
+  riceball: { name: '우사기 주먹밥', kind: 'food', note: '소풍 돗자리 위에서 받은 커다란 주먹밥. 먹으면 기운이 20 찬다.', eat: 20 },
+  jellybake: { name: '젤리 구이', kind: 'food', note: '쿠리만쥬가 구운 겉바삭 속쫀득 안주. 먹으면 기운이 30 찬다.', eat: 30 }
+};
+registerItems(QUEST_ITEMS);
+
+/** 퀘스트에 나오는 곳(main 이 world 좌표로 채운다: cave, lair). r: 이만큼 가까이 가면 도착. */
+export const PLACES = {
+  cave: { name: '하치와레 동굴', r: 3.2 },
+  lair: { name: '바위산 깊은 곳', r: 9 }
+};
+
+export const QUESTS = {
+  // ---------- 마을 이야기(대장 갑옷 씨): 바위산의 수상한 기척 → 왕버섯 ----------
+  story: {
+    title: '바위산의 수상한 기척', giver: 'captain', story: true, needHearts: 0, tutorial: true,
+    ask: '무슨 일이에요?',
+    offer: ['흠흠. {name}, 잠깐 이야기 좀 하지.', '요즘 마을 밖 몬스터가 부쩍 늘었다. 특히 북쪽 바위산 쪽이다.', '마을을 지키려면 토벌할 줄 아는 사람이 필요해.', '검정소에서 토벌 자격증을 따 와라. 토벌 안내서부터 읽고, 무기는 도구점에서.'],
+    steps: [
+      { type: 'license', id: 'hunter', goal: '검정소에서 토벌 자격증 따기', say: ['흠! 합격했군. 역시 내 눈은 틀리지 않았다.', '그럼 첫 임무다. 바위산의 이끼 거북을 3마리 줄여 줘라.'] },
+      { type: 'hunt', species: 'turtle', n: 3, goal: '북쪽 바위산 이끼 거북 3마리 토벌', say: ['수고했다. 그런데… 이상하군.', '쓰러뜨려도 쓰러뜨려도 바위산 쪽에서 계속 나타난다고 한다.', '랏코라면 뭔가 알지도 모른다. 랏코 수련장에 가 봐라.'] },
+      { type: 'talk', to: 'rakko', goal: '랏코에게 바위산 이야기 묻기', say: ['…대장이 보냈나.', '바위산 깊은 곳에서 이상한 기척이 난다. 몬스터들이 거기서 깨어나는 것 같다.', '옛날 이야기라면 카니가 잘 알 거다. 헌책방에 가 봐라.'] },
+      { type: 'talk', to: 'kani', goal: '카니 헌책방에서 옛이야기 듣기', say: ['…바위산 이야기?', '(낡은 그림책을 펼친다)', '…"바위산 깊은 곳, 길이 끝나는 곳에 커다란 버섯이 산다. 포자를 뿌려 풀과 몬스터를 깨운다"…', '…그림책 이야기인 줄 알았는데…', '…바위산 오솔길 끝이야. 조심해. 딱.'] },
+      { type: 'visit', place: 'lair', goal: '바위산 오솔길 끝(깊은 곳) 살펴보기', speaker: null, say: ['(땅이 쿵, 쿵 울린다…)', '(바위 그늘에서 커다란 버섯이 몸을 일으켰다!)', '…저게 그림책 속 왕버섯이야! 일단 마을에 알리자.'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 왕버섯 알리기', say: ['…왕버섯이라고?!', '그 녀석이 포자로 몬스터들을 깨우고 있었던 거군.', '기운을 가득 채우고, 좋은 무기를 들고 가라. 가까이 가면 풀뭉치를 불러낸다니 조심하고.', '마을의 운명이 너에게 달렸다, {name}!'] },
+      { type: 'boss', goal: '바위산 깊은 곳의 왕버섯 쓰러뜨리기', speaker: null, say: ['(왕버섯이 털썩 쓰러지며 포자가 흩어졌다…)', '(바위산에 조용한 바람이 분다)', '해냈다! 대장 갑옷 씨에게 알리자.'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 알리기', say: ['…해냈군, {name}!', '이제 바위산도 조용해질 거다. 마을 모두를 대신해서… 고맙다.', '이건 마을이 너에게 주는 선물이다. 흠흠, 잘 어울리겠군.'] }
+    ],
+    reward: { money: 5000, bond: 6, accessory: 'crown', village: 3 }
+  },
+  // ---------- 친구들의 고충 ----------
+  pillow: {
+    title: '치이카와의 베개', giver: 'chiikawa', needHearts: 1, ask: '무슨 고민 있어?',
+    offer: ['…있잖아…', '요즘 밤마다… 무서운 꿈을 꿔…', '들판의 풀뭉치가… 데굴데굴 쫓아오는 꿈…', '…보송보송한 베개가 있으면… 괜찮을 것 같아…', '풀뭉치 솜털… 3개만… 구해 줄 수 있어…?'],
+    steps: [{ type: 'bring', items: { fluffdown: 3 }, goal: '보송 솜털 3개를 치이카와에게 (동쪽 들판 풀뭉치)', say: ['…! 보송보송해…!', '이걸로 베개 만들면… 무서운 꿈… 안 꿀 거야…', '…고마워…♪ 이거… 내가 좋아하는 꽃 핀…'] }],
+    reward: { money: 300, bond: 3, accessory: 'flower' }
+  },
+  picnic: {
+    title: '우사기의 소풍 자리', giver: 'usagi', needHearts: 1, ask: '무슨 일 있어?',
+    offer: ['우라!', '(들판 쪽을 가리키며 펄쩍펄쩍 뛴다)', '하아?! (데굴데굴 굴러가는 시늉을 한다)', '(돗자리를 펼치는 시늉을 하고는 고개를 젓는다)', '(들판의 풀뭉치 때문에 소풍을 못 가는 것 같다…!)'],
+    steps: [{ type: 'hunt', species: 'fluff', n: 4, goal: '동쪽 들판 풀뭉치 4마리 쫓아내고 우사기에게 알리기', say: ['우라~!!', '(돗자리를 활짝 펼치고 커다란 주먹밥을 건넨다)', '야하! 야하!'] }],
+    reward: { money: 400, bond: 3, items: { riceball: 3 } }
+  },
+  treasure: {
+    title: '모몽가의 보물 상자', giver: 'momonga', needHearts: 1, ask: '뭐 원하는 거 있어?',
+    offer: ['{name}! 나 반짝이는 게 갖고 싶어!', '숲에 사는 뿔벌레 뿔은 반짝반짝하대!', '그리고 밤에 나는 나방 날개 가루도!', '갖다주면… 음… 당분간 네 지갑은 안 노릴게! 흥!'],
+    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개 · 달빛 가루 1개를 모몽가에게', say: ['우와아~ 반짝반짝!!', '내 보물 상자에 넣어야지~ 흐흥♪', '약속은 약속이니까… 사흘 동안은 네 지갑 안 노릴게! 이 리본도 줄게! 흥!'] }],
+    reward: { bond: 3, accessory: 'ribbon', truce: 3 }
+  },
+  snack: {
+    title: '쿠리만쥬의 새 안주', giver: 'kurimanju', needHearts: 2, ask: '오늘은 뭐 만들어?',
+    offer: ['하아~ 이번에 새 안주를 만들어 보려고.', '말랑말랑한 젤리를 구우면… 겉은 바삭, 속은 쫀득하지 않을까?', '강가 슬라임이 떨어뜨리는 말랑 젤리 3개랑 빨간 열매 4개만 있으면 돼~', '하아~ 부탁해도 될까?'],
+    steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 3개 · 빨간 열매 4개를 쿠리만쥬에게', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
+    reward: { money: 500, bond: 3, items: { jellybake: 2 } }
+  },
+  song: {
+    title: '하치와레의 동굴 무대', giver: 'hachiware', needHearts: 2, ask: '요즘 노래 연습은 어때?',
+    offer: ['있잖아, {name}.', '나 동굴에서 혼자 노래 연습하는데… 너무 어두워서 조금 무서워.', '그림자 나방 날개 가루가 밤에 반짝반짝 빛난대!', '달빛 가루 2개만 구해 줄래? 동굴을 반짝이는 무대로 꾸미고 싶어~'],
+    steps: [
+      { type: 'bring', items: { moondust: 2 }, goal: '달빛 가루 2개를 하치와레에게 (밤에 나오는 그림자 나방)', say: ['우와~ 진짜 반짝거린다!', '오늘 밤에 동굴로 와 줄래? 첫 번째 관객이 되어 줘!'] },
+      { type: 'visit', place: 'cave', night: true, goal: '밤(19시 ~ 새벽 5시)에 바위산 하치와레 동굴로 가기', speaker: 'hachiware', say: ['(동굴 안이 달빛 가루로 반짝반짝 빛난다…)', '♪ 라라~ 랄라~ 반짝이는 밤에~ ♪', '…헤헤, 어땠어? 들어 줘서 고마워, {name}!', '이제 사람들 앞에서도 부를 수 있을 것 같아~'] }
+    ],
+    reward: { money: 600, bond: 6, furniture: 'lamp' }
+  },
+  training: {
+    title: '랏코의 수련', giver: 'rakko', needHearts: 2, needLicense: 'hunter', ask: '수련 상대가 필요해?',
+    offer: ['…{name}. 토벌 자격증을 땄다지.', '약속대로 가르쳐 주지. 하지만 먼저 실력을 봐야겠다.', '바위산 이끼 거북 2마리. 단단한 상대다.', '움츠릴 때 물러났다가, 들이받은 뒤를 노려라.'],
+    steps: [{ type: 'hunt', species: 'turtle', n: 2, goal: '북쪽 바위산 이끼 거북 2마리 토벌하고 랏코에게 알리기', say: ['…훗. 해냈군.', '좋은 눈을 가졌다. 이걸 받아라.', '네 손에 맞게 다듬어 둔 무기다. …수련을 게을리하지 마라.'] }],
+    reward: { money: 300, bond: 3, weapon: 'hammer' }
+  },
+  noodles: {
+    title: '시사의 면 삶기 특훈', giver: 'shisa', needHearts: 1, ask: '요즘 연습은 잘 돼?',
+    offer: ['{name} 님! 저 면 삶기 특훈 중인데요…', '사부님이 그러셨어요. 좋은 라멘은 좋은 재료부터라고!', '강가 물가 갈대를 5개만 뽑아다 주실 수 있어요? 국물 거를 때 쓰려고요!'],
+    steps: [{ type: 'pull', kind: 'reed', n: 5, goal: '물가 갈대 5개 뽑고 시사에게 알리기 (3급부터)', say: ['와아! 고마워요, {name} 님!', '이걸로 국물을 거르면 훨씬 맑아질 거예요!', '감사의 뜻으로… 사부님 몰래 드리는 거예요! 쉿!'] }],
+    reward: { money: 700, bond: 3 }
+  }
+};
+export const QUEST_ORDER = Object.keys(QUESTS);
+
+const NIGHT = (h) => h >= 19 || h < 5;
+export const questsOf = (state) => state.quests || {};
+export const questState = (state, id) => questsOf(state)[id] || null;
+export const isDone = (state, id) => !!(questState(state, id) && questState(state, id).done);
+export const isActive = (state, id) => !!(questState(state, id) && !questState(state, id).done);
+/** 지금 단계(없으면 null). */
+export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
+/** 그 단계를 누구에게 알리는지. */
+export const reportTo = (id, step) => step.to || QUESTS[id].giver;
+
+/** 그 단계를 받았을 때 세어 두는 값(사냥 · 풀은 그 뒤로 센다). */
+function snapshot(state, step) {
+  if (step.type === 'hunt') return (state.hunted || {})[step.species] || 0;
+  if (step.type === 'pull') return (state.weedLog || {})[step.kind] || 0;
+  return 0;
+}
+/** 지금 단계의 진행 { have, need } (센 것이 없으면 null). */
+export function progressOf(state, id) {
+  const q = questState(state, id), step = stepOf(state, id);
+  if (!step) return null;
+  if (step.type === 'hunt') return { have: Math.min(step.n, ((state.hunted || {})[step.species] || 0) - q.base), need: step.n };
+  if (step.type === 'pull') return { have: Math.min(step.n, ((state.weedLog || {})[step.kind] || 0) - q.base), need: step.n };
+  if (step.type === 'bring') {
+    const b = bagOf(state).items;
+    const need = Object.values(step.items).reduce((a, n) => a + n, 0);
+    const have = Object.entries(step.items).reduce((a, [it, n]) => a + Math.min(n, b[it] || 0), 0);
+    return { have, need };
+  }
+  return null;
+}
+/** 지금 단계를 끝낼 수 있는지(알리러 가면 되는지). visit · boss 는 main 이 도착 · 쓰러뜨림을 알려 준다. */
+export function stepReady(state, id) {
+  const step = stepOf(state, id);
+  if (!step) return false;
+  if (step.type === 'talk') return true;
+  if (step.type === 'license') return hasLicense(state, step.id);
+  if (step.type === 'visit' || step.type === 'boss') return false;
+  const p = progressOf(state, id);
+  return !!p && p.have >= p.need;
+}
+/** 부탁을 들을 수 있는지: 안 했고, 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
+export function canOffer(state, id) {
+  const Q = QUESTS[id];
+  if (questState(state, id)) return false;
+  if (Q.tutorial && state.tutorial && state.tutorial !== 'done') return false;
+  if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
+  return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
+}
+/** 그 친구에게 지금 할 수 있는 퀘스트 일: { offer: [id], report: [id](끝낼 수 있는 것), waiting: [id](알려야 하지만 아직 덜 한 것) } */
+export function questsFor(state, kind) {
+  const out = { offer: [], report: [], waiting: [] };
+  for (const id of QUEST_ORDER) {
+    if (QUESTS[id].giver === kind && canOffer(state, id)) out.offer.push(id);
+    const step = stepOf(state, id);
+    if (!step || step.type === 'visit' || step.type === 'boss' || reportTo(id, step) !== kind) continue;
+    (stepReady(state, id) ? out.report : out.waiting).push(id);
+  }
+  return out;
+}
+/** 머리 위 표시: '!'(새 부탁) · '?'(알리러 오면 끝) · null. */
+export function markOf(state, kind) {
+  const q = questsFor(state, kind);
+  return q.report.length ? '?' : q.offer.length ? '!' : null;
+}
+
+/** 부탁을 받는다(처음 단계를 시작한다). 화면에 띄울 퀘스트로 고른다. */
+export function startQuest(state, id) {
+  const step = QUESTS[id].steps[0];
+  return { ...state, quests: { ...questsOf(state), [id]: { step: 0, base: snapshot(state, step) } }, questTrack: id };
+}
+
+/** 친밀도를 바로 올린다(퀘스트 보상). 하트 3개가 되면 그 친구 선물 가구도. → { state, up, hearts, gift } */
+export function bond(state, kind, pts) {
+  if (!FRIENDS[kind] || !pts) return { state, up: false, hearts: hearts(friendOf(state, kind)), gift: null };
+  const f = friendOf(state, kind), next = { ...f, pts: Math.min(f.pts + pts, HEART_PTS * MAX_HEARTS + 2) };
+  let s = state, gift = null;
+  const giftId = FRIENDS[kind].gift;
+  if (giftId && !next.gift && hearts(next) >= GIFT_HEARTS) {
+    gift = giftId;
+    next.gift = true;
+    const home = homeOf(s);
+    s = { ...s, home: { ...home, owned: { ...home.owned, [giftId]: (home.owned[giftId] || 0) + 1 } } };
+  }
+  s = { ...s, friends: { ...(s.friends || {}), [kind]: next } };
+  return { state: s, up: hearts(next) > hearts(f), hearts: hearts(next), gift };
+}
+
+/** 보상을 준다. → { state, got: [글자], gifts: [가구 id], up: 하트가 늘었는지 } */
+export function giveReward(state, id, day) {
+  const Q = QUESTS[id], R = Q.reward || {}, got = [], gifts = [];
+  let s = state, up = false;
+  if (R.money) { s = { ...s, money: s.money + R.money }; got.push(`${R.money.toLocaleString('ko-KR')}원`); }
+  if (R.bond) { const b = bond(s, Q.giver, R.bond); s = b.state; up = b.up; if (b.gift) gifts.push(b.gift); got.push(`${FRIENDS[Q.giver].name} 친밀도 +${R.bond}`); }
+  if (R.village) {
+    for (const k of ['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko', 'shisa', 'kani']) { const b = bond(s, k, R.village); s = b.state; if (b.gift) gifts.push(b.gift); }
+    got.push('마을 친구들 모두와 친밀도 +' + R.village);
+  }
+  if (R.items) for (const [it, n] of Object.entries(R.items)) { s = addItem(s, it, n).state; got.push(`${itemInfo(it).name} ×${n}`); }
+  if (R.accessory) {
+    const w = wardrobeOf(s);
+    if (!w.owned.includes(R.accessory)) { s = { ...s, wardrobe: { owned: [...w.owned, R.accessory], wear: w.wear } }; got.push(`${ACCESSORY_ITEMS[R.accessory].name}(옷장)`); }
+    else { s = { ...s, money: s.money + 300 }; got.push('300원(이미 가진 소품 대신)'); }
+  }
+  if (R.weapon) {
+    const w = weaponOf(s);
+    if (!w.owned.includes(R.weapon)) { s = { ...s, weapon: { owned: [...w.owned, R.weapon], held: w.held || R.weapon } }; got.push(`${WEAPONS[R.weapon].name}(무기)`); }
+    else { const m = Math.round(WEAPONS[R.weapon].price / 2); s = { ...s, money: s.money + m }; got.push(`${m.toLocaleString('ko-KR')}원(이미 가진 무기 대신)`); }
+  }
+  if (R.furniture) { const home = homeOf(s); s = { ...s, home: { ...home, owned: { ...home.owned, [R.furniture]: (home.owned[R.furniture] || 0) + 1 } } }; got.push(`${FURNITURE[R.furniture].name}(가구)`); }
+  if (R.truce) { s = { ...s, truce: day + R.truce - 1 }; got.push(`모몽가가 ${R.truce}일 동안 소매치기 안 하기`); }
+  return { state: s, got, gifts, up };
+}
+
+/**
+ * 지금 단계를 끝내고 다음 단계로(마지막이면 퀘스트 끝 + 보상). bring 이면 가방에서 꺼내 건넨다.
+ * → { state, finished, next: 다음 단계 | null, reward: giveReward 결과 | null }
+ */
+export function completeStep(state, id, day) {
+  const Q = QUESTS[id], q = questState(state, id), step = Q.steps[q.step];
+  let s = state;
+  if (step.type === 'bring') for (const [it, n] of Object.entries(step.items)) s = takeItem(s, it, n).state;
+  const nextI = q.step + 1;
+  if (nextI >= Q.steps.length) {
+    s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: 0, done: day } } };
+    if (s.questTrack === id) s = { ...s, questTrack: pickTrack(s) };
+    const reward = giveReward(s, id, day);
+    return { state: reward.state, finished: true, next: null, reward };
+  }
+  const next = Q.steps[nextI];
+  s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: snapshot(s, next) } } };
+  return { state: s, finished: false, next, reward: null };
+}
+
+/** 화면에 띄울 퀘스트: 정해 둔 것이 끝났으면 이야기 → 다른 진행 중인 부탁. */
+export function pickTrack(state) {
+  if (state.questTrack && isActive(state, state.questTrack)) return state.questTrack;
+  return QUEST_ORDER.find((id) => isActive(state, id)) || null;
+}
+/** 진행 중인 퀘스트 목록(이야기가 먼저). */
+export const activeQuests = (state) => QUEST_ORDER.filter((id) => isActive(state, id));
+export const doneQuests = (state) => QUEST_ORDER.filter((id) => isDone(state, id));
+
+/** 지금 단계 목표 한 줄('잡초 2 / 3' 같은 진행 포함). 알리기만 남았으면 '○○에게 알리기'. */
+export function goalText(state, id) {
+  const step = stepOf(state, id);
+  if (!step) return '';
+  const p = progressOf(state, id);
+  if (stepReady(state, id) && step.type !== 'talk') return `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`;
+  return p ? `${step.goal} · ${p.have} / ${p.need}` : step.goal;
+}
+
+/** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */
+export function arrived(step, place, x, z, hour) {
+  if (!step || step.type !== 'visit' || !place) return false;
+  if (step.night && !NIGHT(hour)) return false;
+  return Math.hypot(x - place.x, z - place.z) < (PLACES[step.place].r || 3);
+}
+export const isNightHour = NIGHT;
+
+const num = (v) => typeof v === 'number' && Number.isFinite(v);
+export function isValidQuests(qs) {
+  if (!qs || typeof qs !== 'object' || Array.isArray(qs)) return false;
+  return Object.entries(qs).every(([id, q]) => QUESTS[id] && q && num(q.step) && q.step >= 0 && q.step <= QUESTS[id].steps.length && num(q.base) && (q.done === undefined || num(q.done)));
+}
+export function isValidStory(st) {
+  return !!st && typeof st === 'object' && !Array.isArray(st);
+}
+/** 퀘스트 데이터가 서로 맞는지(테스트용): 친구 · 물건 · 몬스터 · 풀 · 보상이 모두 있는 것인지. */
+export function checkQuestData() {
+  const errs = [];
+  for (const [id, Q] of Object.entries(QUESTS)) {
+    if (!FRIENDS[Q.giver]) errs.push(id + ': giver');
+    for (const st of Q.steps) {
+      if (st.to && !FRIENDS[st.to]) errs.push(id + ': to ' + st.to);
+      if (st.type === 'bring') for (const it of Object.keys(st.items)) if (!itemInfo(it)) errs.push(id + ': item ' + it);
+      if (st.type === 'hunt' && !MONSTERS[st.species]) errs.push(id + ': species');
+      if (st.type === 'pull' && !WEED_KINDS[st.kind]) errs.push(id + ': weed');
+      if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
+      if (!st.goal || !st.say) errs.push(id + ': goal/say');
+    }
+    const R = Q.reward || {};
+    if (R.accessory && !ACCESSORY_ITEMS[R.accessory]) errs.push(id + ': accessory');
+    if (R.weapon && !WEAPONS[R.weapon]) errs.push(id + ': weapon');
+    if (R.furniture && !FURNITURE[R.furniture]) errs.push(id + ': furniture');
+    if (R.items) for (const it of Object.keys(R.items)) if (!itemInfo(it)) errs.push(id + ': reward item ' + it);
+  }
+  return errs;
+}

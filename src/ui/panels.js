@@ -22,6 +22,9 @@ import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
+import { QUESTS, QUEST_ORDER, questState, goalText, progressOf, isDone, isActive, canOffer, pickTrack } from '../core/quests.js';
+import { FRIENDS } from '../core/friends.js';
+import { charSvg } from './art.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -34,6 +37,8 @@ const APP_ICON = {
   // 테스트 도구: 스패너
   dev: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M27.5 6.5a7.5 7.5 0 0 0-7.1 9.9L8.6 28.2a3.2 3.2 0 0 0 4.5 4.5l11.8-11.8a7.5 7.5 0 0 0 9.9-7.1l-4.6 2.4-3.9-1.3-1.3-3.9z" fill="#fff"/></svg>',
   weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>',
+  // 퀘스트: 둘둘 만 두루마리
+  quests: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="25" rx="3" fill="#fff"/><path d="M7 10a4 4 0 0 1 8 0v20a4 4 0 0 1-8 0zM25 30a4 4 0 0 0 8 0" fill="#fff" stroke="#e8a83e" stroke-width="2"/><path d="M15 15h11M15 20h11M15 25h7" stroke="#e8a83e" stroke-width="2.2" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
@@ -107,7 +112,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'monsters', 'dev'];
+  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'dev'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -294,6 +299,33 @@ export function createPanels(ui, handlers) {
           h('li', {}, '무기는 도구점에서 사요. 잡으면 나오는 전리품은 노동 접수에서 팔아요.')),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
+    },
+    // 마을폰 '퀘스트' 앱: 이야기 · 진행 중인 부탁(화면에 띄울 것 고르기) · 들을 수 있는 부탁 · 끝낸 부탁
+    quests(s) {
+      const track = pickTrack(s);
+      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
+        ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
+        : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
+      const card = (id, kind) => {
+        const Q = QUESTS[id], st = questState(s, id), p = kind === 'active' ? progressOf(s, id) : null;
+        return h('div', { class: `row q-card ${kind}${Q.story ? ' story' : ''}${id === track ? ' tracked' : ''}` }, face(Q.giver),
+          h('div', {},
+            h('div', { class: 't' }, Q.title, h('span', { class: 'weed-count' }, Q.story ? '이야기' : FRIENDS[Q.giver].name)),
+            kind === 'active' ? h('div', { class: 'd' }, `${st.step + 1} / ${Q.steps.length}단계 · ${goalText(s, id)}`) : null,
+            p ? h('div', { class: 'q-bar' }, h('i', { style: `width:${Math.round((p.have / p.need) * 100)}%` })) : null,
+            kind === 'offer' ? h('div', { class: 'd' }, `${FRIENDS[Q.giver].name}에게 말을 걸어 봐요 · 머리 위에 ! 가 떠 있어요`) : null,
+            kind === 'locked' ? h('div', { class: 'd' }, `${josa(FRIENDS[Q.giver].name, '과/와')} 하트 ${Q.needHearts}개${Q.needLicense ? ' · 토벌 자격증' : ''}가 되면 들을 수 있을지도…`) : null,
+            kind === 'done' ? h('div', { class: 'd' }, '다 들어줬어요 ✓') : null),
+          kind === 'active' && id !== track ? h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.trackQuest(id)) }, '화면에 띄우기') : null);
+      };
+      const active = QUEST_ORDER.filter((id) => isActive(s, id)), offer = QUEST_ORDER.filter((id) => canOffer(s, id));
+      const done = QUEST_ORDER.filter((id) => isDone(s, id)), locked = QUEST_ORDER.filter((id) => !questState(s, id) && !canOffer(s, id));
+      const out = [appBar('퀘스트', `${done.length} / ${QUEST_ORDER.length}`), h('p', { class: 'sub' }, '친구들의 고민을 들어주고 마을 이야기를 따라가요')];
+      if (active.length) { out.push(h('h3', { class: 'shop-sec' }, '하는 중')); active.forEach((id) => out.push(card(id, 'active'))); }
+      if (offer.length) { out.push(h('h3', { class: 'shop-sec' }, '들을 수 있는 부탁')); offer.forEach((id) => out.push(card(id, 'offer'))); }
+      if (locked.length) { out.push(h('h3', { class: 'shop-sec' }, '아직 몰라요')); locked.forEach((id) => out.push(card(id, 'locked'))); }
+      if (done.length) { out.push(h('h3', { class: 'shop-sec' }, '끝낸 부탁')); done.forEach((id) => out.push(card(id, 'done'))); }
+      return out;
     },
     // 마을폰 '몬스터 도감' 앱: 만난(잡은) 몬스터와 잡은 수
     monsters(s) {
@@ -620,6 +652,7 @@ export function createPanels(ui, handlers) {
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
+          app('quests', APP_ICON.quests, '퀘스트', () => show('quests')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
@@ -656,6 +689,7 @@ export function createPanels(ui, handlers) {
     openMap: () => show('map'),
     openWeeds: () => show('weeds'),
     openMonsters: () => show('monsters'),
+    openQuests: () => show('quests'),
     openSettings: (extra) => show('settings', extra)
   };
 }

@@ -379,7 +379,7 @@ export function createMonsters(scene, village, random = Math.random) {
     nearest(x, z, maxDist, fn = null) {
       let best = null, bd = maxDist;
       for (const m of list) {
-        if (m.dead || (fn && !fn(m))) continue;
+        if (m.dead || m.dormant || (fn && !fn(m))) continue;
         const d = Math.hypot(m.x - x, m.z - z) - m.M.size;
         if (d < bd) { bd = d; best = m; }
       }
@@ -392,7 +392,7 @@ export function createMonsters(scene, village, random = Math.random) {
     strike({ x, z, yaw, range, dmg, knock = 1 }) {
       const out = [];
       for (const m of list) {
-        if (m.dead || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size)) continue;
+        if (m.dead || m.dormant || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size)) continue; // 잠든 왕버섯은 아직 깨울 수 없다
         m.hp -= dmg;
         m.flash = 0.13;
         m.engaged = true;
@@ -414,6 +414,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (const m of list) {
         if (m.dead || !m.mesh.root.visible || Math.hypot(m.x - focus.x, m.z - focus.z) > 16) continue;
         const y = m.mesh.height + (m.species === 'moth' ? Math.sin(performance.now() / 385 + m.phase) * 0.18 : 0);
+        if (m.dormant) { out.push({ id: 'mz' + m.id, x: m.x, y, z: m.z, text: `${m.M.name} · 쿨쿨…`, kind: 'mhp', pct: 1, boss: true }); continue; }
         if (m.alert > 0) out.push({ id: 'ma' + m.id, x: m.x, y: y + 0.45, z: m.z, text: '!', kind: 'alert' });
         if (m.engaged || m.hp < m.M.hp || m.exam) out.push({ id: 'mh' + m.id, x: m.x, y, z: m.z, text: m.M.name, kind: 'mhp', pct: Math.max(0, m.hp / m.M.hp), boss: !!m.M.boss });
       }
@@ -471,7 +472,7 @@ export function createMonsters(scene, village, random = Math.random) {
         }
         if (M.speed > 0) {
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
-          const canSee = ctx.active && !playerSafe && dp < (m.engaged ? M.aggro * 1.7 : M.aggro);
+          const canSee = ctx.active && !playerSafe && !m.dormant && dp < (m.engaged ? M.aggro * 1.7 : M.aggro);
           if (m.state !== 'return' && fromHome > LEASH) m.state = 'return';
           if (m.state === 'wander') {
             if (canSee) {
@@ -504,6 +505,22 @@ export function createMonsters(scene, village, random = Math.random) {
                 const step = M.speed * dt;
                 moveBy(m, ((p.x - m.x) / dp) * step, ((p.z - m.z) / dp) * step);
                 moving = true;
+              }
+            }
+            // 왕버섯: 쫓아오는 동안 이따금 포자를 뿜어 풀뭉치를 불러낸다(살아 있는 부하는 넷까지)
+            if (M.boss && m.state === 'chase') {
+              m.summonT = (m.summonT ?? 4) - dt;
+              if (m.summonT <= 0) {
+                m.summonT = 9;
+                const minions = list.filter((o) => o.summoned && !o.dead).length;
+                for (let k = 0; k < Math.min(2, 4 - minions); k++) {
+                  const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * 2.2, sz = m.z + Math.cos(a) * 2.2;
+                  if (!village.isFree(sx, sz, 0.4)) continue;
+                  const f = add('fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
+                  f.born = 0.01; f.mesh.root.scale.setScalar(0.01);
+                  poof(sx, 0.3, sz, 0.3);
+                }
+                ctx.onSummon?.(m);
               }
             }
           } else if (m.state === 'wind') {

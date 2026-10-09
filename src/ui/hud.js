@@ -38,7 +38,11 @@ export function createHud(ui, input) {
     <div class="hud-grade"></div>
     <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>`;
   const job = el('div', 'hud-job');
-  dock.append(status, job);
+  // 지금 하는 퀘스트(5단계): 일감 칸 아래 두루마리 쪽지
+  const quest = el('div', 'hud-quest');
+  quest.hidden = true;
+  quest.innerHTML = '<i></i><b></b><span></span>';
+  dock.append(status, job, quest);
   const clock = el('div', 'hud-clock');
   clock.innerHTML = '<div class="hud-date"><span class="dl"></span><span class="sk"></span></div><div class="hud-time"><b class="hm"></b><small class="ap"></small></div>';
   // 가방(마을폰 왼쪽): 모아 둔 풀 · 열매 · 물건
@@ -138,6 +142,19 @@ export function createHud(ui, input) {
       const phase = phaseOf(state.clock);
       if (shown.phase !== phase) { shown.phase = phase; skyEl.innerHTML = SKY_ICON[phase]; }
     },
+    /** 지금 하는 퀘스트 { title, goal, story } | null. */
+    setQuest(q) {
+      const key = q ? q.title + '|' + q.goal : '';
+      if (shown.quest === key) return;
+      shown.quest = key;
+      quest.hidden = !q;
+      if (!q) return;
+      quest.classList.toggle('story', !!q.story);
+      quest.querySelector('i').textContent = q.story ? '이야기' : '부탁';
+      quest.querySelector('b').textContent = q.title;
+      quest.querySelector('span').textContent = q.goal;
+      quest.classList.remove('got'); void quest.offsetWidth; quest.classList.add('got');
+    },
     /** 행동 버튼 글자. null 이면 숨긴다. */
     setAction(label) {
       action.hidden = !label;
@@ -229,7 +246,7 @@ export function createHud(ui, input) {
       const e = el('div', 'float-fx ' + kind);
       e.textContent = text;
       labelLayer.appendChild(e);
-      fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : 900) });
+      fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : kind === 'note' ? 1400 : 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     banner(title, sub, ms = 2600) {
