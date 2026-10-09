@@ -81,7 +81,7 @@ export const CHATS = {
 export const HEART_PTS = 3;
 export const MAX_HEARTS = 5;
 export const GIFT_HEARTS = 3;
-const GAIN = { talk: 1, play: 2 };
+const GAIN = { talk: 1, play: 2, drink: 2 }; // drink: 맥주집에서 쿠리만쥬와 건배
 
 /** 그 친구와의 친밀도(처음 보면 0). */
 export function friendOf(state, kind) {
@@ -94,12 +94,12 @@ export function hearts(f) {
 }
 
 /**
- * 이야기하거나(talk) 놀았을 때(play). 같은 날 같은 일은 한 번만 친밀도가 오른다.
+ * 이야기하거나(talk) 놀았을 때(play) · 같이 건배했을 때(drink). 같은 날 같은 일은 한 번만 친밀도가 오른다.
  * 하트가 GIFT_HEARTS 개가 되면 그 친구의 선물 가구가 집에 들어온다(한 번만).
  * → { state, gained, hearts, up(하트가 늘었는지), gift: 가구 id | null }
  */
 export function befriend(state, kind, action, day) {
-  const f = friendOf(state, kind), field = action === 'play' ? 'play' : 'talk';
+  const f = friendOf(state, kind), field = GAIN[action] ? action : 'talk';
   if (f[field] === day) return { state, gained: 0, hearts: hearts(f), up: false, gift: null };
   const next = { ...f, pts: f.pts + GAIN[field], [field]: day };
   let s = state, gift = null;
@@ -161,5 +161,5 @@ export function isValidFriends(fr) {
   if (!fr || typeof fr !== 'object' || Array.isArray(fr)) return false;
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   return Object.entries(fr).every(([kind, f]) => FRIENDS[kind] && f && num(f.pts) && f.pts >= 0 && num(f.talk) && num(f.play) && typeof f.gift === 'boolean'
-    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)));
+    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && (f.drink === undefined || num(f.drink)));
 }

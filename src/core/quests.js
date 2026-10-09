@@ -15,7 +15,7 @@ import { WEED_KINDS } from './weeding.js';
  *   pull    { kind, n }                그 풀을 n 개 뽑고 to 에게 알린다
  *   license { id }                     그 자격증을 따고 to 에게 알린다
  *   talk    { }                        to 에게 말을 건다
- *   visit   { place, night? }          그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시에만)
+ *   visit   { place, night?, evening? } 그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시, evening 이면 저녁 17 ~ 21시에만)
  *   boss    { }                        이야기 속 왕버섯을 쓰러뜨리면 저절로 끝난다
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
  * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
@@ -25,14 +25,16 @@ import { WEED_KINDS } from './weeding.js';
 /** 퀘스트에서만 받는 먹을 것. */
 export const QUEST_ITEMS = {
   riceball: { name: '우사기 주먹밥', kind: 'food', note: '소풍 돗자리 위에서 받은 커다란 주먹밥. 먹으면 기운이 20 찬다.', eat: 20 },
-  jellybake: { name: '젤리 구이', kind: 'food', note: '쿠리만쥬가 구운 겉바삭 속쫀득 안주. 먹으면 기운이 30 찬다.', eat: 30 }
+  jellybake: { name: '젤리 구이', kind: 'food', note: '쿠리만쥬가 구운 겉바삭 속쫀득 안주. 먹으면 기운이 30 찬다.', eat: 30 },
+  bottlebeer: { name: '병맥주', kind: 'food', note: '쿠리만쥬가 챙겨 준 시원한 병맥주. 마시면 기운이 25 찬다.', eat: 25 }
 };
 registerItems(QUEST_ITEMS);
 
 /** 퀘스트에 나오는 곳(main 이 world 좌표로 채운다: cave, lair). r: 이만큼 가까이 가면 도착. */
 export const PLACES = {
   cave: { name: '하치와레 동굴', r: 3.2 },
-  lair: { name: '바위산 깊은 곳', r: 9 }
+  lair: { name: '바위산 깊은 곳', r: 9 },
+  pub: { name: '맥주집', r: 3 }
 };
 
 export const QUESTS = {
@@ -78,6 +80,15 @@ export const QUESTS = {
     steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 3개 · 빨간 열매 4개를 쿠리만쥬에게', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
     reward: { money: 500, bond: 3, items: { jellybake: 2 } }
   },
+  cheers: {
+    title: '쿠리만쥬와 맥주 한 잔', giver: 'kurimanju', needHearts: 2, needLicense: 'liquor', ask: '요즘 맥주는 어때?',
+    offer: ['하아~ {name}, 술 자격증 땄다며?', '마을 동쪽 맥주집 알지? 거기 생맥주가 아주 끝내주거든~', '근데 맥주엔 안주가 있어야지. 빨간 열매 5개만 따다 줄래? 새콤달콤하게 절여 볼게.', '그리고… 저녁에 맥주집에서 같이 한 잔 하자. 하아~'],
+    steps: [
+      { type: 'bring', items: { berry: 5 }, goal: '빨간 열매 5개를 쿠리만쥬에게 (마을 가장자리 열매 덤불)', say: ['오~ 잘 익었네!', '(열매를 새콤달콤하게 절인다…)', '좋아, 안주 준비 끝! 저녁(5시 ~ 9시)에 맥주집에서 기다릴게~'] },
+      { type: 'visit', place: 'pub', evening: true, goal: '저녁(17 ~ 21시)에 맥주집에서 쿠리만쥬 만나기', speaker: 'kurimanju', say: ['왔구나~ 자, 한 잔 받아!', '건배~! (짠—!)', '…캬~ 같이 마시니까 훨씬 맛있다. 하아~', '저녁에 여기 오면 언제든 한 잔 하자. 같이 건배하면 더 친해질 거야~'] }
+    ],
+    reward: { money: 600, bond: 4, items: { bottlebeer: 3 } }
+  },
   song: {
     title: '하치와레의 동굴 무대', giver: 'hachiware', needHearts: 2, ask: '요즘 노래 연습은 어때?',
     offer: ['있잖아, {name}.', '나 동굴에서 혼자 노래 연습하는데… 너무 어두워서 조금 무서워.', '그림자 나방 날개 가루가 밤에 반짝반짝 빛난대!', '달빛 가루 2개만 구해 줄래? 동굴을 반짝이는 무대로 꾸미고 싶어~'],
@@ -103,6 +114,7 @@ export const QUESTS = {
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 const NIGHT = (h) => h >= 19 || h < 5;
+const EVENING = (h) => h >= 17 && h < 21;
 export const questsOf = (state) => state.quests || {};
 export const questState = (state, id) => questsOf(state)[id] || null;
 export const isDone = (state, id) => !!(questState(state, id) && questState(state, id).done);
@@ -257,9 +269,11 @@ export function goalText(state, id) {
 export function arrived(step, place, x, z, hour) {
   if (!step || step.type !== 'visit' || !place) return false;
   if (step.night && !NIGHT(hour)) return false;
+  if (step.evening && !EVENING(hour)) return false;
   return Math.hypot(x - place.x, z - place.z) < (PLACES[step.place].r || 3);
 }
 export const isNightHour = NIGHT;
+export const isEveningHour = EVENING;
 
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 export function isValidQuests(qs) {

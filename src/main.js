@@ -34,7 +34,7 @@ import { advance, hourOf, sleepUntilMorning } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
 import { gainXp, canTakeExam, startExam, examStep, examCounts, promote, PAY_MULT } from './core/license.js';
-import { buy } from './core/shop.js';
+import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { createSound } from './audio/sound.js';
 import { TUTORIAL_LINES, HELP_TOPICS, tutorialActive, tutorialNext } from './core/tutorial.js';
@@ -194,13 +194,17 @@ function boot() {
       panels.close();
       hud.announce({ kicker: '승급 시험 시작!', title: `${names} 연속 ${exam.need}번`, sub: '초록에서 깔끔하게! 한 번이라도 끊기면 불합격' });
     },
-    buy(itemId) {
-      const r = buy(state, 'ramen', itemId);
+    buy(itemId, shopId = 'ramen') {
+      const r = buy(state, shopId, itemId);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : r.reason === 'license' ? '술 자격이 있어야 해요' : '지금은 배불러요'); return; }
       commit(r.state);
       sound.play('eat');
-      hud.toast(itemId === 'ramen' ? '후루룩! 기운이 났어요' : itemId === 'highball' ? '캬~ 시원하다! 기운이 났어요' : '냠냠! 기운이 조금 났어요');
+      const SAY = { ramen: '후루룩! 기운이 났어요', highball: '캬~ 시원하다! 기운이 났어요', beer: '캬~ 거품 가득 생맥주! 기운이 났어요', edamame: '짭짤한 풋콩! 기운이 조금 났어요' };
+      hud.toast(SAY[itemId] || '냠냠! 기운이 조금 났어요');
     },
+    // 맥주집: 쿠리만쥬가 와 있는지 · 오늘 건배했는지, 건배하기
+    pubInfo: () => ({ here: !!kuriAtPub(), cheered: friendOf(state, 'kurimanju').drink === state.clock.day }),
+    cheers() { const k = kuriAtPub(); if (k) cheersWith(k); },
     // 검정소 시험 · 라멘 로우 알바
     takeLicense: (id) => takeLicense(id),
     workRamen: () => workRamen(),
@@ -805,6 +809,7 @@ function boot() {
       if (isEvicted(state)) hud.toast('집에서 쫓겨났어요… 부동산에서 다시 세 들어야 들어갈 수 있어요', 3400);
       else enterHome();
     } else if (target.type === 'pochette') panels.openPochette();
+    else if (target.type === 'pub') panels.openPub();
     else if (target.type === 'books') panels.openBooks();
     else if (target.type === 'tools') panels.openTools();
     else if (target.type === 'rough') sleepRough();
@@ -915,8 +920,9 @@ function boot() {
         commit({ ...state, liquorLesson: i + 1 });
         sayAs(n, [...LIQUOR_LESSONS[i], `(술 공부 ${i + 1} / ${LIQUOR_LESSONS.length}) 다 들으면 동쪽 검정소에서 시험을 봐~ 하아~`], () => reward(n, 'talk'));
       } else if (k === 'drink') {
-        npcs.emote(n, 'drink', 3.5);
-        sayAs(n, ['자격증 챙겼지? 그럼 한 잔~', '…캬~ 오늘 하루도 수고했어. 하아~'], () => reward(n, 'play'));
+        // 맥주집에 와 있을 때만 같이 건배(하루 한 번 · 두 잔 값). 다른 데서는 저녁에 맥주집으로 오라고 한다
+        if (!kuriAtPub()) { sayAs(n, [isPubHour(hourOf(state.clock)) ? '좋지~ 맥주집으로 가자! 먼저 가 있을게. 하아~' : '하아~ 맥주는 역시 맥주집이지.', '저녁 5시 ~ 9시엔 늘 마을 동쪽 맥주집에 있어~ 거기서 건배하자!'], () => { if (isPubHour(hourOf(state.clock))) npcPub(n); endTalk(); }); return; }
+        cheersWith(n);
       } else if (k === 'shop') { endTalk(); panels.openPochette(); }
       else if (k === 'borrow') askLoan(n);
       else if (k === 'repay') {
@@ -1006,6 +1012,22 @@ function boot() {
       }, 650);
       setTimeout(() => { if (h) npcs.hold(h, false); }, 7500);
     }
+    if (step.speaker === 'kurimanju') {
+      // 맥주집 건배: 쿠리만쥬가 카운터 앞에 와 있고, 같이 짠!
+      const k = npcs.byKind('kurimanju'), seat = pubSeat(), front = village.spots.pub;
+      player.setPosition(front.x + 0.15, front.z + 0.1);
+      cam.snap(player.position);
+      if (k) {
+        if (k.away) npcs.comeOut(k, seat.x, seat.z);
+        else { k.x = seat.x; k.z = seat.z; }
+        player.face(k.x, k.z);
+        k.yaw = Math.atan2(player.position.x - k.x, player.position.z - k.z);
+        npcs.hold(k, true);
+        setTimeout(() => { npcs.emote(k, 'drink', 3.6); player.cheerTime = 1.4; hud.floatText({ x: (player.position.x + k.x) / 2, y: 1.7, z: (player.position.z + k.z) / 2, text: '짠!', kind: 'note' }); sound.play('heart'); }, 1200);
+        setTimeout(() => npcs.hold(k, false), 9000);
+      }
+      sound.play('heartUp');
+    }
     finishQuestStep(id, null, lines);
   }
   /** 부탁을 다 들어줬다: 보상과 축하. 이야기의 끝이면 마을 친구들이 다 같이 기뻐한다. */
@@ -1023,7 +1045,7 @@ function boot() {
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : null;
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
   /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
@@ -1124,7 +1146,7 @@ function boot() {
     const pass = () => {
       commit(grant(state, id, state.clock.day));
       endOverlay();
-      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '라멘 로우에서 하이볼을 마실 수 있어요' : id === 'hunter' ? '노동 접수에서 토벌 일감을 받을 수 있어요' : '라멘 로우에서 알바할 수 있어요', 3600);
+      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '맥주집 생맥주 · 라멘 로우 하이볼을 마실 수 있어요' : id === 'hunter' ? '노동 접수에서 토벌 일감을 받을 수 있어요' : '라멘 로우에서 알바할 수 있어요', 3600);
       sound.play('done');
       player.cheerTime = 1.8;
     };
@@ -1551,6 +1573,8 @@ function boot() {
       if (npcs.busy(n) || n === talking || (tag && tag.n === n) || (theft && theft.n === n)) continue;
       if (kind === 'hachiware' && tutorialActive(state.tutorial)) continue; // 첫날 안내 중에는 하치와레가 집에 가지 않는다
       const tired = villagerOf(state, kind, day).energy < TIRED;
+      // 쿠리만쥬: 저녁(17 ~ 21시)에는 쉬던 것도 멈추고 맥주집 카운터 앞에서 한 잔(지쳤으면 먼저 쉰다)
+      if (kind === 'kurimanju' && isPubHour(hour) && !tired && !isSleepHour(hour)) { npcPub(n); continue; }
       if (lifeClock < restUntil[kind] && !isSleepHour(hour) && !tired) continue;
       const plan = decide(state, kind, day, hour);
       if (plan.act === 'sleep' || plan.act === 'nap') npcGoHome(n, plan.act);
@@ -1614,6 +1638,42 @@ function boot() {
     }]);
   }
 
+  // ---------- 맥주집: 저녁이면 쿠리만쥬가 와 있고, 같이 건배하면 친해진다 ----------
+  /** 쿠리만쥬 자리: 카운터 앞 왼쪽 의자 옆(내가 서는 맥주집 앞 자리 바로 왼쪽). */
+  const pubSeat = () => ({ x: village.spots.pub.x - 0.95, z: village.spots.pub.z - 0.35 });
+  /** 쿠리만쥬가 맥주집에 와 있으면 그 친구(아니면 null). */
+  function kuriAtPub() {
+    const k = npcs.byKind('kurimanju'), s = pubSeat();
+    return k && !k.away && Math.hypot(k.x - s.x, k.z - s.z) < 2.6 ? k : null;
+  }
+  /** 쿠리만쥬가 맥주집으로 가서 한 잔 한다(벌써 와 있으면 그 자리에서 계속). */
+  const PUB_LINES = ['캬~ 퇴근 후엔 역시 생맥주!', '하아~ 거품이 살아 있네…', '한 잔 더~', '{name}도 한 잔 할래?'];
+  function npcPub(n) {
+    const s = pubSeat(), steps = [];
+    if (Math.hypot(n.x - s.x, n.z - s.z) > 0.9) steps.push({ do: 'walk', x: s.x, z: s.z });
+    steps.push({ do: 'call', fn: () => { n.yaw = Math.atan2(village.spots.pub.x - n.x, village.spots.pub.z - 2 - n.z); } });
+    steps.push({ do: 'act', anim: 'drink', time: 9, say: fillName(PUB_LINES[Math.floor(Math.random() * PUB_LINES.length)]) });
+    steps.push({ do: 'call', fn: () => { restUntil[n.kind] = lifeClock + 4; } });
+    npcs.plan(n, steps);
+  }
+  /** 쿠리만쥬와 건배: 두 잔 값을 내고 짠! 하루 한 번 하트 +2 · 기운도 조금. */
+  function cheersWith(n) {
+    if (!talking) beginTalk(n);
+    if (!hasLicense(state, 'liquor')) { sayAs(n, ['하아~ 술은 술 자격증부터!', '검정소에서 따 오면 같이 마시자~'], endTalk); return; }
+    if (friendOf(state, n.kind).drink === state.clock.day) { sayAs(n, ['오늘은 벌써 한 잔 했잖아~ 하아~', '내일 저녁에 또 건배하자!'], endTalk); return; }
+    if (state.money < CHEERS_PRICE) { sayAs(n, [`두 잔이면 ${won(CHEERS_PRICE)}인데… 돈이 모자라나 봐.`, '다음에 같이 마시자~'], endTalk); return; }
+    commit({ ...state, money: state.money - CHEERS_PRICE, stamina: Math.min(MAX_STAMINA, state.stamina + CHEERS_STAMINA) });
+    sound.play('coin');
+    const p = player.position;
+    player.face(n.x, n.z);
+    n.yaw = Math.atan2(p.x - n.x, p.z - n.z);
+    npcs.emote(n, 'drink', 3.6);
+    player.cheerTime = 1.4;
+    hud.floatText({ x: (p.x + n.x) / 2, y: 1.7, z: (p.z + n.z) / 2, text: '짠!', kind: 'note' });
+    setTimeout(() => sound.play('heart'), 250);
+    sayAs(n, ['건배~!', '…캬~ 같이 마시니까 훨씬 맛있다. 하아~', `(생맥주 두 잔 ${won(CHEERS_PRICE)} · 기운 +${CHEERS_STAMINA})`], () => reward(n, 'drink'));
+  }
+
   // ---------- 소매치기 모몽가: 하루 한 번쯤, 낮은 확률로 살금살금 다가와 지갑을 노린다 ----------
   function maybeSteal(day, hour) {
     if (theft || tag || mode !== 'play' || hour < 8 || hour >= 20 || tutorialActive(state.tutorial) || !canSteal(state, day)) return;
@@ -1671,7 +1731,7 @@ function boot() {
   }
 
   // ---------- 상호작용 대상 ----------
-  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['home', '집에 들어가기'], ['factory', '스티커 작업']];
+  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업']];
   // 가장 가까운 대상을 고른다. 건물은 거리를 0.6 깎아 조금 우선한다.
   function findTarget() {
     const p = player.position;

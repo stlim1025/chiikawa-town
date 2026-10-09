@@ -86,7 +86,7 @@ export function roadDist(x, z) {
 
 /**
  * 마을 건물 자리. 모두 남쪽(카메라 쪽)을 본다. kind: house(박공지붕 집) · dome(하얀 돔 집) · stall(노점) · board(게시판)
- * · bench(작업대) · dojo(수련장). home 이 있으면 그 친구의 집(3단계에서 들어가 잔다).
+ * · bench(작업대) · dojo(수련장) · pub(맥주집 노점). home 이 있으면 그 친구의 집(3단계에서 들어가 잔다).
  */
 export const LOTS = [
   { id: 'furniture', kind: 'house', x: -17, z: -14, s: 1.05, roof: '#9fd8c4', label: '가구점' },
@@ -104,14 +104,15 @@ export const LOTS = [
   { id: 'kurimanju', kind: 'house', x: 14.5, z: 7.5, s: 0.9, roof: '#d9a066', label: '쿠리만쥬네', home: 'kurimanju' },
   { id: 'momonga', kind: 'house', x: -12, z: 17, s: 0.8, roof: '#bfe0f5', label: '모몽가네', home: 'momonga' },
   { id: 'rakko', kind: 'house', x: 12, z: 17, s: 0.95, roof: '#a8826a', label: '랏코네', home: 'rakko' },
-  { id: 'dojo', kind: 'dojo', x: 17, z: 16, label: '랏코 수련장' }
+  { id: 'dojo', kind: 'dojo', x: 17, z: 16, label: '랏코 수련장' },
+  { id: 'pub', kind: 'pub', x: 20.5, z: 3.4, roof: '#e9884f', label: '맥주집' }
 ];
 
-const RADIUS = { house: (l) => 1.716 * l.s, dome: (l) => 1.47 * l.s, stall: () => 1.15, board: () => 1.0, bench: () => 1.0, dojo: () => 2.0 };
+const RADIUS = { house: (l) => 1.716 * l.s, dome: (l) => 1.47 * l.s, stall: () => 1.15, board: () => 1.0, bench: () => 1.0, dojo: () => 2.0, pub: () => 1.3 };
 /** 건물이 차지하는 반지름(장애물 크기와 같다). */
 export const lotRadius = (lot) => RADIUS[lot.kind](lot);
 
-const FRONT = { house: (l) => 1.716 * l.s + 0.65, stall: () => 1.8, board: () => 1.65, bench: () => 1.7, dojo: () => 2.6 };
+const FRONT = { house: (l) => 1.716 * l.s + 0.65, stall: () => 1.8, board: () => 1.65, bench: () => 1.7, dojo: () => 2.6, pub: () => 2.0 };
 /** 건물 앞(문 앞) 지점: 말 걸기 · 들어가기 대상이 되는 자리. 돔은 오른쪽 현관 혹 앞. */
 export function doorSpot(lot) {
   if (lot.kind === 'dome') { const R = 1.4 * lot.s; return { x: lot.x + R * 0.62, z: lot.z + R * 0.62 + 0.42 * lot.s + 0.8 }; } // 현관 혹의 문 바로 앞

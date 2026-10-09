@@ -262,6 +262,59 @@ export function buildVillage(scene) {
     labels.push({ x: lot.x, y: 1.8, z: lot.z, text: lot.label });
   }
 
+  /**
+   * 맥주집: 주황 차양 아래 나무 카운터, 뒤 선반에 맥주잔 · 맥주통, 앞에 동그란 의자 셋, 처마 끝에 빨간 등(밤에 켜진다),
+   * 지붕 위에 거품 가득한 커다란 맥주잔 간판. 저녁이면 쿠리만쥬가 카운터 앞 왼쪽 자리에 와서 한 잔 한다.
+   */
+  function pub(lot) {
+    const { x, z } = lot, g = new THREE.Group(), wood = '#b98a5e', dark = '#8a6240';
+    g.position.set(x, 0, z);
+    // 카운터(앞판은 진한 나무, 위는 밝은 상판)
+    place(g, toonMesh(GEO.box, dark, { position: [0, 0.45, 0.1], scale: [2.3, 0.9, 0.5], shell: true }));
+    place(g, toonMesh(GEO.box, '#d8b48c', { position: [0, 0.94, 0.12], scale: [2.45, 0.08, 0.66], shell: true }));
+    [-0.75, 0, 0.75].forEach((px) => place(g, toonMesh(GEO.box, '#a77a52', { position: [px, 0.45, 0.36], scale: [0.04, 0.8, 0.02], outline: false, shadow: false })));
+    // 뒤 기둥 · 앞 기둥 · 차양 지붕
+    [[-1.15, -0.55], [1.15, -0.55], [-1.15, 0.45], [1.15, 0.45]].forEach(([px, pz]) => place(g, toonMesh(GEO.box, wood, { position: [px, 1.15, pz], scale: [0.09, 2.3, 0.09], shell: true })));
+    place(g, toonMesh(ROOF, lot.roof || '#e9884f', { position: [0, 2.25, -0.05], scale: [2.75, 0.55, 1.45], shell: true }));
+    // 차양 끝 흰 줄무늬(노렌 느낌)
+    [-0.9, -0.3, 0.3, 0.9].forEach((px) => place(g, toonMesh(GEO.box, '#fff3e0', { position: [px, 2.0, 0.66], scale: [0.48, 0.34, 0.03], shell: true, outline: 0.015, shadow: false })));
+    // 뒤 선반: 맥주잔 줄 · 맥주통
+    place(g, toonMesh(GEO.box, wood, { position: [0, 1.35, -0.5], scale: [2.1, 0.06, 0.28], shell: true, shadow: false }));
+    [-0.75, -0.4, -0.05, 0.3].forEach((px) => {
+      place(g, toonMesh(GEO.cylinder, '#f6c453', { position: [px, 1.38, -0.5], scale: [0.09, 0.2, 0.09], outline: 0.012, shadow: false }));
+      place(g, toonMesh(GEO.sphere, '#ffffff', { position: [px, 1.6, -0.5], scale: [0.1, 0.06, 0.1], outline: 0.01, shadow: false }));
+    });
+    place(g, toonMesh(GEO.cylinder, '#b07a4a', { position: [0.82, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.26, 0.5, 0.26], outline: 0.02, shadow: false }));
+    [0.66, 0.98].forEach((px) => place(g, toonMesh(GEO.cylinder, '#5a5560', { position: [px, 0.98, -0.42], rotation: [0, 0, Math.PI / 2], scale: [0.27, 0.04, 0.27], outline: false, shadow: false })));
+    // 카운터 위 생맥주 꼭지
+    place(g, toonMesh(GEO.cylinder, '#c9ced6', { position: [-0.55, 0.98, -0.02], scale: [0.05, 0.32, 0.05], outline: 0.012, shadow: false }));
+    place(g, toonMesh(GEO.box, '#c9ced6', { position: [-0.55, 1.3, 0.04], scale: [0.06, 0.05, 0.16], outline: 0.012, shadow: false }));
+    // 앞 동그란 의자 셋
+    [-0.8, 0, 0.8].forEach((px) => {
+      place(g, toonMesh(GEO.cylinder, '#e9884f', { position: [px, 0.42, 0.95], scale: [0.22, 0.08, 0.22], outline: 0.02 }));
+      place(g, toonMesh(GEO.cylinder, dark, { position: [px, 0, 0.95], scale: [0.05, 0.42, 0.05], outline: 0.012, shadow: false }));
+    });
+    // 처마 끝 빨간 등 둘(밤에 불이 들어온다)
+    const lantern = toonMaterial('#f2604f', { unique: true });
+    windows.push(lantern);
+    [-1.25, 1.25].forEach((px) => {
+      place(g, toonMesh(GEO.box, dark, { position: [px, 1.92, 0.62], scale: [0.03, 0.18, 0.03], outline: false, shadow: false }));
+      place(g, toonMesh(GEO.sphere, null, { material: lantern, position: [px, 1.68, 0.62], scale: [0.17, 0.24, 0.17], outline: 0.018, shadow: false }));
+      place(g, toonMesh(GEO.cylinder, '#3a3236', { position: [px, 1.42, 0.62], scale: [0.1, 0.04, 0.1], outline: false, shadow: false }));
+    });
+    // 지붕 위 커다란 맥주잔 간판
+    const sign = new THREE.Group();
+    sign.position.set(0, 2.62, 0.1);
+    place(sign, toonMesh(GEO.cylinder, '#f6c453', { position: [0, 0, 0], scale: [0.3, 0.55, 0.3], outline: 0.025 }));
+    place(sign, toonMesh(GEO.sphere, '#ffffff', { position: [0, 0.58, 0], scale: [0.36, 0.17, 0.36], outline: 0.02 }));
+    place(sign, toonMesh(GEO.sphere, '#ffffff', { position: [0.16, 0.64, 0.1], scale: [0.16, 0.12, 0.16], outline: 0.015 }));
+    place(sign, toonMesh(new THREE.TorusGeometry(0.17, 0.05, 8, 20, Math.PI), '#f6c453', { position: [0.3, 0.28, 0], rotation: [0, 0, -Math.PI / 2], scale: [1, 1, 1], outline: 0.015 }));
+    g.add(sign);
+    world.add(g);
+    obstacles.push({ x, z: z - 0.05, r: lotRadius(lot) });
+    labels.push({ x, y: 3.6, z, text: lot.label });
+  }
+
   // ---------- 마을 건물: layout 의 자리(LOTS)마다 남쪽(카메라 쪽)을 보고 짓는다 ----------
   // 건물마다 덧붙이는 모양(가게 간판 · 친구 집의 특징)
   const EXTRA = {
@@ -332,6 +385,7 @@ export function buildVillage(scene) {
     else if (lot.kind === 'board') board(lot);
     else if (lot.kind === 'bench') bench(lot);
     else if (lot.kind === 'dojo') dojo(lot);
+    else if (lot.kind === 'pub') pub(lot);
     if (lot.home) homes[lot.home] = doorSpot(lot);
     else spots[lot.id] = doorSpot(lot);
   }

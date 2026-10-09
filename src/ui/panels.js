@@ -1,6 +1,6 @@
 import { JOB_TYPES, availableJobs, isComplete, payout } from '../core/jobs.js';
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, canTakeExam } from '../core/license.js';
-import { SHOPS } from '../core/shop.js';
+import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
 import { FURNITURE, homeOf } from '../core/home.js';
 import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, EVICT_AFTER, LODGING_PRICE, ROUGH_REST, housingOf } from '../core/housing.js';
@@ -399,6 +399,7 @@ export function createPanels(ui, handlers) {
           h('span', { class: 'chip-lab' }, '오늘'),
           chip(talked ? 'check' : 'todo', talked ? 'done' : 'todo', '이야기'),
           F.play ? chip(played ? 'check' : 'todo', played ? 'done' : 'todo', '놀기') : null,
+          k === 'kurimanju' ? chip(f.drink === today ? 'check' : 'todo', f.drink === today ? 'done' : 'todo', '건배') : null,
           F.gift && FURNITURE[F.gift] ? (f.gift ? chip('check', 'done', `선물 ${FURNITURE[F.gift].name}`) : chip('heart', 'gift', `${GIFT_HEARTS}개면 ${FURNITURE[F.gift].name} 선물`)) : null,
           f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null
         ];
@@ -438,6 +439,35 @@ export function createPanels(ui, handlers) {
       out.push(h('div', { class: 'row' },
         h('div', {}, h('div', { class: 't' }, '레시피 북'), h('div', { class: 'd' }, '라멘 다섯 가지 만드는 법')),
         h('button', { class: 'btn', type: 'button', onClick: () => show('recipes') }, '보기')));
+      out.push(h('div', { class: 'actions' }, closeBtn()));
+      return out;
+    },
+    // 맥주집: 생맥주(술 자격증) · 풋콩, 저녁에 와 있는 쿠리만쥬와 건배(하루 한 번 · 하트 +2)
+    pub(s) {
+      const shop = SHOPS.pub, info = handlers.pubInfo ? handlers.pubInfo() : { here: false, cheered: false };
+      const ART = {
+        beer: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="12" width="17" height="22" rx="3" fill="#f6c453" stroke="#c98a2a" stroke-width="2"/><path d="M26 16h3a4 4 0 0 1 0 12h-3" fill="none" stroke="#c98a2a" stroke-width="2.6"/><path d="M8 13q0-6 5-6q2-3 5-1q4-2 6 1q4 0 4 5z" fill="#fff" stroke="#d9cbb0" stroke-width="1.4"/><path d="M14 18v11M20 18v11" stroke="#ffe08a" stroke-width="2" stroke-linecap="round"/></svg>',
+        edamame: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 27q4-15 17-18q7-1 7 4q-2 13-18 17q-6 1-6-3z" fill="#9fd36a" stroke="#5e9f40" stroke-width="2"/><circle cx="14" cy="24" r="3.4" fill="#c4ea8e"/><circle cx="20" cy="19" r="3.6" fill="#c4ea8e"/><circle cx="26" cy="14" r="3.2" fill="#c4ea8e"/></svg>'
+      };
+      const out = [head(shop.name, s.money), h('p', { class: 'sub' }, `지금 기운 ${s.stamina} / ${MAX_STAMINA}`)];
+      shop.items.forEach((item) => {
+        const cannot = item.needs && !hasLicense(s, item.needs) ? `${LICENSES[item.needs].name} 필요`
+          : s.money < item.price ? '돈이 부족해요' : s.stamina >= MAX_STAMINA ? '배불러요' : null;
+        out.push(h('div', { class: 'row pub-row' }, svgSpan('lic-ico', ART[item.id]),
+          h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `${won(item.price)} · 기운 +${item.stamina}`)),
+          h('button', { class: 'btn primary', type: 'button', disabled: !!cannot, onClick: after(() => handlers.buy(item.id, 'pub')) }, cannot || (item.id === 'beer' ? '마시기' : '먹기'))));
+      });
+      // 쿠리만쥬와 건배
+      const lic = hasLicense(s, 'liquor');
+      const side = !lic ? h('span', { class: 'lic-badge' }, '술 자격증 필요')
+        : !info.here ? h('span', { class: 'lic-badge' }, `저녁 ${PUB_HOURS[0]}시 ~ ${PUB_HOURS[1]}시에 와요`)
+          : info.cheered ? h('span', { class: 'lic-badge done' }, ico('check'), '오늘 건배함')
+            : h('button', { class: 'btn pink', type: 'button', disabled: s.money < CHEERS_PRICE, onClick: () => { close(true); handlers.cheers(); } }, s.money < CHEERS_PRICE ? '돈이 부족해요' : `건배 ${won(CHEERS_PRICE)}`);
+      out.push(h('div', { class: `row pub-row cheers${info.here ? ' here' : ''}` },
+        svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg('kurimanju')}</svg>`),
+        h('div', {}, h('div', { class: 't' }, '쿠리만쥬와 건배'),
+          h('div', { class: 'mon-chips' }, chip('heart', 'gift', '하트 +2'), chip(null, '', `기운 +${CHEERS_STAMINA}`))),
+        side));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
@@ -816,6 +846,7 @@ export function createPanels(ui, handlers) {
     openFurniture: () => show('furniture'),
     openRealty: () => show('realty'),
     openPochette: () => show('pochette'),
+    openPub: () => show('pub'),
     openBag: () => show('bag'),
     openWardrobe: () => show('wardrobe'),
     openBooks: () => show('books'),
