@@ -10,7 +10,7 @@ export function createPlayer(scene, chibi, village) {
   let yaw = 0, phase = 0, t = 0;
   let model = chibi;
   let held = null, weapon = null, weaponShown = true;
-  let swingT = 0, hurtT = 0, blinkT = 0;
+  let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   const knock = { x: 0, z: 0 };
   const showHeld = () => {
     for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || (weaponShown && weapon && tag === 'w-' + weapon);
@@ -47,7 +47,7 @@ export function createPlayer(scene, chibi, village) {
     /** 오른손 무기 id | null(4단계). */
     setWeapon(id) { if (weapon === id) return; weapon = id; showHeld(); },
     /** 무기를 휘두른다(seconds 동안 휘두르기 몸짓). */
-    swing(seconds = 0.32) { swingT = seconds; api.swingDur = seconds; },
+    swing(seconds = 0.32, style = 'swing') { swingT = seconds; api.swingDur = seconds; swingStyle = style; },
     get swinging() { return swingT > 0; },
     /** 휘두르기 진행(0 → 1, 안 휘두르면 0). */
     get swingK() { return swingT > 0 ? 1 - swingT / api.swingDur : 0; },
@@ -100,7 +100,7 @@ export function createPlayer(scene, chibi, village) {
       api.danceTime = Math.max(0, api.danceTime - dt);
       swingT = Math.max(0, swingT - dt);
       hurtT = Math.max(0, hurtT - dt);
-      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? 'swing' : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
       // 풀 뽑기 · 춤 · 만세 중에는 무기를 넣어 둔다(손이 풀 · 머리에 박히지 않게)
       const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer');
       if (show !== weaponShown) { weaponShown = show; showHeld(); }

@@ -352,6 +352,18 @@ const WEAPON_PARTS = {
     { m: 'box', c: '#9a948c', p: [0, 0, 0.47], s: [0.28, 0.17, 0.17] },
     { m: 'box', c: '#6f6a63', p: [0, 0, 0.47], s: [0.07, 0.185, 0.185] }
   ],
+  // 사스마타: 긴 나무 자루(손잡이 쪽 빨간 감개) 끝에 은빛 U자 갈래, 갈래 끝은 뾰족
+  'w-fork': [
+    { m: 'box', c: '#5a3b28', p: [0, 0, -0.2], s: [0.06, 0.06, 0.07] },
+    { m: 'box', c: '#e2574c', p: [0, 0, 0.04], s: [0.055, 0.055, 0.16] },
+    { m: 'box', c: '#b8834a', p: [0, 0, 0.45], s: [0.045, 0.045, 1.1] },
+    { m: 'box', c: '#8f969f', p: [0, 0, 0.99], s: [0.08, 0.06, 0.06] },
+    { m: 'box', c: '#c9ced6', p: [0, 0, 1.03], s: [0.34, 0.035, 0.045] },
+    { m: 'box', c: '#c9ced6', p: [-0.152, 0, 1.15], s: [0.036, 0.036, 0.24] },
+    { m: 'box', c: '#c9ced6', p: [0.152, 0, 1.15], s: [0.036, 0.036, 0.24] },
+    { m: 'cone', c: '#e6eaef', p: [-0.152, 0, 1.27], r: [Math.PI / 2, 0, 0], s: [0.032, 0.11, 0.032] },
+    { m: 'cone', c: '#e6eaef', p: [0.152, 0, 1.27], r: [Math.PI / 2, 0, 0], s: [0.032, 0.11, 0.032] }
+  ],
   'w-star': [
     { m: 'box', c: '#3a4a7a', p: [0, 0, -0.01], s: [0.05, 0.05, 0.15] },
     { m: 'box', c: '#f2c94c', p: [0, 0, 0.075], s: [0.19, 0.045, 0.05] },
@@ -604,7 +616,11 @@ function playerDef(rawLook) {
   parts.push({ m: 'cylinder', c: '#6f94bb', p: [-0.4, 0.2, 0.06], r: [Math.PI / 2, 0, 0], s: [0.045, 0.24, 0.045], n: 'armL', tag: 'flashlight' });
   parts.push({ m: 'sphere', c: '#fff7d6', p: [-0.4, 0.2, 0.31], s: [0.05, 0.05, 0.02], n: 'armL', tag: 'flashlight', o: false });
   // 무기(4단계, 오른손): player.setWeapon 으로 보인다. 휘두르기(swing) 자세에 맞춰 손끝에서 앞으로 뻗게 적는다
-  for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, tag }));
+  // 무기는 손끝에 따로 마디('weapon', 팔 마디의 자식)를 두고 단다: 평소에는 비스듬히 들어 올려(뒤에서도 보이게),
+  // 휘두르기 · 찌르기 때는 팔과 한 줄로(animateChibi 의 a.weapon)
+  const arm = parts.find((pt) => pt.n === 'armR' && pt.m === 'sphere'), az = arm.r ? arm.r[2] : 0;
+  pivots.weapon = [arm.p[0] + arm.s[1] * Math.sin(az), arm.p[1] - arm.s[1] * Math.cos(az), arm.p[2]];
+  for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag }));
   const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
@@ -739,6 +755,18 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.head = [slam ? 0.18 : -0.08, 0, 0];
     lean = slam ? 0.18 : -0.06 * Math.min(1, k / 0.3);
     bob = k < 0.3 ? 0.05 * (k / 0.3) : 0;
+  } else if (mode === 'thrust') {
+    // 찌르기(사스마타, opts.swing 0 → 1): 뒤로 당겼다가(~0.3) 앞으로 쭉 내찌르고(~0.5) 제자리로. 몸도 앞으로 쏠린다
+    const k = opts.swing || 0;
+    const ease = (x) => 1 - (1 - x) * (1 - x);
+    // 창끝이 수평을 유지하도록 팔은 조금만 들고, 몸 전체가 뒤로 빠졌다가 앞으로 쑥 나간다
+    let ax, push;
+    if (k < 0.3) { const e = ease(k / 0.3); ax = -0.25 * e; push = -0.14 * e; lean = -0.08 * e; }
+    else if (k < 0.5) { const e = ease((k - 0.3) / 0.2); ax = -0.25 - 0.12 * e; push = -0.14 + 0.46 * e; lean = -0.08 + 0.28 * e; }
+    else { const e = ease((k - 0.5) / 0.5); ax = -0.37 * (1 - e); push = 0.32 * (1 - e); lean = 0.2 * (1 - e); }
+    a.armR = [ax, 0, -0.12]; a.armL = [-0.6 - ax, 0, 0.3];
+    a.head = [k > 0.3 && k < 0.7 ? 0.1 : -0.04, 0, 0];
+    chibi.inner.position.z = push;
   } else if (mode === 'hurt') {
     // 맞았을 때: 뒤로 휘청
     a.armL = [0, 0, -0.9]; a.armR = [0, 0, 0.9];
@@ -756,6 +784,8 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.head = [Math.sin(t * 1.7 + phase) * 0.04, opts.look || 0, 0];
     a.armL = [0, 0, -0.1 - br]; a.armR = [0, 0, 0.1 + br];
   }
+  // 손에 든 무기(내 캐릭터만): 공격할 때만 팔과 한 줄, 평소에는 바깥 위로 비스듬히 든다
+  if (mode !== 'swing' && mode !== 'thrust') a.weapon = mode === 'walk' ? [-0.75 + s * 0.12, 0.6, 0] : [-0.8, 0.6, 0];
   const ear = mode === 'walk' ? -0.25 - Math.abs(s) * 0.25 : mode === 'pull' ? -0.4 : -0.1;
   a.earL = [ear, 0, -0.08]; a.earR = [ear, 0, 0.08];
   for (const name in chibi.pivots) {
@@ -763,5 +793,6 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     chibi.pivots[name].rotation.set(r[0], r[1], r[2], 'YXZ');
   }
   chibi.inner.position.y = bob;
+  if (mode !== 'thrust') chibi.inner.position.z = 0;
   chibi.inner.rotation.set(lean, 0, waddle, 'YXZ');
 }

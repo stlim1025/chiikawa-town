@@ -1117,14 +1117,14 @@ function boot() {
     const W = WEAPONS[id], p = player.position;
     const near = monsters.nearest(p.x, p.z, W.range + 1.2);
     if (near) player.face(near.x, near.z);
-    player.swing(SWING_TIME);
+    player.swing(SWING_TIME, W.thrust ? 'thrust' : 'swing');
     swingCool = W.cool;
     swingHit = { t: HIT_DELAY, id };
     sound.play('swing');
   }
   function resolveSwing(id) {
     const W = WEAPONS[id], p = player.position;
-    const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg, knock: W.knock || 1 });
+    const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg, knock: W.knock || 1, arc: W.arc });
     if (!hits.length) return;
     sound.play('hit');
     for (const { m, killed } of hits) {
@@ -1229,17 +1229,24 @@ function boot() {
   slash.visible = false;
   slash.renderOrder = 3;
   scene.add(slash);
+  // 찌르는 무기(사스마타): 앞으로 길고 좁은 궤적
+  const stab = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.0, 16, 1, -0.62, 1.24), slash.material);
+  stab.visible = false;
+  stab.renderOrder = 3;
+  scene.add(stab);
   /** 매 프레임(마을 돌아다니는 중): 휘두르기 · 무적 시간 · 실기 시계 · 손에 든 무기. */
   function updateCombat(dt) {
-    const k = player.swingK;
-    slash.visible = k > 0.32 && k < 0.75;
-    if (slash.visible) {
-      const id = weaponNow(), reach = id ? WEAPONS[id].range + 0.2 : 1.5;
-      slash.position.set(player.position.x, 0.35, player.position.z);
-      slash.rotation.set(-Math.PI / 2, player.yaw - Math.PI / 2, 0, 'YXZ');
-      slash.scale.setScalar(reach);
-      slash.material.opacity = 0.75 * (1 - Math.abs(k - 0.45) / 0.3);
-      slash.material.color.set(id === 'star' ? 0xfff2a8 : 0xffffff);
+    const k = player.swingK, wid = weaponNow(), thrust = !!(wid && WEAPONS[wid].thrust);
+    const trail = thrust ? stab : slash;
+    (thrust ? slash : stab).visible = false;
+    trail.visible = k > 0.32 && k < 0.75;
+    if (trail.visible) {
+      const reach = wid ? WEAPONS[wid].range + 0.2 : 1.5;
+      trail.position.set(player.position.x, 0.35, player.position.z);
+      trail.rotation.set(-Math.PI / 2, player.yaw - Math.PI / 2, 0, 'YXZ');
+      trail.scale.setScalar(reach);
+      trail.material.opacity = 0.75 * (1 - Math.abs(k - 0.45) / 0.3);
+      trail.material.color.set(wid === 'star' ? 0xfff2a8 : 0xffffff);
     }
     swingCool = Math.max(0, swingCool - dt);
     iframe = Math.max(0, iframe - dt);
@@ -1832,6 +1839,7 @@ function boot() {
       swing: () => doSwing(),
       exam: () => hunterExam && { t: hunterExam.t, left: hunterExam.left },
       iframe: () => iframe,
+      combat: () => ({ swingCool, swingHit, swinging: player.swinging, k: player.swingK, mode, fainting }),
       quests: () => ({ quests: state.quests, track: pickTrack(state), story: state.story, boss: bossM && { x: bossM.x, z: bossM.z, hp: bossM.hp, dormant: !!bossM.dormant, state: bossM.state } }),
       lair: () => lairSpot,
       marks: () => npcs.list.map((m) => [m.kind, markOf(state, m.kind)]).filter((x) => x[1]),

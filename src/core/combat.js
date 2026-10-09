@@ -11,10 +11,12 @@ import { josa } from './weeding.js';
 export const WEAPONS = {
   stick: { name: '나무 막대기', price: 300, dmg: 1, range: 1.35, cool: 0.5, note: '가볍고 휘두르기 쉬운 막대기' },
   sword: { name: '목검', price: 1200, dmg: 2, range: 1.55, cool: 0.5, note: '단단한 나무로 깎은 연습용 검' },
+  // 사스마타: 긴 자루 끝에 U자 갈래(끝이 뾰족)가 달린 창. 휘두르지 않고 앞으로 찌른다 — 폭은 좁지만 멀리 닿고 밀어낸다
+  fork: { name: '사스마타', price: 1800, dmg: 2, range: 2.25, cool: 0.6, knock: 1.5, thrust: true, arc: 0.62, note: '긴 자루 끝에 U자 갈래가 달린 창. 멀리서 찔러 밀어낸다' },
   hammer: { name: '돌 망치', price: 2600, dmg: 3, range: 1.45, cool: 0.8, knock: 1.6, note: '느리지만 묵직해서 멀리 밀어낸다' },
   star: { name: '반짝 검', price: 6000, dmg: 4, range: 1.7, cool: 0.45, note: '별빛처럼 반짝이는 날' }
 };
-export const WEAPON_ORDER = ['stick', 'sword', 'hammer', 'star'];
+export const WEAPON_ORDER = ['stick', 'sword', 'fork', 'hammer', 'star'];
 
 /**
  * 몬스터 종류. region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든). hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다).
@@ -87,15 +89,15 @@ export function sellDrops(state) {
   return { state: { ...s, money: s.money + earned }, earned, sold };
 }
 
-/** 플레이어 공격이 몬스터에 닿는지: 바라보는 쪽 부채꼴(±60도) 안, 무기 길이 + 몬스터 크기. */
-export function inSwing(px, pz, yaw, range, mx, mz, size) {
+/** 플레이어 공격이 몬스터에 닿는지: 바라보는 쪽 부채꼴(기본 ±60도, 찌르는 무기는 더 좁게) 안, 무기 길이 + 몬스터 크기. */
+export function inSwing(px, pz, yaw, range, mx, mz, size, arc = Math.PI / 3) {
   const d = Math.hypot(mx - px, mz - pz);
   if (d > range + size * 0.6) return false;
   if (d < 0.5) return true;
   let a = Math.atan2(mx - px, mz - pz) - yaw;
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
-  return Math.abs(a) < Math.PI / 3;
+  return Math.abs(a) < arc;
 }
 
 /**

@@ -389,10 +389,10 @@ export function createMonsters(scene, village, random = Math.random) {
      * 내 공격: 바라보는 쪽 부채꼴 안의 몬스터를 때린다. → [{ m, killed }]
      * hit: { x, z, yaw, range, dmg, knock }
      */
-    strike({ x, z, yaw, range, dmg, knock = 1 }) {
+    strike({ x, z, yaw, range, dmg, knock = 1, arc }) {
       const out = [];
       for (const m of list) {
-        if (m.dead || m.dormant || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size)) continue; // 잠든 왕버섯은 아직 깨울 수 없다
+        if (m.dead || m.dormant || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size, arc)) continue; // 잠든 왕버섯은 아직 깨울 수 없다
         m.hp -= dmg;
         m.flash = 0.13;
         m.engaged = true;
