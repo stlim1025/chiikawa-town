@@ -146,6 +146,9 @@ export function createSound(storage) {
       tone({ freq: 520, slideTo: 300, type: 'triangle', start: 0.08, dur: 0.12, vol: 0.12 });
     },
     growl: () => tone({ freq: 150, slideTo: 210, type: 'sawtooth', dur: 0.28, vol: 0.05 }),
+    // 몬스터 공격 예고(짧게 올라가는 삐-) · 땅을 쿵 치는 소리
+    warn: () => tone({ freq: 520, slideTo: 880, type: 'triangle', dur: 0.14, vol: 0.06 }),
+    thud: () => { tone({ freq: 110, slideTo: 55, type: 'sine', dur: 0.22, vol: 0.2 }); noise({ dur: 0.12, vol: 0.12, freq: 300, sweepTo: 120, q: 0.8 }); },
     faint: () => [659, 587, 523, 440, 330].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.16, dur: 0.3, vol: 0.12 })),
     // 아침: 해가 뜨며 올라가는 소리
     morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 }))

@@ -21,25 +21,45 @@ export const WEAPONS = {
 export const WEAPON_ORDER = ['fork', 'sword', 'hammer', 'star'];
 
 /**
- * 몬스터 종류. region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든). hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다).
- * dmg: 내 기운을 깎는 양, speed: 쫓아오는 빠르기, aggro: 이만큼 가까우면 쫓아온다, drop: 전리품 id, size: 크기.
+ * 몬스터 종류(구역마다 셋 + 밤 나방 + 이야기 속 왕버섯). region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든).
+ * hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다), dmg: 내 기운을 깎는 양, speed: 쫓아오는 빠르기, aggro: 이만큼 가까우면 쫓아온다,
+ * drop: 전리품 id, size: 크기, attack: 공격 방식(world/monsters.js 의 ATK), atk: 안내서에 적는 짧은 공격 이름.
  */
 export const MONSTERS = {
-  fluff: { name: '풀뭉치', region: 'fields', hp: 3, dmg: 6, speed: 2.1, aggro: 5.5, drop: 'fluffdown', size: 0.45, note: '들판의 풀이 뭉쳐 굴러다닌다. 가까이 가면 통통 튀어 부딪친다.' },
-  beetle: { name: '도토리 뿔벌레', region: 'forest', hp: 4, dmg: 8, speed: 2.5, aggro: 6, drop: 'horn', size: 0.45, note: '숲속 도토리 껍데기를 쓴 벌레. 뿔로 들이받는다.' },
-  slime: { name: '물방울 슬라임', region: 'river', hp: 3, dmg: 6, speed: 1.9, aggro: 5, drop: 'jelly', size: 0.42, note: '강가에서 뽀글뽀글 생긴다. 말랑하지만 끈질기다.' },
-  turtle: { name: '이끼 거북', region: 'mountain', hp: 8, dmg: 11, speed: 1.3, aggro: 5, drop: 'shell', size: 0.6, note: '등에 이끼가 낀 바위 거북. 느리지만 아주 단단하다.' },
-  moth: { name: '그림자 나방', region: 'night', hp: 3, dmg: 8, speed: 2.8, aggro: 7, drop: 'moondust', size: 0.45, night: true, note: '밤에만 날아다닌다. 날개에서 달빛 가루가 떨어진다.' },
-  kingcap: { name: '바위산 왕버섯', region: 'boss', hp: 30, dmg: 16, speed: 1.5, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
-  dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, note: '토벌 실기용 허수아비.' }
+  fluff: { name: '풀뭉치', region: 'fields', hp: 3, dmg: 7, speed: 2.3, aggro: 6, drop: 'fluffdown', size: 0.45, attack: 'bump', atk: '통통 들이받기', note: '들판의 풀이 뭉쳐 굴러다닌다. 가까이 붙어 통통 부딪친다.' },
+  hopper: { name: '풀잎 메뚜기', region: 'fields', hp: 2, dmg: 8, speed: 2.8, aggro: 7.5, drop: 'leafwing', size: 0.4, attack: 'leap', atk: '멀리서 뛰어들기', note: '긴 뒷다리로 멀리서 훌쩍 뛰어든다. 내려앉을 자리를 피하자.' },
+  mole: { name: '흙두더지', region: 'fields', hp: 5, dmg: 10, speed: 1.8, aggro: 6.5, drop: 'sweetroot', size: 0.48, attack: 'burrow', atk: '땅속 기습', note: '땅속으로 숨어 발밑까지 파고든다. 흙이 들썩이면 얼른 비키자.' },
+  beetle: { name: '도토리 뿔벌레', region: 'forest', hp: 4, dmg: 10, speed: 2.5, aggro: 7, drop: 'horn', size: 0.45, attack: 'charge', atk: '뿔 돌진', note: '도토리 껍데기를 쓴 벌레. 뿔을 겨누고 일직선으로 돌진한다.' },
+  shroom: { name: '보라 독버섯', region: 'forest', hp: 3, dmg: 7, speed: 1.7, aggro: 7.5, drop: 'spore', size: 0.42, attack: 'shoot', atk: '포자 세 갈래', note: '숲 그늘의 꼬마 버섯. 거리를 두고 포자를 세 갈래로 뿜는다.' },
+  stump: { name: '그루터기 장군', region: 'forest', hp: 7, dmg: 13, speed: 1.5, aggro: 5.5, drop: 'bark', size: 0.55, attack: 'slam', atk: '쿵! 내려찍기', note: '걸어 다니는 그루터기. 펄쩍 뛰어 둘레를 쿵 내려찍는다.' },
+  slime: { name: '물방울 슬라임', region: 'river', hp: 3, dmg: 8, speed: 1.9, aggro: 7, drop: 'jelly', size: 0.42, attack: 'spit', atk: '물방울 뱉기', note: '강가에서 뽀글뽀글 생긴다. 떨어져서 커다란 물방울을 뱉는다.' },
+  frog: { name: '연잎 개구리', region: 'river', hp: 3, dmg: 9, speed: 2.4, aggro: 7, drop: 'lilypad', size: 0.42, attack: 'tongue', atk: '혀 채찍', note: '연잎 모자를 쓴 개구리. 긴 혀를 일직선으로 쭉 뻗는다.' },
+  crab: { name: '조약돌 게', region: 'river', hp: 4, dmg: 6, speed: 2.6, aggro: 6, drop: 'pearl', size: 0.45, attack: 'combo', atk: '집게 세 번', note: '조약돌을 등에 진 게. 붙으면 집게로 세 번 연달아 꼬집는다.' },
+  turtle: { name: '이끼 거북', region: 'mountain', hp: 8, dmg: 12, speed: 1.3, aggro: 6, drop: 'shell', size: 0.6, attack: 'spin', atk: '등껍질 회전', note: '이끼 낀 바위 거북. 등껍질에 숨어 빙글빙글 돌며 쫓아온다.' },
+  pebble: { name: '데굴 돌멩이', region: 'mountain', hp: 6, dmg: 11, speed: 2.0, aggro: 7, drop: 'ore', size: 0.48, attack: 'roll', atk: '굴러오기', note: '바위산을 굴러다니는 돌멩이. 멀리서 데굴데굴 굴러와 튕긴다.' },
+  ram: { name: '구름 산양', region: 'mountain', hp: 5, dmg: 12, speed: 2.6, aggro: 7, drop: 'wool', size: 0.52, attack: 'stomp', atk: '높이 뛰어 짓밟기', note: '구름 같은 털에 말린 뿔. 높이 뛰어올라 넓게 짓밟는다.' },
+  moth: { name: '그림자 나방', region: 'night', hp: 3, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
+  kingcap: { name: '바위산 왕버섯', region: 'boss', hp: 30, dmg: 16, speed: 1.5, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기 · 포자 · 부하', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
-export const MONSTER_ORDER = ['fluff', 'beetle', 'slime', 'turtle', 'moth', 'kingcap'];
+/** 도감 · 안내서 순서(구역별로 셋씩). */
+export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'beetle', 'shroom', 'stump', 'slime', 'frog', 'crab', 'turtle', 'pebble', 'ram', 'moth', 'kingcap'];
+/** 구역 순서(안내서 묶음). */
+export const MONSTER_REGIONS = ['fields', 'forest', 'river', 'mountain', 'night', 'boss'];
 /** 전리품: 가방(core/inventory.js 의 registerItems)과 노동 접수 매입가. */
 export const DROPS = {
   fluffdown: { name: '보송 솜털', kind: 'drop', price: 30, note: '풀뭉치에게서 떨어진 보송보송한 솜털.' },
+  leafwing: { name: '풀잎 날개', kind: 'drop', price: 25, note: '풀잎 메뚜기의 얇은 날개.' },
+  sweetroot: { name: '달콤 뿌리', kind: 'drop', price: 50, note: '흙두더지가 모아 둔 달콤한 뿌리.' },
   horn: { name: '반짝 뿔', kind: 'drop', price: 45, note: '도토리 뿔벌레의 단단한 뿔.' },
+  spore: { name: '보라 포자', kind: 'drop', price: 40, note: '보라 독버섯의 반짝이는 포자 주머니.' },
+  bark: { name: '단단 나무껍질', kind: 'drop', price: 60, note: '그루터기 장군의 두꺼운 껍질.' },
   jelly: { name: '말랑 젤리', kind: 'drop', price: 35, note: '물방울 슬라임이 남긴 말랑한 젤리.' },
+  lilypad: { name: '동그란 연잎', kind: 'drop', price: 40, note: '연잎 개구리가 쓰고 있던 연잎.' },
+  pearl: { name: '작은 진주', kind: 'drop', price: 65, note: '조약돌 게가 품고 있던 작은 진주.' },
   shell: { name: '이끼 등껍질 조각', kind: 'drop', price: 80, note: '이끼 거북의 등껍질 조각. 묵직하다.' },
+  ore: { name: '반짝 원석', kind: 'drop', price: 70, note: '데굴 돌멩이 속에서 나온 반짝이는 돌.' },
+  wool: { name: '구름 양털', kind: 'drop', price: 65, note: '구름 산양에게서 얻은 폭신한 털.' },
   moondust: { name: '달빛 가루', kind: 'drop', price: 60, note: '그림자 나방의 날개에서 모은 반짝이는 가루.' },
   kingcap: { name: '왕버섯 갓', kind: 'drop', price: 1500, note: '바위산 왕버섯의 커다란 갓 조각. 귀한 물건이다.' }
 };
@@ -115,6 +135,8 @@ export function huntQuiz(n, random = Math.random) {
     ...field.map((k) => () => q(`${josa(name(k), '은/는')} ${MONSTERS[k].night ? '언제 어디에' : '어디에'} 나타날까?`, REGION[MONSTERS[k].region], shuffle(Object.values(REGION).filter((r) => r !== REGION[MONSTERS[k].region])))),
     ...field.map((k) => () => q(`${josa(name(k), '을/를')} 잡으면 얻는 전리품은?`, DROPS[MONSTERS[k].drop].name, shuffle(field.filter((o) => o !== k).map((o) => DROPS[MONSTERS[o].drop].name)))),
     () => q('가장 단단한(여러 번 때려야 하는) 몬스터는?', name('turtle'), shuffle(['fluff', 'beetle', 'slime', 'moth'].map(name))),
+    ...field.map((k) => () => q(`${josa(name(k), '은/는')} 어떻게 공격할까?`, MONSTERS[k].atk, shuffle(field.filter((o) => MONSTERS[o].atk !== MONSTERS[k].atk).map((o) => MONSTERS[o].atk)))),
+    () => q('바닥에 빨간 표시가 뜨면?', '곧 그 자리로 공격이 오니 피한다', ['보물이 묻힌 자리라 기다린다', '몬스터가 잠든다는 뜻이다', '아무 일도 없다']),
     () => q('몬스터에게 맞으면 무엇이 줄어들까?', '기운', ['돈', '친밀도', '제초 급수']),
     () => q('기운이 0이 되면 어떻게 될까?', '기절해서 마을 입구로 옮겨지고 돈을 조금 잃는다', ['그 자리에서 바로 다시 일어난다', '가방의 물건을 모두 잃는다', '집으로 옮겨지고 아무것도 잃지 않는다']),
     () => q('몬스터가 들어오지 못하는 곳은?', '마을 울타리 안', ['남쪽 강가', '동쪽 들판', '바위산 동굴 앞']),

@@ -1265,12 +1265,13 @@ function boot() {
     }
   }
   /** 몬스터의 들이받기가 닿았다: 기운이 줄고 밀려난다. 잠깐은 다시 안 맞는다. 기운이 0이면 기절. */
-  function onMonsterHit(m) {
+  /** 몬스터 공격이 닿았다. hit: { dmg, x, z } — 공격마다 다른 피해와 날아온 자리(탄 · 충격파는 그 자리에서 밀려난다). */
+  function onMonsterHit(m, hit = {}) {
     if (iframe > 0 || fainting || sleeping || mode !== 'play' || !state) return;
-    const dmg = m.M.dmg, next = Math.max(0, state.stamina - dmg);
+    const dmg = hit.dmg ?? m.M.dmg, next = Math.max(0, state.stamina - dmg);
     commit({ ...state, stamina: next }, false);
     iframe = PLAYER_IFRAME;
-    const p = player.position, dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1;
+    const p = player.position, dx = p.x - (hit.x ?? m.x), dz = p.z - (hit.z ?? m.z), d = Math.hypot(dx, dz) || 1;
     cancelPull();
     player.hurt((dx / d) * PLAYER_KNOCK, (dz / d) * PLAYER_KNOCK, PLAYER_IFRAME);
     sound.play('hurt');
@@ -1998,7 +1999,10 @@ function boot() {
       scene: () => scene, // 그리기 호출을 무엇이 쓰는지 들여다보기
       region: () => player && regionAt(player.position.x, player.position.z),
       // 토벌(4단계) 확인용
-      monsters: () => monsters.list.map((m) => ({ id: m.id, species: m.species, x: +m.x.toFixed(2), z: +m.z.toFixed(2), hp: m.hp, state: m.state, dead: m.dead, visible: m.mesh.root.visible })),
+      monsters: () => monsters.list.map((m) => ({ id: m.id, species: m.species, x: +m.x.toFixed(2), z: +m.z.toFixed(2), hp: m.hp, state: m.state, atk: m.atk && m.atk.kind, under: m.under, air: +(m.airY || 0).toFixed(2), dead: m.dead, visible: m.mesh.root.visible })),
+      clearMonsters: () => monsters.clear(() => true),
+      faceMonsters: () => monsters.list.forEach((m) => { m.yaw = 0; m.mesh.root.rotation.y = 0; }),
+      monsterShots: () => monsters.shots(),
       monsterCounts: () => monsters.counts(),
       spawnMonster: (species, dx = 0, dz = 2) => { const m = monsters.spawnAt(species, player.position.x + dx, player.position.z + dz); m.home = { x: m.x, z: m.z }; return m.id; },
       swing: () => doSwing(),
@@ -2077,7 +2081,12 @@ function boot() {
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 중에는 멈칫)
     const hunting = mode === 'play' && !!state && !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !sticker;
-    monsters.update(dt, t, { player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro });
+    monsters.update(dt, t, {
+      player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro,
+      // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
+      onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
+      onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); }
+    });
     if (state) ground.sync(groundOf(state), groundKind);
     ground.update(dt, focus);
     if (state && player && mode === 'intro') {

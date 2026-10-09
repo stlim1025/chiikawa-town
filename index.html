@@ -872,6 +872,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .chip.muted { color: var(--ink-soft); white-space: normal; }
 .chip.region.fields { background: #fdeeb5; } .chip.region.forest { background: #d8eecb; } .chip.region.river { background: #d6ebf8; }
 .chip.region.mountain { background: #e8e1d3; } .chip.region.night { background: #e3daf5; } .chip.region.boss { background: #f8d0ca; }
+.chip.atk-chip { background: #ffe1d8; font-weight: 700; color: #a8452f; }
+/* 구역 머리글(카드 셋씩 묶는다) */
+.mon-region { display: flex; align-items: center; gap: 6px; margin: 14px 0 6px; padding: 6px 14px 7px 10px; border-radius: 999px; width: fit-content; font-size: 18px; }
+.mon-region .ico { width: 20px; height: 20px; }
+.mon-region .ico svg { display: block; width: 100%; height: 100%; }
+.mon-region.fields { background: #fdeeb5; } .mon-region.forest { background: #d8eecb; } .mon-region.river { background: #d6ebf8; }
+.mon-region.mountain { background: #e8e1d3; } .mon-region.night { background: #e3daf5; } .mon-region.boss { background: #f8d0ca; }
 .tough { display: inline-flex; gap: 2px; margin-left: 1px; }
 .tough i { width: 8px; height: 12px; border-radius: 3px 3px 5px 5px; background: #ddd3c0; }
 .tough i.on { background: #6f8fb5; }

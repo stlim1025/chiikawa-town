@@ -20,7 +20,7 @@ import { weedSvg } from './weedart.js';
 import { pochetteSvg, itemSvg, accessorySvg } from './itemart.js';
 import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
-import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
+import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from '../core/friends.js';
@@ -63,6 +63,7 @@ const ICO = {
   up: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#9fdcb7"/><path d="M10 14.5v-8M6.5 9.5 10 6l3.5 3.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   star: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l2.2 4.7 5.1.6-3.8 3.5 1 5.1L10 13.9l-4.5 2.5 1-5.1-3.8-3.5 5.1-.6z" fill="#ffc93c" stroke="#d9a520" stroke-width="1" stroke-linejoin="round"/></svg>',
   todo: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="#c9b99a" stroke-width="2" stroke-dasharray="3.2 2.3"/></svg>',
+  zap: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 1.8 4 11.2h5l-1.4 7 7.6-9.6h-5z" fill="#ff8a6a" stroke="#d9573f" stroke-width="1.2" stroke-linejoin="round"/></svg>',
   check: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#6cc48f"/><path d="M6 10.3l2.7 2.7L14.2 7.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 const ico = (name, cls = 'ico') => svgSpan(cls, ICO[name]);
@@ -105,17 +106,17 @@ function leftPill(n, max) {
 }
 
 /**
- * 몬스터 카드(토벌 안내서 · 몬스터 도감): 얼굴 · 이름 · 사는 곳 · 단단함 · 전리품 · 설명. withCount 면 잡은 수(못 잡았으면 흐리게).
- * 이야기 속 왕버섯은 만나기 전에는 '???' 로 감춘다.
+ * 몬스터 카드(토벌 안내서 · 몬스터 도감): 구역마다 머리글 아래 셋씩. 카드에는 얼굴 · 이름 · 공격 방식 · 단단함 · 공격 · 전리품.
+ * withCount 면 잡은 수(못 잡았으면 흐리게)와 한 줄 설명. 이야기 속 왕버섯은 만나기 전에는 '???' 로 감춘다.
  */
 function monsterCards(s, withCount) {
   const hunted = s.hunted || {};
-  return MONSTER_ORDER.map((k) => {
+  const card = (k) => {
     const M = MONSTERS[k], n = hunted[k] || 0, D = DROPS[M.drop];
     const hidden = M.boss && !n && !(s.story && s.story.bossSeen);
     if (hidden) {
       return h('div', { class: 'row mon-card unseen' }, svgSpan('mon-ico mystery', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="34" r="20" fill="#e6d8b8"/><text x="32" y="44" text-anchor="middle" font-size="28" font-weight="700" fill="#b9a37a">?</text></svg>'),
-        h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'mon-chips' }, chip('pin', 'region boss', REGION_TEXT[M.region]), chip(null, 'muted', '커다란 무언가가 산다는 소문…'))));
+        h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'mon-chips' }, chip(null, 'muted', '커다란 무언가가 산다는 소문…'))));
     }
     // 단단함: 몇 대 맞아야 쓰러지는지 방패 다섯 칸으로
     const tough = Math.min(5, Math.ceil(M.hp / 3));
@@ -124,12 +125,20 @@ function monsterCards(s, withCount) {
       h('div', {},
         h('div', { class: 't' }, M.name, withCount ? h('span', { class: 'weed-count' }, n ? `${n}마리 잡음` : '아직 못 잡았어요') : null),
         h('div', { class: 'mon-chips' },
-          chip(M.night ? 'moon' : 'pin', `region ${M.region}`, REGION_TEXT[M.region]),
+          chip('zap', 'atk-chip', M.atk),
           chip('shield', 'tough-chip', '단단함', shields),
-          chip('heart', 'hit', `공격 −${M.dmg}`),
+          chip('heart', 'hit', `−${M.dmg}`),
           chip(svgSpan('ico', dropSvg(M.drop)), 'drop', D.name, h('b', {}, won(D.price)))),
         withCount ? h('div', { class: 'd weed-tip' }, M.note) : null));
-  });
+  };
+  const out = [];
+  for (const r of MONSTER_REGIONS) {
+    const ks = MONSTER_ORDER.filter((k) => MONSTERS[k].region === r);
+    if (!ks.length) continue;
+    out.push(h('div', { class: `mon-region ${r}` }, ico(r === 'night' ? 'moon' : 'pin'), h('b', {}, REGION_TEXT[r])));
+    ks.forEach((k) => out.push(card(k)));
+  }
+  return out;
 }
 
 /**
@@ -354,7 +363,7 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'rule-grid' },
           rule('faint', '맞으면 기운이 줄어요', '0이면 기절 · 돈을 조금 잃어요'),
           rule('safe', '마을 안은 안전해요', '울타리 안으로 못 들어와요'),
-          rule('dodge', '붉게 깜빡이면 피해요', '곧 들이받으려는 거예요'),
+          rule('dodge', '빨간 표시를 피해요', '곧 그 자리로 공격이 와요'),
           rule('shop', '무기는 도구점에서', '전리품은 노동 접수에서 팔아요')),
         h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
