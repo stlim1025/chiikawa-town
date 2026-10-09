@@ -83,37 +83,111 @@ function makeQ(q, right, wrong, random) {
   return { q, choices, answer: choices.indexOf(right) };
 }
 
+/** 같은 보기 묶음이 겹치지 않게 서로 다른 것만 n 개. */
+function distinct(list, n, key = (x) => x) {
+  const seen = new Set(), out = [];
+  for (const x of list) { const k = key(x); if (!seen.has(k)) { seen.add(k); out.push(x); } if (out.length >= n) break; }
+  return out;
+}
+/** 레시피 재료를 '간장 수프 · 굵은 면 · 숙주 ×2' 처럼(늘 수프 → 면 → 토핑 순서로, 보기 순서로 답이 드러나지 않게). */
+const ING_ORDER = Object.keys(INGREDIENTS);
+const listOf = (items) => Object.entries(items).sort((a, b) => ING_ORDER.indexOf(a[0]) - ING_ORDER.indexOf(b[0]))
+  .map(([k, n]) => (n > 1 ? `${INGREDIENTS[k].name} ×${n}` : INGREDIENTS[k].name)).join(' · ');
+/** 받침에 맞는 조사. */
+const ga = (w) => { const c = w.charCodeAt(w.length - 1); return w + (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? '이' : '가'); };
+
 /**
- * 슈퍼 알바이터 필기: 레시피에서 문제를 만든다(수프 · 면 · 들어가지 않는 토핑 · 산더미 라멘).
+ * 슈퍼 알바이터 필기: 레시피 · 조리 규칙에서 4지선다를 만든다. 비슷한 오답(재료 하나만 다르거나 개수만 다른 것)으로 헷갈리게 한다.
+ * 유형: 전체 재료 고르기 · 재료로 라멘 맞히기 · 개수 · 한 재료가 들어가는 라멘들 · 면 종류로 묶기 · 삶는 시간 · 퍼지는 시간 · 빠진 재료 찾기.
  * → [{ q, choices, answer }]
  */
 export function ramenQuiz(n, random = Math.random) {
   const ids = Object.keys(RECIPES);
-  const soups = Object.keys(INGREDIENTS).filter((k) => INGREDIENTS[k].kind === 'soup');
   const toppings = Object.keys(INGREDIENTS).filter((k) => INGREDIENTS[k].kind === 'topping');
-  const name = (k) => INGREDIENTS[k].name;
+  const soups = Object.keys(INGREDIENTS).filter((k) => INGREDIENTS[k].kind === 'soup');
+  const name = (k) => INGREDIENTS[k].name, rname = (r) => RECIPES[r].name;
+  /** 레시피를 살짝 바꾼 오답: 토핑 하나 바꾸기 · 개수 바꾸기 · 수프나 면 바꾸기. */
+  function mutate(items) {
+    const m = { ...items }, keys = Object.keys(m), r = random();
+    if (r < 0.4) {
+      const tops = keys.filter((k) => INGREDIENTS[k].kind === 'topping'), out = toppings.filter((t) => !m[t]);
+      const k = pickOne(tops, random); delete m[k]; m[pickOne(out, random)] = 1;
+    } else if (r < 0.65) {
+      const tops = keys.filter((k) => INGREDIENTS[k].kind === 'topping'), k = pickOne(tops, random);
+      m[k] = m[k] > 1 ? 1 : 2;
+    } else if (r < 0.85) {
+      const s = keys.find((k) => INGREDIENTS[k].kind === 'soup'); delete m[s]; m[pickOne(soups.filter((x) => x !== s), random)] = 1;
+    } else {
+      const nd = m.thin ? 'thin' : 'thick'; delete m[nd]; m[nd === 'thin' ? 'thick' : 'thin'] = 1;
+    }
+    return m;
+  }
+  const same = (a, b) => listOf(a) === listOf(b);
   const makers = [
+    // 1) 전체 재료 고르기(비슷한 오답 셋)
     (rid) => {
-      const r = RECIPES[rid], soup = soups.find((s) => r.items[s]);
-      return makeQ(`${r.name}에 들어가는 수프는?`, name(soup), shuffle(soups.filter((s) => s !== soup), random).slice(0, 2).map(name), random);
+      const want = RECIPES[rid].items, wrong = [];
+      for (let t = 0; t < 40 && wrong.length < 3; t++) {
+        const m = mutate(want);
+        if (!same(m, want) && !wrong.some((w) => same(w, m)) && !ids.some((o) => same(RECIPES[o].items, m))) wrong.push(m);
+      }
+      return makeQ(`${rname(rid)}의 재료로 맞는 것은?`, listOf(want), wrong.map(listOf), random);
     },
+    // 2) 재료로 라멘 맞히기(수프 이름은 빼고 면 · 토핑만 보여 준다)
     (rid) => {
-      const r = RECIPES[rid], noodle = r.items.thin ? 'thin' : 'thick';
-      return makeQ(`${r.name}에 들어가는 면은?`, name(noodle), [name(noodle === 'thin' ? 'thick' : 'thin')], random);
+      const want = RECIPES[rid].items, shown = Object.fromEntries(Object.entries(want).filter(([k]) => INGREDIENTS[k].kind !== 'soup'));
+      return makeQ(`면과 토핑이 '${listOf(shown)}'인 라멘은?`, rname(rid), shuffle(ids.filter((i) => i !== rid), random).slice(0, 3).map(rname), random);
     },
+    // 3) 개수: 두 번 넣는 재료가 있는 라멘에서
+    () => {
+      const k = pickOne(['moyashi', 'chashu'], random);
+      return makeQ(`로우 라멘에 ${name(k)}는 몇 번 올릴까?`, '2번', ['1번', '3번', '안 올린다'], random);
+    },
+    // 4) 한 토핑이 들어가는 라멘을 모두 고르기(묶음 보기)
+    () => {
+      const cands = toppings.filter((t) => ids.filter((i) => RECIPES[i].items[t]).length >= 2);
+      const t = pickOne(cands, random), right = ids.filter((i) => RECIPES[i].items[t]);
+      const rightTxt = right.map(rname).join(' · ');
+      const wrong = [];
+      for (let k = 0; k < 40 && wrong.length < 3; k++) {
+        const pick = shuffle(ids, random).slice(0, right.length);
+        const txt = ids.filter((i) => pick.includes(i)).map(rname).join(' · ');
+        if (txt !== rightTxt && !wrong.includes(txt)) wrong.push(txt);
+      }
+      return makeQ(`${ga(name(t))} 들어가는 라멘을 모두 고르면?`, ids.filter((i) => right.includes(i)).map(rname).join(' · '), wrong, random);
+    },
+    // 5) 굵은 면을 쓰는 라멘끼리
+    () => {
+      const thick = ids.filter((i) => RECIPES[i].items.thick), right = thick.map(rname).join(' · ');
+      const wrong = distinct(shuffle([['shoyu', 'miso'], ['miso', 'shio'], ['rou', 'tonkotsu'], ['shoyu', 'rou'], ['shio', 'tonkotsu']], random)
+        .map((p) => ids.filter((i) => p.includes(i)).map(rname).join(' · ')).filter((t) => t !== right), 3);
+      return makeQ('굵은 면을 쓰는 라멘끼리 묶은 것은?', right, wrong, random);
+    },
+    // 6) 삶는 시간
+    () => {
+      const nd = pickOne(['thin', 'thick'], random);
+      const right = `${BOIL[nd].toFixed(1)}초`, pool = ['2.0초', '3.0초', '3.5초', '4.5초', '6.0초'].filter((x) => x !== right);
+      return makeQ(`${name(nd)}은 몇 초 삶아야 딱 좋을까?`, right, shuffle(pool, random).slice(0, 3), random);
+    },
+    // 7) 퍼지는 시간
+    () => makeQ('다 삶은 면을 냄비에 몇 초 넘게 두면 퍼질까?', `${SOGGY_AFTER}초`, ['2초', '6초', '8초'], random),
+    // 8) 빠진 재료 찾기(하나를 빼고 보여 준다)
     (rid) => {
-      const r = RECIPES[rid], inside = toppings.filter((t) => r.items[t]), outside = toppings.filter((t) => !r.items[t]);
-      return makeQ(`${r.name}에 올리지 않는 토핑은?`, name(pickOne(outside, random)), shuffle(inside, random).slice(0, 2).map(name), random);
-    },
-    () => makeQ('숙주와 차슈를 두 번씩 듬뿍 올리는 라멘은?', RECIPES.rou.name, shuffle(ids.filter((i) => i !== 'rou'), random).slice(0, 2).map((i) => RECIPES[i].name), random)
+      const want = RECIPES[rid].items, keys = Object.keys(want).filter((k) => INGREDIENTS[k].kind === 'topping'), miss = pickOne(keys, random);
+      const shown = Object.fromEntries(Object.entries(want).filter(([k]) => k !== miss));
+      const wrong = shuffle(toppings.filter((t) => !want[t]), random).slice(0, 3).map(name);
+      return makeQ(`${rname(rid)}: ${listOf(shown)} … 하나가 빠졌다. 무엇일까?`, name(miss), wrong, random);
+    }
   ];
   const out = [], used = new Set();
-  for (let tries = 0; out.length < n && tries < 60; tries++) {
-    const m = Math.floor(random() * makers.length) % makers.length, rid = pickOne(ids, random);
-    const key = m === 3 ? 'rou-pile' : `${m}-${rid}`;
+  // 레시피를 통째로 묻는 문제가 적어도 둘은 나오게 앞에 둔다
+  const order = [0, 0, ...shuffle([1, 2, 3, 4, 5, 6, 7, 1, 7, 0], random)];
+  for (let tries = 0; out.length < n && tries < 80; tries++) {
+    const m = order[tries % order.length], rid = pickOne(ids, random);
+    const key = [0, 1, 7].includes(m) ? `${m}-${rid}` : `${m}`;
     if (used.has(key)) continue;
     used.add(key);
     out.push(makers[m](rid));
   }
-  return out;
+  return shuffle(out, random);
 }

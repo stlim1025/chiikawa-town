@@ -3,12 +3,12 @@ import { trySpend } from './state.js';
 /**
  * 제초 검정 말고 검정소에서 딸 수 있는 자격.
  *  liquor   술 자격: 쿠리만쥬에게 위스키 강의(8강)를 듣고 → 필기(전문 지식 6문제 중 5개, 문제당 15초) + 실기(하이볼 만들기)
- *  arbeiter 슈퍼 알바이터: 필기(레시피 4문제 중 3개) + 실기(레시피 북 없이 손님 3명에게 실수 없이) → 라멘 로우 알바
+ *  arbeiter 슈퍼 알바이터: 필기(레시피 · 조리 규칙 6문제 중 5개, 문제당 12초) + 실기(레시피 북 없이 손님 3명에게 실수 없이) → 라멘 로우 알바
  * state.licenses = { liquor?: { day: 딴 날 }, arbeiter?: { day } }, state.ramenDay = 마지막으로 알바한 날
  */
 export const LICENSES = {
   liquor: { name: '술 자격', fee: 100, questions: 6, pass: 5, seconds: 15 },
-  arbeiter: { name: '슈퍼 알바이터', fee: 200, questions: 4, pass: 3 }
+  arbeiter: { name: '슈퍼 알바이터', fee: 200, questions: 6, pass: 5, seconds: 12 }
 };
 
 /**

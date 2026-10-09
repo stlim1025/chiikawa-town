@@ -461,108 +461,161 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   .cat-img { flex: 0 0 auto; width: 96px; }
 }
 
-/* ---------- 라멘 로우 주방: 재료가 그림으로 늘어선 조리대(알바 · 슈퍼 알바이터 실기) ---------- */
+/* ---------- 라멘 로우 주방(알바 · 슈퍼 알바이터 실기) ----------
+   위: 남색 노렌(가게 이름 · 시간 · 번 돈) → 쇠막대에 집게로 꽂힌 주문표 줄.
+   아래: 나무 조리대 위에 왼쪽 위 수프 통 · 왼쪽 아래 면 채반과 냄비 · 가운데 큰 그릇 · 오른쪽 위 토핑 통 · 오른쪽 아래 내기.
+   그릇이 주인공이라 가장 크고, 나머지는 조용한 나무색 칸에 둔다. */
 .kitchen-wrap { padding: 8px; }
-.panel.kitchen { width: min(1040px, 100%); height: calc(100% - 2px); max-height: none; background: #b7834b; box-shadow: 0 6px 0 rgba(84, 62, 38, 0.4), 0 16px 30px rgba(84, 62, 38, 0.3); }
-.kitchen-scene { position: relative; overflow: hidden; display: grid; gap: 8px; padding: 10px 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 0.8fr);
-  grid-template-areas: "top top top" "trays tray soups" "boil shelf shelf";
-  background: repeating-linear-gradient(90deg, rgba(84, 52, 20, 0.06) 0 2px, transparent 2px 140px), linear-gradient(#cf9c61, #b98449); }
-/* 위: 주문표 칠판 · 레시피 깃발 · 내기 간판 */
-.k-top { grid-area: top; display: flex; gap: 10px; align-items: stretch; min-height: 0; }
-.k-board { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 10px 8px; border-radius: 14px; background: #2f4a3f; color: #f4f0e2; box-shadow: inset 0 0 0 4px #6b4a2c, 0 3px 0 rgba(0, 0, 0, 0.25); }
-.k-board-head { display: flex; align-items: center; gap: 8px; font-size: 16px; }
-.k-board-head b { margin-right: auto; font-size: 19px; }
-.k-timer, .k-earn { padding: 0 10px 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); font-variant-numeric: tabular-nums; }
-.k-timer { background: var(--yellow); color: var(--ink); }
-.k-quit { padding: 1px 12px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); color: #f4f0e2; font-size: 15px; }
-.k-counter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.seat { display: flex; align-items: center; gap: 6px; min-height: 56px; padding: 3px 8px; border-radius: 6px 6px 12px 12px; background: #fffaeb; color: var(--ink); text-align: left; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); }
-.seat.empty { justify-content: center; background: rgba(255, 255, 255, 0.07); color: rgba(244, 240, 226, 0.5); box-shadow: none; cursor: default; }
-.seat.sel { background: var(--yellow); box-shadow: 0 0 0 3px #fff3b8, 0 2px 0 rgba(0, 0, 0, 0.25); }
-.seat .face { flex: 0 0 44px; height: 44px; }
-.seat .face svg { width: 100%; height: 100%; display: block; }
-.seat .ticket { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.seat .ticket small { font-size: 13px; color: var(--ink-soft); }
-.seat .ticket b { font-size: 18px; line-height: 1.1; }
-.patience { display: block; height: 7px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
-.patience i { display: block; height: 100%; border-radius: 999px; background: var(--mint-deep); }
-.patience i.mid { background: #f2b84b; }
-.patience i.low { background: #e9705a; }
-.k-recipe { flex: 0 0 74px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 14px; border-radius: 6px 6px 0 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 86%, 0 100%);
-  background: repeating-linear-gradient(135deg, #e4523f 0 10px, #f2b84b 10px 20px); box-shadow: inset 0 6px 0 #7a4a2a; }
-.k-recipe span { padding: 2px 8px 4px; border-radius: 8px; background: #fffaeb; color: #b8432f; font-size: 17px; }
-.k-serve { flex: 0 0 124px; position: relative; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #4a2e16;
-  background: linear-gradient(#e0ae74, #b67d45); box-shadow: inset 0 0 0 4px #8a5a30, 0 4px 0 #6b4424; }
-.k-serve b { font-size: 30px; rotate: -4deg; }
-.k-serve .bell { position: absolute; left: -4px; top: -4px; width: 30px; height: 30px; border-radius: 50% 50% 40% 40%; background: radial-gradient(circle at 35% 30%, #ffe9a0, #e3a92c 60%, #b8801a); box-shadow: 0 2px 0 #8a5d12; }
-.k-serve:active, .k-item:active, .k-pot:active, .k-recipe:active { transform: translateY(2px); }
-/* 가운데: 트레이 · 빨간 쟁반 위 그릇 · 수프 통 */
-.k-trays, .k-soups { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.k-trays { grid-area: trays; }
-.k-soups { grid-area: soups; }
-.k-item { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; border-radius: 14px; }
-.k-item .art { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
-.k-item .art svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 3px 0 rgba(84, 62, 38, 0.25)); }
-.k-item .lab { flex: 0 0 auto; padding: 0 8px 1px; border-radius: 999px; background: rgba(255, 250, 235, 0.88); font-size: 14px; line-height: 1.3; white-space: nowrap; }
-.k-item:hover, .k-item:focus-visible { background: rgba(255, 250, 235, 0.25); outline: none; }
-.bump { animation: bump 0.22s ease-out; }
-@keyframes bump { 50% { scale: 1.08; } }
-.k-traybox { grid-area: tray; position: relative; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 22px;
-  background: #d24c3f; box-shadow: inset 0 0 0 6px #b33b30, inset 0 12px 0 rgba(255, 255, 255, 0.12), 0 4px 0 rgba(84, 62, 38, 0.35); }
-.k-bowl { width: 88%; height: 94%; display: flex; align-items: center; justify-content: center; }
-.k-bowl svg { width: 100%; height: 100%; display: block; }
-.k-say { position: absolute; left: 50%; top: 6px; z-index: 1; max-width: 96%; transform: translateX(-50%); margin: 0; padding: 3px 14px 5px; overflow: hidden; border-radius: 999px;
-  background: var(--paper); box-shadow: 0 3px 0 var(--shadow); font-size: 17px; white-space: nowrap; text-overflow: ellipsis; }
-/* 아래: 면 삶는 냄비(게이지) · 선반(면 바구니 · 토핑 · 쓰레기통) */
-.k-boil, .k-shelf { min-height: 0; border-radius: 16px; background: #8f6236; box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.18); }
-.k-boil { grid-area: boil; display: flex; padding: 4px; }
-.k-pot { position: relative; flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 78px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); align-items: center; gap: 2px 4px; padding: 4px 6px; border-radius: 14px; }
-.k-pot .gauge { grid-row: 1; grid-column: 1; }
-.k-pot .gauge svg { width: 78px; display: block; }
-.k-pot .gauge .needle { transform-box: view-box; transform-origin: 50px 52px; }
-.k-pot .pot-art { grid-row: 1 / 3; grid-column: 2; height: 100%; min-height: 0; display: flex; align-items: center; }
-.k-pot .pot-art svg { width: 100%; height: 100%; display: block; }
-.k-pot .pot-say { grid-row: 2; grid-column: 1; align-self: start; font-size: 13px; line-height: 1.15; color: #fff6df; text-align: center; }
-.k-pot[data-state="ready"] { background: rgba(115, 198, 142, 0.35); box-shadow: 0 0 0 3px #73c68e; animation: pot-ready 0.6s ease-in-out infinite alternate; }
-.k-pot[data-state="soggy"] { background: rgba(233, 112, 90, 0.3); }
-@keyframes pot-ready { from { scale: 1; } to { scale: 1.03; } }
-.k-shelf { grid-area: shelf; display: flex; align-items: stretch; gap: 4px; padding: 4px 8px; }
-.k-shelf .k-item { flex: 1 1 0; }
-.k-sep { flex: 0 0 3px; margin: 6px 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.2); }
-.k-trash { flex: 0.8 1 0; }
+.panel.kitchen { width: min(1120px, 100%); height: calc(100% - 2px); max-height: none; border-radius: 26px; background: #c48a50;
+  box-shadow: 0 6px 0 rgba(84, 52, 20, 0.45), 0 16px 30px rgba(84, 62, 38, 0.3); }
+.kx { --wood: #d6a165; --wood-deep: #a8703c; --noren: #2f3f6b; position: relative; flex: 1 1 auto; min-height: 0; display: grid; gap: 8px 10px; padding: 0 12px 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.25fr);
+  grid-template-rows: auto auto minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas: "noren noren noren" "rail rail rail" "soups center tops" "boil center acts";
+  background: repeating-linear-gradient(90deg, rgba(110, 62, 24, 0.07) 0 2px, transparent 2px 150px), repeating-linear-gradient(90deg, rgba(255, 240, 210, 0.06) 0 1px, transparent 1px 41px), linear-gradient(#dcaa6e, #c58b51); }
+/* 노렌: 아래가 세 번 갈라진 남색 천 */
+.kx-noren { grid-area: noren; position: relative; display: flex; align-items: center; gap: 12px; margin: 0 -12px; padding: 8px 18px 16px; color: #f6efe0; background: var(--noren);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 75.3% 100%, 75.3% 74%, 74.7% 74%, 74.7% 100%, 50.3% 100%, 50.3% 74%, 49.7% 74%, 49.7% 100%, 25.3% 100%, 25.3% 74%, 24.7% 74%, 24.7% 100%, 0 100%); }
+.kx-crest { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #f6efe0; color: var(--noren); font-size: 22px; line-height: 1; }
+.kx-title { display: flex; align-items: baseline; gap: 10px; margin-right: auto; min-width: 0; }
+.kx-title b { font-size: 26px; letter-spacing: 1px; white-space: nowrap; }
+.kx-title span { font-size: 16px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kx-stats { display: flex; gap: 8px; font-variant-numeric: tabular-nums; }
+.kx-stats span { padding: 1px 12px 3px; border-radius: 999px; background: rgba(246, 239, 224, 0.16); font-size: 17px; white-space: nowrap; }
+.kx-stats .kx-timer { background: var(--yellow); color: var(--ink); }
+.kx-quit { padding: 2px 14px 4px; border-radius: 999px; background: rgba(246, 239, 224, 0.2); color: #f6efe0; font-size: 16px; }
+/* 주문표: 쇠막대에 나무 집게로 꽂힌 종이. 고른 주문표는 노랗게 내려온다 */
+.kx-rail { grid-area: rail; position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px 4px 4px; }
+.kx-rail::before { content: ""; position: absolute; left: -6px; right: -6px; top: 6px; height: 5px; border-radius: 3px; background: #8b97a3; box-shadow: 0 2px 0 #5f6a75; }
+.kx-ticket { position: relative; display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 8px 12px 12px 8px; text-align: left; border-radius: 3px 3px 10px 10px;
+  background: #fffaeb; box-shadow: 0 3px 0 rgba(84, 52, 20, 0.28); rotate: -1.2deg; transform-origin: 50% 0; transition: transform 0.15s; }
+.kx-ticket:nth-child(2) { rotate: 0.8deg; } .kx-ticket:nth-child(3) { rotate: -0.4deg; }
+.kx-clip { position: absolute; top: -10px; left: 50%; width: 14px; height: 20px; margin-left: -7px; border-radius: 3px; background: #c8a06a; box-shadow: inset 0 -4px 0 #9c7646; }
+.kx-ticket.sel { background: #fff3b8; transform: translateY(5px); box-shadow: 0 0 0 3px var(--yellow-deep), 0 5px 0 rgba(84, 52, 20, 0.28); }
+.kx-ticket.sel .kx-clip { background: var(--yellow); box-shadow: inset 0 -4px 0 var(--yellow-deep); }
+.kx-ticket.new { animation: tk-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.kx-ticket.hurry { animation: tk-hurry 0.5s ease-in-out infinite alternate; }
+@keyframes tk-in { from { transform: translateY(-46px); opacity: 0; } }
+@keyframes tk-hurry { to { rotate: 1.6deg; } }
+.kx-ticket.empty { justify-content: center; color: rgba(255, 250, 235, 0.85); background: rgba(255, 250, 235, 0.14); box-shadow: inset 0 0 0 2px rgba(255, 250, 235, 0.45); font-size: 16px; }
+.kx-face { flex: 0 0 44px; height: 44px; }
+.kx-face svg { width: 100%; height: 100%; display: block; }
+.kx-order { min-width: 0; }
+.kx-order small { display: block; font-size: 14px; color: var(--ink-soft); }
+.kx-order b { display: block; font-size: 21px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kx-pat { position: absolute; left: 10px; right: 10px; bottom: 5px; height: 5px; border-radius: 3px; background: #eadcb8; overflow: hidden; }
+.kx-pat i { display: block; height: 100%; border-radius: 3px; background: var(--mint-deep); }
+.kx-pat i.mid { background: #f2b84b; } .kx-pat i.low { background: #e9705a; }
+/* 재료 칸: 조리대에 살짝 파인 나무 칸 + 위에 걸린 이름표 */
+.kx-st { position: relative; min-height: 0; display: flex; flex-direction: column; padding: 14px 6px 6px; border-radius: 16px; background: rgba(110, 62, 24, 0.14); box-shadow: inset 0 2px 0 rgba(110, 62, 24, 0.2); }
+.kx-st h3 { position: absolute; top: 0; left: 14px; z-index: 1; margin: 0; padding: 0 10px 2px; border-radius: 0 0 8px 8px; font-size: 15px; font-weight: 700; color: #fffaeb; background: var(--wood-deep); }
+.kx-soups { grid-area: soups; } .kx-tops { grid-area: tops; } .kx-boil { grid-area: boil; }
+.kx-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 4px; }
+.kx-soups .kx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.kx-tops .kx-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.kx-ing { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px; border-radius: 12px; }
+.kx-ing .art { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; }
+.kx-ing .art svg { width: 100%; height: 100%; display: block; }
+.kx-ing .lab { flex: 0 0 auto; padding: 0 8px 1px; border-radius: 999px; font-size: 14px; line-height: 1.3; white-space: nowrap; background: rgba(255, 250, 235, 0.92); }
+.kx-ing:hover, .kx-ing:focus-visible { background: rgba(255, 250, 235, 0.25); outline: none; }
+.kx-ing:active { transform: translateY(2px) scale(0.97); }
+/* 면: 채반 둘 + 냄비(둘레 고리가 시간) */
+.kx-boil-row { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.3fr); gap: 4px; }
+.kx-pot { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; border-radius: 14px; }
+.pot-wrap { position: relative; flex: 1 1 auto; min-height: 0; aspect-ratio: 1; max-width: 100%; }
+.pot-art, .kx-ring { position: absolute; inset: 0; }
+.pot-art svg, .kx-ring { width: 100%; height: 100%; display: block; }
+.pot-art { inset: 9%; }
+.kx-ring .trk { fill: none; stroke: rgba(255, 250, 235, 0.45); stroke-width: 7; }
+.kx-ring .arc { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke 0.2s; }
+.pot-say { flex: 0 0 auto; padding: 0 10px 1px; border-radius: 999px; font-size: 14px; line-height: 1.3; white-space: nowrap; background: rgba(255, 250, 235, 0.92); }
+.kx-pot[data-state="ready"] .pot-say { background: #55b877; color: #fff; animation: pot-go 0.5s ease-in-out infinite alternate; }
+.kx-pot[data-state="soggy"] .pot-say { background: #e9705a; color: #fff; }
+@keyframes pot-go { to { scale: 1.08; } }
+.bub { transform-box: fill-box; transform-origin: center; animation: bub 0.9s ease-in-out infinite; }
+@keyframes bub { 0% { scale: 0.3; opacity: 0; } 40% { opacity: 1; } 100% { scale: 1.3; opacity: 0; } }
+/* 가운데 그릇: 가장 크게. 위에 손님 말, 아래에 주문과 맞춰 본 칩 */
+.kx-center { grid-area: center; position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding: 30px 4px 4px;
+  border-radius: 22px; background: radial-gradient(ellipse 60% 45% at 50% 66%, rgba(255, 244, 220, 0.6), transparent 70%); }
+.kx-bowl { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.kx-bowl svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.kx-bowl.bump { animation: bowl-bump 0.25s ease-out; }
+.kx-bowl.shake { animation: bowl-shake 0.38s ease-in-out; }
+.kx-bowl.out { animation: bowl-out 0.46s cubic-bezier(0.5, 0, 0.8, 0.4) forwards; }
+@keyframes bowl-bump { 40% { scale: 1.04 0.97; } }
+@keyframes bowl-shake { 20% { translate: -10px 0; } 40% { translate: 9px 0; } 60% { translate: -6px 0; } 80% { translate: 4px 0; } }
+@keyframes bowl-out { to { translate: 0 -60px; scale: 0.7; opacity: 0; } }
+.kx-bowl .drop { animation: top-drop 0.38s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes top-drop { from { transform: translateY(-26px); opacity: 0; } }
+.kx-bowl .steam path { stroke-dasharray: 12 70; animation: steam 2.8s linear infinite; }
+.kx-bowl .steam path:nth-child(2) { animation-delay: -0.9s; } .kx-bowl .steam path:nth-child(3) { animation-delay: -1.8s; }
+.kx-ing .steam path { stroke-dasharray: 8 40; animation: steam 2.4s linear infinite; }
+.kx-ing .steam path:nth-child(2) { animation-delay: -1.2s; }
+@keyframes steam { from { stroke-dashoffset: 0; opacity: 0; } 30% { opacity: 0.9; } to { stroke-dashoffset: -80; opacity: 0; } }
+.kx-say { position: absolute; top: 0; left: 50%; z-index: 2; max-width: 98%; margin: 0; padding: 3px 14px 5px; transform: translateX(-50%); border-radius: 999px; font-size: 17px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--paper); box-shadow: 0 3px 0 var(--shadow); }
+.kx-check { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; min-height: 28px; }
+.kx-hint { font-size: 15px; color: rgba(90, 68, 49, 0.75); }
+/* 재료 칩(레시피 북 · 주방 체크): 작은 그림 + 이름. have 들어감 · part 덜 들어감 · extra 빼야 함 */
+.ing-chip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 10px 3px 3px; border-radius: 999px; font-size: 15px; line-height: 1.2; white-space: nowrap; background: rgba(255, 250, 235, 0.7); color: var(--ink-soft); }
+.ing-chip svg { width: 24px; height: 20px; flex: 0 0 auto; }
+.ing-chip.have { background: var(--mint); color: var(--ink); box-shadow: 0 2px 0 var(--mint-deep); }
+.ing-chip.part { background: var(--butter); color: var(--ink); box-shadow: 0 2px 0 var(--yellow-deep); }
+.ing-chip.extra { background: #f7c7bf; color: #9b3b2b; box-shadow: 0 2px 0 #e08f80; text-decoration: line-through; }
+/* 내기: 크고 노란 버튼(종 달림) + 작은 버튼 둘 */
+.kx-acts { grid-area: acts; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: 8px; align-content: end; }
+.kx-acts:not(:has([data-k="book"])) .kx-small { grid-column: 1 / -1; }
+.kx-small { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 2px 10px 4px; border-radius: 14px; font-size: 16px; background: rgba(255, 250, 235, 0.85); box-shadow: 0 3px 0 rgba(110, 62, 24, 0.35); }
+.kx-small .ico { flex: 0 0 auto; }
+.kx-small .ico svg { width: 24px; height: 24px; display: block; }
+.kx-serve { grid-column: 1 / -1; position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 64px; border-radius: 22px; font-size: 34px;
+  background: var(--yellow); box-shadow: 0 6px 0 var(--yellow-deep), 0 10px 18px rgba(110, 62, 24, 0.3); }
+.kx-serve .bell { width: 34px; height: 30px; border-radius: 50% 50% 40% 40%; background: radial-gradient(circle at 35% 30%, #fff1b8, #e3a92c 60%, #b8801a); box-shadow: 0 3px 0 #8a5d12; }
+.kx-serve:active, .kx-small:active { transform: translateY(3px); }
+.kx-serve.bump .bell { animation: ring 0.4s ease-in-out; }
+@keyframes ring { 25% { rotate: -18deg; } 75% { rotate: 14deg; } }
 /* 레시피 북 · 결과 */
-.k-book { position: absolute; inset: 8px; z-index: 2; overflow-y: auto; padding: 12px 16px; border-radius: var(--r); background: var(--dots), var(--paper); box-shadow: 0 6px 0 var(--shadow); }
+.k-book { position: absolute; inset: 8px; z-index: 3; overflow-y: auto; padding: 12px 16px; border-radius: var(--r); background: var(--dots), var(--paper); box-shadow: 0 6px 0 var(--shadow); }
 .k-book-head { display: flex; justify-content: space-between; align-items: center; font-size: 22px; }
-.recipe-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 8px; }
+.recipe-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
 .recipe-card { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 10px; border-radius: 18px; background: var(--paper-2); }
 .recipe-card b { font-size: 21px; }
-.recipe-card .chips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 16px; }
-.ing-chip { display: inline-flex; align-items: center; gap: 6px; }
-.ing-chip i { width: 14px; height: 14px; flex: 0 0 auto; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(84, 62, 38, 0.35); }
-.k-result { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; text-align: center; background: var(--dots), var(--paper); }
-.k-result b { font-size: 38px; color: #e0745a; }
-.k-result p { margin: 0; font-size: 20px; }
-@media (max-height: 420px) {
-  .kitchen-scene { gap: 6px; padding: 8px 10px; }
-  .k-board { padding: 4px 8px 6px; gap: 4px; }
-  .k-board-head b { font-size: 17px; }
-  .seat { min-height: 44px; }
-  .seat .face { flex-basis: 34px; height: 34px; }
-  .seat .ticket b { font-size: 16px; }
-  .k-serve { flex-basis: 104px; }
-  .k-serve b { font-size: 24px; }
-  .k-item .lab { font-size: 12px; }
-  .k-pot { grid-template-columns: 62px minmax(0, 1fr); }
-  .k-pot .gauge svg { width: 62px; }
-  .k-say { font-size: 15px; }
+.recipe-card .chips { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.k-result { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(84, 52, 20, 0.45); }
+.k-result-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 34px 20px; border-radius: var(--r); text-align: center; background: var(--dots), var(--paper);
+  box-shadow: 0 0 0 5px var(--yellow), 0 10px 0 5px var(--yellow-deep), 0 18px 30px rgba(84, 62, 38, 0.3); animation: pop 0.3s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.k-result-bowl { width: 170px; height: 118px; }
+.k-result-bowl svg { width: 100%; height: 100%; display: block; }
+.k-result b { font-size: 36px; color: #e0745a; }
+.k-result p { margin: 0; font-size: 19px; }
+.k-result .btn { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .kx-ticket, .kx-bowl, .kx-bowl *, .bub, .pot-say, .kx-ing .steam path { animation: none !important; } }
+/* 휴대폰 가로(낮은 화면): 글씨 · 주문표를 줄인다 */
+@media (max-height: 460px) {
+  .kx { gap: 5px 8px; padding: 0 8px 8px; }
+  .kx-noren { margin: 0 -8px; padding: 4px 12px 11px; gap: 8px; }
+  .kx-crest { width: 26px; height: 26px; font-size: 17px; }
+  .kx-title b { font-size: 20px; } .kx-title span { display: none; }
+  .kx-stats span { font-size: 14px; padding: 0 9px 2px; } .kx-quit { font-size: 14px; padding: 1px 10px 3px; }
+  .kx-rail { gap: 8px; padding-top: 9px; }
+  .kx-ticket { min-height: 46px; padding: 5px 10px 9px 6px; gap: 6px; }
+  .kx-face { flex-basis: 32px; height: 32px; }
+  .kx-order small { font-size: 12px; } .kx-order b { font-size: 16px; }
+  .kx-st { padding: 11px 4px 4px; } .kx-st h3 { font-size: 12px; left: 10px; }
+  .kx-ing .lab, .pot-say { font-size: 11px; padding: 0 6px; }
+  .kx-center { padding-top: 24px; } .kx-say { font-size: 14px; }
+  .ing-chip { font-size: 12px; padding-right: 7px; } .ing-chip svg { width: 18px; height: 15px; }
+  .kx-check { min-height: 22px; gap: 3px 4px; flex-wrap: nowrap; justify-content: flex-start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .kx-small { min-height: 30px; font-size: 13px; } .kx-small .ico svg { width: 18px; height: 18px; }
+  .kx-serve { min-height: 44px; font-size: 24px; border-radius: 16px; } .kx-serve .bell { width: 24px; height: 21px; }
 }
+/* 세로 화면: 그릇을 위에 크게, 재료는 아래로(조리대 안에서 스크롤) */
 @media (orientation: portrait) and (max-width: 640px) {
-  .kitchen-scene { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 0.7fr);
-    grid-template-areas: "top top" "tray tray" "trays trays" "soups soups" "boil boil" "shelf shelf"; }
-  .k-trays, .k-soups { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
-  .k-counter { grid-template-columns: minmax(0, 1fr); }
+  .kx { overflow-y: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 220px auto auto auto;
+    grid-template-areas: "noren noren" "rail rail" "center center" "soups soups" "tops tops" "boil acts"; }
+  .kx-soups, .kx-tops, .kx-boil { min-height: 150px; }
+  .kx-soups .kx-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+  .kx-title span, .kx-order small { display: none; }
 }
 
 /* ---------- 검정소 시험지(필기) · 하이볼 실기 ---------- */
@@ -688,6 +741,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .world-label.prompt kbd { padding: 0 7px 1px; border-radius: 7px; font-family: var(--hand); font-size: 14px; line-height: 1.4; color: var(--ink); background: var(--paper); box-shadow: inset 0 -2px 0 var(--paper-3), 0 0 0 1.5px var(--ink-soft); }
 @keyframes prompt-pop { from { opacity: 0; scale: 0.5; } to { opacity: 1; scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .world-label.prompt { animation: none; } }
+/* 친밀도 하트: 친구 머리 위로 퐁퐁(+1), 하트가 늘면 사방으로 터지고 위 가운데 하트 줄 카드 */
+.heart-fx { position: absolute; width: 0; height: 0; pointer-events: none; }
+.heart-fx .hf { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; opacity: 0; animation: hf-float 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) var(--t) forwards; }
+.heart-fx.up .hf { width: 26px; height: 26px; left: -13px; top: -13px; animation: hf-burst 1.3s cubic-bezier(0.15, 0.8, 0.3, 1) var(--t) forwards; }
+.heart-fx .hf svg, .hf-plus svg, .heart-card svg { width: 100%; height: 100%; display: block; }
+.hf-plus { position: absolute; left: 0; top: -30px; display: flex; align-items: center; gap: 2px; padding: 1px 10px 3px 6px; transform: translateX(-50%); border-radius: 999px;
+  font-size: 18px; color: #c2405f; background: #fff0f4; box-shadow: 0 3px 0 #f3a8bb; white-space: nowrap; animation: hf-plus 1.25s ease-out forwards; }
+.hf-plus svg { width: 18px; height: 18px; }
+@keyframes hf-float { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) rotate(calc(-1 * var(--a))) scale(0.4); } 20% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) rotate(calc(-1 * var(--a))) translateY(-24px) scale(1); } }
+@keyframes hf-burst { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) rotate(calc(-1 * var(--a))) scale(0.3); } 15% { opacity: 1; }
+  70% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) rotate(calc(-1 * var(--a))) scale(1.1); } }
+@keyframes hf-plus { 0% { opacity: 0; translate: 0 10px; scale: 0.6; } 18% { opacity: 1; translate: 0 0; scale: 1.08; } 30% { scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; translate: 0 -22px; } }
+.heart-card { position: absolute; left: 50%; top: max(70px, 14%); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 22px 10px;
+  border-radius: var(--r); background: var(--dots), var(--paper); box-shadow: 0 0 0 4px var(--tag), 0 8px 0 4px rgba(84, 62, 38, 0.18), 0 14px 24px rgba(84, 62, 38, 0.2);
+  pointer-events: none; z-index: 5; animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); transition: opacity 0.4s, translate 0.4s; }
+.heart-card.out { opacity: 0; translate: 0 -12px; }
+.heart-card b { font-size: 22px; }
+.heart-card .row { display: flex; gap: 4px; }
+.heart-card .row i { width: 30px; height: 30px; filter: grayscale(1) opacity(0.35); }
+.heart-card .row i.on { filter: none; }
+.heart-card .row i.new { animation: hc-new 0.7s cubic-bezier(0.2, 1.8, 0.4, 1) 0.3s both; }
+@keyframes hc-new { from { scale: 0; filter: grayscale(1) opacity(0.35); } 60% { scale: 1.45; } to { scale: 1; filter: none; } }
+.heart-card small { font-size: 16px; color: #c2405f; }
+@media (prefers-reduced-motion: reduce) { .heart-fx .hf, .hf-plus, .heart-card .row i.new { animation-duration: 0.01s; } }
 /* PC(키보드 · 마우스): 조이스틱과 행동 버튼 없이 키보드로. 할 수 있는 행동은 위의 안내로 보인다 */
 [data-input="desk"] .hud-action, [data-input="desk"] .stick { display: none !important; } .app.card .app-ico { background: #f2a7bb; }
 .weed-grade { display: flex; align-items: center; gap: 8px; margin: 14px 4px 0; font-size: 19px; }

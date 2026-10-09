@@ -242,7 +242,7 @@ export function createPanels(ui, handlers) {
       // 술 자격 · 슈퍼 알바이터: 필기 + 실기
       const INFO = {
         liquor: `필기 ${LICENSES.liquor.questions}문제(${LICENSES.liquor.pass}개 이상, 문제당 ${LICENSES.liquor.seconds}초) + 하이볼 실기 · 쿠리만쥬에게 위스키 강의를 다 듣고 와요`,
-        arbeiter: '필기 4문제(3개 이상) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북으로 공부해요'
+        arbeiter: `필기 ${LICENSES.arbeiter.questions}문제(${LICENSES.arbeiter.pass}개 이상, 문제당 ${LICENSES.arbeiter.seconds}초) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북과 삶는 시간까지 공부해요`
       };
       for (const id of ['liquor', 'arbeiter']) {
         const L = LICENSES[id], own = hasLicense(s, id);

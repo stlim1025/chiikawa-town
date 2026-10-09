@@ -73,6 +73,9 @@ export function createHud(ui, input) {
   action.addEventListener('contextmenu', (e) => e.preventDefault());
 
   const labelEls = new Map();
+  // 월드에 붙는 잠깐짜리 연출(친밀도 하트 등): { x, y, z, el, until }
+  const fx = [];
+  const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5C6 16.4 2.6 13 2.6 8.9 2.6 6.2 4.7 4 7.3 4c2 0 3.6 1.1 4.7 2.8C13.1 5.1 14.7 4 16.7 4c2.6 0 4.7 2.2 4.7 4.9 0 4.1-3.4 7.5-9.4 11.6z" fill="#ff8fab" stroke="#e0607f" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.4 8.2q.6-1.6 2.2-1.9" fill="none" stroke="#ffe3ea" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const v = new THREE.Vector3();
   let lastText = '';
   // 바뀐 값만 DOM 에 쓴다
@@ -181,6 +184,32 @@ export function createHud(ui, input) {
         fly.onfinish = () => { card.remove(); glow(); };
       }, 1500);
     },
+    /**
+     * 친밀도가 올랐을 때: 친구 머리 위로 하트가 퐁퐁 떠오르고 '+1' 이 뜬다. up 이면 하트가 사방으로 터지고,
+     * 위 가운데에 그 친구의 하트 줄(새 하트가 톡 채워진다) 카드가 잠깐 뜬다.
+     * { x, y, z: 친구 머리 위, gained, up, hearts: 지금 하트 수, name, tag: 이름표 색 }
+     */
+    hearts({ x, y, z, gained, up, hearts, name, tag }) {
+      const e = el('div', 'heart-fx' + (up ? ' up' : ''));
+      const n = up ? 9 : 4;
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        const a = up ? (i / n) * 360 : -60 + (i / (n - 1)) * 120, d = up ? 70 + (i % 3) * 14 : 34 + (i % 2) * 16;
+        html += `<i class="hf" style="--a:${a}deg;--d:${d}px;--t:${(i * 0.06).toFixed(2)}s">${HEART_SVG}</i>`;
+      }
+      e.innerHTML = html + `<b class="hf-plus">${HEART_SVG}+${gained}</b>`;
+      labelLayer.appendChild(e);
+      fx.push({ x, y, z, el: e, until: performance.now() + (up ? 1700 : 1300) });
+      if (!up) return;
+      const card = el('div', 'heart-card');
+      card.setAttribute('role', 'status');
+      card.style.setProperty('--tag', tag || '#ffd6e2');
+      card.innerHTML = `<b></b><span class="row">${Array.from({ length: 5 }, (_, i) => `<i class="${i < hearts ? 'on' : ''}${i === hearts - 1 ? ' new' : ''}">${HEART_SVG}</i>`).join('')}</span><small>더 친해졌어요!</small>`;
+      card.querySelector('b').textContent = name;
+      ui.appendChild(card);
+      setTimeout(() => card.classList.add('out'), 2300);
+      setTimeout(() => card.remove(), 2700);
+    },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     banner(title, sub, ms = 2600) {
       const b = el('div', 'hud-banner');
@@ -223,6 +252,15 @@ export function createHud(ui, input) {
         seen.add(it.id);
       }
       labelEls.forEach((e, id) => { if (!seen.has(id)) { e.remove(); labelEls.delete(id); } });
+      // 잠깐짜리 연출: 붙은 자리를 따라다니다가 시간이 되면 지운다
+      const t = performance.now();
+      for (let i = fx.length - 1; i >= 0; i--) {
+        const f = fx[i];
+        if (t > f.until) { f.el.remove(); fx.splice(i, 1); continue; }
+        v.set(f.x, f.y, f.z).project(camera);
+        f.el.style.left = ((v.x + 1) / 2) * w + 'px';
+        f.el.style.top = ((1 - v.y) / 2) * h + 'px';
+      }
     }
   };
 }

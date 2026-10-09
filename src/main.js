@@ -850,6 +850,13 @@ function boot() {
   function reward(n, action) {
     const r = befriend(state, n.kind, action, state.clock.day);
     commit(r.state);
+    if (r.gained > 0) {
+      // 친밀도가 오르면 머리 위로 하트(하트가 늘면 크게 터지고 하트 줄 카드)
+      const F = FRIENDS[n.kind];
+      hud.hearts({ x: n.x, y: n.chibi.height + 0.5, z: n.z, gained: r.gained, up: r.up, hearts: r.hearts, name: F.name, tag: F.tag });
+      sound.play(r.up ? 'heartUp' : 'heart');
+      npcs.emote(n, 'cheer', r.up ? 1.6 : 0.9);
+    }
     if (r.gift) {
       sayAs(n, ['{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
         hud.banner('선물을 받았어요!', `${FURNITURE[r.gift].name} · 집에서 '꾸미기'로 놓아요`, 3400);
@@ -858,7 +865,6 @@ function boot() {
       });
       return;
     }
-    if (r.up) { hud.toast(`${FRIENDS[n.kind].name}와 더 친해졌어요 ${'♥'.repeat(r.hearts)}`, 3000); sound.play('job'); }
     endTalk();
   }
 
@@ -1248,6 +1254,7 @@ function boot() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
     try {
       tick(dt);
     } catch (e) {
@@ -1256,7 +1263,7 @@ function boot() {
     }
   }
 
-  let skipRender = false, holdRender = false; // 디버그 step 중에는 그리지 않는다
+  let skipRender = false, holdRender = false, pauseLoop = false; // 디버그 step 중에는 그리지 않는다
   // 로컬 확인용: 주소에 ?debug 가 있을 때만 시간을 직접 흘리는 훅을 연다
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) {
     window.__town = {
@@ -1264,6 +1271,8 @@ function boot() {
       step(seconds, dt = 1 / 30) { skipRender = true; try { for (let s = 0; s < seconds; s += dt) tick(dt); } finally { skipRender = holdRender; } },
       // 3D 그리기를 멈춰 둔다(느린 확인 환경에서 화면 글자 · 창만 빨리 찍을 때)
       hold(on) { holdRender = skipRender = !!on; },
+      pause(on) { pauseLoop = !!on; },
+      hud,
       get state() { return state; },
       get target() { return target && { type: target.type, label: target.label }; },
       player: () => player && { ...player.position },

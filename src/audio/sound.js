@@ -122,6 +122,9 @@ export function createSound(storage) {
     job: () => [784, 988].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.09, dur: 0.16, vol: 0.12 })),
     // 노동 완료: 빰빠밤!
     done: () => [659, 784, 1047, 1319, 1047, 1319, 1568].forEach((f, i) => tone({ freq: f, type: i < 4 ? 'square' : 'triangle', start: i * 0.09, dur: i === 6 ? 0.6 : 0.12, vol: i < 4 ? 0.07 : 0.12 })),
+    // 친밀도: 퐁퐁(오름), 하트가 늘면 반짝이는 아르페지오
+    heart: () => [988, 1319].forEach((f, i) => tone({ freq: f, type: 'sine', start: i * 0.09, dur: 0.22, vol: 0.12 })),
+    heartUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone({ freq: f, type: i % 2 ? 'triangle' : 'sine', start: i * 0.08, dur: i === 4 ? 0.6 : 0.2, vol: 0.11 })),
     // 아침: 해가 뜨며 올라가는 소리
     morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 }))
   };
