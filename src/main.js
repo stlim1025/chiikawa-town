@@ -2169,6 +2169,7 @@ function boot() {
       homeTarget: () => homeTarget && homeTarget.type,
       leaveRoom: () => exitVisit(),
       free: (x, z, r) => village.isFree(x, z, r),
+      solids: () => village.obstacles.list.filter((o) => !o.soft).map((o) => ({ x: o.x, z: o.z, r: o.r, box: o.box ? { hx: o.box.hx, hz: o.box.hz } : null })),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),

@@ -75,9 +75,8 @@ export function createPlayer(scene, chibi, village) {
       }
       // 맞아서 밀려나는 중이면 조작이 잠깐 안 먹는다
       if (Math.abs(knock.x) + Math.abs(knock.z) > 0.05) {
-        const nx = position.x + knock.x * dt, nz = position.z + knock.z * dt;
-        if (village.isFree(nx, position.z, RADIUS)) position.x = nx;
-        if (village.isFree(position.x, nz, RADIUS)) position.z = nz;
+        const p = village.move(position.x, position.z, position.x + knock.x * dt, position.z + knock.z * dt, RADIUS);
+        position.x = p.x; position.z = p.z;
         const damp = Math.exp(-dt * 10);
         knock.x *= damp; knock.z *= damp;
       }
@@ -86,9 +85,9 @@ export function createPlayer(scene, chibi, village) {
       if (len > 0.12) {
         const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y);
         const step = SPEED * len * dt, ox = position.x, oz = position.z;
-        const nx = position.x + dx * step, nz = position.z + dz * step;
-        if (village.isFree(nx, position.z, RADIUS)) position.x = nx;
-        if (village.isFree(position.x, nz, RADIUS)) position.z = nz;
+        // 막혀도 장애물을 따라 미끄러지며 간다(가로등 · 건물 모서리에 살짝 걸려도 멈추지 않게)
+        const p = village.move(position.x, position.z, position.x + dx * step, position.z + dz * step, RADIUS);
+        position.x = p.x; position.z = p.z;
         moving = Math.hypot(position.x - ox, position.z - oz) > step * 0.25; // 벽에 막혀 제자리면 걷는 몸짓을 하지 않는다
         const want = Math.atan2(dx, dz);
         let d = want - yaw;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
 import { astar, smoothPath } from '../core/pathfind.js';
-import { createObstacleIndex } from '../core/obstacles.js';
+import { createObstacleIndex, slideMove } from '../core/obstacles.js';
 import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, roadDist, shoreDist, doorSpot, lotRadius } from '../core/layout.js';
 import { createZones } from './zones.js';
 import { buildOutdoors } from './outdoors.js';
@@ -92,6 +92,39 @@ export function buildVillage(scene) {
   // 연못은 장애물 대신 isFree 가 물로 막는다
 
   const place = (parent, mesh) => { parent.add(mesh); return mesh; };
+  /**
+   * 건물 · 가판대가 실제로 차지하는 바닥을 장애물로: 몸에 닿는 높이(바닥 위 0.25 ~ 0.85)에 걸친 조각마다 네모(둥근 벽 · 고깔은 원).
+   * 예전처럼 건물 전체를 감싸는 큰 원 하나로 막으면 벽에서 한참 떨어진 곳에서도 걸려 답답했다.
+   * 그 큰 원은 꽃 · 나무 자리를 고를 때만 쓰도록 soft 로 남긴다(걸어서는 지나갈 수 있다).
+   * g: 다 지은 무리(위치 · y 회전만 있다), list: 그 조각들(g 바로 밑 것만 센다). union: 모두 합친 네모 하나로(가판대 · 게시판처럼 작은 것).
+   */
+  const SOLID_BOX = new THREE.Box3(), SOLID_ALL = new THREE.Box3();
+  function solid(g, list, union = false) {
+    const a = g.rotation.y, ca = Math.cos(a), sa = Math.sin(a), shapes = [];
+    const shapeOf = (bx) => ({ cx: (bx.min.x + bx.max.x) / 2, cz: (bx.min.z + bx.max.z) / 2, hx: (bx.max.x - bx.min.x) / 2, hz: (bx.max.z - bx.min.z) / 2 });
+    SOLID_ALL.makeEmpty();
+    for (const m of list) {
+      if (!m.isMesh || m.parent !== g) continue;
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      m.updateMatrix();
+      SOLID_BOX.copy(m.geometry.boundingBox).applyMatrix4(m.matrix);
+      if (SOLID_BOX.min.y > 0.85 || SOLID_BOX.max.y < 0.25) continue; // 머리 위(지붕 · 처마 · 간판) · 발밑(깔개 · 계단 · 받침)은 걸리지 않는다
+      if (union) { SOLID_ALL.union(SOLID_BOX); continue; }
+      const sh = shapeOf(SOLID_BOX);
+      if (sh.hx < 0.03 && sh.hz < 0.03) continue;
+      sh.round = (m.geometry === GEO.cylinder || m.geometry === GEO.cone) && !m.rotation.x && !m.rotation.z && Math.abs(sh.hx - sh.hz) < 0.02;
+      shapes.push(sh);
+    }
+    if (union && !SOLID_ALL.isEmpty()) shapes.push(shapeOf(SOLID_ALL));
+    // 큰 것부터, 이미 넣은 네모 안에 쏙 들어가는 조각(벽 위 창틀 · 모서리 기둥)은 뺀다
+    shapes.sort((p, q) => q.hx * q.hz - p.hx * p.hz);
+    const kept = [], within = (s, k) => s.cx - s.hx >= k.cx - k.hx - 0.02 && s.cx + s.hx <= k.cx + k.hx + 0.02 && s.cz - s.hz >= k.cz - k.hz - 0.02 && s.cz + s.hz <= k.cz + k.hz + 0.02;
+    for (const s of shapes) if (!kept.some((k) => !k.round && within(s, k))) kept.push(s);
+    for (const s of kept) {
+      const x = g.position.x + ca * s.cx + sa * s.cz, z = g.position.z - sa * s.cx + ca * s.cz;
+      obstacles.push(s.round ? { x, z, r: s.hx } : { x, z, box: { hx: s.hx, hz: s.hz, yaw: a } });
+    }
+  }
 
   // 집도 나무처럼, 카메라와 내 캐릭터 사이를 가리면 반투명해진다. 그래서 집마다 재질을 따로 둔다.
   const houses = [];
@@ -117,7 +150,8 @@ export function buildVillage(scene) {
     const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
     const { H } = design({ s, part, block, glow, ROOF });
     world.add(g);
-    obstacles.push({ x, z, r: lotRadius(lot) });
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, meshes);
     houses.push({ x, z, half: 1.32 * s, mats: [...mats.values()], meshes, fade: 1 });
     return { H };
   }
@@ -206,7 +240,8 @@ export function buildVillage(scene) {
     place(g, toonMesh(ROOF, '#f7b6cc', { position: [0, 1.72, -0.05], scale: [1.95, 0.42, 1.1], shell: true }));
     ['#f7a8c4', '#bfe0f5', '#fff1a8', '#d9ccff', '#ffd6e2'].forEach((c, i) => place(g, toonMesh(GEO.box, c, { position: [-0.6 + i * 0.3, 0.9, 0.05], scale: [0.2, 0.16, 0.09], shell: true, shadow: false })));
     world.add(g);
-    obstacles.push({ x, z, r: lotRadius(lot) });
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children, true);
     labels.push({ x, y: 2.5, z, text: lot.label });
   }
 
@@ -222,7 +257,8 @@ export function buildVillage(scene) {
       place(g, toonMesh(GEO.box, c, { position: [nx, ny, 0.05], scale: [0.32, 0.26, 0.02], outline: false, shadow: false }));
     });
     world.add(g);
-    obstacles.push({ x, z, r: lotRadius(lot) });
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children, true);
     labels.push({ x, y: 2.4, z, text: lot.label });
   }
 
@@ -239,7 +275,8 @@ export function buildVillage(scene) {
     place(g, toonMesh(GEO.box, '#e2b77f', { position: [1.05, 0.25, 0], scale: [0.45, 0.5, 0.45], shell: true }));
     ['#e0524f', '#f7c948'].forEach((c, i) => place(g, toonMesh(GEO.sphere, c, { position: [0.95 + i * 0.2, 0.55, 0.05], scale: [0.11, 0.1, 0.11], outline: 0.015 })));
     world.add(g);
-    obstacles.push({ x, z, r: lotRadius(lot) });
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children, true);
     labels.push({ x, y: 1.6, z, text: lot.label });
   }
 
@@ -311,7 +348,8 @@ export function buildVillage(scene) {
     pp(sign, new THREE.TorusGeometry(0.17, 0.05, 8, 20, Math.PI), '#f6c453', { position: [0.3, 0.28, 0], rotation: [0, 0, -Math.PI / 2], scale: [1, 1, 1], outline: 0.015 });
     g.add(sign);
     world.add(g);
-    obstacles.push({ x, z: z - 0.05, r: lotRadius(lot) });
+    obstacles.push({ x, z: z - 0.05, r: lotRadius(lot), soft: true });
+    solid(g, g.children, true);
     houses.push({ x, z, half: 1.4, mats: [...mats.values()], meshes, fade: 1 });
     labels.push({ x, y: 3.6, z, text: lot.label });
   }
@@ -555,9 +593,13 @@ export function buildVillage(scene) {
     return true;
   };
 
+  /** (ox, oz) 에서 (nx, nz) 로 가려 할 때 실제로 갈 자리: 막히면 장애물을 따라 미끄러진다(core/obstacles.js slideMove). */
+  const move = (ox, oz, nx, nz, radius = 0.35) => slideMove(isFree, obstacles.pushOut, ox, oz, nx, nz, radius);
+
   return {
     group: world,
     obstacles,
+    move,
     labels,
     spots,
     /** 친구 집 문 앞: { chiikawa, usagi, kurimanju, momonga, rakko }. */
