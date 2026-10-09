@@ -15,10 +15,11 @@ const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3
  */
 export function createIntro(ui, { player, cam, npcs, village, sound }) {
   const E = village.entrance;
+  // 마을 이름 리본: 리본이 펼쳐지고 이름이 떠오른 뒤 '어서 와요!' 딱지가 톡 붙는다
   const stamp = document.createElement('div');
-  stamp.className = 'village-stamp';
+  stamp.className = 'village-title';
   stamp.hidden = true;
-  stamp.innerHTML = '<span>치이카와 마을에</span><b>어서 와요!</b>';
+  stamp.innerHTML = '<div class="vt-band"><i class="vt-tail l"></i><i class="vt-tail r"></i><div class="vt-ribbon"><b class="vt-name">치이카와 마을</b><span class="vt-line" aria-hidden="true"></span></div></div><i class="vt-kicker">어서 와요!</i>';
   const skip = document.createElement('button');
   skip.type = 'button';
   skip.className = 'btn skip-btn';
@@ -51,7 +52,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
     /** fresh: 처음 만든 캐릭터면 true(인사가 달라진다). */
     start(onDone, fresh = true) {
       t = 0; active = true; stamped = false; greeted = false; done = onDone; first = fresh;
-      stamp.querySelector('b').textContent = fresh ? '어서 와요!' : '또 왔어요!';
+      stamp.querySelector('.vt-kicker').textContent = fresh ? '어서 와요!' : '또 왔어요!';
       player.placeAt(E.outside.x, E.outside.z);
       player.face(E.outside.x, E.outside.z - 1);
       player.walkTo = { x: E.inside.x, z: E.inside.z, speed: 2.6 };
@@ -78,7 +79,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
         stamp.classList.remove('show');
         void stamp.offsetWidth; // 애니메이션 다시 시작
         stamp.classList.add('show');
-        sound?.play('stamp');
+        sound?.play('morning');
       }
       // 걸어 들어오는 동안 친구들이 고개(몸)를 천천히 돌려 내 캐릭터를 따라 본다
       if (!greeted) GREETERS.forEach(([kind]) => {

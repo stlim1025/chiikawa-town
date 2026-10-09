@@ -27,7 +27,7 @@ import { createState, addMoney, useStamina, restoreStamina, MAX_STAMINA } from '
 import { advance, hourOf, sleepUntilMorning } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
-import { gainXp, canTakeExam, startExam, examStep, examCounts, promote } from './core/license.js';
+import { gainXp, canTakeExam, startExam, examStep, examCounts, promote, PAY_MULT } from './core/license.js';
 import { buy } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { createSound } from './audio/sound.js';
@@ -136,6 +136,14 @@ function boot() {
   const panels = createPanels(ui, {
     getState: () => state,
     getSound: () => sound.prefs,
+    toast: (text) => hud.toast(text),
+    // 테스트 도구(마을폰 숨은 앱)
+    dev: {
+      money(n) { commit(addMoney(state, n)); sound.play('coin'); hud.toast(`테스트: ${won(n)}을 넣었어요`); },
+      stamina() { commit({ ...state, stamina: MAX_STAMINA }); },
+      grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0 }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
+      hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); }
+    },
     toggleSound: (kind) => sound.toggle(kind),
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
     onClose: () => input.setEnabled(true),
@@ -145,7 +153,9 @@ function boot() {
       if (!r.ok) { hud.toast('그 일감은 오늘 마감됐어요. 다른 일감을 골라요'); return; }
       commit({ ...r.state, job: acceptJob(typeId) });
       sound.play('job');
-      hud.toast(`일감을 받았어요: ${JOB_TYPES[typeId].title}`);
+      const T = JOB_TYPES[typeId];
+      panels.close();
+      hud.announce({ kicker: '새 일감!', title: T.title, sub: `${T.where} · 보수 ${won(Math.round(T.base * PAY_MULT[state.license.grade]))}부터` });
     },
     quitJob() { commit({ ...returnToBoard(state, state.job.typeId, state.clock.day), job: null }); hud.toast('일감을 그만뒀어요. 게시판에 다시 걸렸어요'); },
     reportJob() {
@@ -161,7 +171,8 @@ function boot() {
       const exam = startExam(state.license.grade), names = kindsOfGrade(state.license.grade).map((k) => WEED_KINDS[k].name).join(' · ');
       commit({ ...state, exam });
       sound.play('job');
-      hud.toast(`승급 시험 시작! ${josa(names, '을/를')} 깔끔하게 연속 ${exam.need}번 뽑아요`, 3600);
+      panels.close();
+      hud.announce({ kicker: '승급 시험 시작!', title: `${names} 연속 ${exam.need}번`, sub: '초록에서 깔끔하게! 한 번이라도 끊기면 불합격' });
     },
     buy(itemId) {
       const r = buy(state, 'ramen', itemId);
@@ -438,7 +449,7 @@ function boot() {
   });
 
   hud.onSettings(() => { if (state && mode === 'play' && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); });
-  hud.onZoom((f) => cam.zoomBy(f));
+  input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
   // 등불 버튼: 가진 불만 끔 → 랜턴 → 손전등
   hud.onLight(() => { if (state && mode === 'play') { commit(nextLight(state)); } });
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoomBy(Math.exp(e.deltaY * 0.001)); }, { passive: false });
@@ -1103,6 +1114,33 @@ function boot() {
     return options.length ? options[0].t : null;
   }
 
+  // ---------- 행동 안내: 지금 누르면 무엇을 하는지 대상 발밑에 노란 고리, 머리 위에 (PC 면 키 모양과 함께) 할 일 ----------
+  const cue = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfcd95b, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+  cue.rotation.x = -Math.PI / 2;
+  cue.renderOrder = 2;
+  cue.visible = false;
+  scene.add(cue);
+  /** 대상의 자리 { x, z, r: 고리 크기, y: 안내 높이, id }. */
+  function targetSpot(tg) {
+    if (!tg) return null;
+    if (tg.type === 'weed') { const big = tg.weed.kind === 'giantweed'; return { x: tg.weed.x, z: tg.weed.z, r: big ? 0.75 : 0.5, y: big ? 2.0 : 1.05, id: 'w' + tg.weed.id }; }
+    if (tg.type === 'berry') return { x: tg.bush.x, z: tg.bush.z, r: 0.75, y: 1.3, id: 'b' + tg.bush.x.toFixed(2) };
+    if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
+    const s = village.spots[tg.type];
+    return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
+  }
+  function showTargetCue() {
+    const sp = targetSpot(target);
+    cue.visible = !!sp;
+    if (!sp) return null;
+    const pulse = 1 + 0.07 * Math.sin(t * 6);
+    cue.position.set(sp.x, 0.04, sp.z);
+    cue.scale.setScalar(sp.r * pulse);
+    cue.material.opacity = 0.65 + 0.25 * Math.sin(t * 6);
+    if (sp.skipLabel) return null; // 친구가 말하는 중이면 말풍선을 가리지 않게
+    return { id: 'prompt:' + sp.id, x: sp.x, y: sp.y, z: sp.z, text: target.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' };
+  }
+
   // ---------- 하늘 ----------
   const skyTop = new THREE.Color(), skyHorizon = new THREE.Color();
   const celTint = new THREE.Color(), CEL_DAY = new THREE.Color('#ffffff'), CEL_NIGHT = new THREE.Color('#9aa6d6');
@@ -1218,18 +1256,21 @@ function boot() {
     }
   }
 
-  let skipRender = false; // 디버그 step 중에는 그리지 않는다
+  let skipRender = false, holdRender = false; // 디버그 step 중에는 그리지 않는다
   // 로컬 확인용: 주소에 ?debug 가 있을 때만 시간을 직접 흘리는 훅을 연다
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) {
     window.__town = {
       // 시간을 흘린다. 그리기는 마지막 한 번만(느린 확인 환경에서도 빨리 돌게)
-      step(seconds, dt = 1 / 30) { skipRender = true; try { for (let s = 0; s < seconds; s += dt) tick(dt); } finally { skipRender = false; } },
+      step(seconds, dt = 1 / 30) { skipRender = true; try { for (let s = 0; s < seconds; s += dt) tick(dt); } finally { skipRender = holdRender; } },
+      // 3D 그리기를 멈춰 둔다(느린 확인 환경에서 화면 글자 · 창만 빨리 찍을 때)
+      hold(on) { holdRender = skipRender = !!on; },
       get state() { return state; },
       get target() { return target && { type: target.type, label: target.label }; },
       player: () => player && { ...player.position },
       teleport(x, z) { player.setPosition(x, z); },
       weeds: () => weeds.list.map((w) => ({ kind: w.kind, area: w.area, x: w.x, z: w.z, stage: w.stage, hidden: !!w.hidden, visible: w.mesh.visible })),
       weedCounts: () => weeds.counts(),
+      camPos: () => cam.camera.position.toArray(),
       pull: () => pulling && { kind: pulling.weed.kind, power: pulling.pull.power, from: pulling.pull.greenFrom, to: pulling.pull.greenTo, label: pulling.label },
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null })),
@@ -1286,7 +1327,8 @@ function boot() {
       player.update(dt, input);
       intro.update(dt);
     } else if (state && player && mode === 'play') {
-      if (!panels.isOpen() && !sleeping) state = { ...state, clock: advance(state.clock, dt) };
+      if ((!panels.isOpen() || panels.isPhone()) && !sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 마을폰을 보는 동안에도 시간은 흐른다
+      panels.tick(state);
       newDayCheck();
       player.update(dt, input);
       if (pulling) {
@@ -1340,6 +1382,8 @@ function boot() {
     if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
     const bubbles = npcs.labels(), mark = mode === 'play' ? tutorialMarker() : null;
     if (mark) bubbles.push(mark);
+    const prompt = mode === 'play' ? showTargetCue(bubbles) : (cue.visible = false, null);
+    if (prompt) bubbles.push(prompt);
     // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게)
     const near = signLabels.filter((l) => Math.abs(l.x - focus.x) < 45 && Math.abs(l.z - focus.z) < 45);
     hud.placeLabels(bubbles.length ? near.concat(bubbles) : near, cam.camera);

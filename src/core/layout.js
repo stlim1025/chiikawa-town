@@ -99,7 +99,7 @@ export const LOTS = [
   { id: 'board', kind: 'board', x: -5, z: -5.4, label: '노동 접수' },
   { id: 'factory', kind: 'bench', x: -9.5, z: -5.4, label: '스티커 작업대' },
   { id: 'home', kind: 'dome', x: -8, z: 7.5, s: 1.0, label: '내 집' },
-  { id: 'chiikawa', kind: 'dome', x: -14.5, z: 8, s: 0.8, label: '치이카와네', home: 'chiikawa' },
+  { id: 'chiikawa', kind: 'dome', x: -14.5, z: 8, s: 1.15, label: '치이카와네', home: 'chiikawa' },
   { id: 'usagi', kind: 'house', x: 8, z: 7.5, s: 0.85, roof: '#f2cf7a', label: '우사기네', home: 'usagi' },
   { id: 'kurimanju', kind: 'house', x: 14.5, z: 7.5, s: 0.9, roof: '#d9a066', label: '쿠리만쥬네', home: 'kurimanju' },
   { id: 'momonga', kind: 'house', x: -12, z: 17, s: 0.8, roof: '#bfe0f5', label: '모몽가네', home: 'momonga' },

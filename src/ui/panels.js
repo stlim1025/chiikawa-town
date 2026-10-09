@@ -26,6 +26,8 @@ const APP_ICON = {
   card: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="10" width="28" height="20" rx="4" fill="#fff"/><circle cx="14" cy="19" r="4" fill="#7fb6e2"/><path d="M9 27q5 -5 10 0" fill="#7fb6e2"/><path d="M22 17h8M22 22h6" stroke="#b9a37a" stroke-width="2.4" stroke-linecap="round"/></svg>',
   map: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 10l9-3 10 3 9-3v23l-9 3-10-3-9 3z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M15 7v23M25 10v23" stroke="#7fb6e2" stroke-width="2.4"/><circle cx="20" cy="17" r="3" fill="#f06a8f"/></svg>',
   // 풀 도감: 펼친 책 위에 새싹
+  // 테스트 도구: 스패너
+  dev: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M27.5 6.5a7.5 7.5 0 0 0-7.1 9.9L8.6 28.2a3.2 3.2 0 0 0 4.5 4.5l11.8-11.8a7.5 7.5 0 0 0 9.9-7.1l-4.6 2.4-3.9-1.3-1.3-3.9z" fill="#fff"/></svg>',
   weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>'
 };
 
@@ -94,7 +96,11 @@ function pochetteSvg(id, P) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds'];
+  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'dev'];
+  // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
+  const DEV_KEY = 'chiikawa-town-dev';
+  const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
+  let titleTaps = [];
   // 마을폰을 열 때 받은 것({ storage }). 폰 안에서 화면을 옮겨도 그대로 쓴다
   let phoneExtra = {};
 
@@ -416,6 +422,18 @@ export function createPanels(ui, handlers) {
       out.push(h('p', { class: 'note' }, '오른쪽 등불 버튼으로 끄고 켜요.'), h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
+    // 테스트 도구(숨은 앱): 돈 · 기운 · 급수 · 시각을 바로 바꾼다
+    dev(s) {
+      const row = (t, d, ...btns) => h('div', { class: 'row dev-row' }, h('div', {}, h('div', { class: 't' }, t), d ? h('div', { class: 'd' }, d) : null), h('div', { class: 'dev-btns' }, ...btns));
+      const b = (label, fn, cls = 'btn') => h('button', { class: cls, type: 'button', onClick: after(fn) }, label);
+      return [appBar('테스트', '개발용'),
+        h('p', { class: 'sub' }, '여러 기능을 빨리 시험해 보는 도구예요.'),
+        row('돈', `지금 ${won(s.money)}`, b('+1만', () => handlers.dev.money(10000), 'btn primary'), b('+10만', () => handlers.dev.money(100000), 'btn primary')),
+        row('기운', `지금 ${s.stamina} / ${MAX_STAMINA}`, b('가득', () => handlers.dev.stamina())),
+        row('제초 검정', `지금 ${s.license.grade}급`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
+        row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
+        h('p', { class: 'note' }, '마을폰 제목을 다시 다섯 번 누르면 이 앱이 숨어요.')];
+    },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
     weeds(s) {
       const log = s.weedLog || {}, grade = s.license.grade;
@@ -456,13 +474,23 @@ export function createPanels(ui, handlers) {
       const sound = (kind, label) => app(`${kind}${snd[kind] ? '' : ' off'}`, APP_ICON[kind], label,
         after(() => handlers.toggleSound(kind)), String(!!snd[kind]));
       return [
-        h('h2', { class: 'phone-title' }, '마을폰'),
+        h('h2', { class: 'phone-title', onClick: () => {
+          const now = performance.now();
+          titleTaps = titleTaps.filter((t) => now - t < 2500).concat(now);
+          if (titleTaps.length < 5) return;
+          titleTaps = [];
+          const on = !devOn();
+          try { localStorage.setItem(DEV_KEY, on ? '1' : '0'); } catch { /* 저장이 막혀 있으면 이번만 */ }
+          handlers.toast?.(on ? '테스트 도구가 켜졌어요' : '테스트 도구를 껐어요');
+          render();
+        } }, '마을폰'),
         h('div', { class: 'apps' },
           sound('sfx', '효과음'),
           sound('music', '배경음악'),
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
+          devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
         // 저장 안내: 폰을 열 때 저장 여부를 받지 못했으면(지도 · 자격증으로 바로 열었을 때) 안 보인다
@@ -474,6 +502,14 @@ export function createPanels(ui, handlers) {
 
   return {
     isOpen: () => !!current,
+    /** 마을폰을 보고 있는지(폰을 볼 때는 시간이 계속 흐른다). */
+    isPhone: () => !!current?.phone,
+    /** 매 프레임: 폰 상태 줄 시각을 흐르는 시간에 맞춘다. */
+    tick(s) {
+      if (!current?.phone || !s) return;
+      const t = timeLabel(s.clock);
+      if (current.status.time.textContent !== t) current.status.time.textContent = t;
+    },
     close: () => close(),
     openBoard: () => show('board'),
     openExam: () => show('exam'),

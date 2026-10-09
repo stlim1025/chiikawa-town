@@ -14,8 +14,8 @@ const SKY_ICON = {
   night: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5a8.6 8.6 0 1 0 5 13.2A7 7 0 0 1 15.5 3.5z" fill="#fff0a6"/></svg>'
 };
 SKY_ICON.day = SKY_ICON.morning;
-const PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
-const MINUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>';
+// 새 일감 쪽지 그림(게시판에 꽂힌 메모 + 압정)
+const NOTE = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="9" width="32" height="34" rx="5" fill="#fffaeb" stroke="#5a4431" stroke-width="2.6"/><path d="M15 21h18M15 28h18M15 35h11" stroke="#d6c08e" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="9" r="5" fill="#f2768f" stroke="#5a4431" stroke-width="2.4"/><circle cx="22.4" cy="7.6" r="1.4" fill="#fff"/></svg>';
 const LIGHT_ICON = {
   off: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M9 4v3l-2 3v9h10v-9l-2-3V4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
   lantern: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M9 4v3l-2 3v9h10v-9l-2-3V4" fill="#ffe08a" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="14" r="2.4" fill="#ff9d3c"/></svg>',
@@ -44,15 +44,12 @@ export function createHud(ui, input) {
   const gear = el('button', 'hud-phone', PHONE);
   gear.type = 'button';
   gear.setAttribute('aria-label', '마을폰(설정)');
+  // 마을폰 아래 등불 버튼(확대 · 축소는 휠 · 두 손가락으로)
   const zoom = el('div', 'hud-zoom');
-  const zoomIn = el('button', 'icon-btn', PLUS), zoomOut = el('button', 'icon-btn', MINUS);
-  zoomIn.type = zoomOut.type = 'button';
-  zoomIn.setAttribute('aria-label', '확대');
-  zoomOut.setAttribute('aria-label', '축소');
   const lightBtn = el('button', 'icon-btn hud-light', LIGHT_ICON.off);
   lightBtn.type = 'button';
   lightBtn.hidden = true;
-  zoom.append(zoomIn, zoomOut, lightBtn);
+  zoom.append(lightBtn);
   const action = el('button', 'hud-action');
   action.type = 'button';
   action.hidden = true;
@@ -91,7 +88,6 @@ export function createHud(ui, input) {
     /** 왼쪽 위 기둥(하치와레의 할 일 쪽지를 여기에 붙인다). */
     dock,
     onSettings(fn) { gear.addEventListener('click', fn); },
-    onZoom(fn) { zoomIn.addEventListener('click', () => fn(0.85)); zoomOut.addEventListener('click', () => fn(1.18)); },
     /** 등불 버튼을 누르면(끔 → 랜턴 → 손전등). */
     onLight(fn) { lightBtn.addEventListener('click', fn); },
     /** 등불 버튼 모양. mode 가 null 이면 버튼을 숨긴다(불이 하나도 없을 때). */
@@ -152,6 +148,39 @@ export function createHud(ui, input) {
       timer.hidden = !text;
       if (text && timer.textContent !== text) timer.textContent = text;
     },
+    /**
+     * 새 일감 · 시험을 받았을 때: 가운데에 쪽지 카드가 톡 떴다가 왼쪽 위 일감 칸으로 날아가 꽂히고, 일감 칸이 반짝인다.
+     * { kicker: '새 일감!', title, sub }
+     */
+    announce({ kicker, title, sub }) {
+      const card = el('div', 'task-card');
+      card.setAttribute('role', 'status');
+      card.innerHTML = `<span class="task-ico">${NOTE}</span><div class="task-txt"><i></i><b></b><span></span></div>`;
+      card.querySelector('i').textContent = kicker;
+      card.querySelector('b').textContent = title;
+      card.querySelector('.task-txt span').textContent = sub || '';
+      ui.appendChild(card);
+      const glow = () => {
+        job.classList.remove('got');
+        void job.offsetWidth; // 반짝임 다시 시작
+        job.classList.add('got');
+        setTimeout(() => job.classList.remove('got'), 1600);
+      };
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        if (still || !card.animate) { card.remove(); glow(); return; }
+        // 일감 칸 자리로 줄어들며 날아간다
+        const from = card.getBoundingClientRect(), to = job.getBoundingClientRect();
+        const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        const k = Math.max(0.15, Math.min(0.6, to.height / from.height));
+        const fly = card.animate([
+          { transform: 'translate(-50%, -50%) rotate(-2deg)', opacity: 1 },
+          { transform: `translate(calc(-50% + ${dx * 0.35}px), calc(-50% + ${dy * 0.35 - 30}px)) rotate(-8deg) scale(${(1 + k) / 2})`, opacity: 1, offset: 0.45 },
+          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(0deg) scale(${k})`, opacity: 0.2 }
+        ], { duration: 620, easing: 'cubic-bezier(0.5, 0, 0.7, 0.4)', fill: 'forwards' });
+        fly.onfinish = () => { card.remove(); glow(); };
+      }, 1500);
+    },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     banner(title, sub, ms = 2600) {
       const b = el('div', 'hud-banner');
@@ -179,7 +208,16 @@ export function createHud(ui, input) {
         if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) continue;
         let e = labelEls.get(it.id);
         if (!e) { e = el('div', 'world-label ' + it.kind); labelLayer.appendChild(e); labelEls.set(it.id, e); }
-        if (e.textContent !== it.text) e.textContent = it.text;
+        if (it.kind === 'prompt') {
+          // 행동 안내: (PC 면) 키 모양 + 할 일
+          const want = (it.key || '') + '|' + it.text;
+          if (e.dataset.v !== want) {
+            e.dataset.v = want;
+            e.replaceChildren(...(it.key ? [el('kbd', '', ''), el('span', '', '')] : [el('span', '', '')]));
+            if (it.key) e.firstChild.textContent = it.key;
+            e.lastChild.textContent = it.text;
+          }
+        } else if (e.textContent !== it.text) e.textContent = it.text;
         e.style.left = ((v.x + 1) / 2) * w + 'px';
         e.style.top = ((1 - v.y) / 2) * h + 'px';
         seen.add(it.id);
