@@ -35,10 +35,13 @@ export function showTitle(ui, saved) {
     };
 
     if (saved) {
-      const first = button(`이어하기 · ${saved.profile.name} (${saved.license.grade}급)`, 'primary', () => leave('continue'));
+      const first = button('이어하기', 'primary', () => leave('continue'));
+      const who = document.createElement('small'); // 누구로 이어 하는지는 버튼 안 둘째 줄에 작게
+      who.textContent = `${saved.profile.name} ${saved.license.grade}급`;
+      first.append(who);
       let armed = false;
       const fresh = button('새로 시작하기', '', () => {
-        if (!armed) { armed = true; fresh.textContent = '저장이 지워져요. 한 번 더 누르면 새로 시작해요'; return; }
+        if (!armed) { armed = true; fresh.textContent = '한 번 더 누르면 저장을 지우고 새로 시작해요'; return; }
         leave('new');
       });
       first.focus();

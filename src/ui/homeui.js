@@ -135,7 +135,7 @@ export function createHomeUI(ui, h) {
     pickRow.hidden = !pickedItem;
     hint.textContent = note || (pickedItem ? `${FURNITURE[pickedItem.id].name}: 어떻게 할까요?`
       : selected ? `${FURNITURE[selected].name}을(를) 놓을 빈 칸을 눌러요`
-        : owned.length ? '끌어다 놓기 · 누르면 돌리기' : '마을 가구점에서 가구를 사 와요');
+        : owned.length ? '끌어서 옮기고 누르면 돌려요' : '마을 가구점에서 가구를 사 와요');
   }
 
   const setDecor = (on) => { decor = on; selected = null; picked = null; note = ''; h.showGrid(on); h.highlight(null); h.onDecor?.(on); render(); };
@@ -178,7 +178,7 @@ export function createHomeUI(ui, h) {
       const home = homeOf(h.getState()), there = home.placed.find((p) => p.cx === cell.cx && p.cz === cell.cz);
       note = '';
       if (selected) {
-        if (there) note = '거기엔 이미 가구가 있어요. 다른 칸을 눌러요';
+        if (there) note = '이미 가구가 있는 칸이에요';
         else {
           h.place(selected, cell.cx, cell.cz);
           if (spare(homeOf(h.getState()), selected) <= 0) selected = null;

@@ -30,7 +30,7 @@ const TABS = [
   ] },
   { id: 'hair', label: '머리', groups: [
     { key: 'hair', title: '헤어스타일', options: opt(HAIR_TYPES) },
-    { key: 'hairColor', title: '헤어·수염 색', options: sw(HAIR_COLORS, HAIR_COLOR_NAMES) },
+    { key: 'hairColor', title: '머리와 수염 색', options: sw(HAIR_COLORS, HAIR_COLOR_NAMES) },
     { key: 'accessory', title: '장식', options: opt(ACCESSORIES) }
   ] }
 ];

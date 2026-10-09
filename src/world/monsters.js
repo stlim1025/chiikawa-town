@@ -978,7 +978,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (const m of list) {
         if (m.dead || m.under || !m.mesh.root.visible || Math.hypot(m.x - focus.x, m.z - focus.z) > 16) continue;
         const y = m.mesh.height + (m.airY || 0) + (m.species === 'moth' ? Math.sin(performance.now() / 385 + m.phase) * 0.18 : 0);
-        if (m.dormant) { out.push({ id: 'mz' + m.id, x: m.x, y, z: m.z, text: `${m.M.name} · 쿨쿨…`, kind: 'mhp', pct: 1, boss: true }); continue; }
+        if (m.dormant) { out.push({ id: 'mz' + m.id, x: m.x, y, z: m.z, text: `${m.M.name} 쿨쿨…`, kind: 'mhp', pct: 1, boss: true }); continue; }
         if (m.alert > 0) out.push({ id: 'ma' + m.id, x: m.x, y: y + 0.45, z: m.z, text: '!', kind: 'alert' });
         if (m.engaged || m.hp < m.M.hp || m.exam) out.push({ id: 'mh' + m.id, x: m.x, y, z: m.z, text: m.M.name, kind: 'mhp', pct: Math.max(0, m.hp / m.M.hp), boss: !!m.M.boss });
       }

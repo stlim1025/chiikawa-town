@@ -60,7 +60,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     <div class="panel kitchen" role="dialog" aria-label="라멘 로우 주방"><div class="kx">
       <header class="kx-noren">
         <span class="kx-crest" aria-hidden="true">라</span>
-        <div class="kx-title"><b>라멘 로우</b><span>${exam ? '슈퍼 알바이터 실기 · 레시피 북 없이' : '오늘의 알바'}</span></div>
+        <div class="kx-title"><b>라멘 로우</b><span>${exam ? '실기 시험: 실수 없이 세 그릇' : '오늘의 알바'}</span></div>
         <div class="kx-stats"><span class="kx-timer"></span><span class="kx-earn"></span></div>
         <button class="kx-quit" type="button" data-k="quit">${exam ? '포기하기' : '그만하기'}</button>
       </header>
@@ -181,7 +181,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
   }
   function addIngredient(id) {
     if (INGREDIENTS[id].kind === 'noodle') {
-      if (pot) { say('면이 이미 있어요 · 초록일 때 건져요'); return; }
+      if (pot) { say('냄비에 면이 이미 있어요'); return; }
       pot = { type: id, start: now() };
       say('고리가 초록이 되면 건져요');
       sound?.play('click');
@@ -206,7 +206,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     const r = ringOf(pot, t);
     arc.setAttribute('stroke', r.color);
     arc.setAttribute('stroke-dashoffset', (RING * (1 - r.frac)).toFixed(1));
-    const label = st === 'boiling' ? `삶는 중 ${Math.ceil(r.left)}초` : { empty: '면을 넣어요', ready: '지금 건져요!', soggy: '퍼졌어요 · 눌러서 버리기' }[st];
+    const label = st === 'boiling' ? `삶는 중 ${Math.ceil(r.left)}초` : { empty: '면을 넣어요', ready: '지금 건져요!', soggy: '퍼진 면 버리기' }[st];
     if (potSay.textContent !== label) potSay.textContent = label;
   }
 
@@ -238,7 +238,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     });
     renderPot(t);
     // 시간
-    if (exam) timerEl.textContent = `손님 ${Math.min(served + 1, EXAM_COUNT)} / ${EXAM_COUNT} · 실수하면 불합격`;
+    if (exam) timerEl.textContent = `손님 ${Math.min(served + 1, EXAM_COUNT)} / ${EXAM_COUNT}`;
     else {
       const left = Math.max(0, Math.ceil(duration - t));
       timerEl.textContent = `남은 시간 ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -260,12 +260,12 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
       lines = completed ? ['레시피 북 없이 세 그릇을 실수 없이 냈어요.'] : [reason || '다음에 다시 도전해요.'];
     } else {
       title = completed ? '근무 끝! 수고했어요' : '일찍 마쳤어요';
-      lines = [`낸 그릇 ${served}${missed ? ` · 놓친 손님 ${missed}` : ''}${wrong ? ` · 잘못 낸 그릇 ${wrong}` : ''}`, `팁 포함 ${earned.toLocaleString('ko-KR')}원`,
+      lines = [`낸 그릇 ${served}`, missed ? `놓친 손님 ${missed}` : '', wrong ? `잘못 낸 그릇 ${wrong}` : '', `팁 포함 ${earned.toLocaleString('ko-KR')}원`,
         completed ? '기본급은 가게 주인이 따로 줘요.' : '끝까지 일하지 않아서 기본급은 없어요.'];
     }
     result.innerHTML = `<div class="k-result-card"><span class="k-result-bowl">${bowlSvg({ items: completed ? { shoyu: 1, thin: 1, chashu: 2, egg: 1, nori: 1, negi: 1 } : {} })}</span><b></b><div class="lines"></div><button class="btn primary" type="button" data-k="ok">확인</button></div>`;
     result.querySelector('b').textContent = title;
-    result.querySelector('.lines').append(...lines.map((l) => { const p = document.createElement('p'); p.textContent = l; return p; }));
+    result.querySelector('.lines').append(...lines.filter(Boolean).map((l) => { const p = document.createElement('p'); p.textContent = l; return p; }));
     result.querySelector('[data-k="ok"]').focus();
     result.querySelector('[data-k="ok"]').addEventListener('click', () => { wrap.remove(); onEnd?.(res); });
     sound?.play(completed ? 'done' : 'fail');

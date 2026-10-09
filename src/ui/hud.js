@@ -88,6 +88,26 @@ export function createHud(ui, input) {
   meter.hidden = true;
   meter.innerHTML = '<div class="lab">꾹 눌렀다가 초록에서 떼요</div><div class="track"><span class="zone"></span><span class="fill"></span><span class="needle"></span></div>';
   const toasts = el('div', 'hud-toasts');
+  /**
+   * 짧은 조각 여러 개를 한 줄에: 글 하나('초록에서 떼요') 또는 [글 | { icon, text, pill }] 목록.
+   * 조각마다 따로 떨어진 칸(그림이 있거나 pill 이면 동그란 알약)이라 '·' 로 이어 쓰지 않아도 구분된다.
+   * icon: 'coin' | 'energy' | SVG 문자열. 같은 내용이면 다시 그리지 않는다(매 프레임 불려도 가볍게).
+   */
+  function fillParts(target, parts) {
+    const list = typeof parts === 'string' ? [parts] : parts.filter(Boolean);
+    const key = list.map((p) => (typeof p === 'string' ? p : (p.icon ? '#' : '') + p.text)).join('|');
+    if (target.dataset.k === key) return;
+    target.dataset.k = key;
+    target.replaceChildren(...list.map((p) => {
+      const s = el('span', typeof p === 'string' ? 'part' : 'part pill');
+      if (typeof p === 'string') { s.textContent = p; return s; }
+      if (p.icon) s.innerHTML = p.icon === 'coin' ? COIN : p.icon === 'energy' ? HEART : p.icon;
+      const em = document.createElement('em');
+      em.textContent = p.text;
+      s.append(em);
+      return s;
+    }));
+  }
   // 놀이 시간(술래잡기): 위 가운데 노란 알약
   const timer = el('div', 'hud-timer');
   timer.hidden = true;
@@ -233,10 +253,10 @@ export function createHud(ui, input) {
     },
     /** 힘 게이지. zone = { from, to } (0..1) */
     /** 힘 게이지. label 을 주면 위 글씨를 바꾼다(풀 이름 · 몇 번째인지). */
+    /** label: 글 하나 또는 조각 목록(fillParts). */
     showMeter(power, zone, label = '꾹 눌렀다가 초록에서 떼요') {
       meter.hidden = false;
-      const lab = q(meter, '.lab');
-      if (lab.textContent !== label) lab.textContent = label;
+      fillParts(q(meter, '.lab'), label);
       const z = q(meter, '.zone');
       z.style.left = zone.from * 100 + '%';
       z.style.width = (zone.to - zone.from) * 100 + '%';
@@ -244,17 +264,17 @@ export function createHud(ui, input) {
       q(meter, '.needle').style.left = power * 100 + '%';
     },
     hideMeter() { meter.hidden = true; },
-    /** 놀이 시간 표시. null 이면 숨긴다. */
-    setTimer(text) {
-      timer.hidden = !text;
-      if (text && timer.textContent !== text) timer.textContent = text;
+    /** 놀이 · 시험 시간 표시: 글 하나 또는 조각 목록(fillParts). null 이면 숨긴다. */
+    setTimer(parts) {
+      timer.hidden = !parts;
+      if (parts) fillParts(timer, parts);
     },
     /**
      * 새 일감 · 시험 · 부탁을 받았을 때: 가운데에 쪽지 카드가 톡 떴다가 왼쪽 위로 날아가 꽂히고 그 칸이 반짝인다.
      * to: 'job'(일감 칸, 기본) | 'quest'(퀘스트 쪽지 — 쪽지는 카드가 꽂힐 때 나타나며 별이 튄다)
-     * { kicker: '새 일감!', title, sub, to }
+     * { kicker: '새 일감!', title, sub, to, chips: [{ icon: 'coin' | SVG, text }] } — 덧붙일 것(어디서 · 보수)은 sub 에 잇지 말고 chips 로.
      */
-    announce({ kicker, title, sub, to = 'job', id = null }) {
+    announce({ kicker, title, sub, to = 'job', id = null, chips = null }) {
       const toQuest = to === 'quest';
       if (toQuest && id) { incoming.set(id, (incoming.get(id) || 0) + 1); notes.get(id)?.el.classList.add('incoming'); }
       const card = el('div', 'task-card' + (toQuest ? ' quest' : ''));
@@ -263,6 +283,12 @@ export function createHud(ui, input) {
       card.querySelector('i').textContent = kicker;
       card.querySelector('b').textContent = title;
       card.querySelector('.task-txt span').textContent = sub || '';
+      if (!sub) card.querySelector('.task-txt span').remove();
+      if (chips && chips.length) {
+        const row = el('div', 'task-chips');
+        fillParts(row, chips.map((c) => ({ ...c, pill: true })));
+        card.querySelector('.task-txt').append(row);
+      }
       ui.appendChild(card);
       const glow = () => {
         if (toQuest) {

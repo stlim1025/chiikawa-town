@@ -92,9 +92,10 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
     ended = true;
     const passed = correct >= pass;
     s.step.textContent = '결과';
-    s.body.innerHTML = '<p class="exam-score"></p><p class="exam-tip"></p><div class="actions"><button class="btn primary" type="button">확인</button></div>';
-    s.body.querySelector('.exam-score').textContent = `${questions.length}문제 중 ${correct}문제 맞혔어요 · ${passed ? '필기 합격!' : '필기 불합격…'}`;
-    s.body.querySelector('.exam-tip').textContent = passed ? '이어서 실기 시험이에요.' : `${pass}문제 이상 맞혀야 해요. 공부하고 다시 와요.`;
+    s.body.innerHTML = '<p class="exam-score"></p><p class="exam-count"></p><p class="exam-tip"></p><div class="actions"><button class="btn primary" type="button">확인</button></div>';
+    s.body.querySelector('.exam-score').textContent = passed ? '필기 합격!' : '필기 불합격…';
+    s.body.querySelector('.exam-count').textContent = `${questions.length}문제 중 ${correct}문제 맞혔어요`;
+    s.body.querySelector('.exam-tip').textContent = passed ? '이어서 실기 시험이에요' : `${pass}문제 이상 맞혀야 합격이에요`;
     const ok = s.body.querySelector('button');
     ok.addEventListener('click', () => { stopClock(); s.close(); onDone?.(correct, passed); });
     ok.focus();
@@ -116,7 +117,7 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
  * 1단계 위스키를 아래 선 안까지 → 2단계 탄산수를 위 선 안까지(넘치면 안 된다). onDone(합격했는지).
  */
 export function openHighball(ui, { onDone, sound }) {
-  const s = sheet(ui, '하이볼 만들기 · 실기');
+  const s = sheet(ui, '하이볼 실기');
   s.step.textContent = '1단계';
   s.body.innerHTML = `
     <div class="hb">
@@ -128,7 +129,8 @@ export function openHighball(ui, { onDone, sound }) {
       <div class="hb-side">
         <p class="hb-say" aria-live="polite"></p>
         <button class="btn primary hb-pour" type="button">꾹 눌러서 붓기</button>
-        <p class="exam-tip">스페이스를 꾹 눌러도 돼요. 위스키 1 : 탄산수 3 이 딱 좋아요.</p>
+        <p class="exam-tip">위스키 1 : 탄산수 3 이 딱 좋아요</p>
+        <p class="exam-tip">스페이스를 꾹 눌러도 돼요</p>
       </div>
     </div>`;
   const sayEl = s.body.querySelector('.hb-say'), pourBtn = s.body.querySelector('.hb-pour');

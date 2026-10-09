@@ -71,13 +71,13 @@ export const QUESTS = {
   treasure: {
     title: '모몽가의 보물 상자', giver: 'momonga', needHearts: 1, ask: '뭐 원하는 거 있어?',
     offer: ['야, {name}. 나 반짝이는 게 필요해.', '숲 뿔벌레 뿔이랑, 밤에 나는 나방 날개 가루.', '…가져오면 당분간 네 지갑은 봐줄게. 흥!'],
-    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개 · 달빛 가루 1개를 모몽가에게', say: ['…흥, 생각보다 빨랐네.', '(보물 상자에 넣으며 몰래 흐뭇해한다)', '약속은 약속이야. 사흘은 봐줄게. 이 리본도 가져. 흥!'] }],
+    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개와 달빛 가루 1개를 모몽가에게', say: ['…흥, 생각보다 빨랐네.', '(보물 상자에 넣으며 몰래 흐뭇해한다)', '약속은 약속이야. 사흘은 봐줄게. 이 리본도 가져. 흥!'] }],
     reward: { bond: 3, accessory: 'ribbon', truce: 3 }
   },
   snack: {
     title: '쿠리만쥬의 새 안주', giver: 'kurimanju', needHearts: 2, ask: '오늘은 뭐 만들어?',
     offer: ['하아~ 이번에 새 안주를 만들어 보려고.', '말랑말랑한 젤리를 구우면… 겉은 바삭, 속은 쫀득하지 않을까?', '강가 슬라임이 떨어뜨리는 말랑 젤리 3개랑 빨간 열매 4개만 있으면 돼~', '하아~ 부탁해도 될까?'],
-    steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 3개 · 빨간 열매 4개를 쿠리만쥬에게', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
+    steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 3개와 빨간 열매 4개를 쿠리만쥬에게', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
     reward: { money: 500, bond: 3, items: { jellybake: 2 } }
   },
   cheers: {
@@ -260,13 +260,15 @@ export function pickTrack(state) {
 export const activeQuests = (state) => QUEST_ORDER.filter((id) => isActive(state, id));
 export const doneQuests = (state) => QUEST_ORDER.filter((id) => isDone(state, id));
 
-/** 지금 단계 목표 한 줄('잡초 2 / 3' 같은 진행 포함). 알리기만 남았으면 '○○에게 알리기'. */
+/**
+ * 대화 상자용 지금 단계 목표: 한 문장(text)과 괄호 속 안내(hint, 어디서 · 몇 급부터 같은 것).
+ * 몇 개 모았는지는 글에 붙이지 않고 shortGoal 의 parts 그림 꼬리표로 따로 보여 준다. 알리기만 남았으면 '○○에게 알리기'.
+ */
 export function goalText(state, id) {
   const step = stepOf(state, id);
-  if (!step) return '';
-  const p = progressOf(state, id);
-  if (stepReady(state, id) && step.type !== 'talk') return `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`;
-  return p ? `${step.goal} (지금 ${p.have} / ${p.need})` : step.goal;
+  if (!step) return { text: '', hint: '' };
+  if (stepReady(state, id) && step.type !== 'talk') return { text: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, hint: '' };
+  return { text: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), hint: (step.goal.match(/\(([^)]*)\)/) || [])[1] || '' };
 }
 
 /** 구역 이름(토벌 목표의 '어디서'). */
@@ -289,7 +291,7 @@ export function shortGoal(state, id) {
     return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '에서 ' : ''}${M.name} 토벌`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
   }
   if (step.type === 'pull') return { goal: `${WEED_KINDS[step.kind].name} 뽑기`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
-  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').replace(/\s*·\s*/g, ', ').trim(), n: p ? `${p.have} / ${p.need}` : '', parts: [] };
+  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n: p ? `${p.have} / ${p.need}` : '', parts: [] };
 }
 
 /** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */

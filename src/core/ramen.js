@@ -89,10 +89,10 @@ function distinct(list, n, key = (x) => x) {
   for (const x of list) { const k = key(x); if (!seen.has(k)) { seen.add(k); out.push(x); } if (out.length >= n) break; }
   return out;
 }
-/** 레시피 재료를 '간장 수프 · 굵은 면 · 숙주 ×2' 처럼(늘 수프 → 면 → 토핑 순서로, 보기 순서로 답이 드러나지 않게). */
+/** 레시피 재료를 '간장 수프, 굵은 면, 숙주 ×2' 처럼(늘 수프 → 면 → 토핑 순서로, 보기 순서로 답이 드러나지 않게). */
 const ING_ORDER = Object.keys(INGREDIENTS);
 const listOf = (items) => Object.entries(items).sort((a, b) => ING_ORDER.indexOf(a[0]) - ING_ORDER.indexOf(b[0]))
-  .map(([k, n]) => (n > 1 ? `${INGREDIENTS[k].name} ×${n}` : INGREDIENTS[k].name)).join(' · ');
+  .map(([k, n]) => (n > 1 ? `${INGREDIENTS[k].name} ×${n}` : INGREDIENTS[k].name)).join(', ');
 /** 받침에 맞는 조사. */
 const ga = (w) => { const c = w.charCodeAt(w.length - 1); return w + (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? '이' : '가'); };
 
@@ -147,20 +147,20 @@ export function ramenQuiz(n, random = Math.random) {
     () => {
       const cands = toppings.filter((t) => ids.filter((i) => RECIPES[i].items[t]).length >= 2);
       const t = pickOne(cands, random), right = ids.filter((i) => RECIPES[i].items[t]);
-      const rightTxt = right.map(rname).join(' · ');
+      const rightTxt = right.map(rname).join(', ');
       const wrong = [];
       for (let k = 0; k < 40 && wrong.length < 3; k++) {
         const pick = shuffle(ids, random).slice(0, right.length);
-        const txt = ids.filter((i) => pick.includes(i)).map(rname).join(' · ');
+        const txt = ids.filter((i) => pick.includes(i)).map(rname).join(', ');
         if (txt !== rightTxt && !wrong.includes(txt)) wrong.push(txt);
       }
-      return makeQ(`${ga(name(t))} 들어가는 라멘을 모두 고르면?`, ids.filter((i) => right.includes(i)).map(rname).join(' · '), wrong, random);
+      return makeQ(`${ga(name(t))} 들어가는 라멘을 모두 고르면?`, ids.filter((i) => right.includes(i)).map(rname).join(', '), wrong, random);
     },
     // 5) 굵은 면을 쓰는 라멘끼리
     () => {
-      const thick = ids.filter((i) => RECIPES[i].items.thick), right = thick.map(rname).join(' · ');
+      const thick = ids.filter((i) => RECIPES[i].items.thick), right = thick.map(rname).join(', ');
       const wrong = distinct(shuffle([['shoyu', 'miso'], ['miso', 'shio'], ['rou', 'tonkotsu'], ['shoyu', 'rou'], ['shio', 'tonkotsu']], random)
-        .map((p) => ids.filter((i) => p.includes(i)).map(rname).join(' · ')).filter((t) => t !== right), 3);
+        .map((p) => ids.filter((i) => p.includes(i)).map(rname).join(', ')).filter((t) => t !== right), 3);
       return makeQ('굵은 면을 쓰는 라멘끼리 묶은 것은?', right, wrong, random);
     },
     // 6) 삶는 시간

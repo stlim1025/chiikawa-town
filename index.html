@@ -104,7 +104,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-action:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--yellow-deep); }
 /* 풀 뽑기 힘 게이지 */
 .hud-meter { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(300px, 48vw); padding: 6px 16px 12px; text-align: center; border-radius: var(--r); background: var(--paper-soft); box-shadow: var(--lift); }
-.hud-meter .lab { font-size: 18px; margin-bottom: 6px; }
+.hud-meter .lab { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 8px; font-size: 18px; margin-bottom: 6px; }
+.hud-meter .lab .pill { background: var(--paper-2); }
 .hud-meter .track { position: relative; height: 20px; border-radius: 999px; background: var(--paper-3); }
 .hud-meter .zone { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; background: var(--mint-deep); }
 .hud-meter .fill { position: absolute; top: 2px; bottom: 2px; left: 2px; border-radius: 999px; background: rgba(255, 159, 180, 0.45); }
@@ -164,6 +165,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .panel .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 14px 12px; border-radius: 20px 22px 20px 18px; background: var(--paper-2); }
 .panel .row .t { font-size: 24px; line-height: 1.15; }
 .panel .row .d { margin-top: 2px; font-size: 19px; line-height: 1.25; color: var(--ink-soft); }
+.panel .row .d.chip-line { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; color: var(--ink); }
 .panel .row > div:first-child { flex: 1 1 auto; min-width: 0; }
 .panel .row > .btn { flex: 0 0 auto; }
 /* 버튼 대신 상태가 오면 작은 꼬리표로 */
@@ -240,7 +242,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .mapview-btn.mapview-me { width: auto; height: 34px; padding: 0 12px 2px; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); font-size: 16px; white-space: nowrap; }
 .mapview-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
 .mapview-btn.mapview-me:active { box-shadow: 0 1px 0 var(--yellow-deep); }
-.phone-foot { flex: 0 0 auto; margin: 8px 2px 0; text-align: center; font-size: 15px; line-height: 1.25; color: var(--ink-soft); }
+.phone-foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; margin: 8px 2px 0; text-align: center; font-size: 15px; line-height: 1.25; color: var(--ink-soft); }
 .phone-foot span, .phone-foot b { white-space: nowrap; }
 .phone-foot b { color: var(--ink); }
 /* 낮은 가로 화면(약 450px): 틀 · 아이콘을 줄여 지도와 앱이 들어가게 */
@@ -292,6 +294,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   background: var(--paper); border-radius: 46px 54px 50px 42px / 52px 46px 54px 48px; box-shadow: 0 5px 0 var(--shadow), 0 14px 26px rgba(84, 62, 38, 0.2); cursor: pointer; z-index: 5; animation: pop 0.25s cubic-bezier(0.2, 1.5, 0.4, 1); }
 .guide-name { position: absolute; left: 34px; top: -18px; margin: 0; padding: 2px 18px 4px; border-radius: 999px; background: #a9d4f2; color: #2f5577; font-size: 21px; rotate: -5deg; box-shadow: 0 3px 0 rgba(60, 110, 150, 0.35); }
 .guide-text { margin: 0; font-size: 24px; line-height: 1.4; }
+.guide-chips { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 10px 0 0; }
+.guide-chips[hidden] { display: none; }
+.g-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 12px 3px 5px; border-radius: 999px; background: #fff1c4; box-shadow: 0 2px 0 #e8c97a; color: #7a4f12; font-size: 19px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.g-chip svg { width: 28px; height: 28px; margin: -3px 0; flex: 0 0 auto; }
+.g-chip em { font-style: normal; }
+.g-chip.done { background: #d4f0d8; box-shadow: 0 2px 0 #9fd3a9; color: #2f6b3c; }
 .guide-next { position: absolute; left: 50%; bottom: 6px; width: 32px; height: 22px; margin-left: -16px;
   background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 22'%3E%3Cpath d='M4 4h24L16 19z' fill='%23f2a43a' stroke='%23f2a43a' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E");
   animation: next-bob 0.55s ease-in-out infinite alternate; }
@@ -313,6 +321,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* 술래잡기 남은 시간 */
 .hud-timer { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 4px 22px 7px; border-radius: 999px; background: var(--yellow); box-shadow: 0 4px 0 var(--yellow-deep);
   font-size: 24px; font-variant-numeric: tabular-nums; z-index: 2; animation: pop 0.25s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.hud-timer { display: flex; align-items: center; gap: 4px 12px; white-space: nowrap; }
+.hud-timer .pill { background: rgba(255, 255, 255, 0.55); }
+/* 시간 알약, 게이지 글, 새 일감 카드의 조각(fillParts): 그림 + 짧은 글 */
+.part.pill { display: inline-flex; align-items: center; gap: 3px; padding: 0 10px 1px 5px; border-radius: 999px; }
+.part.pill svg { width: 1.1em; height: 1.1em; flex: 0 0 auto; }
+.part.pill em { font-style: normal; }
+.task-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 18px; }
+.task-chips .pill { background: var(--paper-2); color: var(--ink); }
 #ui:has(.hud-timer:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 56px); }
 /* 할 일 쪽지(왼쪽 위 기둥 맨 아래) */
 .guide-goal { display: flex; align-items: center; gap: 8px; padding: 4px 14px 6px 6px; border-radius: 16px 18px 16px 14px; background: var(--butter); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
@@ -346,6 +362,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .title-sub { margin: 6px 0 16px; font-size: 19px; color: var(--ink-soft); }
 .title-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .title-actions .btn { min-width: min(260px, 100%); font-size: 23px; }
+.title-actions .btn small { display: block; margin-top: -2px; font-size: 16px; opacity: 0.8; }
 /* 휴대폰 가로처럼 낮은 화면: 카드를 작게(버튼은 가로로 나란히) 위쪽에 두어 아래 친구들을 가리지 않게 */
 @media (max-height: 420px) {
   .title-screen { padding-top: max(10px, 3vh); }
@@ -359,6 +376,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   .guide { min-height: 0; padding: 18px 28px 24px; }
   .guide-name { font-size: 18px; top: -15px; }
   .guide-text { font-size: 20px; line-height: 1.32; }
+  .guide-chips { margin-top: 6px; }
+  .g-chip { font-size: 16px; }
+  .g-chip svg { width: 22px; height: 22px; }
   .hud-money { font-size: 21px; }
   .hud-pill .ico { font-size: 22px; }
   .hud-job, .guide-goal { font-size: 17px; }
@@ -656,6 +676,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .exam-choice.wrong::after { content: " ✕"; color: #d0563e; }
 .exam-tip { margin: 10px 4px 0; font-size: 16px; color: var(--ink-soft); }
 .exam-score { margin: 12px 4px 4px; font-size: 26px; }
+.exam-count { margin: 0 4px; font-size: 19px; }
 .hb { display: flex; gap: 22px; align-items: center; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
 .hb-glass { position: relative; flex: 0 0 auto; width: 110px; height: 190px; overflow: hidden; border-radius: 10px 10px 22px 22px; background: rgba(214, 236, 245, 0.55); box-shadow: inset 0 0 0 4px #b9d6e3, 0 4px 0 var(--shadow); }
 .hb-glass .band { position: absolute; left: 0; right: 0; border-top: 2px dashed; border-bottom: 2px dashed; z-index: 2; }
@@ -852,11 +873,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .job-ico svg, .drop-ico svg, .mon-ico svg { width: 100%; height: 100%; display: block; }
 .panel .row.job.hunt { justify-content: flex-start; }
 .panel .row.job.hunt > div { flex: 1 1 auto; min-width: 0; }
-.panel .row.sell { justify-content: flex-start; background: var(--pink); }
-.panel .row.sell > div:not(.sell-icons) { flex: 1 1 auto; min-width: 0; }
-.sell-icons { display: flex; flex: 0 0 auto; }
-.sell-icons .job-ico { width: 40px; height: 40px; margin-left: -10px; }
-.sell-icons .job-ico:first-child { margin-left: 0; }
+.panel .row.sell { flex-direction: column; align-items: stretch; gap: 8px; background: var(--pink); }
+.sell-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sell-head .btn { flex: 0 0 auto; }
+.sell-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sell-chips .chip { font-size: 18px; padding: 3px 11px 4px 6px; }
+.sell-chips .chip .ico { width: 28px; height: 28px; margin: -4px 0; }
 .panel .row.mon-card { align-items: flex-start; justify-content: flex-start; gap: 10px; }
 .mon-ico { flex: 0 0 auto; width: 60px; height: 60px; border-radius: 16px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
 .mon-card.unseen .mon-ico { filter: saturate(0.35) opacity(0.75); }

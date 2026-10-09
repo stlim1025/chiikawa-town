@@ -2,6 +2,7 @@
  * 대화 상자(동물의 숲처럼 아래쪽, 기울어진 이름표와 통통 튀는 ▼)와, 지금 할 일을 알려 주는 쪽지.
  * 하치와레뿐 아니라 마을 친구 누구나 이 상자로 말한다. who = { kind, name, tag(이름표 색), ink(이름 글씨 색), hearts? }
  * say(lines, onDone, who): 한 줄씩 보여 주고 다 읽으면 onDone. 상자 아무 곳이나 누르거나 ▼ 버튼(엔터·스페이스)으로 넘긴다.
+ *   줄은 글 한 줄이거나 { text, chips: [{ icon(SVG), text, done? }] }: 글 밑에 물건 · 몬스터 그림 꼬리표를 단다(몇 개 모았는지 등).
  * ask(text, choices, onPick, who): 말 한 줄과 오른쪽 위 선택지 말풍선. 고르면 onPick(번호).
  * onDone · onPick 안에서 다시 say · ask 를 부르면 상자가 닫히지 않고 바로 이어진다.
  * opts.onLine(who): 새 줄이 나올 때마다(말소리용). opts.dock: 할 일 쪽지를 붙일 곳(HUD 왼쪽 위 기둥).
@@ -16,6 +17,7 @@ export function createGuide(ui, { onLine, dock } = {}) {
   box.innerHTML = `
     <p class="guide-name"><span class="nm"></span><span class="hearts" aria-hidden="true"></span><span class="note"></span></p>
     <p class="guide-text" aria-live="polite"></p>
+    <p class="guide-chips" hidden></p>
     <div class="guide-choices" role="menu" hidden></div>
     <button class="guide-next" type="button"></button>`;
   const goal = document.createElement('div');
@@ -24,7 +26,7 @@ export function createGuide(ui, { onLine, dock } = {}) {
   ui.append(box);
   (dock || ui).append(goal);
 
-  const text = box.querySelector('.guide-text'), next = box.querySelector('.guide-next'), choicesEl = box.querySelector('.guide-choices');
+  const text = box.querySelector('.guide-text'), chipsEl = box.querySelector('.guide-chips'), next = box.querySelector('.guide-next'), choicesEl = box.querySelector('.guide-choices');
   const nameEl = box.querySelector('.guide-name'), nmEl = nameEl.querySelector('.nm'), heartsEl = nameEl.querySelector('.hearts'), noteEl = nameEl.querySelector('.note');
   let lines = [], i = 0, done = null, who = HACHI, choosing = false, seq = 0;
   let sel = 0, pickFn = null; // 선택지: 지금 고른 줄, 골랐을 때 부를 함수
@@ -49,8 +51,23 @@ export function createGuide(ui, { onLine, dock } = {}) {
     cb?.(arg);
     if (seq === before) box.hidden = true;
   }
+  /** 글 밑 그림 꼬리표(없으면 숨긴다). */
+  function setChips(list = []) {
+    chipsEl.hidden = !list.length;
+    chipsEl.replaceChildren(...list.map((c) => {
+      const el = document.createElement('span');
+      el.className = 'g-chip' + (c.done ? ' done' : '');
+      if (c.icon) el.insertAdjacentHTML('beforeend', c.icon);
+      const t = document.createElement('em');
+      t.textContent = c.text;
+      el.append(t);
+      return el;
+    }));
+  }
   function show() {
-    text.textContent = lines[i];
+    const L = lines[i];
+    text.textContent = typeof L === 'string' ? L : L.text;
+    setChips(typeof L === 'string' ? [] : L.chips);
     next.setAttribute('aria-label', i === lines.length - 1 ? '알겠어!' : '다음');
     onLine?.(who);
   }
@@ -126,6 +143,7 @@ export function createGuide(ui, { onLine, dock } = {}) {
       pickFn = onPick;
       next.hidden = true;
       text.textContent = line;
+      setChips();
       onLine?.(who);
       choicesEl.replaceChildren(...choices.map((label, k) => {
         const b = document.createElement('button');
