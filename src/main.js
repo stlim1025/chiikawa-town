@@ -287,7 +287,7 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요! 마을 밖 몬스터 가까이에서 버튼을 눌러 휘둘러요`, 3600);
+      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요! 마을 밖 몬스터 가까이에서 버튼(PC 는 클릭 · 스페이스)으로 휘둘러요`, 3600);
     },
     holdWeapon(id) {
       commit(holdWeapon(state, id));
@@ -536,6 +536,16 @@ function boot() {
   // 등불 버튼: 가진 불만 끔 → 랜턴 → 손전등
   hud.onLight(() => { if (state && mode === 'play') { commit(nextLight(state)); } });
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoomBy(Math.exp(e.deltaY * 0.001)); }, { passive: false });
+  // PC: 마우스 왼쪽 클릭으로 무기를 휘두른다(누른 쪽 · 그 근처 몬스터를 노린다)
+  const clickRay = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), clickHit = new THREE.Vector3();
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || mode !== 'play' || !state || !weaponNow()) return;
+    if (panels.isOpen() || guide.open || sleeping || funBusy() || fainting || sticker || pulling || talking) return;
+    const p = ndc(e);
+    clickRay.setFromCamera(p, cam.camera);
+    const hit = clickRay.ray.intersectPlane(groundPlane, clickHit);
+    doSwing(hit ? { x: hit.x, z: hit.z } : null);
+  });
 
   /** 이번 작업으로 일감을 다 했으면 크게 알린다(가운데 도장 + 빰빠밤 + 만세). */
   function celebrateIfDone(before, after) {
@@ -1156,12 +1166,20 @@ function boot() {
   /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 사스마타). */
   const weaponNow = () => (state ? heldWeapon(state) || (hunterExam ? 'fork' : null) : null);
 
-  /** 휘두르기: 가까운 몬스터 쪽으로 몸을 돌리고(휴대폰에서도 맞히기 쉽게) 잠깐 뒤에 맞힌다. */
-  function doSwing() {
+  /**
+   * 휘두르기: 가까운 몬스터 쪽으로 몸을 돌리고(휴대폰에서도 맞히기 쉽게) 잠깐 뒤에 맞힌다.
+   * aim(마우스로 누른 땅 { x, z })이 있으면 그 근처 몬스터를, 없으면 누른 쪽을 바라보고 휘두른다.
+   */
+  function doSwing(aim) {
     const id = weaponNow();
     if (!id || swingCool > 0 || player.swinging || fainting) return;
     const W = WEAPONS[id], p = player.position;
-    const near = monsters.nearest(p.x, p.z, W.range + 1.2);
+    let near = monsters.nearest(p.x, p.z, W.range + 1.2);
+    if (aim) {
+      const m = monsters.nearest(aim.x, aim.z, 1.6);
+      near = m && Math.hypot(m.x - p.x, m.z - p.z) < W.range + 1.2 ? m : null;
+      if (!near && Math.hypot(aim.x - p.x, aim.z - p.z) > 0.2) player.face(aim.x, aim.z);
+    }
     if (near) player.face(near.x, near.z);
     player.swing(SWING_TIME, W.thrust ? 'thrust' : 'swing');
     swingCool = W.cool;
@@ -1727,7 +1745,7 @@ function boot() {
     cue.scale.setScalar(sp.r * pulse);
     cue.material.opacity = 0.65 + 0.25 * Math.sin(t * 6);
     if (sp.skipLabel) return null; // 친구가 말하는 중이면 말풍선을 가리지 않게
-    return { id: 'prompt:' + sp.id, x: sp.x, y: sp.y, z: sp.z, text: target.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' };
+    return { id: 'prompt:' + sp.id, x: sp.x, y: sp.y, z: sp.z, text: target.label, key: input.mode === 'desk' ? (target.type === 'attack' ? 'Space · 클릭' : 'Space') : null, kind: 'prompt' };
   }
 
   // ---------- 하늘 ----------
@@ -1865,6 +1883,8 @@ function boot() {
       weeds: () => weeds.list.map((w) => ({ kind: w.kind, area: w.area, x: w.x, z: w.z, stage: w.stage, hidden: !!w.hidden, visible: w.mesh.visible })),
       weedCounts: () => weeds.counts(),
       camPos: () => cam.camera.position.toArray(),
+      // 월드 점 → 화면 좌표(클릭 확인용)
+      project: (x, y, z) => { const v = new THREE.Vector3(x, y, z).project(cam.camera), r = canvas.getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height }; },
       pull: () => pulling && { kind: pulling.weed.kind, power: pulling.pull.power, from: pulling.pull.greenFrom, to: pulling.pull.greenTo, label: pulling.label },
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null })),

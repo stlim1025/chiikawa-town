@@ -23,7 +23,7 @@ import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, goalText, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
-import { FRIENDS } from '../core/friends.js';
+import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
 
 // 마을폰 앱 아이콘
@@ -41,11 +41,35 @@ const APP_ICON = {
   options: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M17.4 5h5.2l.9 4.1a11 11 0 0 1 3 1.7l4-1.3 2.6 4.5-3.1 2.8a11 11 0 0 1 0 3.4l3.1 2.8-2.6 4.5-4-1.3a11 11 0 0 1-3 1.7l-.9 4.1h-5.2l-.9-4.1a11 11 0 0 1-3-1.7l-4 1.3-2.6-4.5 3.1-2.8a11 11 0 0 1 0-3.4l-3.1-2.8 2.6-4.5 4 1.3a11 11 0 0 1 3-1.7z" fill="#fff"/><circle cx="20" cy="20" r="5" fill="#9aa3b5"/></svg>',
   // 퀘스트: 둘둘 만 두루마리
   quests: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="25" rx="3" fill="#fff"/><path d="M7 10a4 4 0 0 1 8 0v20a4 4 0 0 1-8 0zM25 30a4 4 0 0 0 8 0" fill="#fff" stroke="#e8a83e" stroke-width="2"/><path d="M15 15h11M15 20h11M15 25h7" stroke="#e8a83e" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  // 친구: 하트
+  friends: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33S7 24.6 7 15.4A6.6 6.6 0 0 1 20 12.6a6.6 6.6 0 0 1 13 2.8C33 24.6 20 33 20 33z" fill="#fff"/><path d="M13.5 16a3.4 3.4 0 0 1 3.8-2.6" fill="none" stroke="#f28fb0" stroke-width="2.4" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 /** 몬스터가 사는 곳(안내서 · 도감). */
 const REGION_TEXT = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '밤에만 · 마을 밖 어디든', boss: '바위산 깊은 곳' };
+
+// 안내서 · 검정소의 작은 그림 아이콘(글 대신 한눈에)
+const ICO = {
+  pin: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 18s-6-6.2-6-10a6 6 0 0 1 12 0c0 3.8-6 10-6 10z" fill="#e8746a"/><circle cx="10" cy="8" r="2.4" fill="#fff"/></svg>',
+  moon: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.5 2.5a7.5 7.5 0 1 0 4 12.5A6.5 6.5 0 0 1 13.5 2.5z" fill="#8a6fb0"/></svg>',
+  shield: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2l7 2.5v5c0 4.4-3 7.4-7 8.5-4-1.1-7-4.1-7-8.5v-5z" fill="#8fa7c4"/><path d="M10 4.5v11" stroke="#fff" stroke-width="1.6" opacity="0.7"/></svg>',
+  heart: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17.5S2.5 12.8 2.5 7.6A4 4 0 0 1 10 5.4a4 4 0 0 1 7.5 2.2c0 5.2-7.5 9.9-7.5 9.9z" fill="#f06a8f"/></svg>',
+  pen: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="2.5" width="11" height="15" rx="2" fill="#fff" stroke="#9b8466" stroke-width="1.5"/><path d="M6 7h5M6 10h5M6 13h3" stroke="#9b8466" stroke-width="1.4" stroke-linecap="round"/><path d="M15.5 6.5l2 2-6 6-2.6.6.6-2.6z" fill="#f2a65a"/></svg>',
+  clock: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10.5" r="7" fill="#fff" stroke="#7fb6e2" stroke-width="2"/><path d="M10 6.5v4.2l2.8 1.8" fill="none" stroke="#5a7fa8" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  hand: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 11V6.5a1.3 1.3 0 0 1 2.6 0V10V4.3a1.3 1.3 0 0 1 2.6 0V10V5a1.3 1.3 0 0 1 2.6 0v5.5l.6-1.6a1.3 1.3 0 0 1 2.4 1l-1.8 4.6A5 5 0 0 1 9.4 18H9a4 4 0 0 1-4-4z" fill="#ffd2a8" stroke="#c98a5a" stroke-width="1.1" stroke-linejoin="round"/></svg>',
+  book: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5q4-1.6 7.5.6Q13.5 3.4 17.5 5v11q-4-1.6-7.5.6Q6.5 14.4 2.5 16z" fill="#a9d7c0" stroke="#5e9f80" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 5.6v11" stroke="#5e9f80" stroke-width="1.3"/></svg>',
+  coin: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="#fcd95b" stroke="#d9a520" stroke-width="1.6"/><path d="M7 7.5l1.4 5 1.6-3.6 1.6 3.6 1.4-5" fill="none" stroke="#a57412" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  up: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#9fdcb7"/><path d="M10 14.5v-8M6.5 9.5 10 6l3.5 3.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  star: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l2.2 4.7 5.1.6-3.8 3.5 1 5.1L10 13.9l-4.5 2.5 1-5.1-3.8-3.5 5.1-.6z" fill="#ffc93c" stroke="#d9a520" stroke-width="1" stroke-linejoin="round"/></svg>',
+  todo: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="#c9b99a" stroke-width="2" stroke-dasharray="3.2 2.3"/></svg>',
+  check: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#6cc48f"/><path d="M6 10.3l2.7 2.7L14.2 7.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const ico = (name, cls = 'ico') => svgSpan(cls, ICO[name]);
+/** 아이콘 + 한 줄 글로 된 짧은 목록(긴 설명 대신). [[아이콘, 글], ...] */
+const facts = (list) => h('ul', { class: 'facts' }, list.filter(Boolean).map(([icon, ...text]) => h('li', {}, ico(icon), h('span', {}, ...text))));
+/** 동글한 알약 꼬리표: 아이콘 + 글. */
+const chip = (icon, cls, ...text) => h('span', { class: `chip${cls ? ' ' + cls : ''}` }, icon ? (typeof icon === 'string' && ICO[icon] ? ico(icon) : icon) : null, ...text);
 
 function h(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -88,15 +112,20 @@ function monsterCards(s, withCount) {
     const hidden = M.boss && !n && !(s.story && s.story.bossSeen);
     if (hidden) {
       return h('div', { class: 'row mon-card unseen' }, svgSpan('mon-ico mystery', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="34" r="20" fill="#e6d8b8"/><text x="32" y="44" text-anchor="middle" font-size="28" font-weight="700" fill="#b9a37a">?</text></svg>'),
-        h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'd' }, `${REGION_TEXT[M.region]}에 무언가 커다란 것이 산다는 소문…`)));
+        h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'mon-chips' }, chip('pin', 'region boss', REGION_TEXT[M.region]), chip(null, 'muted', '커다란 무언가가 산다는 소문…'))));
     }
-    const tough = M.hp >= 20 ? '아주 많이' : M.hp >= 6 ? '여러 번' : '몇 번';
+    // 단단함: 몇 대 맞아야 쓰러지는지 방패 다섯 칸으로
+    const tough = Math.min(5, Math.ceil(M.hp / 3));
+    const shields = h('span', { class: 'tough', 'aria-label': `단단함 ${tough} / 5` }, Array.from({ length: 5 }, (_, i) => h('i', { class: i < tough ? 'on' : '' })));
     return h('div', { class: `row mon-card${withCount && !n ? ' unseen' : ''}` }, svgSpan('mon-ico', monsterSvg(k)),
       h('div', {},
         h('div', { class: 't' }, M.name, withCount ? h('span', { class: 'weed-count' }, n ? `${n}마리 잡음` : '아직 못 잡았어요') : null),
-        h('div', { class: 'd' }, `${REGION_TEXT[M.region]} · ${tough} 때려야 쓰러짐 · 들이받으면 기운 −${M.dmg}`),
-        h('div', { class: 'd mon-drop' }, svgSpan('drop-ico', dropSvg(M.drop)), `전리품 ${D.name} · 노동 접수에서 ${won(D.price)}`),
-        h('div', { class: 'd weed-tip' }, M.note)));
+        h('div', { class: 'mon-chips' },
+          chip(M.night ? 'moon' : 'pin', `region ${M.region}`, REGION_TEXT[M.region]),
+          chip('shield', 'tough-chip', '단단함', shields),
+          chip('heart', 'hit', `공격 −${M.dmg}`),
+          chip(svgSpan('ico', dropSvg(M.drop)), 'drop', D.name, h('b', {}, won(D.price)))),
+        withCount ? h('div', { class: 'd weed-tip' }, M.note) : null));
   });
 }
 
@@ -114,7 +143,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'dev'];
+  const PHONE_APPS = ['settings', 'options', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'dev'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -181,6 +210,13 @@ export function createPanels(ui, handlers) {
     if (!silent) handlers.onClose?.();
   }
 
+  // Esc: 가운데 창을 닫는다(주머니에서 칸을 골라 둔 상태면 고르기만 푼다)
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !current) return;
+    e.preventDefault();
+    if (current.kind === 'bag' && current.sel) { current.sel = null; render(); return; }
+    close();
+  });
   const closeBtn = () => h('button', { class: 'btn', type: 'button', onClick: () => close() }, '닫기');
   const after = (fn) => () => { fn(); if (current) render(); };
   // 마을폰 앱 화면 위 막대: 홈으로(‹) · 앱 이름 · (지도면) 지금 있는 곳
@@ -259,41 +295,65 @@ export function createPanels(ui, handlers) {
     },
     exam(s) {
       const lic = s.license, mult = PAY_MULT[lic.grade];
-      const out = [head('검정소', s.money), h('p', { class: 'sub' }, '여러 자격을 따는 곳. 자격이 있으면 할 수 있는 일이 늘어나요.')];
-      let examRow;
+      const out = [head('검정소', s.money), h('p', { class: 'sub' }, '자격을 따면 할 수 있는 일이 늘어요')];
+      // 자격 한 장: 위 줄에 이름 · 상태(버튼), 아래에 아이콘 한 줄씩
+      const card = (art, title, side, lines) => h('div', { class: 'row lic' },
+        h('div', { class: 'lic-top' }, svgSpan('lic-ico', art), h('div', { class: 't' }, title), side),
+        facts(lines));
+      // 제초 검정
       const names = kindsOfGrade(lic.grade).map((k) => WEED_KINDS[k].name).join(' · ');
-      if (s.exam) examRow = h('div', { class: 'd' }, `시험 중 · 깔끔하게 연속 ${s.exam.need || 5}번 (지금 ${s.exam.streak}번)`);
-      else if (canTakeExam(lic)) examRow = h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.startExam) }, `${lic.grade - 1}급 승급 시험 보기`);
-      else if (lic.grade > 1) examRow = h('div', { class: 'd' }, `다음 시험까지 경험치 ${lic.xp} / ${XP_TO_EXAM[lic.grade]}`);
-      else examRow = h('div', { class: 'd' }, '최고 급수인 1급이에요!');
-      out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${lic.grade}급`), h('div', { class: 'd' }, lic.grade > 1 ? `보수 ${mult}배 · ${josa(names, '을/를')} 깔끔하게 연속 ${EXAM_STREAK[lic.grade]}번 뽑으면 승급` : `보수 ${mult}배 · 모든 풀을 뽑을 수 있어요`)), examRow));
-      // 술 자격 · 슈퍼 알바이터: 필기 + 실기
-      const INFO = {
-        liquor: `필기 ${LICENSES.liquor.questions}문제(${LICENSES.liquor.pass}개 이상, 문제당 ${LICENSES.liquor.seconds}초) + 하이볼 실기 · 쿠리만쥬에게 위스키 강의를 다 듣고 와요`,
-        arbeiter: `필기 ${LICENSES.arbeiter.questions}문제(${LICENSES.arbeiter.pass}개 이상, 문제당 ${LICENSES.arbeiter.seconds}초) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북과 삶는 시간까지 공부해요`,
-        hunter: `필기 ${LICENSES.hunter.questions}문제(${LICENSES.hunter.pass}개 이상, 문제당 ${LICENSES.hunter.seconds}초) + 실기: 허수아비 ${LICENSES.hunter.dummies}개를 ${LICENSES.hunter.practical}초 안에 쓰러뜨리기 · 아래 토벌 안내서로 공부해요(무기가 없으면 실기 때 사스마타를 빌려줘요)`
+      let side;
+      if (s.exam) side = h('span', { class: 'lic-badge going' }, `시험 중 · ${s.exam.streak} / ${s.exam.need || 5}번`);
+      else if (canTakeExam(lic)) side = h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.startExam) }, `${lic.grade - 1}급 시험 보기`);
+      else if (lic.grade <= 1) side = h('span', { class: 'lic-badge done' }, ico('star'), '최고 급수');
+      const xpNeed = XP_TO_EXAM[lic.grade];
+      out.push(card('<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V18" stroke="#5e9f80" stroke-width="3" stroke-linecap="round"/><path d="M20 20q-2-9-11-11q0 9 11 11zM20 17q2-9 11-10q-1 9-11 10z" fill="#8fd16a" stroke="#5e9f80" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 33h20" stroke="#c9a77c" stroke-width="3" stroke-linecap="round"/></svg>', `제초 검정 ${lic.grade}급`, side, [
+        ['coin', `보수 ${mult}배`],
+        lic.grade > 1 ? ['up', `승급: ${names}`, h('br'), `깔끔하게 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀을 뽑을 수 있어요'],
+        lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `다음 시험까지 경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
+      ]));
+      // 술 자격 · 슈퍼 알바이터 · 토벌: 필기 · 실기 · 준비를 한 줄씩
+      const LIC_ART = {
+        liquor: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 9h18l-2 22a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2"/><path d="M12.5 17h15l-1.3 13.5a2 2 0 0 1-2 1.8h-8.4a2 2 0 0 1-2-1.8z" fill="#f2b45a"/><circle cx="17" cy="23" r="1.4" fill="#fff"/><circle cx="22" cy="27" r="1.1" fill="#fff"/></svg>',
+        arbeiter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 19h28a14 13 0 0 1-28 0z" fill="#d9675b"/><path d="M9 19q5-4 11 0t11 0" fill="none" stroke="#fcd95b" stroke-width="2.6" stroke-linecap="round"/><path d="M24 6l-6 13M29 7l-7 12" stroke="#c9a77c" stroke-width="2.4" stroke-linecap="round"/></svg>',
+        hunter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 33 22 19" stroke="#f3a6b8" stroke-width="3.4" stroke-linecap="round"/><path d="M19 15a7 7 0 1 0 6 6" fill="none" stroke="#f3a6b8" stroke-width="3.2" stroke-linecap="round"/><path d="M27 13l4-1M28 18l4 1M22 11l1-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>'
+      };
+      const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].questions}문제 · ${L[id].pass}개 맞히면 합격`, h('br'), `문제당 ${L[id].seconds}초`];
+      const LINES = {
+        liquor: [test('liquor'), ['hand', '실기: 하이볼 만들기'], ['book', '준비: 쿠리만쥬의 위스키 강의']],
+        arbeiter: [test('arbeiter'), ['hand', '실기: 레시피 북 없이 손님 3명'], ['book', '준비: 라멘 로우 레시피 북 · 삶는 시간']],
+        hunter: [test('hunter'), ['hand', `실기: 허수아비 ${L.hunter.dummies}개를 ${L.hunter.practical}초 안에`], ['book', '준비: 토벌 안내서 · 무기는 빌려줘요']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
-        const L = LICENSES[id], own = hasLicense(s, id);
-        out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, L.name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요` : INFO[id])),
-          own ? h('div', { class: 'd' }, '합격 ✓')
-            : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L.fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L.fee ? `응시료 ${won(L.fee)} 부족` : `시험 보기 ${won(L.fee)}`)));
+        const own = hasLicense(s, id);
+        const side2 = own ? h('span', { class: 'lic-badge done' }, ico('check'), '합격')
+          : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L[id].fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L[id].fee ? `${won(L[id].fee)} 부족` : `시험 보기 ${won(L[id].fee)}`);
+        out.push(card(LIC_ART[id], L[id].name, side2, own ? [['check', `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요`]] : LINES[id]));
       }
-      out.push(h('div', { class: 'row' },
-        h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, '마을 밖 몬스터 · 전리품 · 지켜야 할 규칙 (토벌 자격증 필기 범위)')),
-        h('button', { class: 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기')));
+      out.push(h('div', { class: 'row lic guide-row' },
+        h('div', { class: 'lic-top' }, svgSpan('lic-ico', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 10q8-3 15 1q7-4 15-1v21q-8-3-15 1q-7-4-15-1z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2" stroke-linejoin="round"/><path d="M20 11v21" stroke="#c98a5a" stroke-width="2"/><circle cx="12.5" cy="19" r="4" fill="#8fd16a"/><path d="M10.5 18.5h1M14 18.5h1" stroke="#335" stroke-width="1.4" stroke-linecap="round"/><path d="M23 17h8M23 21h8M23 25h5" stroke="#c9a77c" stroke-width="2" stroke-linecap="round"/></svg>'),
+          h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, '몬스터 · 전리품 · 규칙')),
+          h('button', { class: 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기'))));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
     // 검정소 토벌 안내서: 몬스터 카드 + 규칙(필기 범위)
     guidebook(s) {
-      return [head('토벌 안내서'), h('p', { class: 'sub' }, '마을 밖에는 몬스터가 살아요. 잘 알고 나가요!'),
-        h('ul', { class: 'rules' },
-          h('li', {}, '몬스터에게 맞으면 기운이 줄어요. 기운이 0이 되면 기절해서 마을 입구로 옮겨지고 돈을 조금 잃어요.'),
-          h('li', {}, '몬스터는 마을 울타리 안으로 들어오지 못해요. 위험하면 마을로 도망쳐요!'),
-          h('li', {}, '몬스터가 몸을 움츠리면(붉게 깜빡) 곧 들이받아요. 그때 물러나면 피할 수 있어요.'),
-          h('li', {}, '무기는 도구점에서 사요. 잡으면 나오는 전리품은 노동 접수에서 팔아요.')),
+      // 지켜야 할 규칙: 그림 + 굵은 한 줄 + 짧은 한 줄짜리 카드 넷(필기 범위)
+      const RULE_ART = {
+        faint: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 41S7 30.5 7 18.6A9 9 0 0 1 24 13.4a9 9 0 0 1 17 5.2C41 30.5 24 41 24 41z" fill="#f06a8f"/><path d="M25 14l-4 8 6 3-5 9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        safe: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 24 24 12l14 12" fill="none" stroke="#5e9f80" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 22v13h20V22" fill="#a9e4cb"/><rect x="21" y="27" width="6" height="8" rx="2" fill="#5e9f80"/><path d="M4 37h40M8 31v9M16 31v9M32 31v9M40 31v9" stroke="#c9a77c" stroke-width="2.6" stroke-linecap="round"/></svg>',
+        dodge: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5l5 10 11-3-6 10 9 7-11 2 1 11-9-6-9 6 1-11-11-2 9-7-6-10 11 3z" fill="#ff9a8a"/><path d="M24 15v11" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="32" r="2.6" fill="#fff"/></svg>',
+        shop: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 18h32l-3 22H11z" fill="#fcd95b" stroke="#d9a520" stroke-width="2" stroke-linejoin="round"/><path d="M17 18v-3a7 7 0 0 1 14 0v3" fill="none" stroke="#d9a520" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="5" fill="#fff8dc"/><path d="M22 27.5l1 3 1-2 1 2 1-3" fill="none" stroke="#a57412" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      };
+      const rule = (art, title, sub) => h('div', { class: 'rule-card' }, svgSpan('rule-ico', RULE_ART[art]), h('div', {}, h('b', {}, title), h('span', {}, sub)));
+      return [head('토벌 안내서'), h('p', { class: 'sub' }, '알고 나가면 안전해요!'),
+        h('div', { class: 'rule-grid' },
+          rule('faint', '맞으면 기운이 줄어요', '0이면 기절 · 돈을 조금 잃어요'),
+          rule('safe', '마을 안은 안전해요', '울타리 안으로 못 들어와요'),
+          rule('dodge', '붉게 깜빡이면 피해요', '곧 들이받으려는 거예요'),
+          rule('shop', '무기는 도구점에서', '전리품은 노동 접수에서 팔아요')),
+        h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
     },
@@ -319,6 +379,37 @@ export function createPanels(ui, handlers) {
       if (active.length) { out.push(h('h3', { class: 'shop-sec' }, '하는 중')); active.forEach((id) => out.push(card(id, 'active'))); }
       if (done.length) { out.push(h('h3', { class: 'shop-sec' }, '끝낸 부탁')); done.forEach((id) => out.push(card(id, 'done'))); }
       if (!active.length && !done.length) out.push(h('p', { class: 'bag-empty' }, '아직 받은 부탁이 없어요. 머리 위에 ! 가 뜬 친구에게 말을 걸어 봐요!'));
+      return out;
+    },
+    // 마을폰 '친구' 앱: 마을 친구마다 하트 · 다음 하트까지 · 오늘 이야기했는지 · 놀았는지 · 선물 · 빌린 돈
+    friends(s) {
+      const today = s.clock.day, kinds = Object.keys(FRIENDS);
+      const total = kinds.reduce((a, k) => a + hearts(friendOf(s, k)), 0);
+      const HEART = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17.5S2.5 12.8 2.5 7.6A4 4 0 0 1 10 5.4a4 4 0 0 1 7.5 2.2c0 5.2-7.5 9.9-7.5 9.9z"/></svg>';
+      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
+        ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
+        : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
+      const out = [appBar('친구', `하트 ${total}개`), h('p', { class: 'sub' }, '하루에 한 번씩 이야기하고 놀면 하트가 늘어요')];
+      // 하트 많은 친구부터(같으면 원래 순서)
+      kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
+        const F = FRIENDS[k], hc = hearts(f), full = hc >= MAX_HEARTS, into = f.pts % HEART_PTS;
+        const talked = f.talk === today, played = f.play === today;
+        // 오늘 한 일(이야기 · 놀기)은 체크 / 빈 동그라미로, 선물 · 빌린 돈은 짧은 꼬리표로
+        const chips = [
+          h('span', { class: 'chip-lab' }, '오늘'),
+          chip(talked ? 'check' : 'todo', talked ? 'done' : 'todo', '이야기'),
+          F.play ? chip(played ? 'check' : 'todo', played ? 'done' : 'todo', '놀기') : null,
+          F.gift && FURNITURE[F.gift] ? (f.gift ? chip('check', 'done', `선물 ${FURNITURE[F.gift].name}`) : chip('heart', 'gift', `${GIFT_HEARTS}개면 ${FURNITURE[F.gift].name} 선물`)) : null,
+          f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null
+        ];
+        out.push(h('div', { class: `row f-card${f.pts ? '' : ' new'}` }, face(k),
+          h('div', {},
+            h('div', { class: 't' }, F.name,
+              h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
+            h('div', { class: 'f-next' }, full ? '하트가 가득해요!' : f.pts ? `다음 하트까지 ${HEART_PTS - into}` : '아직 친해지지 않았어요',
+              full ? null : h('span', { class: 'q-bar' }, h('i', { style: `width:${Math.round((into / HEART_PTS) * 100)}%` }))),
+            h('div', { class: 'mon-chips' }, chips))));
+      });
       return out;
     },
     // 마을폰 '몬스터 도감' 앱: 만난(잡은) 몬스터와 잡은 수
@@ -675,6 +766,7 @@ export function createPanels(ui, handlers) {
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
           app('quests', APP_ICON.quests, '퀘스트', () => show('quests')),
+          app('friends', APP_ICON.friends, '친구', () => show('friends')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
