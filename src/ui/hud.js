@@ -43,6 +43,26 @@ export function createHud(ui, input) {
   quest.hidden = true;
   quest.innerHTML = '<i></i><b></b><span></span>';
   dock.append(status, job, quest);
+  // 퀘스트 쪽지로 날아가는 카드 수(그동안 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
+  let questFly = 0;
+  const STAR = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0Q11.2 8.8 20 10Q11.2 11.2 10 20Q8.8 11.2 0 10Q8.8 8.8 10 0Z" fill="currentColor"/></svg>';
+  /** 퀘스트 쪽지가 톡 튀며 반짝: 빛이 한 번 쓸고 지나가고, 둘레에서 별이 튄다. */
+  function shineQuest() {
+    quest.classList.remove('got', 'shine');
+    void quest.offsetWidth;
+    quest.classList.add('shine');
+    quest.querySelectorAll('.q-star').forEach((e) => e.remove());
+    const spots = [[0, 0], [35, -8], [72, -6], [100, 10], [104, 70], [80, 108], [40, 106], [-4, 80], [-6, 30]];
+    spots.forEach(([x, y], i) => {
+      const st = document.createElement('i');
+      st.className = 'q-star';
+      const dx = (x - 50) * 0.5, dy = (y - 50) * 0.5;
+      st.style.cssText = `--x:${x}%;--y:${y}%;--dx:${dx.toFixed(0)}px;--dy:${dy.toFixed(0)}px;--t:${(i * 0.05).toFixed(2)}s;--c:${i % 3 === 1 ? '#ffffff' : i % 3 === 2 ? '#ffb3c7' : '#ffc93c'}`;
+      st.innerHTML = STAR;
+      quest.appendChild(st);
+    });
+    setTimeout(() => { quest.classList.remove('shine'); quest.querySelectorAll('.q-star').forEach((e) => e.remove()); }, 1600);
+  }
   const clock = el('div', 'hud-clock');
   clock.innerHTML = '<div class="hud-date"><span class="dl"></span><span class="sk"></span></div><div class="hud-time"><b class="hm"></b><small class="ap"></small></div>';
   // 가방(마을폰 왼쪽): 모아 둔 풀 · 열매 · 물건
@@ -153,6 +173,8 @@ export function createHud(ui, input) {
       quest.querySelector('i').textContent = q.story ? '이야기' : '부탁';
       quest.querySelector('b').textContent = q.title;
       quest.querySelector('span').textContent = q.goal;
+      // 새 부탁 쪽지가 날아오는 중이면 반짝임은 쪽지가 꽂힐 때(announce) 한다
+      if (questFly) return;
       quest.classList.remove('got'); void quest.offsetWidth; quest.classList.add('got');
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
@@ -179,11 +201,14 @@ export function createHud(ui, input) {
       if (text && timer.textContent !== text) timer.textContent = text;
     },
     /**
-     * 새 일감 · 시험을 받았을 때: 가운데에 쪽지 카드가 톡 떴다가 왼쪽 위 일감 칸으로 날아가 꽂히고, 일감 칸이 반짝인다.
-     * { kicker: '새 일감!', title, sub }
+     * 새 일감 · 시험 · 부탁을 받았을 때: 가운데에 쪽지 카드가 톡 떴다가 왼쪽 위로 날아가 꽂히고 그 칸이 반짝인다.
+     * to: 'job'(일감 칸, 기본) | 'quest'(퀘스트 쪽지 — 쪽지는 카드가 꽂힐 때 나타나며 별이 튄다)
+     * { kicker: '새 일감!', title, sub, to }
      */
-    announce({ kicker, title, sub }) {
-      const card = el('div', 'task-card');
+    announce({ kicker, title, sub, to = 'job' }) {
+      const toQuest = to === 'quest', target = toQuest ? quest : job;
+      if (toQuest) { questFly++; quest.classList.add('incoming'); }
+      const card = el('div', 'task-card' + (toQuest ? ' quest' : ''));
       card.setAttribute('role', 'status');
       card.innerHTML = `<span class="task-ico">${NOTE}</span><div class="task-txt"><i></i><b></b><span></span></div>`;
       card.querySelector('i').textContent = kicker;
@@ -191,6 +216,7 @@ export function createHud(ui, input) {
       card.querySelector('.task-txt span').textContent = sub || '';
       ui.appendChild(card);
       const glow = () => {
+        if (toQuest) { questFly = Math.max(0, questFly - 1); if (!questFly) quest.classList.remove('incoming'); shineQuest(); return; }
         job.classList.remove('got');
         void job.offsetWidth; // 반짝임 다시 시작
         job.classList.add('got');
@@ -198,9 +224,10 @@ export function createHud(ui, input) {
       };
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       setTimeout(() => {
-        if (still || !card.animate) { card.remove(); glow(); return; }
-        // 일감 칸 자리로 줄어들며 날아간다
-        const from = card.getBoundingClientRect(), to = job.getBoundingClientRect();
+        const to = target.getBoundingClientRect();
+        if (still || !card.animate || !to.width) { card.remove(); glow(); return; }
+        // 일감 칸(또는 퀘스트 쪽지) 자리로 줄어들며 날아간다
+        const from = card.getBoundingClientRect();
         const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
         const k = Math.max(0.15, Math.min(0.6, to.height / from.height));
         const fly = card.animate([

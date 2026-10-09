@@ -934,7 +934,7 @@ function boot() {
       commit(startQuest(state, id));
       sound.play('job');
       endTalk();
-      hud.announce({ kicker: Q.story ? '이야기 시작!' : '새 부탁!', title: Q.title, sub: goalText(state, id) });
+      hud.announce({ kicker: Q.story ? '이야기 시작!' : '새 부탁!', title: Q.title, sub: goalText(state, id), to: 'quest' });
     }));
   }
   /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
@@ -954,7 +954,7 @@ function boot() {
       if (!r.finished) {
         if (n) endTalk(); else unlockAfterScene();
         sound.play('job');
-        hud.announce({ kicker: Q.story ? '이야기가 이어져요' : '다음 할 일', title: Q.title, sub: goalText(state, id) });
+        hud.announce({ kicker: Q.story ? '이야기가 이어져요' : '다음 할 일', title: Q.title, sub: goalText(state, id), to: 'quest' });
         return;
       }
       if (n) endTalk(); else unlockAfterScene();
