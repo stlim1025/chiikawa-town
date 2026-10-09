@@ -274,7 +274,7 @@ export function createPanels(ui, handlers) {
       const INFO = {
         liquor: `필기 ${LICENSES.liquor.questions}문제(${LICENSES.liquor.pass}개 이상, 문제당 ${LICENSES.liquor.seconds}초) + 하이볼 실기 · 쿠리만쥬에게 위스키 강의를 다 듣고 와요`,
         arbeiter: `필기 ${LICENSES.arbeiter.questions}문제(${LICENSES.arbeiter.pass}개 이상, 문제당 ${LICENSES.arbeiter.seconds}초) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북과 삶는 시간까지 공부해요`,
-        hunter: `필기 ${LICENSES.hunter.questions}문제(${LICENSES.hunter.pass}개 이상, 문제당 ${LICENSES.hunter.seconds}초) + 실기: 허수아비 ${LICENSES.hunter.dummies}개를 ${LICENSES.hunter.practical}초 안에 쓰러뜨리기 · 아래 토벌 안내서로 공부해요(실기 때는 연습용 막대기를 빌려줘요)`
+        hunter: `필기 ${LICENSES.hunter.questions}문제(${LICENSES.hunter.pass}개 이상, 문제당 ${LICENSES.hunter.seconds}초) + 실기: 허수아비 ${LICENSES.hunter.dummies}개를 ${LICENSES.hunter.practical}초 안에 쓰러뜨리기 · 아래 토벌 안내서로 공부해요(무기가 없으면 실기 때 사스마타를 빌려줘요)`
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const L = LICENSES[id], own = hasLicense(s, id);

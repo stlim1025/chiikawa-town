@@ -1107,8 +1107,8 @@ function boot() {
   let swingCool = 0, iframe = 0, fainting = false, swingHit = null; // swingHit: { t: 맞히기까지 남은 초, id: 무기 }
   let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비, pass, fail }
   let growlCool = 0, warnCool = 0;
-  /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 막대기). */
-  const weaponNow = () => (state ? heldWeapon(state) || (hunterExam ? 'stick' : null) : null);
+  /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 사스마타). */
+  const weaponNow = () => (state ? heldWeapon(state) || (hunterExam ? 'fork' : null) : null);
 
   /** 휘두르기: 가까운 몬스터 쪽으로 몸을 돌리고(휴대폰에서도 맞히기 쉽게) 잠깐 뒤에 맞힌다. */
   function doSwing() {
@@ -1208,7 +1208,7 @@ function boot() {
     hunterExam = { t: L.practical, left: spots.length, pass, fail };
     player.face(ex.x, ex.z + 2);
     sound.play('job');
-    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: `${L.practical}초 안에! 가까이 가서 버튼(PC 는 스페이스)으로 휘둘러요${heldWeapon(state) ? '' : ' · 연습용 막대기를 빌려줬어요'}` });
+    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: `${L.practical}초 안에! 가까이 가서 버튼(PC 는 스페이스)으로 휘둘러요${heldWeapon(state) ? '' : ' · 사스마타를 빌려줬어요'}` });
   }
   function endHunterExam() {
     if (!hunterExam) return;

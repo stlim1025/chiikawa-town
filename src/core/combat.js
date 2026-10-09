@@ -9,14 +9,16 @@ import { josa } from './weeding.js';
  * state.weapon = { owned: [무기 id], held: 든 무기 id | null }, state.hunted = { 종류: 잡은 수 }
  */
 export const WEAPONS = {
+  // 예전 기본 무기(이제 가게에서는 팔지 않는다 · 가진 사람은 그대로 쓴다)
   stick: { name: '나무 막대기', price: 300, dmg: 1, range: 1.35, cool: 0.5, note: '가볍고 휘두르기 쉬운 막대기' },
   sword: { name: '목검', price: 1200, dmg: 2, range: 1.55, cool: 0.5, note: '단단한 나무로 깎은 연습용 검' },
-  // 사스마타: 긴 자루 끝에 U자 갈래(끝이 뾰족)가 달린 창. 휘두르지 않고 앞으로 찌른다 — 폭은 좁지만 멀리 닿고 밀어낸다
-  fork: { name: '사스마타', price: 1800, dmg: 2, range: 2.25, cool: 0.6, knock: 1.5, thrust: true, arc: 0.62, note: '긴 자루 끝에 U자 갈래가 달린 창. 멀리서 찔러 밀어낸다' },
+  // 사스마타(가장 기본 무기): 긴 분홍 자루 끝에 가시 돋친 둥근 U자 갈래. 휘두르지 않고 앞으로 찌른다 — 폭은 좁지만 멀리 닿고 밀어낸다
+  fork: { name: '사스마타', price: 200, dmg: 1, range: 2.15, cool: 0.5, knock: 1.5, thrust: true, arc: 0.66, note: '토벌의 기본! 가시 돋친 U자 갈래로 멀리서 찔러 밀어낸다' },
   hammer: { name: '돌 망치', price: 2600, dmg: 3, range: 1.45, cool: 0.8, knock: 1.6, note: '느리지만 묵직해서 멀리 밀어낸다' },
   star: { name: '반짝 검', price: 6000, dmg: 4, range: 1.7, cool: 0.45, note: '별빛처럼 반짝이는 날' }
 };
-export const WEAPON_ORDER = ['stick', 'sword', 'fork', 'hammer', 'star'];
+/** 도구점에서 파는 무기(사스마타가 가장 기본). 나무 막대기는 예전에 산 사람만 가지고 있다. */
+export const WEAPON_ORDER = ['fork', 'sword', 'hammer', 'star'];
 
 /**
  * 몬스터 종류. region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든). hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다).

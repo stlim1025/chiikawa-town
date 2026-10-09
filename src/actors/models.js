@@ -57,7 +57,9 @@ const CAP_OPEN = 1.9; // 앞쪽으로 트인 폭(라디안)
 const hairCaps = {
   cap: new THREE.SphereGeometry(1, 36, 20, Math.PI / 2 + CAP_OPEN / 2, Math.PI * 2 - CAP_OPEN, 0, Math.PI * 0.62),
   top: new THREE.SphereGeometry(1, 36, 14, 0, Math.PI * 2, 0, Math.PI * 0.32),
-  ring: new THREE.TorusGeometry(1, 0.14, 8, 28)
+  ring: new THREE.TorusGeometry(1, 0.14, 8, 28),
+  // 사스마타 갈래: 반지름 1 의 둥근 U(반원보다 조금 더 감겨 끝이 안쪽으로 휜다). 꼭대기(자루와 붙는 곳)가 −z, 열린 쪽이 +z, 바닥에 눕힌 모양
+  forkArc: new THREE.TorusGeometry(1, 0.13, 8, 30, Math.PI * 1.16).rotateZ(-Math.PI * 0.08).rotateX(-Math.PI / 2)
 };
 
 function geometryFor(m) {
@@ -70,6 +72,7 @@ function geometryFor(m) {
     case 'hairCap': return hairCaps.cap;
     case 'hairTop': return hairCaps.top;
     case 'ring': return hairCaps.ring;
+    case 'forkArc': return hairCaps.forkArc;
     case 'hachi': return patternGeometry('hachi', partPattern(NAVY, WHITE));
     case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.12 + Math.sin(x * 5) * 0.04 ? KURI_TOP : KURI_BOT));
     case 'rakko': return patternGeometry('rakko', (x, y, z) => (z > 0.5 && y < 0.3 ? RAKKO_FACE : RAKKO));
@@ -335,6 +338,26 @@ const PROP_PARTS = {
   ])
 };
 
+/** 사스마타 부품: 자루 · 마개 · 둥근 U 갈래(forkArc) · 가시(안쪽 셋 · 바깥쪽 둘씩). */
+function forkParts() {
+  const PINK = '#f3a6b8', SPIKE = '#fffaf6', R = 0.3, tip = 1.0, zc = tip + R;
+  const parts = [
+    { m: 'cylinder', c: '#ffffff', p: [0, 0, -0.25], r: [Math.PI / 2, 0, 0], s: [0.04, 0.07, 0.04] },
+    { m: 'box', c: PINK, p: [0, 0, 0.4], s: [0.042, 0.042, 1.24] },
+    { m: 'dot', c: PINK, p: [0, 0, tip], s: [0.045, 0.045, 0.045] },
+    { m: 'forkArc', c: PINK, p: [0, 0, zc], s: [R, R * 1.2, R] }
+  ];
+  // 고리 위의 점(각도 a: 0 이면 오른쪽 옆, π/2 면 자루 쪽 꼭대기)과 그 자리에서 고리 안쪽 · 바깥쪽을 향한 가시
+  const spike = (a, out, len) => {
+    const x = R * Math.cos(a), z = zc - R * Math.sin(a), d = out ? 1 : -1;
+    const dx = d * Math.cos(a), dz = -d * Math.sin(a);
+    parts.push({ m: 'cone', c: SPIKE, p: [x + dx * 0.025, 0, z + dz * 0.025], r: [Math.PI / 2, Math.atan2(dx, dz), 0], s: [0.034, len, 0.034] });
+  };
+  for (const a of [-0.04, 0.1, 0.24, 0.37]) { spike(a * Math.PI, false, 0.1); spike(Math.PI - a * Math.PI, false, 0.1); }
+  for (const a of [0.02, 0.18]) { spike(a * Math.PI, true, 0.085); spike(Math.PI - a * Math.PI, true, 0.085); }
+  return parts;
+}
+
 /** 내 무기(4단계): 꼬리표 'w-무기id'. HOLD.train 자세에서 손끝 기준(+z 앞)으로 적는다. */
 const WEAPON_PARTS = {
   'w-stick': [
@@ -352,18 +375,8 @@ const WEAPON_PARTS = {
     { m: 'box', c: '#9a948c', p: [0, 0, 0.47], s: [0.28, 0.17, 0.17] },
     { m: 'box', c: '#6f6a63', p: [0, 0, 0.47], s: [0.07, 0.185, 0.185] }
   ],
-  // 사스마타: 긴 나무 자루(손잡이 쪽 빨간 감개) 끝에 은빛 U자 갈래, 갈래 끝은 뾰족
-  'w-fork': [
-    { m: 'box', c: '#5a3b28', p: [0, 0, -0.2], s: [0.06, 0.06, 0.07] },
-    { m: 'box', c: '#e2574c', p: [0, 0, 0.04], s: [0.055, 0.055, 0.16] },
-    { m: 'box', c: '#b8834a', p: [0, 0, 0.45], s: [0.045, 0.045, 1.1] },
-    { m: 'box', c: '#8f969f', p: [0, 0, 0.99], s: [0.08, 0.06, 0.06] },
-    { m: 'box', c: '#c9ced6', p: [0, 0, 1.03], s: [0.34, 0.035, 0.045] },
-    { m: 'box', c: '#c9ced6', p: [-0.152, 0, 1.15], s: [0.036, 0.036, 0.24] },
-    { m: 'box', c: '#c9ced6', p: [0.152, 0, 1.15], s: [0.036, 0.036, 0.24] },
-    { m: 'cone', c: '#e6eaef', p: [-0.152, 0, 1.27], r: [Math.PI / 2, 0, 0], s: [0.032, 0.11, 0.032] },
-    { m: 'cone', c: '#e6eaef', p: [0.152, 0, 1.27], r: [Math.PI / 2, 0, 0], s: [0.032, 0.11, 0.032] }
-  ],
+  // 사스마타: 긴 분홍 자루(끝에 하얀 마개) 끝에 둥근 U자 갈래, 갈래 안쪽 · 바깥쪽에 하얀 가시
+  'w-fork': forkParts(),
   'w-star': [
     { m: 'box', c: '#3a4a7a', p: [0, 0, -0.01], s: [0.05, 0.05, 0.15] },
     { m: 'box', c: '#f2c94c', p: [0, 0, 0.075], s: [0.19, 0.045, 0.05] },

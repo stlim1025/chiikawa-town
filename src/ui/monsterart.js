@@ -83,10 +83,31 @@ const WEAPON = {
   stick: `<path d="M14 52L50 12" stroke="${L}" stroke-width="8" stroke-linecap="round"/><path d="M14 52L50 12" stroke="#b07a45" stroke-width="4.4" stroke-linecap="round"/><circle cx="34" cy="30" r="2" fill="#8a5a30"/><path d="M44 19q8-4 10 2q-6 4-10-2z" fill="#7cc25e" ${S}/>`,
   sword: `<path d="M24 40L52 10" stroke="${L}" stroke-width="9" stroke-linecap="round"/><path d="M24 40L52 10" stroke="#e3c08d" stroke-width="5.4" stroke-linecap="round"/><path d="M17 37l10 10" stroke="${L}" stroke-width="7" stroke-linecap="round"/><path d="M17 37l10 10" stroke="#3e2a1d" stroke-width="3.6" stroke-linecap="round"/><path d="M12 52l9-9" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M12 52l9-9" stroke="#5a3b28" stroke-width="4" stroke-linecap="round"/>`,
   hammer: `<path d="M14 54L40 22" stroke="${L}" stroke-width="8" stroke-linecap="round"/><path d="M14 54L40 22" stroke="#9a6a3c" stroke-width="4.4" stroke-linecap="round"/><path d="M30 14l10-10 20 20-10 10z" fill="#9a948c" ${S}/><path d="M38 12l14 14" stroke="#6f6a63" stroke-width="5"/><path d="M34 14l4-4" stroke="#c9c4bc" stroke-width="2.4" stroke-linecap="round"/>`,
-  // 사스마타: 비스듬한 긴 자루 + 빨간 감개 + 은빛 U자 갈래(끝이 뾰족)
-  fork: `<path d="M10 56L40 26" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M10 56L40 26" stroke="#b8834a" stroke-width="4" stroke-linecap="round"/><path d="M12.5 53.5l5-5" stroke="#e2574c" stroke-width="4.4" stroke-linecap="round"/>
-    <path d="M33 23l10 10M38 18q-6 6 0 12q6 6 12 0" fill="none" stroke="${L}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 23l10 10M38 18q-6 6 0 12q6 6 12 0" fill="none" stroke="#c9ced6" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M38 18l1.2-9 4.8 6.2zM50 30l9-1.2-6.2-4.8z" fill="#e6eaef" ${S} stroke-width="2"/>`,
+  // 사스마타: 비스듬한 분홍 자루(하얀 마개) + 끝이 안으로 휜 둥근 U 갈래 + 하얀 가시
+  fork: (() => {
+    // 갈래 고리: 가운데 (44, 20), 반지름 11, 자루 쪽(왼쪽 아래)에서 열린 쪽(오른쪽 위)으로
+    const cx = 43, cy = 21, R = 13, base = Math.PI * 0.75; // 자루가 붙는 방향(왼쪽 아래)
+    const pt = (a, r = R) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+    const a0 = base - Math.PI * 0.53, a1 = base + Math.PI * 0.53;
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    const arc = `M${x0.toFixed(1)} ${y0.toFixed(1)}A${R} ${R} 0 1 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    let spikes = '';
+    for (const k of [-0.48, -0.3, -0.13, 0.13, 0.3, 0.48]) {
+      const a = base + Math.PI * k;
+      const [px, py] = pt(a), [ix, iy] = pt(a, R - 6), [s1x, s1y] = pt(a - 0.13), [s2x, s2y] = pt(a + 0.13);
+      spikes += `<path d="M${s1x.toFixed(1)} ${s1y.toFixed(1)}L${ix.toFixed(1)} ${iy.toFixed(1)}L${s2x.toFixed(1)} ${s2y.toFixed(1)}Z" fill="#fffaf6" stroke="${L}" stroke-width="1.6" stroke-linejoin="round"/>`;
+      void px; void py;
+    }
+    for (const k of [-0.4, 0.4]) {
+      const a = base + Math.PI * k;
+      const [ox, oy] = pt(a, R + 5.5), [s1x, s1y] = pt(a - 0.13), [s2x, s2y] = pt(a + 0.13);
+      spikes += `<path d="M${s1x.toFixed(1)} ${s1y.toFixed(1)}L${ox.toFixed(1)} ${oy.toFixed(1)}L${s2x.toFixed(1)} ${s2y.toFixed(1)}Z" fill="#fffaf6" stroke="${L}" stroke-width="1.6" stroke-linejoin="round"/>`;
+    }
+    const [jx, jy] = pt(base);
+    return `<path d="M9 57L${jx.toFixed(1)} ${jy.toFixed(1)}" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M9 57L${jx.toFixed(1)} ${jy.toFixed(1)}" stroke="#f3a6b8" stroke-width="4" stroke-linecap="round"/>
+      <path d="M8 58l4-4" stroke="${L}" stroke-width="7.6" stroke-linecap="round"/><path d="M8 58l4-4" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/>
+      ${spikes}<path d="${arc}" fill="none" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="${arc}" fill="none" stroke="#f3a6b8" stroke-width="4" stroke-linecap="round"/>`;
+  })(),
   star: `<path d="M24 40L52 10" stroke="${L}" stroke-width="9" stroke-linecap="round"/><path d="M24 40L52 10" stroke="#cdeeff" stroke-width="5.4" stroke-linecap="round"/><path d="M30 33L48 14" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><path d="M16 36l12 12" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M16 36l12 12" stroke="#f2c94c" stroke-width="4" stroke-linecap="round"/><circle cx="22" cy="42" r="3" fill="#ff7a9a" ${S} stroke-width="1.6"/><path d="M12 52l8-8" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M12 52l8-8" stroke="#3a4a7a" stroke-width="4" stroke-linecap="round"/><path d="M54 4l1.6 3.4 3.4 1.6-3.4 1.6L54 14l-1.6-3.4L49 9l3.4-1.6z" fill="#ffd94a"/>`
 };
 export const weaponSvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow(16)}${WEAPON[id] || ''}</svg>`;
