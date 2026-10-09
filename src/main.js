@@ -1242,7 +1242,7 @@ function boot() {
   }
   function resolveSwing(id) {
     const W = WEAPONS[id], p = player.position;
-    const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg, knock: W.knock || 1, arc: W.arc });
+    const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg + trainBonus(), knock: W.knock || 1, arc: W.arc }); // 랏코와 수련한 날은 +1
     if (!hits.length) return;
     sound.play('hit');
     for (const { m, killed } of hits) {
@@ -1573,7 +1573,7 @@ function boot() {
   /** 오늘 이미 같이 놀았을 때. */
   const HOME_DONE = {
     chiikawa: ['…오늘은 벌써 푹 잤어…', '내일 또 같이 자자…!'], usagi: ['우라!', '(풀 다발이 이미 반듯하게 정리돼 있다)'],
-    kurimanju: ['하아~ 오늘은 배불러~', '내일 또 구워 먹자~'], rakko: ['…오늘 수련은 끝났다.', '무리하면 안 된다. 내일 다시 와라.'],
+    kurimanju: ['하아~ 오늘은 배불러~', '내일 또 구워 먹자~'], rakko: ['…오늘 수련은 끝났다.', '그 힘, 몬스터 앞에서 써 봐라. 내일 다시 와라.'],
     hachiware: ['오늘은 목이 좀 쉬었나 봐~', '내일 또 같이 부르자!'], momonga: ['또 거울?', '…흥, 마음대로 해.']
   };
   /** 간식(하루 한 번): 집주인마다 다른 맛 · 기운. */
@@ -1656,7 +1656,7 @@ function boot() {
         setTimeout(() => { if (mode === 'visit' && !talking) panels.openWardrobe(); }, first ? 900 : 100);
       });
     } else if (kind === 'rakko') {
-      sayAs(n, ['…좋다. 짚 인형을 쳐라.', '바늘이 초록에 들 때 눌러라. 다섯 번 중 세 번이다.'], () => { endTalk(); startDrill(n); });
+      sayAs(n, ['…좋다. 짚 인형을 쳐라.', '바늘이 초록에 들 때 눌러라. 다섯 번 중 세 번이다.', '해내면 오늘 하루 네 일격이 더 세진다.'], () => { endTalk(); startDrill(n); });
     } else if (kind === 'hachiware') {
       // 같이 노래: 짧은 노래 · 둘이 춤 · 기분이 좋아져 기운 +15
       sayAs(n, ['좋아~! 하나, 둘, 셋!', '라~ 라라~ ♪'], () => {
@@ -1675,9 +1675,11 @@ function boot() {
       });
     }
   }
-  // 랏코네 수련: 바늘이 오가는 게이지에서 초록일 때 누른다. 다섯 번 중 세 번 맞히면 성공(기운 −8)
+  // 랏코네 수련: 바늘이 오가는 게이지에서 초록일 때 누른다. 다섯 번 중 세 번 맞히면 성공 → 그날 하루 공격 +1(기운 −8, 실패하면 −4)
   let drill = null; // { n, t, tries, hits, cool }
-  const DRILL = { tries: 5, need: 3, zone: { from: 0.42, to: 0.6 }, speed: 2.6, cost: 8 };
+  const DRILL = { tries: 5, need: 3, zone: { from: 0.42, to: 0.6 }, speed: 2.6, cost: 8, failCost: 4, bonus: 1 };
+  /** 오늘 랏코와 수련에 성공했으면 무기 힘 +1(하루 동안). */
+  const trainBonus = () => (state && friendOf(state, 'rakko').home === state.clock.day ? DRILL.bonus : 0);
   function startDrill(n) {
     drill = { n, t: 0, tries: 0, hits: 0, cool: 0.35 };
     overlay = true;
@@ -1698,10 +1700,15 @@ function boot() {
   function finishDrill(ok) {
     const n = drill.n;
     endDrill();
-    commit({ ...state, stamina: Math.max(0, state.stamina - DRILL.cost) });
+    commit({ ...state, stamina: Math.max(0, state.stamina - (ok ? DRILL.cost : DRILL.failCost)) });
     beginTalk(n);
-    if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '네 손에 힘이 붙었군. (기운 −8)'], () => { rooms.hostPose('cheer', 1.2); reward(n, 'home'); });
-    else sayAs(n, ['…아직이군.', '숨을 고르고 다시 와라. (기운 −8)'], endTalk);
+    if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '오늘은 네 무기에 힘이 더 실릴 거다.', '몬스터 앞에서 써 봐라.'], () => {
+      rooms.hostPose('cheer', 1.2);
+      hud.banner('수련 성공!', `오늘 하루 공격 +${DRILL.bonus} · 기운 −${DRILL.cost}`, 2800);
+      sound.play('done');
+      reward(n, 'home');
+    });
+    else sayAs(n, ['…아직이군.', `숨을 고르고 다시 와라. (기운 −${DRILL.failCost})`], endTalk);
   }
 
   // ---------- 친구들의 기운 · 잠(3단계) ----------

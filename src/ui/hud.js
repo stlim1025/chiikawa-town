@@ -36,7 +36,8 @@ export function createHud(ui, input) {
   const status = el('div', 'hud-status');
   status.innerHTML = `<div class="hud-pill hud-money">${COIN}<span class="mv"></span></div>
     <div class="hud-grade"></div>
-    <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>`;
+    <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>
+    <div class="hud-buff" hidden>💪 공격 +1</div>`;
   const job = el('div', 'hud-job');
   job.hidden = true;
   job.innerHTML = '<b></b><span class="n"></span>';
@@ -117,6 +118,7 @@ export function createHud(ui, input) {
   let size = { w: ui.clientWidth, h: ui.clientHeight };
   window.addEventListener('resize', () => { size = { w: ui.clientWidth, h: ui.clientHeight }; });
   const gradeEl = q(status, '.hud-grade'), moneyEl = q(status, '.mv'), staminaEl = q(status, '.sv');
+  const buffEl = q(status, '.hud-buff');
   const bar = q(status, '.hud-bar');
   const dateEl = q(clock, '.dl'), skyEl = q(clock, '.sk'), hmEl = q(clock, '.hm'), apEl = q(clock, '.ap');
 
@@ -141,6 +143,9 @@ export function createHud(ui, input) {
     /** 상태와 일감, 시계를 그린다. */
     render(state) {
       setText('grade', gradeEl, `제초 ${state.license.grade}급`);
+      // 랏코와 수련한 날: 공격 +1 꼬리표
+      const trained = !!(state.friends && state.friends.rakko && state.friends.rakko.home === state.clock.day);
+      if (shown.buff !== trained) { shown.buff = trained; buffEl.hidden = !trained; }
       setText('money', moneyEl, state.money.toLocaleString('ko-KR') + '원');
       if (shown.stamina !== state.stamina) {
         shown.stamina = state.stamina;
