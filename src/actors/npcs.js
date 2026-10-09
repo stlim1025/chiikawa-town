@@ -71,7 +71,7 @@ export function createNpcs(scene, village, weeds, berries) {
     return {
       kind, chibi, fixed, home: { ...p }, x: p.x, z: p.z, yaw: Math.random() * 6, phase: Math.random() * 6,
       state: 'idle', timer: 0.5 + Math.random() * 2, tx: p.x, tz: p.z, talk: 0, bubble: null,
-      speed: chibi.height > 1.8 ? 0.8 : 0.95
+      speed: chibi.height > 1.8 ? 0.8 : fixed ? 0.95 : 1.15 // 마을 친구들은 할 일이 많아 조금 더 빨리 걷는다
     };
   });
 
@@ -102,7 +102,9 @@ export function createNpcs(scene, village, weeds, berries) {
     const d = Math.hypot(lastPlayer.x - x, lastPlayer.z - z);
     return d < n.chibi.radius + 0.35 && d < Math.hypot(lastPlayer.x - n.x, lastPlayer.z - n.z);
   };
-  const say = (n, text) => { n.bubble = { text, t: 2.4 }; };
+  /** 말풍선이 떠 있는 시간: 긴 말은 조금 더 오래(읽을 수 있게). */
+  const lineTime = (text) => Math.max(2.4, Math.min(4.2, 1.3 + String(text).length * 0.09));
+  const say = (n, text) => { n.bubble = { text, t: lineTime(text) }; };
 
   /**
    * 게시판 · 작업대 · 라멘 가게처럼 여럿이 쓰는 곳의 자리 고르기: 다른 친구(와 나)가 서 있거나 가는 중인 자리는 피하고,
@@ -254,11 +256,16 @@ export function createNpcs(scene, village, weeds, berries) {
    * 일정(plan) 한 단계를 진행한다. 단계: walk { x, z } 또는 { slots: [{ x, z }…], near } (갈 때 빈자리를 고른다)
    * · weeds { kind, left, onPull } · berries { left, onPick } · act { anim, time, say, face: { x, z } } · say { text }
    * · wait { time } · call { fn } · hunt { find(x, z, skip), hit(m), left, onKill(m) } (마을 밖 몬스터 토벌). 다 하면 다음 단계로.
+   * · walk 에 run: true 면 뛰어간다. act 에 quick: true 면 끝나자마자 다음 단계(대화처럼 박자를 맞출 때).
+   * · sync { group: { need, here: Set } } 같은 group 의 친구가 다 모일 때까지 기다린다(오래 안 오면 모두 그만둔다).
+   * · approach { near, max } 내 캐릭터에게 다가간다(움직여도 따라간다).
    */
   function runPlan(n) {
     const step = n.plan[0];
     const next = (timer = 0.2) => { n.plan.shift(); n.timer = timer; };
+    if (step.do !== 'walk') n.dash = false;
     if (step.do === 'walk') {
+      n.dash = !!step.run;
       if (step.slots && step.x == null) { const p = pickSlot(n, step.slots); step.x = p.x; step.z = p.z; }
       const d = Math.hypot(step.x - n.x, step.z - n.z);
       if (d < (step.near ?? 0.9)) { next(); return; }
@@ -303,7 +310,7 @@ export function createNpcs(scene, village, weeds, berries) {
       n.tx = p.x; n.tz = p.z; n.state = 'walk';
     } else if (step.do === 'hunt') {
       // 토벌: 가장 가까운 그 몬스터에게 걸어가서(마을 밖까지) 닿으면 휘두른다. 못 찾거나 못 가면 기다리다 그만둔다
-      if (step.left <= 0) { next(); return; }
+      if (step.left <= 0 || (step.giveUp && step.giveUp())) { next(); return; } // 다 잡았거나 너무 오래 헤맸다
       step.skip = step.skip || new Set();
       let m = step.target;
       if (!m || m.dead) m = step.target = step.find(n.x, n.z, step.skip);
@@ -315,6 +322,7 @@ export function createNpcs(scene, village, weeds, berries) {
         clearRoute(n);
         n.tx = m.x + ((n.x - m.x) / d) * (reach - 0.3);
         n.tz = m.z + ((n.z - m.z) / d) * (reach - 0.3);
+        n.dash = d > 5; // 마을 밖 먼 길은 뛰어간다
         n.state = 'walk';
         return;
       }
@@ -324,9 +332,29 @@ export function createNpcs(scene, village, weeds, berries) {
       n.state = 'work';
       n.workT = 0;
       if (step.hit(m)) { step.left--; step.target = null; step.onKill?.(m); }
+    } else if (step.do === 'sync') {
+      const g = step.group;
+      if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
+      if (g.cancel) { n.plan = null; n.timer = 1; return; }
+      g.here.add(n);
+      if (g.here.size >= g.need) { next(0.05); return; }
+      step.waited = (step.waited || 0) + 0.3;
+      n.timer = 0.3;
+      if (step.waited > (step.max || 16)) { g.cancel = true; n.plan = null; n.timer = 1; } // 짝이 안 온다: 모두 그만
+    } else if (step.do === 'approach') {
+      const d = Math.hypot(lastPlayer.x - n.x, lastPlayer.z - n.z);
+      if (d < (step.near || 1.6)) { n.yaw = Math.atan2(lastPlayer.x - n.x, lastPlayer.z - n.z); next(0.05); return; }
+      step.tries = (step.tries || 0) + 1;
+      if (step.tries > (step.max || 14) || d > 30) { n.plan = null; n.timer = 1; return; } // 못 따라잡았다
+      clearRoute(n);
+      const k = (d - (step.near || 1.6) * 0.7) / d;
+      n.tx = n.x + (lastPlayer.x - n.x) * k;
+      n.tz = n.z + (lastPlayer.z - n.z) * k;
+      n.dash = !!step.run;
+      n.state = 'walk';
     } else if (step.do === 'act') {
       if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
-      n.task = { type: 'act', anim: step.anim, time: step.time };
+      n.task = { type: 'act', anim: step.anim, time: step.time, quick: !!step.quick };
       n.state = 'work';
       n.workT = 0;
       if (step.say) say(n, step.say);
@@ -378,11 +406,13 @@ export function createNpcs(scene, village, weeds, berries) {
     /** 종류로 친구를 찾는다. */
     byKind(kind) { return list.find((n) => n.kind === kind); },
     /** 일정을 맡긴다(마을 살림: 일감 · 밥). 다른 일정이 있으면 덮어쓴다. */
-    plan(n, steps) { if (n.task) endTask(n); n.plan = steps; n.timer = 0.2; },
+    plan(n, steps) { if (n.task) endTask(n); n.plan = steps; n.timer = 0.2; n.dash = false; },
     /** 일정이 있거나 따라다니기 · 앞장서기 · 도망 · 대화 중이라 다른 걸 시킬 수 없는지. */
     busy(n) { return !!((n.plan && n.plan.length) || n.follow || n.lead || n.flee || n.talk > 0 || n.emote); },
     /** 말풍선 한 줄. */
     say(n, text) { say(n, text); },
+    /** 그 말이 말풍선에 떠 있는 시간(대화 박자 맞추기). */
+    lineTime,
     /** 말 걸었을 때의 첫마디(말풍선 없이 대사만). */
     greeting(kind) { return pick(TALK[kind] || ['…']); },
     /** 대화 상자가 열려 있는 동안 하던 일을 멈추고 나를 바라보며 서 있게 한다(on=false 면 다시 자유롭게). */
@@ -530,7 +560,7 @@ export function createNpcs(scene, village, weeds, berries) {
             const goal = path && path.length ? path[0] : { x: n.tx, z: n.tz };
             const want = Math.atan2(goal.x - n.x, goal.z - n.z);
             // 따라올 때는 내 걸음에 맞춰 빠르게, 앞장설 때는 내가 따라오기 좋게, 도망갈 때는 달린다
-            const speed = n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.speed, step = speed * dt;
+            const speed = n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.dash ? 2.6 : n.speed, step = speed * dt;
             // 늦게 도는 몸 방향이 아니라 가려는 쪽으로 걷고, 막히면 옆으로 틀어 비켜 간다
             let heading = want, moved = false;
             for (const off of STEER) {
@@ -545,6 +575,13 @@ export function createNpcs(scene, village, weeds, berries) {
             if (moved) { n.phase += dt * speed * 9; mode = 'walk'; } // 정말 움직였을 때만 걷는 몸짓(막히면 제자리 달리기 없이 서 있는다)
             checkStuck(n, dt);
           }
+        }
+        // 한가하게 서 있는 친구는 내가 가까이 지나가면 고개를 돌려 바라본다
+        if (n.state === 'idle' && !n.task && !n.emote && n.talk <= 0 && !n.flee && pd0 < 2.8 && !(n.plan && n.plan[0] && n.plan[0].do === 'sync')) {
+          let dd = Math.atan2(player.x - n.x, player.z - n.z) - n.yaw;
+          while (dd > Math.PI) dd -= Math.PI * 2;
+          while (dd < -Math.PI) dd += Math.PI * 2;
+          n.yaw += Math.max(-dt * 4, Math.min(dt * 4, dd));
         }
         // 내 캐릭터와 겹치지 않게
         const px = n.x - player.x, pz = n.z - player.z, pd = Math.hypot(px, pz), min = n.chibi.radius + 0.35;

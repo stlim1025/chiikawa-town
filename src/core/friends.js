@@ -82,7 +82,7 @@ export const CHATS = {
 export const HEART_PTS = 3;
 export const MAX_HEARTS = 5;
 export const GIFT_HEARTS = 3;
-const GAIN = { talk: 1, play: 2, drink: 2, home: 2, hunt: 2 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …), hunt: 같이 토벌해서 몬스터를 잡았다
+const GAIN = { talk: 1, play: 2, drink: 2, home: 2, hunt: 2, watch: 1 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …), hunt: 같이 토벌해서 몬스터를 잡았다, watch: 하치와레 공연을 끝까지 들었다
 
 /** 그 친구와의 친밀도(처음 보면 0). */
 export function friendOf(state, kind) {
@@ -168,5 +168,5 @@ export function isValidFriends(fr) {
   if (!fr || typeof fr !== 'object' || Array.isArray(fr)) return false;
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   return Object.entries(fr).every(([kind, f]) => FRIENDS[kind] && f && num(f.pts) && f.pts >= 0 && num(f.talk) && num(f.play) && typeof f.gift === 'boolean'
-    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt'].every((k) => f[k] === undefined || num(f[k])));
+    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt', 'watch', 'giftDay'].every((k) => f[k] === undefined || num(f[k])));
 }

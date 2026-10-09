@@ -500,6 +500,9 @@ export function createHud(ui, input) {
             e.querySelector('u').style.width = Math.round(it.pct * 100) + '%';
             e.classList.toggle('low', it.pct <= 0.34);
           }
+        } else if (it.kind === 'doing') {
+          // 친구가 하는 일: 머리 위 작은 동그라미 아이콘
+          if (e.dataset.v !== it.icon) { e.dataset.v = it.icon; e.innerHTML = it.svg; }
         } else if (e.textContent !== it.text) e.textContent = it.text;
         e.style.left = ((v.x + 1) / 2) * w + 'px';
         e.style.top = ((1 - v.y) / 2) * h + 'px';

@@ -306,7 +306,7 @@ export function createPanels(ui, handlers) {
     current.status.date.textContent = handlers.dayLabel(s.clock.day);
     // 지도 화면: 지도 칸이 화면에 붙은 뒤에 만든다(칸 크기를 재야 해서)
     const host = p.querySelector('.mapview');
-    if (host) current.view = createMapView(host, { explored: s.explored || '', player: handlers.playerPos(), labels: handlers.mapLabels() });
+    if (host) current.view = createMapView(host, { explored: s.explored || '', player: handlers.playerPos(), labels: handlers.mapLabels(), friends: handlers.mapFriends ? handlers.mapFriends() : [] });
   }
 
   const BUILD = {
@@ -471,7 +471,7 @@ export function createPanels(ui, handlers) {
     // 마을폰 '퀘스트' 앱: 하는 중인 부탁(화면에 띄울 것 고르기) · 끝낸 부탁
     quests(s) {
       const track = pickTrack(s);
-      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
+      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko'].includes(kind)
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
       const card = (id, kind) => {
@@ -499,12 +499,22 @@ export function createPanels(ui, handlers) {
     // 마을폰 '친구' 앱: 마을 친구마다 하트 · 다음 하트까지 · 오늘 이야기했는지 · 놀았는지 · 선물 · 빌린 돈
     friends(s) {
       const today = s.clock.day, kinds = Object.keys(FRIENDS);
+      // 마을 살림(main): 친구마다 지금 하는 일 · 오늘 마을 소식
+      const live = handlers.villageLive ? handlers.villageLive() : { doing: {}, news: [] };
+      const hourLabel = (hr) => { const hh = Math.floor(hr); return `${hh < 12 ? '오전' : '오후'} ${((hh + 11) % 12) + 1}시`; };
       const total = kinds.reduce((a, k) => a + hearts(friendOf(s, k)), 0);
       const HEART = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17.5S2.5 12.8 2.5 7.6A4 4 0 0 1 10 5.4a4 4 0 0 1 7.5 2.2c0 5.2-7.5 9.9-7.5 9.9z"/></svg>';
-      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
+      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko'].includes(kind)
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
       const out = [appBar('친구', `하트 ${total}개`), h('p', { class: 'sub' }, '하루 한 번씩 하트가 늘어요')];
+      if (live.news.length) {
+        out.push(h('h3', { class: 'shop-sec' }, '오늘 마을 소식'));
+        out.push(h('ul', { class: 'news-list' }, live.news.map((e) => h('li', {},
+          h('span', { class: 'n-faces' }, e.faces.map((f) => svgSpan('n-face', f))),
+          h('span', { class: 'n-text' }, e.text), h('span', { class: 'n-time' }, hourLabel(e.hour))))));
+        out.push(h('h3', { class: 'shop-sec' }, '친구들'));
+      }
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
         const F = FRIENDS[k], hc = hearts(f), full = hc >= MAX_HEARTS, into = f.pts % HEART_PTS;
@@ -523,6 +533,7 @@ export function createPanels(ui, handlers) {
           h('div', {},
             h('div', { class: 't' }, F.name,
               h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
+            live.doing[k] ? h('div', { class: 'f-now' }, live.doing[k].svg ? svgSpan('f-now-ico', live.doing[k].svg) : null, live.doing[k].text) : null,
             h('div', { class: 'f-next' }, full ? '하트가 가득해요!' : f.pts ? `다음 하트까지 ${HEART_PTS - into}` : '아직 친해지지 않았어요',
               full ? null : h('span', { class: 'q-bar' }, h('i', { style: `width:${Math.round((into / HEART_PTS) * 100)}%` }))),
             h('div', { class: 'mon-chips' }, chips))));

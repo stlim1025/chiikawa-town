@@ -77,7 +77,7 @@ function buildFog(explored) {
  * → { recenter(), zoomBy(factor), destroy() }
  */
 export function createMapView(host, opts = {}) {
-  const { explored = '', labels = [] } = opts;
+  const { explored = '', labels = [], friends = [] } = opts;
   const p = opts.player;
   const player = p && Number.isFinite(p.x) && Number.isFinite(p.z) ? p : null;
 
@@ -115,6 +115,13 @@ export function createMapView(host, opts = {}) {
     return isExplored(explored, i, j);
   });
   const g = canvas.getContext('2d');
+  // 마을 친구들 얼굴(지금 있는 곳): SVG 를 그림으로 바꿔 두고, 다 읽히면 다시 그린다
+  const faces = friends.filter((f) => Number.isFinite(f.x) && Number.isFinite(f.z)).map((f) => {
+    const img = new Image();
+    img.onload = () => draw();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(f.svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
+    return { ...f, img };
+  });
 
   // 보기 상태: 화면 가운데의 월드 좌표(cx, cz) 와 배율(CSS px / 월드 1칸). 화면 크기는 CSS px
   let cx = player ? player.x : 0, cz = player ? player.z : 0, scale = SCALE_START;
@@ -254,6 +261,36 @@ export function createMapView(host, opts = {}) {
     }
   }
 
+  /** 친구 얼굴: 흰 동그라미 안에 얼굴, 아래로 짧은 꼬리(그 자리를 가리킨다). */
+  function drawFriends() {
+    for (const f of faces) {
+      const x = sx(f.x), y = sy(f.z) - 14;
+      if (x < -20 || x > cssW + 20 || y < -20 || y > cssH + 30) continue;
+      g.beginPath();
+      g.moveTo(x - 4, y + 9);
+      g.lineTo(x, y + 15);
+      g.lineTo(x + 4, y + 9);
+      g.closePath();
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.beginPath();
+      g.arc(x, y, 11.5, 0, Math.PI * 2);
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.lineWidth = 1.5;
+      g.strokeStyle = 'rgba(90, 68, 49, 0.35)';
+      g.stroke();
+      if (f.img.complete && f.img.naturalWidth) {
+        g.save();
+        g.beginPath();
+        g.arc(x, y, 10, 0, Math.PI * 2);
+        g.clip();
+        g.drawImage(f.img, x - 12, y - 11, 24, 24);
+        g.restore();
+      }
+    }
+  }
+
   /** 내 위치: 흰 테두리 분홍 점, 바라보는 쪽(월드 (sin yaw, cos yaw))으로 작은 분홍 화살표. */
   function drawPlayer() {
     if (!player) return;
@@ -296,6 +333,7 @@ export function createMapView(host, opts = {}) {
     drawBuildings();
     drawFog();
     drawLabels();
+    drawFriends();
     drawPlayer();
   }
 
