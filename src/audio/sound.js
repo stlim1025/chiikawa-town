@@ -140,6 +140,11 @@ export function createSound(storage) {
       noise({ dur: 0.22, vol: 0.24, freq: 1800, sweepTo: 600, q: 0.7 });
       [1175, 1568, 2093].forEach((f, i) => tone({ freq: f, type: 'sine', start: 0.1 + i * 0.06, dur: 0.18, vol: 0.09 }));
     },
+    // 바닥에 떨어뜨리기: 사락(잎) + 톡
+    drop: () => {
+      noise({ dur: 0.14, vol: 0.18, freq: 2600, sweepTo: 900, q: 0.8 });
+      tone({ freq: 520, slideTo: 300, type: 'triangle', start: 0.08, dur: 0.12, vol: 0.12 });
+    },
     growl: () => tone({ freq: 150, slideTo: 210, type: 'sawtooth', dur: 0.28, vol: 0.05 }),
     faint: () => [659, 587, 523, 440, 330].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.16, dur: 0.3, vol: 0.12 })),
     // 아침: 해가 뜨며 올라가는 소리

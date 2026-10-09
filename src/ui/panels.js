@@ -22,7 +22,7 @@ import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
-import { QUESTS, QUEST_ORDER, questState, goalText, progressOf, isDone, isActive, canOffer, pickTrack } from '../core/quests.js';
+import { QUESTS, QUEST_ORDER, questState, goalText, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS } from '../core/friends.js';
 import { charSvg } from './art.js';
 
@@ -37,6 +37,8 @@ const APP_ICON = {
   // 테스트 도구: 스패너
   dev: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M27.5 6.5a7.5 7.5 0 0 0-7.1 9.9L8.6 28.2a3.2 3.2 0 0 0 4.5 4.5l11.8-11.8a7.5 7.5 0 0 0 9.9-7.1l-4.6 2.4-3.9-1.3-1.3-3.9z" fill="#fff"/></svg>',
   weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>',
+  // 설정: 톱니바퀴
+  options: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M17.4 5h5.2l.9 4.1a11 11 0 0 1 3 1.7l4-1.3 2.6 4.5-3.1 2.8a11 11 0 0 1 0 3.4l3.1 2.8-2.6 4.5-4-1.3a11 11 0 0 1-3 1.7l-.9 4.1h-5.2l-.9-4.1a11 11 0 0 1-3-1.7l-4 1.3-2.6-4.5 3.1-2.8a11 11 0 0 1 0-3.4l-3.1-2.8 2.6-4.5 4 1.3a11 11 0 0 1 3-1.7z" fill="#fff"/><circle cx="20" cy="20" r="5" fill="#9aa3b5"/></svg>',
   // 퀘스트: 둘둘 만 두루마리
   quests: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="25" rx="3" fill="#fff"/><path d="M7 10a4 4 0 0 1 8 0v20a4 4 0 0 1-8 0zM25 30a4 4 0 0 0 8 0" fill="#fff" stroke="#e8a83e" stroke-width="2"/><path d="M15 15h11M15 20h11M15 25h7" stroke="#e8a83e" stroke-width="2.2" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
@@ -112,7 +114,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'dev'];
+  const PHONE_APPS = ['settings', 'options', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'dev'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -194,6 +196,7 @@ export function createPanels(ui, handlers) {
     // 다시 그려도 스크롤 자리는 그대로(가구 목록에서 사기를 눌러도 위로 튀지 않게)
     const keep = [p, p.querySelector('.cat-list')].map((e) => e && e.scrollTop);
     p.replaceChildren(...BUILD[current.kind](s, current.extra));
+    if (current.afterRender) { const f = current.afterRender; current.afterRender = null; f(); }
     [p, p.querySelector('.cat-list')].forEach((e, i) => { if (e && keep[i]) e.scrollTop = keep[i]; });
     if (!current.phone) return;
     // 폰 상태 줄: 지금 시각 · 날짜
@@ -300,7 +303,7 @@ export function createPanels(ui, handlers) {
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
     },
-    // 마을폰 '퀘스트' 앱: 이야기 · 진행 중인 부탁(화면에 띄울 것 고르기) · 들을 수 있는 부탁 · 끝낸 부탁
+    // 마을폰 '퀘스트' 앱: 하는 중인 부탁(화면에 띄울 것 고르기) · 끝낸 부탁
     quests(s) {
       const track = pickTrack(s);
       const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju'].includes(kind)
@@ -313,18 +316,15 @@ export function createPanels(ui, handlers) {
             h('div', { class: 't' }, Q.title, h('span', { class: 'weed-count' }, Q.story ? '이야기' : FRIENDS[Q.giver].name)),
             kind === 'active' ? h('div', { class: 'd' }, `${st.step + 1} / ${Q.steps.length}단계 · ${goalText(s, id)}`) : null,
             p ? h('div', { class: 'q-bar' }, h('i', { style: `width:${Math.round((p.have / p.need) * 100)}%` })) : null,
-            kind === 'offer' ? h('div', { class: 'd' }, `${FRIENDS[Q.giver].name}에게 말을 걸어 봐요 · 머리 위에 ! 가 떠 있어요`) : null,
-            kind === 'locked' ? h('div', { class: 'd' }, `${josa(FRIENDS[Q.giver].name, '과/와')} 하트 ${Q.needHearts}개${Q.needLicense ? ' · 토벌 자격증' : ''}가 되면 들을 수 있을지도…`) : null,
             kind === 'done' ? h('div', { class: 'd' }, '다 들어줬어요 ✓') : null),
           kind === 'active' && id !== track ? h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.trackQuest(id)) }, '화면에 띄우기') : null);
       };
-      const active = QUEST_ORDER.filter((id) => isActive(s, id)), offer = QUEST_ORDER.filter((id) => canOffer(s, id));
-      const done = QUEST_ORDER.filter((id) => isDone(s, id)), locked = QUEST_ORDER.filter((id) => !questState(s, id) && !canOffer(s, id));
-      const out = [appBar('퀘스트', `${done.length} / ${QUEST_ORDER.length}`), h('p', { class: 'sub' }, '친구들의 고민을 들어주고 마을 이야기를 따라가요')];
+      // 받은 부탁만: 하는 중 · 끝낸 것(아직 안 받은 부탁은 친구 머리 위 ! 로 알게 된다)
+      const active = QUEST_ORDER.filter((id) => isActive(s, id)), done = QUEST_ORDER.filter((id) => isDone(s, id));
+      const out = [appBar('퀘스트', `끝낸 부탁 ${done.length}`), h('p', { class: 'sub' }, '받은 부탁과 마을 이야기를 여기서 봐요')];
       if (active.length) { out.push(h('h3', { class: 'shop-sec' }, '하는 중')); active.forEach((id) => out.push(card(id, 'active'))); }
-      if (offer.length) { out.push(h('h3', { class: 'shop-sec' }, '들을 수 있는 부탁')); offer.forEach((id) => out.push(card(id, 'offer'))); }
-      if (locked.length) { out.push(h('h3', { class: 'shop-sec' }, '아직 몰라요')); locked.forEach((id) => out.push(card(id, 'locked'))); }
       if (done.length) { out.push(h('h3', { class: 'shop-sec' }, '끝낸 부탁')); done.forEach((id) => out.push(card(id, 'done'))); }
+      if (!active.length && !done.length) out.push(h('p', { class: 'bag-empty' }, '아직 받은 부탁이 없어요. 머리 위에 ! 가 뜬 친구에게 말을 걸어 봐요!'));
       return out;
     },
     // 마을폰 '몬스터 도감' 앱: 만난(잡은) 몬스터와 잡은 수
@@ -490,46 +490,79 @@ export function createPanels(ui, handlers) {
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
-    // 가방: 모아 둔 풀 · 열매 · 전리품 · 물건. 고르면 아래에 설명과 할 수 있는 일(먹기)
+    // 주머니(동물의 숲처럼): 동그란 칸이 줄지어 있고, 칸을 누르면 이름 말풍선과 할 일 메뉴(먹기 · 들기 · 버리기)
     bag(s) {
-      const b = bagOf(s), ids = Object.keys(b.items).filter((id) => b.items[id] > 0 && itemInfo(id));
-      const KIND = [['herb', '풀'], ['food', '먹을 것'], ['drop', '전리품'], ['quest', '물건']];
-      const out = [head('가방', s.money), h('p', { class: 'sub' }, '일감 없이 뽑은 풀과 딴 열매가 여기 모여요. 일감을 받으면 같은 것을 바로 내요.')];
-      if (!ids.length) out.push(h('p', { class: 'bag-empty' }, '아직 비어 있어요. 풀을 뽑거나 열매를 따 봐요!'));
-      if (current.sel && !b.items[current.sel]) current.sel = null;
-      for (const [k, label] of KIND) {
-        const list = ids.filter((id) => itemInfo(id).kind === k);
-        if (!list.length) continue;
-        out.push(h('h3', { class: 'shop-sec' }, label));
-        out.push(h('div', { class: 'bag-grid' }, list.map((id) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(current.sel === id), onClick: () => { current.sel = id; render(); } },
-          svgSpan('bag-ico', itemSvg(id)), h('span', { class: 'nm' }, itemInfo(id).name), h('span', { class: 'cnt' }, `×${b.items[id]}`)))));
+      const b = bagOf(s), wp = weaponOf(s);
+      const KIND_ORDER = { herb: 0, food: 1, drop: 2, quest: 3 };
+      const order = (id) => { const w = WEED_ORDER.indexOf(id); return w >= 0 ? w : 50 + Object.keys(DROPS).indexOf(id); };
+      const items = Object.keys(b.items).filter((id) => b.items[id] > 0 && itemInfo(id))
+        .sort((a, c) => (KIND_ORDER[itemInfo(a).kind] ?? 9) - (KIND_ORDER[itemInfo(c).kind] ?? 9) || order(a) - order(c));
+      const weapons = [...wp.owned].sort((a, c) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(c));
+      const slots = [...weapons.map((id) => ({ type: 'weapon', id })), ...items.map((id) => ({ type: 'item', id }))];
+      const SLOTS = Math.max(30, Math.ceil(slots.length / 10) * 10);
+      const same = (a, c) => a && c && a.type === c.type && a.id === c.id;
+      if (current.sel && !slots.some((x) => same(x, current.sel))) current.sel = null;
+      const sel = current.sel;
+      const pick = (slot) => { current.sel = same(slot, current.sel) ? null : slot; render(); };
+      const nameOf = (x) => (x.type === 'weapon' ? WEAPONS[x.id].name : itemInfo(x.id).name);
+      const artOf = (x) => (x.type === 'weapon' ? weaponSvg(x.id) : itemSvg(x.id));
+      const grid = h('div', { class: 'pocket-grid', role: 'grid', 'aria-label': '주머니 칸' },
+        Array.from({ length: SLOTS }, (_, i) => {
+          const x = slots[i];
+          if (!x) return h('span', { class: 'pocket-slot empty', 'aria-hidden': 'true' });
+          const n = x.type === 'item' ? b.items[x.id] : 0, held = x.type === 'weapon' && wp.held === x.id;
+          return h('button', { class: `pocket-slot${same(x, sel) ? ' on' : ''}${held ? ' held' : ''}`, type: 'button', 'data-slot': String(i),
+            'aria-label': `${nameOf(x)}${n > 1 ? ` ${n}개` : ''}${held ? ' (들고 있음)' : ''}`, 'aria-pressed': String(same(x, sel)), onClick: () => pick(x) },
+          svgSpan('pocket-ico', artOf(x)),
+          n > 1 ? h('b', { class: 'pocket-cnt' }, String(n)) : null,
+          held ? h('i', { class: 'pocket-held', 'aria-hidden': 'true' }, '✋') : null);
+        }));
+      const wrap = h('div', { class: 'pocket' }, grid);
+      // 고른 칸: 위에 이름 말풍선, 옆에 할 일 메뉴, 아래 띠에 설명
+      let info = h('p', { class: 'pocket-info' }, slots.length ? '칸을 누르면 먹거나 들거나 바닥에 버릴 수 있어요' : '주머니가 비어 있어요. 풀을 뽑거나 열매를 따 봐요!');
+      if (sel) {
+        const n = sel.type === 'item' ? b.items[sel.id] : 1, inf = sel.type === 'item' ? itemInfo(sel.id) : null;
+        const canDrop = handlers.canDrop ? handlers.canDrop() : true;
+        const act = (label, fn, opts = {}) => h('button', { class: `pocket-act${opts.main ? ' main' : ''}`, type: 'button', disabled: !!opts.disabled, onClick: () => { current.sel = null; fn(); if (current) render(); } }, label);
+        const acts = [];
+        if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
+        if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('넣어 두기', () => handlers.holdWeapon(null)) : act('들기', () => handlers.holdWeapon(sel.id), { main: true }));
+        if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
+        else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
+        else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
+        acts.push(act('그만두기', () => {}));
+        wrap.append(h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), h('div', { class: 'pocket-menu', role: 'menu' }, acts));
+        const note = sel.type === 'weapon' ? `${WEAPONS[sel.id].note} · 힘 ${'★'.repeat(WEAPONS[sel.id].dmg)}` : inf.note + (inf.kind === 'herb' ? ` 깔끔하게 뽑은 것 ${b.clean[sel.id] || 0}개.` : '');
+        info = h('p', { class: 'pocket-info sel' }, h('b', {}, `${nameOf(sel)}${n > 1 ? ` ×${n}` : ''}`), ' ', note);
+        // 그린 뒤에 말풍선 · 메뉴를 고른 칸 옆에 붙인다(칸 자리를 재야 해서)
+        current.afterRender = () => {
+          const slot = wrap.querySelector('.pocket-slot.on'), menu = wrap.querySelector('.pocket-menu'), bubble = wrap.querySelector('.pocket-name');
+          if (!slot || !menu) return;
+          const W = wrap.getBoundingClientRect(), r = slot.getBoundingClientRect();
+          const left = r.left - W.left, top = r.top - W.top;
+          bubble.style.left = `${left + r.width / 2}px`;
+          bubble.style.top = `${top - 6}px`;
+          // 칸 오른쪽 → 왼쪽 → (좁은 화면) 칸 아래, 아래가 모자라면 이름 말풍선 위
+          const mw = menu.offsetWidth, mh = menu.offsetHeight;
+          let mx = left + r.width + 8, my = Math.max(4, Math.min(W.height - mh - 4, top + r.height / 2 - mh / 2));
+          if (mx + mw > W.width - 4) {
+            if (left - mw - 8 >= 4) mx = left - mw - 8;
+            else {
+              mx = Math.max(4, Math.min(W.width - mw - 4, left + r.width / 2 - mw / 2));
+              my = top + r.height + 10;
+              if (my + mh > W.height - 4) my = top - mh - 34;
+            }
+          }
+          menu.style.left = `${mx}px`;
+          menu.style.top = `${my}px`;
+          menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
+        };
       }
-      if (current.sel) {
-        const id = current.sel, info = itemInfo(id), n = b.items[id], c = b.clean[id] || 0;
-        out.push(h('div', { class: 'row bag-detail' }, svgSpan('pochette-art', itemSvg(id)),
-          h('div', {}, h('div', { class: 't' }, `${info.name} ×${n}`), h('div', { class: 'd' }, info.note + (info.kind === 'herb' ? ` 깔끔하게 뽑은 것 ${c}개.` : ''))),
-          info.eat ? h('button', { class: 'btn primary', type: 'button', disabled: s.stamina >= MAX_STAMINA, onClick: after(() => handlers.eatItem(id)) }, s.stamina >= MAX_STAMINA ? '배불러요' : '먹기') : null));
-      }
-      // 무기: 눌러서 바꿔 들기 · 넣기
-      const wp = weaponOf(s);
-      if (wp.owned.length) {
-        out.push(h('h3', { class: 'shop-sec' }, '무기 · 눌러서 바꿔 들어요'));
-        out.push(h('div', { class: 'bag-grid' },
-          h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(!wp.held), onClick: after(() => handlers.holdWeapon(null)) },
-            svgSpan('bag-ico', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>'), h('span', { class: 'nm' }, '넣어 두기')),
-          wp.owned.map((id) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(wp.held === id), onClick: after(() => handlers.holdWeapon(id)) },
-            svgSpan('bag-ico', weaponSvg(id)), h('span', { class: 'nm' }, WEAPONS[id].name)))));
-      }
-      // 꾸미기: 가진 것만 보여 주고, 바꾸는 건 집 옷장에서
       const pc = pochetteOf(s), wd = wardrobeOf(s);
-      if (pc.owned.length || wd.owned.length) {
-        out.push(h('h3', { class: 'shop-sec' }, '꾸미기 · 집 옷장에서 바꿔요'));
-        out.push(h('div', { class: 'bag-grid' },
-          pc.owned.map((id) => h('div', { class: 'bag-tile static', 'aria-pressed': String(pc.wear === id) }, svgSpan('bag-ico', pochetteSvg(id, POCHETTES[id])), h('span', { class: 'nm' }, POCHETTES[id].name))),
-          wd.owned.map((id) => h('div', { class: 'bag-tile static', 'aria-pressed': String(wd.wear === id) }, svgSpan('bag-ico', accessorySvg(id)), h('span', { class: 'nm' }, ACCESSORY_ITEMS[id].name)))));
-      }
-      out.push(h('div', { class: 'actions' }, closeBtn()));
-      return out;
+      return [head('주머니', s.money), wrap, info,
+        h('div', { class: 'actions' },
+          pc.owned.length || wd.owned.length ? h('p', { class: 'hint' }, '꾸미기 소품은 집 옷장에서 바꿔요') : h('p', { class: 'hint' }, `${slots.length} / ${SLOTS}칸`),
+          closeBtn())];
     },
     // 집 옷장: 가진 포셰트 · 소품을 골라 바로 바꿔 단다(집 안의 내 캐릭터가 바로 바뀐다)
     wardrobe(s) {
@@ -628,13 +661,9 @@ export function createPanels(ui, handlers) {
         h('p', { class: 'phone-foot' }, h('span', {}, '끌어서 둘러봐요'), ' · ', h('span', {}, '두 손가락이나 휠로 확대'), ' · ', h('b', {}, `가 본 곳 ${pct}%`))];
     },
     // 설정은 동물의 숲 폰처럼: 동그란 앱 아이콘을 누른다
-    settings(s, extra) {
-      const snd = handlers.getSound();
-      const app = (cls, icon, label, onClick, pressed) => h('button', { class: `app ${cls}`, type: 'button', 'aria-pressed': pressed, onClick },
+    settings(s) {
+      const app = (cls, icon, label, onClick) => h('button', { class: `app ${cls}`, type: 'button', onClick },
         svgSpan('app-ico', icon), h('span', { class: 'app-label' }, label));
-      // 소리 앱은 켜짐 · 꺼짐 글씨 없이 아이콘으로만: 꺼지면 회색 + 빗금(.off)
-      const sound = (kind, label) => app(`${kind}${snd[kind] ? '' : ' off'}`, APP_ICON[kind], label,
-        after(() => handlers.toggleSound(kind)), String(!!snd[kind]));
       return [
         h('h2', { class: 'phone-title', onClick: () => {
           const now = performance.now();
@@ -647,8 +676,7 @@ export function createPanels(ui, handlers) {
           render();
         } }, '마을폰'),
         h('div', { class: 'apps' },
-          sound('sfx', '효과음'),
-          sound('music', '배경음악'),
+          app('options', APP_ICON.options, '설정', () => show('options')),
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
@@ -657,10 +685,21 @@ export function createPanels(ui, handlers) {
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
-        // 저장 안내: 폰을 열 때 저장 여부를 받지 못했으면(지도 · 자격증으로 바로 열었을 때) 안 보인다
-        extra.storage == null ? null
-          : h('p', { class: 'phone-note' }, extra.storage ? '진행은 이 브라우저에 자동 저장돼요' : '이 브라우저는 저장이 꺼져 있어요. 창을 닫으면 진행이 사라져요')
       ];
+    },
+    // 마을폰 '설정' 앱: 효과음 · 배경음악 켜고 끄기, 저장 안내
+    options(s, extra) {
+      const snd = handlers.getSound();
+      const toggle = (kind, label, desc) => h('div', { class: 'row opt-row' },
+        h('div', {}, h('div', { class: 't' }, label), h('div', { class: 'd' }, desc)),
+        h('button', { class: `switch${snd[kind] ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(!!snd[kind]), 'aria-label': label, onClick: after(() => handlers.toggleSound(kind)) },
+          h('i', { 'aria-hidden': 'true' }), h('span', {}, snd[kind] ? '켜짐' : '꺼짐')));
+      return [appBar('설정'),
+        h('h3', { class: 'shop-sec' }, '소리'),
+        toggle('sfx', '효과음', '버튼 · 풀 뽑기 · 몬스터 소리'),
+        toggle('music', '배경음악', '오르골 느낌의 마을 음악'),
+        h('h3', { class: 'shop-sec' }, '저장'),
+        h('p', { class: 'phone-note' }, extra.storage == null || extra.storage ? '진행은 이 브라우저에 자동 저장돼요' : '이 브라우저는 저장이 꺼져 있어요. 창을 닫으면 진행이 사라져요')];
     }
   };
 

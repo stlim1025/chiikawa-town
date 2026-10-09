@@ -13,7 +13,7 @@ export function createPlayer(scene, chibi, village) {
   let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   const knock = { x: 0, z: 0 };
   const showHeld = () => {
-    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || (weaponShown && weapon && tag === 'w-' + weapon);
+    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || !!(weaponShown && weapon && tag === 'w-' + weapon);
   };
 
   const api = {

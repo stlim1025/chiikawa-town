@@ -12,6 +12,7 @@ import { isValidBag } from './inventory.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, QUESTS } from './quests.js';
+import { isValidGround } from './ground.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -53,6 +54,7 @@ export function isValidState(s) {
   if (s.questTrack !== undefined && s.questTrack !== null && !QUESTS[s.questTrack]) return false;
   if (s.story !== undefined && !isValidStory(s.story)) return false;
   if (s.truce !== undefined && !num(s.truce)) return false;
+  if (s.ground !== undefined && !isValidGround(s.ground)) return false; // 바닥에 떨어뜨린 물건
   return true;
 }
 

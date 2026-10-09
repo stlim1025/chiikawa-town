@@ -68,6 +68,8 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf } from './core/calendar.js';
 import { WEAPONS, DROPS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { createMonsters } from './world/monsters.js';
+import { createGround } from './world/ground.js';
+import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
 import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, pickTrack, activeQuests, arrived, isDone, isActive, bond } from './core/quests.js';
 
 const ui = document.getElementById('ui');
@@ -122,6 +124,8 @@ function boot() {
   const berries = createBerries(scene, village); // 잡초보다 먼저 심어서 잡초가 덤불을 피해 자란다
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
+  const ground = createGround(scene); // 주머니에서 버린 물건(바닥의 나뭇잎 꾸러미)
+  const groundKind = (e) => (e.weapon ? 'weapon' : (itemInfo(e.id) || { kind: 'quest' }).kind);
   const npcs = createNpcs(scene, village, weeds, berries);
   const input = createInput(ui, canvas);
   const hud = createHud(ui, input);
@@ -291,6 +295,19 @@ function boot() {
       hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600);
     },
     trackQuest(id) { commit({ ...state, questTrack: id }); },
+    // 주머니에서 버리기: 마을을 돌아다닐 때만(집 · 친구 집 안에서는 안 된다). 발 앞에 나뭇잎 꾸러미로 떨어진다
+    canDrop: () => mode === 'play',
+    dropItem(sel, n) {
+      if (mode !== 'play') return;
+      const at = dropSpot();
+      const r = sel.type === 'weapon' ? dropWeapon(state, sel.id, at.x, at.z) : dropToGround(state, sel.id, n, at.x, at.z);
+      if (!r.ok) { hud.toast(r.reason === 'full' ? '바닥에 물건이 너무 많아요. 먼저 좀 주워요' : '버릴 수 없어요'); return; }
+      commit(r.state);
+      ground.sync(groundOf(state), groundKind);
+      sound.play('drop');
+      const name = sel.type === 'weapon' ? WEAPONS[sel.id].name : itemInfo(sel.id).name;
+      hud.toast(`${r.n > 1 ? `${name} ${r.n}개를` : josa(name, '을/를')} 바닥에 떨어뜨렸어요 · 다시 주울 수 있어요`, 2400);
+    },
     sellDrops() {
       const r = sellDrops(state);
       if (!r.sold) return;
@@ -763,6 +780,7 @@ function boot() {
     // 대상이 없어도 무기를 들고 있으면 허공에 휘두른다
     if (!target) { if (weaponNow()) doSwing(); return; }
     if (target.type === 'attack') doSwing();
+    else if (target.type === 'pickup') pickUpGround(target.g);
     else if (target.type === 'weed') beginPull(target.weed);
     else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
@@ -1039,6 +1057,34 @@ function boot() {
       if (mk) out.push({ id: 'q-' + m.kind, x: m.x, y: m.chibi.height + 0.55, z: m.z, text: mk, kind: mk === '?' ? 'qmark report' : 'qmark' });
     }
     return out;
+  }
+
+  /** 버릴 자리: 발 앞부터, 이미 떨어진 꾸러미와 겹치지 않는 빈 땅(동물의 숲처럼 옆으로 하나씩 늘어놓는다). */
+  function dropSpot() {
+    const p = player.position, yaw = player.yaw, list = groundOf(state);
+    const taken = (at) => list.some((e) => Math.hypot(e.x - at.x, e.z - at.z) < 0.55);
+    const ring = [[0.8, 0], [0.85, 0.75], [0.85, -0.75], [0.95, 1.5], [0.95, -1.5], [1.45, 0], [1.45, 0.42], [1.45, -0.42], [1.3, 1.1], [1.3, -1.1], [1.1, 2.3], [1.1, -2.3], [1.0, Math.PI]];
+    let first = null;
+    for (const [d, a] of ring) {
+      const at = village.nearestFree(p.x + Math.sin(yaw + a) * d, p.z + Math.cos(yaw + a) * d, 0.2);
+      first = first || at;
+      if (!taken(at)) return at;
+    }
+    return first;
+  }
+  /** 바닥의 나뭇잎 꾸러미를 줍는다(주머니 칸이 모자라면 들어가는 만큼만). */
+  function pickUpGround(g) {
+    const e = groundOf(state).find((o) => o.g === g);
+    if (!e) return;
+    const r = pickUp(state, g);
+    if (!r.ok) { hud.toast('주머니가 꽉 찼어요(한 칸에 99개까지)'); sound.play('none'); return; }
+    commit(r.state);
+    ground.sync(groundOf(state), groundKind);
+    player.face(e.x, e.z);
+    sound.play('clean');
+    hud.bagBump();
+    const name = groundName(e);
+    hud.toast(r.refund ? `이미 가진 무기라 ${won(r.refund)}에 정리했어요` : r.left > 0 ? `${name} ${r.n}개를 주웠어요 · ${r.left}개는 주머니가 꽉 차서 남겼어요` : `${name}${r.n > 1 ? ` ${r.n}개` : ''} 주웠어요`, 1800);
   }
 
   /** 돈 빌리기: 친구 지갑의 절반까지, 갚기 전에는 한 번만. */
@@ -1612,6 +1658,9 @@ function boot() {
   function findTarget() {
     const p = player.position;
     const options = [];
+    // 바닥에 떨어진 물건(주머니에서 버린 것): 줍기
+    const gi = ground.nearest(p.x, p.z, 1.15);
+    if (gi) options.push({ d: Math.hypot(gi.x - p.x, gi.z - p.z) - 0.3, t: { type: 'pickup', g: gi.g, x: gi.x, z: gi.z, label: `줍기 · ${groundName(gi)}${gi.n > 1 ? ` ×${gi.n}` : ''}` } });
     // 무기를 들었고 몬스터가 닿을 만큼 가까우면 무엇보다 먼저 공격(4단계)
     const wid = weaponNow();
     if (wid) {
@@ -1663,6 +1712,7 @@ function boot() {
     if (tg.type === 'berry') return { x: tg.bush.x, z: tg.bush.z, r: 0.75, y: 1.3, id: 'b' + tg.bush.x.toFixed(2) };
     if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
+    if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
@@ -1913,6 +1963,8 @@ function boot() {
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 중에는 멈칫)
     const hunting = mode === 'play' && !!state && !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !sticker;
     monsters.update(dt, t, { player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro });
+    if (state) ground.sync(groundOf(state), groundKind);
+    ground.update(dt, focus);
     if (state && player && mode === 'intro') {
       player.update(dt, input);
       intro.update(dt);
