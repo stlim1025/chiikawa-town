@@ -82,7 +82,7 @@ export const CHATS = {
 export const HEART_PTS = 3;
 export const MAX_HEARTS = 5;
 export const GIFT_HEARTS = 3;
-const GAIN = { talk: 1, play: 2, drink: 2 }; // drink: 맥주집에서 쿠리만쥬와 건배
+const GAIN = { talk: 1, play: 2, drink: 2, home: 2 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …)
 
 /** 그 친구와의 친밀도(처음 보면 0). */
 export function friendOf(state, kind) {
@@ -95,7 +95,7 @@ export function hearts(f) {
 }
 
 /**
- * 이야기하거나(talk) 놀았을 때(play) · 같이 건배했을 때(drink). 같은 날 같은 일은 한 번만 친밀도가 오른다.
+ * 이야기하거나(talk) 놀았을 때(play) · 같이 건배했을 때(drink) · 친구 집에서 같이 놀았을 때(home). 같은 날 같은 일은 한 번만 친밀도가 오른다.
  * 하트가 GIFT_HEARTS 개가 되면 그 친구의 선물 가구가 집에 들어온다(한 번만).
  * → { state, gained, hearts, up(하트가 늘었는지), gift: 가구 id | null }
  */
@@ -158,9 +158,15 @@ export function repay(state, kind) {
 }
 
 /** 저장된 친밀도 모양이 맞는지(save.js 검사). */
+/** 그날 한 일(간식 얻어먹기처럼 친밀도와 상관없는 것)을 적어 둔다. → state */
+export function markDay(state, kind, field, day) {
+  const f = friendOf(state, kind);
+  return { ...state, friends: { ...(state.friends || {}), [kind]: { ...f, [field]: day } } };
+}
+
 export function isValidFriends(fr) {
   if (!fr || typeof fr !== 'object' || Array.isArray(fr)) return false;
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   return Object.entries(fr).every(([kind, f]) => FRIENDS[kind] && f && num(f.pts) && f.pts >= 0 && num(f.talk) && num(f.play) && typeof f.gift === 'boolean'
-    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && (f.drink === undefined || num(f.drink)));
+    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack'].every((k) => f[k] === undefined || num(f[k])));
 }

@@ -146,6 +146,11 @@ export function createSound(storage) {
       tone({ freq: 520, slideTo: 300, type: 'triangle', start: 0.08, dur: 0.12, vol: 0.12 });
     },
     growl: () => tone({ freq: 150, slideTo: 210, type: 'sawtooth', dur: 0.28, vol: 0.05 }),
+    // 친구 집에서 같이 부르는 짧은 노래(하치와레)
+    song: () => [72, 74, 76, 79, 76, 77, 79, 84, 79, 76, 74, 72].forEach((n, i) => {
+      tone({ freq: midi(n), type: 'triangle', start: i * 0.24, dur: 0.3, vol: 0.12 });
+      if (i % 2 === 0) tone({ freq: midi(n - 12), type: 'sine', start: i * 0.24, dur: 0.45, vol: 0.06 });
+    }),
     // 몬스터 공격 예고(짧게 올라가는 삐-) · 땅을 쿵 치는 소리
     warn: () => tone({ freq: 520, slideTo: 880, type: 'triangle', dur: 0.14, vol: 0.06 }),
     thud: () => { tone({ freq: 110, slideTo: 55, type: 'sine', dur: 0.22, vol: 0.2 }); noise({ dur: 0.12, vol: 0.12, freq: 300, sweepTo: 120, q: 0.8 }); },

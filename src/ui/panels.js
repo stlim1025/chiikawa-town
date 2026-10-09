@@ -105,6 +105,9 @@ function leftPill(n, max) {
   return h('span', { class: `left-pill${cls}` }, dots, n <= 0 ? '마감' : n === 1 ? '마지막 1건' : `${n}건 남음`);
 }
 
+/** 하트 2개부터 집(동굴)에 놀러 가서 같이 놀 수 있는 친구. */
+const HOME_VISIT = new Set(['chiikawa', 'hachiware', 'usagi', 'kurimanju', 'momonga', 'rakko']);
+
 /**
  * 몬스터 카드(토벌 안내서 · 몬스터 도감): 구역마다 머리글 아래 셋씩. 카드에는 얼굴 · 이름 · 공격 방식 · 단단함 · 공격 · 전리품.
  * withCount 면 잡은 수(못 잡았으면 흐리게)와 한 줄 설명. 이야기 속 왕버섯은 만나기 전에는 '???' 로 감춘다.
@@ -416,6 +419,7 @@ export function createPanels(ui, handlers) {
           chip(talked ? 'check' : 'todo', talked ? 'done' : 'todo', '이야기'),
           F.play ? chip(played ? 'check' : 'todo', played ? 'done' : 'todo', '놀기') : null,
           k === 'kurimanju' ? chip(f.drink === today ? 'check' : 'todo', f.drink === today ? 'done' : 'todo', '건배') : null,
+          HOME_VISIT.has(k) && hc >= 2 ? chip(f.home === today ? 'check' : 'todo', f.home === today ? 'done' : 'todo', '집에서') : null,
           F.gift && FURNITURE[F.gift] ? (f.gift ? chip('check', 'done', `선물 ${FURNITURE[F.gift].name}`) : chip('heart', 'gift', `${GIFT_HEARTS}개면 ${FURNITURE[F.gift].name} 선물`)) : null,
           f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null
         ];

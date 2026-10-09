@@ -46,10 +46,10 @@ import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
-import { FRIENDS, CHATS, friendOf, hearts, befriend, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
+import { FRIENDS, CHATS, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
-import { addItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
+import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
 import { openRamenShop } from './ui/ramenshop.js';
@@ -250,6 +250,7 @@ function boot() {
       commit(wearPochette(state, id));
       refreshLook();
       if (mode === 'home') interior.setPlayer(myLook(), true);
+      else if (mode === 'visit') rooms.setPlayer(myLook()); // 모몽가네 거울 앞에서 갈아입을 때
       sound.play('click');
       hud.toast(id ? `${POCHETTES[id].name}을(를) 멨어요` : '포셰트를 벗었어요');
     },
@@ -267,6 +268,7 @@ function boot() {
       commit(wearAccessory(state, id));
       refreshLook();
       if (mode === 'home') interior.setPlayer(myLook(), true);
+      else if (mode === 'visit') rooms.setPlayer(myLook()); // 모몽가네 거울 앞에서 갈아입을 때
       sound.play('click');
     },
     // 가방
@@ -785,9 +787,11 @@ function boot() {
 
   let homeTarget = null; // 집 안에서 지금 누르면 할 일
   input.onAction((down) => {
+    if (mode === 'visit' && drill) { if (down) drillPress(); return; } // 랏코네 수련: 바늘이 초록일 때 누른다
     if (mode === 'visit' && down && homeTarget && state && !sleeping && !panels.isOpen() && !guide.open) {
       if (homeTarget.type === 'door') exitVisit();
       else if (homeTarget.type === 'host') talkTo(npcs.byKind(visit.kind));
+      else if (homeTarget.type === 'act') doHomeAct(visit.kind);
       return;
     }
     if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating && !guide.open) {
@@ -898,8 +902,13 @@ function boot() {
     else if (n.kind === 'momonga' && mode !== 'visit') opts.push(['snub', '같이 놀자']); // 까칠해서 안 놀아 준다
     // 하트 2개부터: 집에 놀러 가기(밤에는 안 된다)
     if (mode === 'play' && VILLAGERS[n.kind] && friendDoors()[n.kind] && hearts(friendOf(state, n.kind)) >= 2 && !isSleepHour(hourOf(state.clock))) opts.push(['visit', n.kind === 'hachiware' ? '동굴에 놀러 가도 돼?' : '집에 놀러 가도 돼?']);
+    // 친구 집 안: 그 집의 놀이 · 간식(하루 한 번)
+    if (mode === 'visit' && visit && visit.kind === n.kind) {
+      if (HOME_ACTS[n.kind]) opts.push(['homeact', HOME_ACTS[n.kind].ask]);
+      if (friendOf(state, n.kind).snack !== state.clock.day) opts.push(['snack', '출출한데… 간식 있어?']);
+    }
     // 쿠리만쥬: 술 자격 공부(강의) · 자격을 따면 한 잔
-    if (n.kind === 'kurimanju') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : ['study', '술 공부하고 싶어']);
+    if (n.kind === 'kurimanju' && mode !== 'visit') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : ['study', '술 공부하고 싶어']);
     if (n.kind === 'pochette') opts.push(['shop', '포셰트 구경할래']);
     // 지갑이 있는 친구: 하트를 꽉 채우면 돈을 빌릴 수 있고, 빌렸으면 갚는다. 쫓겨났으면 밤에 하룻밤 재워 달라고 한다.
     if (VILLAGERS[n.kind]) {
@@ -921,6 +930,8 @@ function boot() {
       else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
       else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거라면 몰라도. 흥!'], endTalk);
+      else if (k === 'homeact') { endTalk(); doHomeAct(n.kind); }
+      else if (k === 'snack') giveSnack(n);
       else if (k === 'visit') {
         sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : n.kind === 'momonga' ? '…흥, 들어오든가. 아무것도 만지지 마!' : '응! 같이 가자~'], () => {
           endTalk();
@@ -1532,10 +1543,11 @@ function boot() {
     sound.play('job');
     const F = FRIENDS[kind];
     if (lodge) { setTimeout(() => { if (mode === 'visit') doSleep('lodge', exitVisit); }, 900); return; }
-    hud.toast(kind === 'hachiware' ? '하치와레네 동굴에 들어왔어요' : `${F.name}네 집에 놀러 왔어요`, 2400);
+    hud.toast(`${kind === 'hachiware' ? '하치와레네 동굴' : `${F.name}네 집`} · ✨ ${HOME_ACTS[kind] ? HOME_ACTS[kind].label : '놀러 왔어요'}`, 2600);
   }
   function exitVisit() {
     if (!visit) return;
+    if (drill) endDrill();
     const d = friendDoors()[visit.kind];
     visit = null;
     mode = 'play';
@@ -1547,6 +1559,149 @@ function boot() {
     cam.snap(player.position);
     if (!sleeping) input.setEnabled(true);
     save();
+  }
+
+  // ---------- 친구 집에서 할 거리: 집마다 하나씩(하루 한 번 하트 +2) + 간식 ----------
+  const HOME_ACTS = {
+    chiikawa: { label: '같이 낮잠 자기', ask: '같이 낮잠 잘래?' },
+    usagi: { label: '풀 다발 정리하기', ask: '풀 정리 도와줄게!' },
+    kurimanju: { label: '안주 구워 먹기', ask: '화로에 뭐 구워 먹자!' },
+    momonga: { label: '거울 보며 꾸미기', ask: '거울 좀 써도 돼?' },
+    rakko: { label: '같이 수련하기', ask: '수련 상대가 되어 줘!' },
+    hachiware: { label: '같이 노래하기', ask: '같이 노래하자!' }
+  };
+  /** 오늘 이미 같이 놀았을 때. */
+  const HOME_DONE = {
+    chiikawa: ['…오늘은 벌써 푹 잤어…', '내일 또 같이 자자…!'], usagi: ['우라!', '(풀 다발이 이미 반듯하게 정리돼 있다)'],
+    kurimanju: ['하아~ 오늘은 배불러~', '내일 또 구워 먹자~'], rakko: ['…오늘 수련은 끝났다.', '무리하면 안 된다. 내일 다시 와라.'],
+    hachiware: ['오늘은 목이 좀 쉬었나 봐~', '내일 또 같이 부르자!'], momonga: ['또 거울?', '…흥, 마음대로 해.']
+  };
+  /** 간식(하루 한 번): 집주인마다 다른 맛 · 기운. */
+  const SNACKS = {
+    chiikawa: { lines: ['…이거, 같이 먹자…!', '(작은 쿠키를 반으로 나눠 준다)'], gain: 15 },
+    hachiware: { lines: ['버섯 수프 끓여 놨어~', '따끈할 때 먹어!'], gain: 20 },
+    usagi: { lines: ['우라!', '(커다란 주먹밥을 쑥 내민다)'], gain: 20 },
+    kurimanju: { lines: ['하아~ 안주 남은 거 있어.', '먹어 먹어~'], gain: 15 },
+    rakko: { lines: ['…녹차다.', '마음이 차분해진다.'], gain: 12 },
+    momonga: { lines: ['내 간식인데…!', '…흥, 하나만이야. 고마워하라고!'], gain: 10 }
+  };
+  const doneToday = (kind) => friendOf(state, kind).home === state.clock.day;
+  const gainStamina = (n) => { const before = state.stamina; commit({ ...state, stamina: Math.min(MAX_STAMINA, state.stamina + n) }); return state.stamina - before; };
+  function giveSnack(n) {
+    const S = SNACKS[n.kind];
+    if (!S) { endTalk(); return; }
+    sayAs(n, S.lines, () => {
+      const got = gainStamina(S.gain);
+      commit(markDay(state, n.kind, 'snack', state.clock.day));
+      sound.play('eat');
+      hud.toast(got ? `냠냠 · 기운 +${got}` : '냠냠 · 배불러요', 2200);
+      endTalk();
+    });
+  }
+  /** 그 집의 놀이를 한다. */
+  function doHomeAct(kind) {
+    const n = npcs.byKind(kind);
+    if (!n || !HOME_ACTS[kind] || talking || drill) return;
+    if (kind !== 'momonga' && doneToday(kind)) { beginTalk(n); sayAs(n, HOME_DONE[kind], endTalk); return; }
+    const a = rooms.actSpot();
+    if (a) rooms.moveNear(a.x, a.z); // 침대 · 화로 · 짚 인형 옆으로 가서 한다
+    beginTalk(n);
+    if (kind === 'chiikawa') {
+      // 같이 낮잠: 화면이 어두워졌다가 한 시간 반 뒤에 깬다(기운 +40)
+      sayAs(n, ['…같이 자자…!', '(이불을 반으로 나눠 덮어 준다)'], () => {
+        overlay = true;
+        input.setEnabled(false);
+        hud.curtain(true, '쿨쿨… 💤');
+        sound.play('sleep');
+        setTimeout(() => {
+          state = { ...state, clock: advance(state.clock, 45) };
+          const got = gainStamina(40);
+          hud.curtain(false);
+          overlay = false;
+          sayAs(n, ['…잘 잤다…♪', '{name}이랑 자니까 꿈도 좋았어…!'], () => { hud.toast(`푹 잤어요 · 기운 +${got} · 한 시간 반이 지났어요`, 3000); reward(n, 'home'); });
+        }, 2200);
+      });
+    } else if (kind === 'usagi') {
+      // 풀 다발 정리: 우사기가 뽑아 둔 풀을 나눠 준다(가방 → 일감에 바로 낼 수 있다)
+      sayAs(n, ['우라!', '(쓱쓱 싹싹… 같이 풀 다발을 정리한다)', '야하! (풀을 한 움큼 나눠 준다)'], () => {
+        let s = addItem(state, 'weed', 4, 4).state;
+        s = addItem(s, 'clover', 2, 2).state;
+        commit(s);
+        hud.bagBump();
+        hud.toast('잡초 4개 · 토끼풀 2개를 받았어요', 2800);
+        reward(n, 'home');
+      });
+    } else if (kind === 'kurimanju') {
+      // 화로 구이: 말랑 젤리가 있으면 젤리 구이 2개로, 없으면 풋콩을 구워 먹는다
+      if (countOf(state, 'jelly') > 0) {
+        sayAs(n, ['오~ 말랑 젤리 있네! 이리 줘 봐~', '(화로에 젤리를 굽는다… 치익—)', '젤리 구이 완성~! 두 개 챙겨 가. 하아~'], () => {
+          commit(addItem(takeItem(state, 'jelly', 1).state, 'jellybake', 2).state);
+          hud.bagBump();
+          hud.toast('말랑 젤리 1개 → 젤리 구이 2개', 2800);
+          reward(n, 'home');
+        });
+      } else {
+        sayAs(n, ['하아~ 풋콩이나 구워 먹자~', '(화로에 풋콩을 굽는다… 톡톡)', '짭짤하지? 말랑 젤리 가져오면 구워 줄게~'], () => {
+          const got = gainStamina(20);
+          sound.play('eat');
+          hud.toast(got ? `냠냠 · 기운 +${got}` : '냠냠 · 배불러요', 2400);
+          reward(n, 'home');
+        });
+      }
+    } else if (kind === 'momonga') {
+      // 거울: 옷장을 열어 갈아입는다. 처음이면(하루 한 번) 하트 +2
+      const first = !doneToday(kind);
+      sayAs(n, first ? ['…내 거울이야. 특별히 빌려주는 거야.', '꾸며 봐. 나보다 귀여우면 안 돼!'] : HOME_DONE.momonga, () => {
+        if (first) reward(n, 'home'); else endTalk();
+        setTimeout(() => { if (mode === 'visit' && !talking) panels.openWardrobe(); }, first ? 900 : 100);
+      });
+    } else if (kind === 'rakko') {
+      sayAs(n, ['…좋다. 짚 인형을 쳐라.', '바늘이 초록에 들 때 눌러라. 다섯 번 중 세 번이다.'], () => { endTalk(); startDrill(n); });
+    } else if (kind === 'hachiware') {
+      // 같이 노래: 짧은 노래 · 둘이 춤 · 기분이 좋아져 기운 +15
+      sayAs(n, ['좋아~! 하나, 둘, 셋!', '라~ 라라~ ♪'], () => {
+        talking = null;
+        overlay = true;
+        input.setEnabled(false);
+        sound.play('song');
+        rooms.pose('dance', 3);
+        rooms.hostPose('dance', 3);
+        setTimeout(() => {
+          overlay = false;
+          const got = gainStamina(15);
+          beginTalk(n);
+          sayAs(n, ['같이 부르니까 훨씬 좋다~!', '{name} 목소리 예쁘다~ 또 같이 하자!'], () => { hud.toast(`기분이 좋아졌어요${got ? ` · 기운 +${got}` : ''}`, 2600); reward(n, 'home'); });
+        }, 3000);
+      });
+    }
+  }
+  // 랏코네 수련: 바늘이 오가는 게이지에서 초록일 때 누른다. 다섯 번 중 세 번 맞히면 성공(기운 −8)
+  let drill = null; // { n, t, tries, hits, cool }
+  const DRILL = { tries: 5, need: 3, zone: { from: 0.42, to: 0.6 }, speed: 2.6, cost: 8 };
+  function startDrill(n) {
+    drill = { n, t: 0, tries: 0, hits: 0, cool: 0.35 };
+    overlay = true;
+    input.setEnabled(true); // 누르기만 받는다(걷기는 overlay 로 멈춘다)
+  }
+  const drillK = () => (1 - Math.cos(drill.t * DRILL.speed)) / 2;
+  function drillPress() {
+    if (!drill || drill.cool > 0) return;
+    const k = drillK(), hit = k >= DRILL.zone.from && k <= DRILL.zone.to;
+    drill.tries++;
+    drill.cool = 0.35;
+    rooms.pose('swing', 0.32);
+    if (hit) { drill.hits++; sound.play('hit'); } else sound.play('none');
+    const left = DRILL.tries - drill.tries;
+    if (drill.hits >= DRILL.need || drill.hits + left < DRILL.need) finishDrill(drill.hits >= DRILL.need);
+  }
+  function endDrill() { drill = null; overlay = false; hud.hideMeter(); }
+  function finishDrill(ok) {
+    const n = drill.n;
+    endDrill();
+    commit({ ...state, stamina: Math.max(0, state.stamina - DRILL.cost) });
+    beginTalk(n);
+    if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '네 손에 힘이 붙었군. (기운 −8)'], () => { rooms.hostPose('cheer', 1.2); reward(n, 'home'); });
+    else sayAs(n, ['…아직이군.', '숨을 고르고 다시 와라. (기운 −8)'], endTalk);
   }
 
   // ---------- 친구들의 기운 · 잠(3단계) ----------
@@ -1986,6 +2141,8 @@ function boot() {
       spots: village.spots,
       homes: () => friendDoors(),
       visitRoom: (kind) => enterVisit(kind),
+      homeAct: (kind) => doHomeAct(kind),
+      drill: () => drill && { k: drillK(), hits: drill.hits, tries: drill.tries },
       homeStand: (x, z) => interior.standAt(x, z),
       homeTarget: () => homeTarget && homeTarget.type,
       leaveRoom: () => exitVisit(),
@@ -2040,12 +2197,21 @@ function boot() {
       if (free) rooms.walk(dt, input.vector());
       homeTarget = free ? rooms.target() : null;
       rooms.setCue(homeTarget, t);
-      hud.setAction(homeTarget ? homeTarget.label : null);
+      if (drill) {
+        drill.t += dt;
+        drill.cool = Math.max(0, drill.cool - dt);
+        hud.showMeter(drillK(), DRILL.zone, `초록에서 ${input.mode === 'desk' ? 'Space' : '치기'}! ${drill.hits}/${DRILL.need} · 남은 ${DRILL.tries - drill.tries}번`);
+        hud.setAction('치기!');
+      } else hud.setAction(homeTarget ? homeTarget.label : null);
       rooms.update(dt, t, !!talking);
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
       if (!skipRender) gfx.renderer.render(rooms.scene, rooms.camera);
-      hud.placeLabels(homeTarget ? [{ id: 'prompt:v' + homeTarget.type, x: homeTarget.x, y: homeTarget.y, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' }] : [], rooms.camera);
+      // 놀이 자리 표시(오늘 아직 안 했으면 ✨), 가까이 가면 행동 안내
+      const act = rooms.actSpot(), vLabels = [];
+      if (act && !drill && (!homeTarget || homeTarget.type !== 'act') && (visit.kind === 'momonga' || !doneToday(visit.kind))) vLabels.push({ id: 'vact', x: act.x, y: 1.9, z: act.z, text: '✨ ' + act.label, kind: 'mark' });
+      if (homeTarget) vLabels.push({ id: 'prompt:v' + homeTarget.type, x: homeTarget.x, y: homeTarget.y, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' });
+      hud.placeLabels(vLabels, rooms.camera);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
       return;

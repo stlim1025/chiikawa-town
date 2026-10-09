@@ -8,14 +8,15 @@ import { furnitureModel } from './interior.js';
  * shell: dome(하얀 돔 집) · house(박공지붕 집: 앞이 트인 네모 방) · cave(바위 동굴). items: [가구 id, x, z, 돌린 칸(0~3)].
  * prop: 집주인마다 다른 물건(마시던 머그 · 풀 다발 · 술병과 화로 · 거울 · 수련 인형 · 나뭇잎 침대).
  * 걷기 · 행동 안내는 내 집(interior.js)과 같다: 집주인 옆이면 '말 걸기', 문간이면 '나가기'.
+ * act: 그 집에서만 할 수 있는 놀이 자리 [x, z, 닿는 거리, 글] — 침대에서 같이 낮잠 · 풀 다발 정리 · 화로 구이 · 거울 · 짚 인형 수련 · 악보대 노래.
  */
 const ROOMS = {
-  chiikawa: { shell: 'dome', wall: '#fbfaf5', floor: '#e8c9a0', items: [['bed', -1.6, -1.7, 0], ['cushion', 0.5, -0.6, 0], ['plant', 2.1, -1.8, 0], ['table', 1.0, -1.5, 0]], prop: 'mug', host: [-0.4, -0.7] },
-  usagi: { shell: 'house', wall: '#fbe6a6', floor: '#d9b07a', items: [['bed', -2.0, -1.7, 0], ['rug', 0.3, 0.2, 0], ['shelf', 2.0, -2.0, 0]], prop: 'grass', host: [0.4, -0.8] },
-  kurimanju: { shell: 'house', wall: '#f3d6b0', floor: '#c99a6a', items: [['table', 0.2, -1.0, 0], ['stove', -2.1, -2.0, 0], ['shelf', 2.1, -2.0, 0], ['rug', 0.2, 0.7, 0], ['bed', 2.2, -0.2, 3]], prop: 'bottles', host: [-0.9, -0.6] },
-  momonga: { shell: 'house', wall: '#dcecf8', floor: '#e2c6a8', items: [['bed', -2.0, -1.7, 0], ['lamp', -0.6, -2.1, 0], ['rug', 0.6, 0.3, 0], ['cushion', 1.6, -1.2, 0]], prop: 'mirror', host: [0.2, -0.9] },
-  rakko: { shell: 'house', wall: '#e9dcc6', floor: '#b98c5e', items: [['shelf', -2.1, -2.1, 0], ['table', 1.7, -1.8, 0], ['bed', -2.2, -0.2, 1], ['rug', 0.4, 0.4, 0]], prop: 'dojo', host: [0.4, -1.0] },
-  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', host: [-0.2, -0.9] }
+  chiikawa: { shell: 'dome', wall: '#fbfaf5', floor: '#e8c9a0', items: [['bed', -1.6, -1.7, 0], ['cushion', 0.5, -0.6, 0], ['plant', 2.1, -1.8, 0], ['table', 1.0, -1.5, 0]], prop: 'mug', host: [-0.4, -0.7], act: [-1.6, -1.7, 1.35, '같이 낮잠 자기'] },
+  usagi: { shell: 'house', wall: '#fbe6a6', floor: '#d9b07a', items: [['bed', -2.0, -1.7, 0], ['rug', 0.3, 0.2, 0], ['shelf', 2.0, -2.0, 0]], prop: 'grass', host: [0.4, -0.8], act: [-0.05, -2.1, 1.3, '풀 다발 정리하기'] },
+  kurimanju: { shell: 'house', wall: '#f3d6b0', floor: '#c99a6a', items: [['table', 0.2, -1.0, 0], ['stove', -2.1, -2.0, 0], ['shelf', 2.1, -2.0, 0], ['rug', 0.2, 0.7, 0], ['bed', 2.2, -0.2, 3]], prop: 'bottles', host: [-0.9, -0.6], act: [-1.2, 0.6, 1.1, '안주 구워 먹기'] },
+  momonga: { shell: 'house', wall: '#dcecf8', floor: '#e2c6a8', items: [['bed', -2.0, -1.7, 0], ['lamp', -0.6, -2.1, 0], ['rug', 0.6, 0.3, 0], ['cushion', 1.6, -1.2, 0]], prop: 'mirror', host: [0.2, -0.9], act: [2.4, -2.6, 1.25, '거울 보며 꾸미기'] },
+  rakko: { shell: 'house', wall: '#e9dcc6', floor: '#b98c5e', items: [['shelf', -2.1, -2.1, 0], ['table', 1.7, -1.8, 0], ['bed', -2.2, -0.2, 1], ['rug', 0.4, 0.4, 0]], prop: 'dojo', host: [0.4, -1.0], act: [1.8, 0.2, 1.1, '같이 수련하기'] },
+  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', host: [-0.2, -0.9], act: [1.0, -1.6, 1.05, '같이 노래하기'] }
 };
 const WALKABLE = new Set(['rug', 'cushion']);
 export const ROOM_OWNERS = Object.keys(ROOMS);
@@ -39,6 +40,8 @@ export function createRooms() {
   let me = null, host = null, spec = null, obst = [], door = { x: 0, z: 2.6 }, hostAt = { x: 0, z: 0 };
   const pos = { x: 0, z: 2 };
   let yaw = Math.PI, phase = 0, moving = false;
+  // 잠깐 하는 몸짓(휘두르기 · 춤 · 만세): { mode, t, dur }
+  let mePose = null, hostPose = null;
   const add = (o, x = 0, z = 0) => { o.position.x += x; o.position.z += z; room.add(o); return o; };
   const mesh = (geo, c, o) => add(toonMesh(geo, c, { shadow: false, ...o }));
 
@@ -187,12 +190,15 @@ export function createRooms() {
       yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
       if (moving) phase += dt * 2.6 * len * 3.2;
     },
-    /** 지금 할 수 있는 일: 집주인과 이야기 · 문(나가기). */
+    /** 그 집의 놀이 자리 { x, z, label } (없으면 null). */
+    actSpot() { return spec && spec.act ? { x: spec.act[0], z: spec.act[1], label: spec.act[3] } : null; },
+    /** 지금 할 수 있는 일: 집주인과 이야기 · 그 집의 놀이 · 문(나가기). */
     target() {
       const opts = [
         { type: 'host', x: hostAt.x, z: hostAt.z, r: 0.75, label: '말 걸기', reach: 1.45, y: host ? host.height + 0.35 : 1.4 },
         { type: 'door', x: door.x, z: door.z - 0.2, r: 0.6, label: '나가기', reach: 0.9, y: 1.1 }
       ];
+      if (spec && spec.act) { const [x, z, reach, label] = spec.act; opts.push({ type: 'act', x, z, r: 0.7, label, reach, y: 1.3 }); }
       let best = null, bd = Infinity;
       for (const o of opts) { const d = Math.hypot(o.x - pos.x, o.z - pos.z); if (d < o.reach && d < bd) { bd = d; best = o; } }
       return best;
@@ -203,6 +209,22 @@ export function createRooms() {
       cue.position.set(t.x, 0.03, t.z);
       cue.scale.setScalar(t.r * (1 + 0.07 * Math.sin(time * 6)));
     },
+    /** 내 캐릭터 · 집주인이 잠깐 몸짓을 한다(mode: 'swing' | 'dance' | 'cheer' …). */
+    pose(mode, dur) { mePose = { mode, t: dur, dur }; },
+    hostPose(mode, dur) { hostPose = { mode, t: dur, dur }; },
+    /** 놀이 자리 (x, z) 옆으로 옮겨 그쪽을 본다(이미 가까우면 바라보기만). 문 쪽으로 d 만큼 떨어진 빈자리. */
+    moveNear(x, z, d = 0.95) {
+      if (Math.hypot(pos.x - x, pos.z - z) <= d + 0.45) { yaw = Math.atan2(x - pos.x, z - pos.z); return; }
+      const dx = door.x - x, dz = door.z - z, L = Math.hypot(dx, dz) || 1;
+      for (const k of [d, d + 0.3, d + 0.6, d + 1]) {
+        for (const a of [0, 0.5, -0.5, 1, -1, 1.6, -1.6]) {
+          const c = Math.cos(a), s = Math.sin(a), px = x + ((dx * c - dz * s) / L) * k, pz = z + ((dx * s + dz * c) / L) * k;
+          if (!blocked(px, pz, 0.3)) { pos.x = px; pos.z = pz; yaw = Math.atan2(x - px, z - pz); return; }
+        }
+      }
+    },
+    /** 내 캐릭터가 (x, z) 를 바라본다. */
+    face(x, z) { yaw = Math.atan2(x - pos.x, z - pos.z); },
     /** 집주인 머리 위(하트 · 말풍선 자리). */
     hostAnchor() { return { x: hostAt.x, y: host ? host.height + 0.5 : 1.5, z: hostAt.z }; },
     resize(aspect) {
@@ -214,10 +236,13 @@ export function createRooms() {
       if (!me) return;
       me.root.position.set(pos.x, 0, pos.z);
       me.root.rotation.y = yaw;
-      animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
+      if (mePose) { mePose.t -= dt; if (mePose.t <= 0) mePose = null; }
+      if (hostPose) { hostPose.t -= dt; if (hostPose.t <= 0) hostPose = null; }
+      if (mePose) animateChibi(me, mePose.mode, t, { phase, swing: 1 - mePose.t / mePose.dur });
+      else animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
       if (host) {
         host.root.rotation.y = Math.atan2(pos.x - hostAt.x, pos.z - hostAt.z); // 집주인은 나를 바라본다
-        animateChibi(host, talking ? 'talk' : 'idle', t, {});
+        animateChibi(host, hostPose ? hostPose.mode : talking ? 'talk' : 'idle', t, {});
       }
     }
   };
