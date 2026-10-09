@@ -20,6 +20,8 @@ import { weedSvg } from './weedart.js';
 import { pochetteSvg, itemSvg, accessorySvg } from './itemart.js';
 import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
+import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, DROPS, weaponOf } from '../core/combat.js';
+import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -31,8 +33,12 @@ const APP_ICON = {
   // 풀 도감: 펼친 책 위에 새싹
   // 테스트 도구: 스패너
   dev: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M27.5 6.5a7.5 7.5 0 0 0-7.1 9.9L8.6 28.2a3.2 3.2 0 0 0 4.5 4.5l11.8-11.8a7.5 7.5 0 0 0 9.9-7.1l-4.6 2.4-3.9-1.3-1.3-3.9z" fill="#fff"/></svg>',
-  weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>'
+  weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>',
+  // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
+  monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
+/** 몬스터가 사는 곳(안내서 · 도감). */
+const REGION_TEXT = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '밤에만 · 마을 밖 어디든', boss: '바위산 깊은 곳' };
 
 function h(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -65,6 +71,29 @@ function leftPill(n, max) {
 }
 
 /**
+ * 몬스터 카드(토벌 안내서 · 몬스터 도감): 얼굴 · 이름 · 사는 곳 · 단단함 · 전리품 · 설명. withCount 면 잡은 수(못 잡았으면 흐리게).
+ * 이야기 속 왕버섯은 만나기 전에는 '???' 로 감춘다.
+ */
+function monsterCards(s, withCount) {
+  const hunted = s.hunted || {};
+  return MONSTER_ORDER.map((k) => {
+    const M = MONSTERS[k], n = hunted[k] || 0, D = DROPS[M.drop];
+    const hidden = M.boss && !n && !(s.story && s.story.bossSeen);
+    if (hidden) {
+      return h('div', { class: 'row mon-card unseen' }, svgSpan('mon-ico mystery', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="34" r="20" fill="#e6d8b8"/><text x="32" y="44" text-anchor="middle" font-size="28" font-weight="700" fill="#b9a37a">?</text></svg>'),
+        h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'd' }, `${REGION_TEXT[M.region]}에 무언가 커다란 것이 산다는 소문…`)));
+    }
+    const tough = M.hp >= 20 ? '아주 많이' : M.hp >= 6 ? '여러 번' : '몇 번';
+    return h('div', { class: `row mon-card${withCount && !n ? ' unseen' : ''}` }, svgSpan('mon-ico', monsterSvg(k)),
+      h('div', {},
+        h('div', { class: 't' }, M.name, withCount ? h('span', { class: 'weed-count' }, n ? `${n}마리 잡음` : '아직 못 잡았어요') : null),
+        h('div', { class: 'd' }, `${REGION_TEXT[M.region]} · ${tough} 때려야 쓰러짐 · 들이받으면 기운 −${M.dmg}`),
+        h('div', { class: 'd mon-drop' }, svgSpan('drop-ico', dropSvg(M.drop)), `전리품 ${D.name} · 노동 접수에서 ${won(D.price)}`),
+        h('div', { class: 'd weed-tip' }, M.note)));
+  });
+}
+
+/**
  * 게시판(노동 접수), 제초 검정소, 라멘 로우, 가구점, 부동산, 포셰트 가게, 설정 창. (집 안은 ui/homeui.js)
  * handlers: { getState, acceptJob(typeId), quitJob(), reportJob(), startExam(), buy(itemId), toTitle(),
  *   takeLicense(id: 'liquor' | 'arbeiter'), workRamen(),
@@ -78,7 +107,7 @@ function leftPill(n, max) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'dev'];
+  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds', 'monsters', 'dev'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -172,7 +201,7 @@ export function createPanels(ui, handlers) {
 
   const BUILD = {
     board(s) {
-      const left = boardOf(s, s.clock.day).left, mine = availableJobs(s.license.grade);
+      const left = boardOf(s, s.clock.day).left, mine = availableJobs(s.license.grade, licensesOf(s));
       const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
       const out = [head('노동 접수'), h('p', { class: 'sub' }, remain > 0 ? '빠른 사람이 임자! 날이 바뀌면 새 일감이 올라와요.' : '오늘 일감은 다 나갔어요. 날이 바뀌면 새로 올라와요.')];
       // 오늘 남은 일감: 큰 숫자 + 남은 만큼 찬 막대(한눈에 보이게). 적게 남으면 주황, 다 나가면 회색
@@ -193,16 +222,30 @@ export function createPanels(ui, handlers) {
             : h('button', { class: 'btn', type: 'button', onClick: after(handlers.quitJob) }, '그만두기')));
       } else {
         // 하치와레 안내 중(첫 일감)에는 풀 뽑기만 보여 준다
-        const jobs = s.tutorial === 'board' ? [JOB_TYPES.weed8] : availableJobs(s.license.grade);
+        const jobs = s.tutorial === 'board' ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s));
+        let huntHead = false;
         jobs.forEach((type) => {
+          // 토벌 일감은 따로 제목을 달고 몬스터 얼굴을 붙인다
+          if (type.hunt && !huntHead) { huntHead = true; out.push(h('h3', { class: 'shop-sec' }, '토벌 일감 · 토벌 자격증')); }
           // 남은 건수는 제목 옆 알약(하루 몫만큼 동그라미)으로 크게
           const n = left[type.id] ?? 0, max = Math.max(DAILY_JOBS[type.id] ?? 0, n);
-          out.push(h('div', { class: `row job${n > 0 ? '' : ' soldout'}` },
+          out.push(h('div', { class: `row job${n > 0 ? '' : ' soldout'}${type.hunt ? ' hunt' : ''}` },
+            type.hunt ? svgSpan('job-ico', monsterSvg(type.kind)) : null,
             h('div', {},
               h('div', { class: 'job-title' }, h('span', { class: 't' }, type.title), leftPill(n, max)),
-              h('div', { class: 'd' }, `${won(Math.round(type.base * mult))}부터 · ${type.where}`)),
+              h('div', { class: 'd' }, `${won(Math.round(type.base * (type.hunt ? 1 : mult)))}부터 · ${type.where}`)),
             h('button', { class: 'btn primary', type: 'button', disabled: n <= 0, onClick: after(() => handlers.acceptJob(type.id)) }, n > 0 ? '받기' : '오늘 마감')));
         });
+        if (s.tutorial !== 'board' && !hasLicense(s, 'hunter')) out.push(h('p', { class: 'note' }, '검정소에서 토벌 자격증을 따면 마을 밖 몬스터 토벌 일감도 받을 수 있어요.'));
+      }
+      // 전리품 팔기: 가방의 몬스터 전리품을 한꺼번에
+      const drops = Object.keys(DROPS).filter((id) => bagOf(s).items[id] > 0);
+      if (drops.length) {
+        const total = drops.reduce((a, id) => a + bagOf(s).items[id] * DROPS[id].price, 0);
+        out.push(h('div', { class: 'row sell' },
+          h('div', { class: 'sell-icons' }, drops.slice(0, 4).map((id) => svgSpan('job-ico', dropSvg(id)))),
+          h('div', {}, h('div', { class: 't' }, '전리품 팔기'), h('div', { class: 'd' }, drops.map((id) => `${DROPS[id].name} ×${bagOf(s).items[id]}`).join(' · '))),
+          h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.sellDrops) }, `${won(total)} 받기`)));
       }
       // 지금 급수 · 보수 배율과 승급 안내를 각각 다른 줄에(한 줄에 몰리면 읽기 어렵다)
       out.push(h('div', { class: 'row' },
@@ -225,17 +268,39 @@ export function createPanels(ui, handlers) {
       // 술 자격 · 슈퍼 알바이터: 필기 + 실기
       const INFO = {
         liquor: `필기 ${LICENSES.liquor.questions}문제(${LICENSES.liquor.pass}개 이상, 문제당 ${LICENSES.liquor.seconds}초) + 하이볼 실기 · 쿠리만쥬에게 위스키 강의를 다 듣고 와요`,
-        arbeiter: `필기 ${LICENSES.arbeiter.questions}문제(${LICENSES.arbeiter.pass}개 이상, 문제당 ${LICENSES.arbeiter.seconds}초) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북과 삶는 시간까지 공부해요`
+        arbeiter: `필기 ${LICENSES.arbeiter.questions}문제(${LICENSES.arbeiter.pass}개 이상, 문제당 ${LICENSES.arbeiter.seconds}초) + 레시피 북 없이 손님 3명 실기 · 라멘 로우 레시피 북과 삶는 시간까지 공부해요`,
+        hunter: `필기 ${LICENSES.hunter.questions}문제(${LICENSES.hunter.pass}개 이상, 문제당 ${LICENSES.hunter.seconds}초) + 실기: 허수아비 ${LICENSES.hunter.dummies}개를 ${LICENSES.hunter.practical}초 안에 쓰러뜨리기 · 아래 토벌 안내서로 공부해요(실기 때는 연습용 막대기를 빌려줘요)`
       };
-      for (const id of ['liquor', 'arbeiter']) {
+      for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const L = LICENSES[id], own = hasLicense(s, id);
         out.push(h('div', { class: 'row' },
           h('div', {}, h('div', { class: 't' }, L.name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요` : INFO[id])),
           own ? h('div', { class: 'd' }, '합격 ✓')
             : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L.fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L.fee ? `응시료 ${won(L.fee)} 부족` : `시험 보기 ${won(L.fee)}`)));
       }
+      out.push(h('div', { class: 'row' },
+        h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, '마을 밖 몬스터 · 전리품 · 지켜야 할 규칙 (토벌 자격증 필기 범위)')),
+        h('button', { class: 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기')));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
+    },
+    // 검정소 토벌 안내서: 몬스터 카드 + 규칙(필기 범위)
+    guidebook(s) {
+      return [head('토벌 안내서'), h('p', { class: 'sub' }, '마을 밖에는 몬스터가 살아요. 잘 알고 나가요!'),
+        h('ul', { class: 'rules' },
+          h('li', {}, '몬스터에게 맞으면 기운이 줄어요. 기운이 0이 되면 기절해서 마을 입구로 옮겨지고 돈을 조금 잃어요.'),
+          h('li', {}, '몬스터는 마을 울타리 안으로 들어오지 못해요. 위험하면 마을로 도망쳐요!'),
+          h('li', {}, '몬스터가 몸을 움츠리면(붉게 깜빡) 곧 들이받아요. 그때 물러나면 피할 수 있어요.'),
+          h('li', {}, '무기는 도구점에서 사요. 잡으면 나오는 전리품은 노동 접수에서 팔아요.')),
+        ...monsterCards(s, false),
+        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
+    },
+    // 마을폰 '몬스터 도감' 앱: 만난(잡은) 몬스터와 잡은 수
+    monsters(s) {
+      const caught = MONSTER_ORDER.filter((k) => (s.hunted || {})[k] > 0).length;
+      return [appBar('몬스터 도감', `${caught} / ${MONSTER_ORDER.length}종`),
+        h('p', { class: 'sub' }, '잡은 몬스터는 잡은 수가 적혀요. 검정소 토벌 안내서에도 같은 내용이 있어요.'),
+        ...monsterCards(s, true)];
     },
     shop(s) {
       const shop = SHOPS.ramen;
@@ -267,7 +332,7 @@ export function createPanels(ui, handlers) {
     licenses(s) {
       const out = [appBar('자격증'), h('p', { class: 'sub' }, `${s.profile.name}의 자격증 지갑`)];
       out.push(h('div', { class: 'row license-card' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${PAY_MULT[s.license.grade]}배 · 풀 ${WEED_ORDER.filter((k) => canPullKind(s.license.grade, k)).length}종 뽑기`))));
-      for (const id of ['liquor', 'arbeiter']) {
+      for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
         out.push(h('div', { class: `row license-card${own ? '' : ' none'}` },
           h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요 · 검정소에서 시험을 봐요'))));
@@ -413,6 +478,16 @@ export function createPanels(ui, handlers) {
           h('div', {}, h('div', { class: 't' }, `${info.name} ×${n}`), h('div', { class: 'd' }, info.note + (info.kind === 'herb' ? ` 깔끔하게 뽑은 것 ${c}개.` : ''))),
           info.eat ? h('button', { class: 'btn primary', type: 'button', disabled: s.stamina >= MAX_STAMINA, onClick: after(() => handlers.eatItem(id)) }, s.stamina >= MAX_STAMINA ? '배불러요' : '먹기') : null));
       }
+      // 무기: 눌러서 바꿔 들기 · 넣기
+      const wp = weaponOf(s);
+      if (wp.owned.length) {
+        out.push(h('h3', { class: 'shop-sec' }, '무기 · 눌러서 바꿔 들어요'));
+        out.push(h('div', { class: 'bag-grid' },
+          h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(!wp.held), onClick: after(() => handlers.holdWeapon(null)) },
+            svgSpan('bag-ico', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>'), h('span', { class: 'nm' }, '넣어 두기')),
+          wp.owned.map((id) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(wp.held === id), onClick: after(() => handlers.holdWeapon(id)) },
+            svgSpan('bag-ico', weaponSvg(id)), h('span', { class: 'nm' }, WEAPONS[id].name)))));
+      }
       // 꾸미기: 가진 것만 보여 주고, 바꾸는 건 집 옷장에서
       const pc = pochetteOf(s), wd = wardrobeOf(s);
       if (pc.owned.length || wd.owned.length) {
@@ -459,7 +534,22 @@ export function createPanels(ui, handlers) {
           !own ? h('button', { class: 'btn primary', type: 'button', disabled: s.money < T.price, onClick: after(() => handlers.buyTool(id)) }, s.money < T.price ? '돈이 부족해요' : `${won(T.price)}에 사기`)
             : held ? h('div', { class: 'd' }, '들고 있어요') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '들기')));
       }
-      out.push(h('p', { class: 'note' }, '오른쪽 등불 버튼으로 끄고 켜요.'), h('div', { class: 'actions' }, closeBtn()));
+      out.push(h('p', { class: 'note' }, '오른쪽 등불 버튼으로 끄고 켜요.'));
+      // 무기(4단계): 사면 바로 들고, 가진 무기는 바꿔 들거나 넣어 둔다
+      const wp = weaponOf(s);
+      out.push(h('h3', { class: 'shop-sec' }, '무기'));
+      for (const id of WEAPON_ORDER) {
+        const W = WEAPONS[id], own = wp.owned.includes(id), on = wp.held === id, short = s.money < W.price;
+        let btn;
+        if (!own) btn = h('button', { class: 'btn primary', type: 'button', disabled: short, onClick: after(() => handlers.buyWeapon(id)) }, short ? '돈이 부족해요' : `${won(W.price)}에 사기`);
+        else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '들기');
+        else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '드는 중 · 넣기');
+        out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', weaponSvg(id)),
+          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg))), h('div', { class: 'd' }, `${won(W.price)} · ${W.note}${own ? ' · 가지고 있어요' : ''}`)),
+          btn));
+      }
+      out.push(h('p', { class: 'note' }, '무기를 들고 마을 밖 몬스터 가까이에서 버튼(PC 는 스페이스)을 누르면 휘둘러요. 힘이 셀수록 적게 때려도 쓰러져요.'));
+      out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
     // 테스트 도구(숨은 앱): 돈 · 기운 · 급수 · 시각을 바로 바꾼다
@@ -530,6 +620,7 @@ export function createPanels(ui, handlers) {
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
+          app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
@@ -564,6 +655,7 @@ export function createPanels(ui, handlers) {
     openTools: () => show('tools'),
     openMap: () => show('map'),
     openWeeds: () => show('weeds'),
+    openMonsters: () => show('monsters'),
     openSettings: (extra) => show('settings', extra)
   };
 }

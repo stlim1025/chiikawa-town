@@ -14,7 +14,8 @@ export const DAILY_JOBS = {
   foxtail6: 2, vine4: 2, // 4급
   thorny3: 2, reed5: 2, // 3급
   rockmoss4: 2, moon3: 1, // 2급
-  giant2: 1, poison3: 1 // 1급
+  giant2: 1, poison3: 1, // 1급
+  huntFluff: 2, huntSlime: 2, huntBeetle: 2, huntTurtle: 1, huntMoth: 1 // 토벌(토벌 자격증)
 };
 
 /** 일하는 친구들: 처음 지갑, 부지런함(일감을 받을 확률), 할 줄 아는 일감, 밥 먹으러 갈 확률. */

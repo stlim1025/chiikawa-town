@@ -335,6 +335,32 @@ const PROP_PARTS = {
   ])
 };
 
+/** 내 무기(4단계): 꼬리표 'w-무기id'. HOLD.train 자세에서 손끝 기준(+z 앞)으로 적는다. */
+const WEAPON_PARTS = {
+  'w-stick': [
+    { m: 'box', c: '#b07a45', p: [0, 0, 0.22], s: [0.045, 0.045, 0.62] },
+    { m: 'dot', c: '#8a5a30', p: [0.022, 0, 0.3], s: [0.028, 0.028, 0.028], o: false },
+    { m: 'dot', c: '#7cc25e', p: [0.045, 0.025, 0.44], r: [0, 0.4, 0.3], s: [0.06, 0.016, 0.035], o: false }
+  ],
+  'w-sword': [
+    { m: 'box', c: '#5a3b28', p: [0, 0, -0.01], s: [0.05, 0.05, 0.15] },
+    { m: 'box', c: '#3e2a1d', p: [0, 0, 0.075], s: [0.15, 0.045, 0.045] },
+    { m: 'box', c: '#e3c08d', p: [0, 0, 0.37], s: [0.065, 0.026, 0.54] }
+  ],
+  'w-hammer': [
+    { m: 'box', c: '#9a6a3c', p: [0, 0, 0.18], s: [0.045, 0.045, 0.52] },
+    { m: 'box', c: '#9a948c', p: [0, 0, 0.47], s: [0.28, 0.17, 0.17] },
+    { m: 'box', c: '#6f6a63', p: [0, 0, 0.47], s: [0.07, 0.185, 0.185] }
+  ],
+  'w-star': [
+    { m: 'box', c: '#3a4a7a', p: [0, 0, -0.01], s: [0.05, 0.05, 0.15] },
+    { m: 'box', c: '#f2c94c', p: [0, 0, 0.075], s: [0.19, 0.045, 0.05] },
+    { m: 'dot', c: '#ff7a9a', p: [0, 0.03, 0.075], s: [0.032, 0.032, 0.032], o: false },
+    { m: 'box', c: '#cdeeff', p: [0, 0, 0.39], s: [0.065, 0.024, 0.58] },
+    { m: 'dot', c: '#fff6c9', p: [0, 0.02, 0.7], s: [0.05, 0.05, 0.05], o: false }
+  ]
+};
+
 /**
  * 친구별로 그 몸짓(animateChibi 모드)을 할 때 드는 소품 꼬리표.
  * 'drink' 는 라멘 로우에서 라멘을 먹을 때도 쓰니 그릇을 들고, 쿠리만쥬만 맥주잔을 든다.
@@ -571,12 +597,14 @@ function playerDef(rawLook) {
   hairParts(parts, hc, look);
   accessoryParts(parts, hc, hr, look);
   pochetteParts(parts, pochette);
-  // 손에 드는 불(평소엔 숨김, player.setHeld 로 켠다): 랜턴은 손잡이에 매단 등, 손전등은 앞을 향한 원통
-  parts.push({ m: 'box', c: '#4a3f48', p: [0.4, 0.22, 0.12], s: [0.03, 0.12, 0.03], n: 'armR', tag: 'lantern' });
-  parts.push({ m: 'sphere', c: '#ffe7a3', p: [0.4, 0.08, 0.12], s: [0.09, 0.11, 0.09], n: 'armR', tag: 'lantern', o: false });
-  parts.push({ m: 'cone', c: '#4a3f48', p: [0.4, 0.17, 0.12], s: [0.1, 0.06, 0.1], n: 'armR', tag: 'lantern' });
-  parts.push({ m: 'cylinder', c: '#6f94bb', p: [0.4, 0.2, 0.06], r: [Math.PI / 2, 0, 0], s: [0.045, 0.24, 0.045], n: 'armR', tag: 'flashlight' });
-  parts.push({ m: 'sphere', c: '#fff7d6', p: [0.4, 0.2, 0.31], s: [0.05, 0.05, 0.02], n: 'armR', tag: 'flashlight', o: false });
+  // 손에 드는 불(평소엔 숨김, player.setHeld 로 켠다): 왼손에. 랜턴은 손잡이에 매단 등, 손전등은 앞을 향한 원통
+  parts.push({ m: 'box', c: '#4a3f48', p: [-0.4, 0.22, 0.12], s: [0.03, 0.12, 0.03], n: 'armL', tag: 'lantern' });
+  parts.push({ m: 'sphere', c: '#ffe7a3', p: [-0.4, 0.08, 0.12], s: [0.09, 0.11, 0.09], n: 'armL', tag: 'lantern', o: false });
+  parts.push({ m: 'cone', c: '#4a3f48', p: [-0.4, 0.17, 0.12], s: [0.1, 0.06, 0.1], n: 'armL', tag: 'lantern' });
+  parts.push({ m: 'cylinder', c: '#6f94bb', p: [-0.4, 0.2, 0.06], r: [Math.PI / 2, 0, 0], s: [0.045, 0.24, 0.045], n: 'armL', tag: 'flashlight' });
+  parts.push({ m: 'sphere', c: '#fff7d6', p: [-0.4, 0.2, 0.31], s: [0.05, 0.05, 0.02], n: 'armL', tag: 'flashlight', o: false });
+  // 무기(4단계, 오른손): player.setWeapon 으로 보인다. 휘두르기(swing) 자세에 맞춰 손끝에서 앞으로 뻗게 적는다
+  for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, tag }));
   const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
@@ -700,6 +728,22 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     const up = (Math.sin(t * 1.4) + 1) / 2;
     a.armR = [-1.0 - up * 0.5, -0.35 * up, -0.5]; a.armL = [0, 0, -0.12];
     a.head = [-0.3 * up, 0, 0];
+  } else if (mode === 'swing') {
+    // 무기 휘두르기(opts.swing 0 → 1): 번쩍 들었다가(0~0.3) 앞으로 내리치고(~0.55) 제자리로
+    // 무기는 팔을 내렸을 때 칼끝이 앞을 보게 쥐고 있어서, 팔을 끝까지 내리쳐야(+) 칼끝이 앞아래를 친다
+    const k = opts.swing || 0;
+    const ease = (x) => 1 - (1 - x) * (1 - x);
+    const ax = k < 0.3 ? -2.9 * ease(k / 0.3) : k < 0.5 ? -2.9 + 3.15 * ease((k - 0.3) / 0.2) : 0.25 * (1 - ease((k - 0.5) / 0.5));
+    a.armR = [ax, 0, -0.25]; a.armL = [k < 0.5 ? -0.5 * Math.min(1, k / 0.3) : -0.5 * (1 - (k - 0.5) / 0.5), 0, 0.2];
+    const slam = k > 0.3 && k < 0.75;
+    a.head = [slam ? 0.18 : -0.08, 0, 0];
+    lean = slam ? 0.18 : -0.06 * Math.min(1, k / 0.3);
+    bob = k < 0.3 ? 0.05 * (k / 0.3) : 0;
+  } else if (mode === 'hurt') {
+    // 맞았을 때: 뒤로 휘청
+    a.armL = [0, 0, -0.9]; a.armR = [0, 0, 0.9];
+    a.head = [-0.25, 0, 0];
+    lean = -0.25;
   } else if (mode === 'dance') {
     // 포즈: 두 팔을 번쩍, 통통 뛰며 몸을 흔든다
     const w = Math.sin(t * 7);

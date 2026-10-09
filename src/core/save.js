@@ -10,6 +10,7 @@ import { isValidTools } from './tools.js';
 import { isValidWeedLog } from './weeding.js';
 import { isValidBag } from './inventory.js';
 import { isValidWardrobe } from './wardrobe.js';
+import { isValidWeapon, isValidHunted } from './combat.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -45,6 +46,8 @@ export function isValidState(s) {
   if (s.weedLog !== undefined && !isValidWeedLog(s.weedLog)) return false; // 풀 도감(2단계부터)
   if (s.bag !== undefined && !isValidBag(s.bag)) return false; // 가방
   if (s.wardrobe !== undefined && !isValidWardrobe(s.wardrobe)) return false; // 꾸미기 소품
+  if (s.weapon !== undefined && !isValidWeapon(s.weapon)) return false; // 무기(4단계)
+  if (s.hunted !== undefined && !isValidHunted(s.hunted)) return false; // 잡은 몬스터 수
   return true;
 }
 

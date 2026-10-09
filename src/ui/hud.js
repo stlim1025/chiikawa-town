@@ -67,7 +67,10 @@ export function createHud(ui, input) {
   timer.setAttribute('role', 'timer');
   const labelLayer = el('div');
   labelLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
-  ui.append(labelLayer, dock, clock, bagBtn, gear, zoom, action, meter, timer, toasts);
+  // 맞았을 때 붉은 테두리 · 기절할 때 어둡게 덮는 막
+  const hurtFx = el('div', 'hurt-fx');
+  const curtain = el('div', 'curtain');
+  ui.append(labelLayer, hurtFx, dock, clock, bagBtn, gear, zoom, action, meter, timer, toasts, curtain);
 
   const q = (root, sel) => root.querySelector(sel);
   const press = (down) => (e) => { e.preventDefault(); if (down) action.setPointerCapture?.(e.pointerId); input.setAction(down); };
@@ -217,6 +220,17 @@ export function createHud(ui, input) {
       setTimeout(() => card.classList.add('out'), 2300);
       setTimeout(() => card.remove(), 2700);
     },
+    /** 맞았다: 화면 가장자리가 붉게 번쩍. */
+    hurt() { hurtFx.classList.remove('on'); void hurtFx.offsetWidth; hurtFx.classList.add('on'); },
+    /** 화면을 어둡게 덮는다(기절). on=false 면 걷는다. */
+    curtain(on, text = '') { curtain.textContent = text; curtain.classList.toggle('on', !!on); },
+    /** 월드 위치에서 떠오르는 글씨(맞힌 힘, 얻은 전리품). kind: 'dmg' | 'drop' | 'hurt' */
+    floatText({ x, y, z, text, kind = 'dmg' }) {
+      const e = el('div', 'float-fx ' + kind);
+      e.textContent = text;
+      labelLayer.appendChild(e);
+      fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : 900) });
+    },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     banner(title, sub, ms = 2600) {
       const b = el('div', 'hud-banner');
@@ -252,6 +266,16 @@ export function createHud(ui, input) {
             e.replaceChildren(...(it.key ? [el('kbd', '', ''), el('span', '', '')] : [el('span', '', '')]));
             if (it.key) e.firstChild.textContent = it.key;
             e.lastChild.textContent = it.text;
+          }
+        } else if (it.kind === 'mhp') {
+          // 몬스터 머리 위: 이름 + 체력 줄
+          const want = it.text + '|' + Math.round(it.pct * 100);
+          if (e.dataset.v !== want) {
+            if (!e.firstChild) { e.append(el('b'), el('i', '', '<u></u>')); e.classList.toggle('boss', !!it.boss); }
+            e.dataset.v = want;
+            e.firstChild.textContent = it.text;
+            e.querySelector('u').style.width = Math.round(it.pct * 100) + '%';
+            e.classList.toggle('low', it.pct <= 0.34);
           }
         } else if (e.textContent !== it.text) e.textContent = it.text;
         e.style.left = ((v.x + 1) / 2) * w + 'px';

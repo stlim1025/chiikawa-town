@@ -9,9 +9,11 @@ export function createPlayer(scene, chibi, village) {
   const position = { x: 0, z: 2 };
   let yaw = 0, phase = 0, t = 0;
   let model = chibi;
-  let held = null;
+  let held = null, weapon = null, weaponShown = true;
+  let swingT = 0, hurtT = 0, blinkT = 0;
+  const knock = { x: 0, z: 0 };
   const showHeld = () => {
-    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held;
+    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || (weaponShown && weapon && tag === 'w-' + weapon);
   };
 
   const api = {
@@ -42,6 +44,17 @@ export function createPlayer(scene, chibi, village) {
     },
     /** 손에 드는 불 'lantern' | 'flashlight' | null. 모델을 바꿔도 유지한다. */
     setHeld(tag) { if (held === tag) return; held = tag; showHeld(); },
+    /** 오른손 무기 id | null(4단계). */
+    setWeapon(id) { if (weapon === id) return; weapon = id; showHeld(); },
+    /** 무기를 휘두른다(seconds 동안 휘두르기 몸짓). */
+    swing(seconds = 0.32) { swingT = seconds; api.swingDur = seconds; },
+    get swinging() { return swingT > 0; },
+    /** 휘두르기 진행(0 → 1, 안 휘두르면 0). */
+    get swingK() { return swingT > 0 ? 1 - swingT / api.swingDur : 0; },
+    /** 맞았다: 밀려나고, 잠깐 휘청이며 깜빡인다. (vx, vz) 는 밀려나는 거리. */
+    hurt(vx, vz, seconds = 1.0) { knock.x = vx * 7; knock.z = vz * 7; hurtT = 0.3; blinkT = seconds; },
+    /** 깜빡임(맞은 뒤 잠깐 무적)을 멈춘다. */
+    stopBlink() { blinkT = 0; model.root.visible = true; },
     /** 지점을 바라본다. */
     face(x, z) { yaw = Math.atan2(x - position.x, z - position.z); },
     update(dt, input) {
@@ -59,7 +72,15 @@ export function createPlayer(scene, chibi, village) {
           moving = true;
         }
       }
-      const v = api.busy || api.walkTo || moving ? { x: 0, y: 0 } : input.vector();
+      // 맞아서 밀려나는 중이면 조작이 잠깐 안 먹는다
+      if (Math.abs(knock.x) + Math.abs(knock.z) > 0.05) {
+        const nx = position.x + knock.x * dt, nz = position.z + knock.z * dt;
+        if (village.isFree(nx, position.z, RADIUS)) position.x = nx;
+        if (village.isFree(position.x, nz, RADIUS)) position.z = nz;
+        const damp = Math.exp(-dt * 10);
+        knock.x *= damp; knock.z *= damp;
+      }
+      const v = api.busy || api.walkTo || moving || hurtT > 0 ? { x: 0, y: 0 } : input.vector();
       const len = Math.min(1, Math.hypot(v.x, v.y));
       if (len > 0.12) {
         const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y);
@@ -77,10 +98,17 @@ export function createPlayer(scene, chibi, village) {
       }
       api.cheerTime = Math.max(0, api.cheerTime - dt);
       api.danceTime = Math.max(0, api.danceTime - dt);
-      const mode = api.mode === 'pull' ? 'pull' : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      swingT = Math.max(0, swingT - dt);
+      hurtT = Math.max(0, hurtT - dt);
+      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? 'swing' : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      // 풀 뽑기 · 춤 · 만세 중에는 무기를 넣어 둔다(손이 풀 · 머리에 박히지 않게)
+      const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer');
+      if (show !== weaponShown) { weaponShown = show; showHeld(); }
+      // 맞은 뒤 무적 시간에는 깜빡인다
+      if (blinkT > 0) { blinkT = Math.max(0, blinkT - dt); model.root.visible = blinkT === 0 || Math.floor(blinkT * 14) % 2 === 0; }
       model.root.position.set(position.x, 0, position.z);
       model.root.rotation.y = yaw;
-      animateChibi(model, mode, t, { phase, power: api.power });
+      animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0 });
     }
   };
   return api;

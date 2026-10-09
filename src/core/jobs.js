@@ -18,15 +18,29 @@ export const JOB_TYPES = {
   rockmoss4: { id: 'rockmoss4', title: '바위틈 이끼풀 4개 뽑기', kind: 'rockmoss', target: 4, base: 300, cleanBonus: 15, needGrade: 2, where: '북쪽 바위산' },
   moon3: { id: 'moon3', title: '달빛 풀 3개 뽑기', kind: 'moongrass', target: 3, base: 330, cleanBonus: 18, needGrade: 2, where: '숲 · 바위산 (밤에만)' },
   giant2: { id: 'giant2', title: '왕잡초 2개 뽑기', kind: 'giantweed', target: 2, base: 420, cleanBonus: 30, needGrade: 1, where: '서쪽 숲 깊은 곳' },
-  poison3: { id: 'poison3', title: '독풀 3개 뽑기', kind: 'poisonweed', target: 3, base: 450, cleanBonus: 25, needGrade: 1, where: '북쪽 바위산 깊은 곳' }
+  poison3: { id: 'poison3', title: '독풀 3개 뽑기', kind: 'poisonweed', target: 3, base: 450, cleanBonus: 25, needGrade: 1, where: '북쪽 바위산 깊은 곳' },
+  // 4단계: 토벌 일감(토벌 자격증이 있어야 받는다, 제초 급수와 상관없이). 하나도 안 맞고 잡으면 '깔끔하게'
+  huntFluff: { id: 'huntFluff', title: '풀뭉치 4마리 토벌', kind: 'fluff', target: 4, base: 320, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '동쪽 들판' },
+  huntSlime: { id: 'huntSlime', title: '물방울 슬라임 4마리 토벌', kind: 'slime', target: 4, base: 340, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '남쪽 강가' },
+  huntBeetle: { id: 'huntBeetle', title: '도토리 뿔벌레 3마리 토벌', kind: 'beetle', target: 3, base: 380, cleanBonus: 25, needGrade: 5, needLicense: 'hunter', hunt: true, where: '서쪽 숲' },
+  huntTurtle: { id: 'huntTurtle', title: '이끼 거북 2마리 토벌', kind: 'turtle', target: 2, base: 520, cleanBonus: 40, needGrade: 5, needLicense: 'hunter', hunt: true, where: '북쪽 바위산' },
+  huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 480, cleanBonus: 30, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' }
 };
 
 /** 풀을 뽑는 일감인지. */
 export const isWeedJob = (type) => !!WEED_KINDS[type.kind];
 
-/** 지금 급수로 받을 수 있는 일감(높은 급수 일감부터, 같은 급수는 적힌 순서대로). */
-export function availableJobs(grade) {
-  return Object.values(JOB_TYPES).filter(j => grade <= j.needGrade).sort((a, b) => a.needGrade - b.needGrade);
+/** 몬스터 토벌 일감인지(4단계). */
+export const isHuntJob = (type) => !!type.hunt;
+
+/**
+ * 지금 급수(와 자격증)로 받을 수 있는 일감. 풀 · 열매 · 스티커 일감은 높은 급수 일감부터(같은 급수는 적힌 순서대로),
+ * 토벌 일감은 토벌 자격증이 있을 때만 맨 뒤에 붙는다. licenses: state.licenses
+ */
+export function availableJobs(grade, licenses = {}) {
+  const work = Object.values(JOB_TYPES).filter((j) => !j.needLicense && grade <= j.needGrade).sort((a, b) => a.needGrade - b.needGrade);
+  const licensed = Object.values(JOB_TYPES).filter((j) => j.needLicense && licenses[j.needLicense]);
+  return work.concat(licensed);
 }
 
 /** 일감 수락. */
@@ -46,8 +60,8 @@ export function isComplete(job) {
   return job.count >= JOB_TYPES[job.typeId].target;
 }
 
-/** 보수 = (기본 + 깔끔 보너스) × 급수 배율. */
+/** 보수 = (기본 + 깔끔 보너스) × 급수 배율. 토벌 일감은 제초 급수와 상관없이 그대로. */
 export function payout(job, grade) {
   const type = JOB_TYPES[job.typeId];
-  return Math.round((type.base + job.clean * type.cleanBonus) * PAY_MULT[grade]);
+  return Math.round((type.base + job.clean * type.cleanBonus) * (type.hunt ? 1 : PAY_MULT[grade]));
 }

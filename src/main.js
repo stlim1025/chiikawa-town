@@ -6,7 +6,9 @@
  *  +    라멘 주방 새 단장 · 알바 필기 강화 · 친밀도 하트 연출 · 가방(미리 캐 두기) · 옷장 · 집 안 걷기 · 친밀도별 대사(core/dialogue.js)
  *  3단계 ✅ 마을 생활 — 친구들 기운(일하면 줄고, 모자라면 라멘 · 낮잠, 밤 21시~6시 반에는 집에서 잠), 친구 집 · 하치와레 동굴 안(world/rooms.js),
  *          문 두드리기 · 하트 2개부터 '집에 놀러 가도 돼?' · 쫓겨났을 때 친구 집에서 묵기
- *  4단계: 토벌 — 도구점 무기, 검정소 토벌 자격증, 마을 밖 몬스터(오리지널 디자인), 노동 접수 토벌 일감
+ *  4단계 ✅ 토벌 — 도구점 무기 4종(core/combat.js), 검정소 토벌 자격증(필기 + 허수아비 실기), 마을 밖 몬스터 5종 + 보스(오리지널 디자인,
+ *          world/monsters.js: 어슬렁 → 쫓기 → 움츠렸다 들이받기), 맞으면 기운 −, 0이면 기절(마을 입구 · 돈 조금), 전리품 → 노동 접수에서 팔기,
+ *          토벌 일감 5종, 토벌 안내서 · 몬스터 도감 앱
  *  5단계: 퀘스트 · 스토리 — 친구마다 고충 퀘스트(친밀도 · 돈 · 가구 · 도구 보상), 마을 스토리라인, 퀘스트 앱
  */
 import * as THREE from 'three';
@@ -57,11 +59,13 @@ import {
 import { furnitureThumbs } from './world/thumbs.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, regionAt } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, regionAt } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf } from './core/calendar.js';
+import { WEAPONS, DROPS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
+import { createMonsters } from './world/monsters.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -114,6 +118,7 @@ function boot() {
   const village = buildVillage(scene);
   const berries = createBerries(scene, village); // 잡초보다 먼저 심어서 잡초가 덤불을 피해 자란다
   const weeds = createWeeds(scene, village);
+  const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
   const npcs = createNpcs(scene, village, weeds, berries);
   const input = createInput(ui, canvas);
   const hud = createHud(ui, input);
@@ -268,6 +273,27 @@ function boot() {
       hud.toast(id === 'map' ? '마을 지도를 샀어요! 마을폰에 지도 앱이 생겼어요' : `${TOOLS[id].name}을(를) 샀어요! 밤에 들고 다녀요`, 3200);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
+    // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
+    buyWeapon(id) {
+      const r = buyWeapon(state, id);
+      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 무기예요'); return; }
+      commit(r.state);
+      sound.play('coin');
+      player.cheerTime = 1.2;
+      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 들었어요! 마을 밖 몬스터 가까이에서 버튼을 눌러 휘둘러요`, 3600);
+    },
+    holdWeapon(id) {
+      commit(holdWeapon(state, id));
+      sound.play('click');
+      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 들었어요` : '무기를 넣어 뒀어요', 1600);
+    },
+    sellDrops() {
+      const r = sellDrops(state);
+      if (!r.sold) return;
+      commit(r.state);
+      sound.play('coin');
+      hud.toast(`전리품 ${r.sold}개를 팔아 ${won(r.earned)}을 받았어요!`, 3000);
+    },
     playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
     mapLabels: () => village.labels.map((l) => ({ x: l.x, z: l.z, text: l.text })),
     buyHouse() {
@@ -293,6 +319,7 @@ function boot() {
     toTitle() {
       cancelPull();
       resetFun();
+      endHunterExam();
       save();
       guide.setGoal(null);
       npcs.setFollow('hachiware', false);
@@ -724,9 +751,12 @@ function boot() {
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
       return;
     }
-    if (panels.isOpen()) return;
-    if (pulling || !target) return;
-    if (target.type === 'weed') beginPull(target.weed);
+    if (panels.isOpen() || fainting) return;
+    if (pulling) return;
+    // 대상이 없어도 무기를 들고 있으면 허공에 휘두른다
+    if (!target) { if (weaponNow()) doSwing(); return; }
+    if (target.type === 'attack') doSwing();
+    else if (target.type === 'weed') beginPull(target.weed);
     else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
@@ -879,6 +909,7 @@ function boot() {
   function endOverlay() { overlay = false; if (mode === 'play') input.setEnabled(true); }
   /** 검정소 시험: 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. */
   function takeLicense(id) {
+    if (hunterExam) { hud.toast('토벌 실기 시험 중이에요! 허수아비부터 쓰러뜨려요'); return; }
     const L = LICENSES[id], r = payFee(state, id);
     if (!r.ok) { hud.toast(r.reason === 'money' ? '응시료가 부족해요' : '이미 있는 자격이에요'); return; }
     commit(r.state);
@@ -887,16 +918,17 @@ function boot() {
     const pass = () => {
       commit(grant(state, id, state.clock.day));
       endOverlay();
-      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '라멘 로우에서 하이볼을 마실 수 있어요' : '라멘 로우에서 알바할 수 있어요', 3600);
+      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '라멘 로우에서 하이볼을 마실 수 있어요' : id === 'hunter' ? '노동 접수에서 토벌 일감을 받을 수 있어요' : '라멘 로우에서 알바할 수 있어요', 3600);
       sound.play('done');
       player.cheerTime = 1.8;
     };
-    const questions = id === 'liquor' ? liquorQuiz(L.questions) : ramenQuiz(L.questions);
+    const questions = id === 'liquor' ? liquorQuiz(L.questions) : id === 'hunter' ? huntQuiz(L.questions) : ramenQuiz(L.questions);
     openQuiz(ui, {
       title: `${L.name} · 필기`, questions, pass: L.pass, seconds: L.seconds || 0, sound,
       onDone: (correct, ok) => {
-        if (!ok) { fail('필기에서 떨어졌어요'); return; }
+        if (!ok) { fail(id === 'hunter' ? '필기에서 떨어졌어요 · 검정소 토벌 안내서를 읽어 봐요' : '필기에서 떨어졌어요'); return; }
         if (id === 'liquor') openHighball(ui, { sound, onDone: (good) => (good ? pass() : fail('하이볼을 다시 연습해요')) });
+        else if (id === 'hunter') startHunterPractical(pass, fail);
         else openRamenShop(ui, { mode: 'exam', sound, onEnd: (res) => (res.completed ? pass() : fail(res.reason)) });
       }
     });
@@ -920,6 +952,159 @@ function boot() {
       }
     });
   }
+  // ---------- 토벌(4단계): 무기 휘두르기 · 몬스터에게 맞기 · 기절 · 토벌 실기 ----------
+  const SWING_TIME = 0.34, HIT_DELAY = 0.14;
+  let swingCool = 0, iframe = 0, fainting = false, swingHit = null; // swingHit: { t: 맞히기까지 남은 초, id: 무기 }
+  let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비, pass, fail }
+  let growlCool = 0, warnCool = 0;
+  /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 막대기). */
+  const weaponNow = () => (state ? heldWeapon(state) || (hunterExam ? 'stick' : null) : null);
+
+  /** 휘두르기: 가까운 몬스터 쪽으로 몸을 돌리고(휴대폰에서도 맞히기 쉽게) 잠깐 뒤에 맞힌다. */
+  function doSwing() {
+    const id = weaponNow();
+    if (!id || swingCool > 0 || player.swinging || fainting) return;
+    const W = WEAPONS[id], p = player.position;
+    const near = monsters.nearest(p.x, p.z, W.range + 1.2);
+    if (near) player.face(near.x, near.z);
+    player.swing(SWING_TIME);
+    swingCool = W.cool;
+    swingHit = { t: HIT_DELAY, id };
+    sound.play('swing');
+  }
+  function resolveSwing(id) {
+    const W = WEAPONS[id], p = player.position;
+    const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg, knock: W.knock || 1 });
+    if (!hits.length) return;
+    sound.play('hit');
+    for (const { m, killed } of hits) {
+      hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${W.dmg}`, kind: 'dmg' });
+      if (killed) onKill(m);
+    }
+  }
+  /** 몬스터를 쓰러뜨렸다: 전리품은 가방에, 토벌 일감이면 센다(한 번도 안 맞고 잡으면 깔끔하게). */
+  function onKill(m) {
+    sound.play('poof');
+    if (m.exam) { examDummyDown(); return; }
+    let s = recordHunt(state, m.species);
+    const before = s.job;
+    if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
+    const drop = m.M.drop;
+    let got = 0;
+    if (drop) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
+    commit(s);
+    if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: `+${DROPS[drop].name}`, kind: 'drop' }); hud.bagBump(); }
+    else if (drop) hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)');
+    if (state.hunted[m.species] === 1) hud.toast(`처음으로 ${josa(m.M.name, '을/를')} 잡았어요! 마을폰 몬스터 도감에 적혔어요`, 3400);
+    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${m.M.name} 토벌 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1500);
+    celebrateIfDone(before, state.job);
+  }
+  /** 몬스터의 들이받기가 닿았다: 기운이 줄고 밀려난다. 잠깐은 다시 안 맞는다. 기운이 0이면 기절. */
+  function onMonsterHit(m) {
+    if (iframe > 0 || fainting || sleeping || mode !== 'play' || !state) return;
+    const dmg = m.M.dmg, next = Math.max(0, state.stamina - dmg);
+    commit({ ...state, stamina: next }, false);
+    iframe = PLAYER_IFRAME;
+    const p = player.position, dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1;
+    cancelPull();
+    player.hurt((dx / d) * PLAYER_KNOCK, (dz / d) * PLAYER_KNOCK, PLAYER_IFRAME);
+    sound.play('hurt');
+    hud.hurt();
+    hud.floatText({ x: p.x, y: 1.6, z: p.z, text: `기운 −${dmg}`, kind: 'hurt' });
+    if (next <= 0) startFaint();
+    else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요! 마을로 돌아가 쉬어요', 3000); }
+  }
+  /** 기절: 화면이 어두워졌다가 마을 입구(쓰러진 쪽 문 안)에서 깨어난다. 돈을 조금 잃고, 두 시간이 지나 있다. */
+  function startFaint() {
+    fainting = true;
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    sound.play('faint');
+    hud.curtain(true, '눈앞이 깜깜해졌다…');
+    setTimeout(() => {
+      if (!state) { fainting = false; hud.curtain(false); return; }
+      const r = faint(state), p = player.position;
+      const gate = Object.values(GATES).reduce((a, g) => (Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? g : a));
+      const k = (VILLAGE_R - 2.5) / VILLAGE_R;
+      player.stopBlink();
+      player.setPosition(gate.x * k, gate.z * k);
+      player.face(0, 0);
+      cam.snap(player.position);
+      iframe = 0;
+      commit({ ...r.state, clock: advance(state.clock, 60) });
+      setTimeout(() => {
+        hud.curtain(false);
+        fainting = false;
+        if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true);
+        hud.banner('기절했어요…', r.lost ? `정신을 차려 보니 마을 입구 · ${won(r.lost)}을 잃어버렸어요` : '정신을 차려 보니 마을 입구예요', 3600);
+      }, 700);
+    }, 1500);
+  }
+  /** 토벌 자격증 실기: 검정소 앞마당에 허수아비가 서고, 정해진 시간 안에 모두 쓰러뜨린다. */
+  function startHunterPractical(pass, fail) {
+    const L = LICENSES.hunter, ex = village.spots.exam;
+    endOverlay();
+    const spots = [[-2.4, 1.6], [0, 3.0], [2.4, 1.6]].slice(0, L.dummies).map(([dx, dz]) => village.nearestFree(ex.x + dx, ex.z + dz, 0.4));
+    spots.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
+    hunterExam = { t: L.practical, left: spots.length, pass, fail };
+    player.face(ex.x, ex.z + 2);
+    sound.play('job');
+    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: `${L.practical}초 안에! 가까이 가서 버튼(PC 는 스페이스)으로 휘둘러요${heldWeapon(state) ? '' : ' · 연습용 막대기를 빌려줬어요'}` });
+  }
+  function endHunterExam() {
+    if (!hunterExam) return;
+    hunterExam = null;
+    monsters.clear((m) => m.exam);
+    hud.setTimer(null);
+  }
+  function examDummyDown() {
+    if (!hunterExam) return;
+    hunterExam.left -= 1;
+    if (hunterExam.left > 0) { hud.toast(`허수아비 ${hunterExam.left}개 남았어요!`, 1400); return; }
+    const pass = hunterExam.pass;
+    endHunterExam();
+    setTimeout(pass, 500);
+  }
+  // 휘두를 때 앞에 그려지는 하얀 반달 궤적(맞는 범위: 앞쪽 ±60도, 무기 길이만큼)
+  const slash = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.0, 28, 1, -Math.PI / 3, (Math.PI * 2) / 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+  slash.visible = false;
+  slash.renderOrder = 3;
+  scene.add(slash);
+  /** 매 프레임(마을 돌아다니는 중): 휘두르기 · 무적 시간 · 실기 시계 · 손에 든 무기. */
+  function updateCombat(dt) {
+    const k = player.swingK;
+    slash.visible = k > 0.32 && k < 0.75;
+    if (slash.visible) {
+      const id = weaponNow(), reach = id ? WEAPONS[id].range + 0.2 : 1.5;
+      slash.position.set(player.position.x, 0.35, player.position.z);
+      slash.rotation.set(-Math.PI / 2, player.yaw - Math.PI / 2, 0, 'YXZ');
+      slash.scale.setScalar(reach);
+      slash.material.opacity = 0.75 * (1 - Math.abs(k - 0.45) / 0.3);
+      slash.material.color.set(id === 'star' ? 0xfff2a8 : 0xffffff);
+    }
+    swingCool = Math.max(0, swingCool - dt);
+    iframe = Math.max(0, iframe - dt);
+    growlCool = Math.max(0, growlCool - dt);
+    warnCool = Math.max(0, warnCool - dt);
+    if (swingHit) { swingHit.t -= dt; if (swingHit.t <= 0) { const id = swingHit.id; swingHit = null; resolveSwing(id); } }
+    player.setWeapon(weaponNow());
+    if (hunterExam) {
+      hunterExam.t -= dt;
+      hud.setTimer(`토벌 실기 · 허수아비 ${hunterExam.left}개 · ${Math.max(0, Math.ceil(hunterExam.t))}초`);
+      if (hunterExam.t <= 0) {
+        const fail = hunterExam.fail;
+        endHunterExam();
+        fail('시간 안에 허수아비를 다 쓰러뜨리지 못했어요');
+      }
+    }
+  }
+  /** 몬스터가 나를 알아챘다: 으르릉(너무 자주는 말고), 무기가 없으면 도망치라고 알려 준다. */
+  function onAggro() {
+    if (growlCool <= 0) { sound.play('growl'); growlCool = 1.6; }
+    if (!weaponNow() && warnCool <= 0) { warnCool = 25; hud.toast('몬스터가 쫓아와요! 무기가 없으면 마을로 도망쳐요', 3200); }
+  }
+
   /** 친밀도를 올리고(하루에 한 번), 하트가 늘거나 선물을 주면 알린다. */
   function reward(n, action) {
     const r = befriend(state, n.kind, action, state.clock.day);
@@ -1261,6 +1446,12 @@ function boot() {
   function findTarget() {
     const p = player.position;
     const options = [];
+    // 무기를 들었고 몬스터가 닿을 만큼 가까우면 무엇보다 먼저 공격(4단계)
+    const wid = weaponNow();
+    if (wid) {
+      const m = monsters.nearest(p.x, p.z, WEAPONS[wid].range + 0.5);
+      if (m) options.push({ d: -1, t: { type: 'attack', monster: m, label: '공격' } });
+    }
     // 친구가 뽑으러 가거나 뽑는 중인 풀은 건너뛴다
     let weed = null, wd = 1.3;
     for (const w of weeds.list) {
@@ -1305,6 +1496,7 @@ function boot() {
     if (tg.type === 'berry') return { x: tg.bush.x, z: tg.bush.z, r: 0.75, y: 1.3, id: 'b' + tg.bush.x.toFixed(2) };
     if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
+    if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }
@@ -1313,6 +1505,7 @@ function boot() {
     cue.visible = !!sp;
     if (!sp) return null;
     const pulse = 1 + 0.07 * Math.sin(t * 6);
+    cue.material.color.set(sp.foe ? 0xff6b5b : 0xfcd95b); // 공격할 몬스터는 붉은 고리
     cue.position.set(sp.x, 0.04, sp.z);
     cue.scale.setScalar(sp.r * pulse);
     cue.material.opacity = 0.65 + 0.25 * Math.sin(t * 6);
@@ -1449,7 +1642,9 @@ function boot() {
       get state() { return state; },
       get target() { return target && { type: target.type, label: target.label }; },
       player: () => player && { ...player.position },
-      teleport(x, z) { player.setPosition(x, z); },
+      teleport(x, z) { player.setPosition(x, z); cam.snap(player.position); },
+      // 지금 장면을 한 번 그린다(느린 확인 환경에서 찍기 직전에)
+      draw() { const keep = skipRender; skipRender = false; try { tick(1e-4); } finally { skipRender = keep; } },
       weeds: () => weeds.list.map((w) => ({ kind: w.kind, area: w.area, x: w.x, z: w.z, stage: w.stage, hidden: !!w.hidden, visible: w.mesh.visible })),
       weedCounts: () => weeds.counts(),
       camPos: () => cam.camera.position.toArray(),
@@ -1469,7 +1664,15 @@ function boot() {
       action: (down) => input.setAction(down),
       drawCalls: () => gfx.renderer.info.render.calls,
       scene: () => scene, // 그리기 호출을 무엇이 쓰는지 들여다보기
-      region: () => player && regionAt(player.position.x, player.position.z)
+      region: () => player && regionAt(player.position.x, player.position.z),
+      // 토벌(4단계) 확인용
+      monsters: () => monsters.list.map((m) => ({ id: m.id, species: m.species, x: +m.x.toFixed(2), z: +m.z.toFixed(2), hp: m.hp, state: m.state, dead: m.dead, visible: m.mesh.root.visible })),
+      monsterCounts: () => monsters.counts(),
+      spawnMonster: (species, dx = 0, dz = 2) => { const m = monsters.spawnAt(species, player.position.x + dx, player.position.z + dz); m.home = { x: m.x, z: m.z }; return m.id; },
+      swing: () => doSwing(),
+      exam: () => hunterExam && { t: hunterExam.t, left: hunterExam.left },
+      iframe: () => iframe,
+      flags: () => ({ pulling: !!pulling, panel: panels.isOpen(), guide: guide.open, sleeping, sticker: !!sticker, talking: !!talking, tag: !!tag, dance: !!dance, overlay, fainting, weapon: weaponNow() })
     };
   }
 
@@ -1536,6 +1739,9 @@ function boot() {
     berries.update(dt);
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
+    // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 중에는 멈칫)
+    const hunting = mode === 'play' && !!state && !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !sticker;
+    monsters.update(dt, t, { player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro });
     if (state && player && mode === 'intro') {
       player.update(dt, input);
       intro.update(dt);
@@ -1544,6 +1750,7 @@ function boot() {
       panels.tick(state);
       newDayCheck();
       player.update(dt, input);
+      updateCombat(dt);
       if (pulling) {
         const before = pulling.pull.power;
         pulling.pull = chargePull(pulling.pull, dt);
@@ -1553,10 +1760,12 @@ function boot() {
         weeds.tug(pulling.weed, pulling.pull.power);
         hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
       }
-      target = pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() ? null : findTarget();
+      target = pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting ? null : findTarget();
       updateFun(dt);
       villageLife(dt);
-      hud.setAction(pulling ? '뽑는 중' : target ? target.label : null);
+      // 무기를 들고 몬스터가 근처에 있으면(닿지 않아도) 휘두르기 버튼을 띄운다(휴대폰)
+      const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
+      hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
       // 불: 등불 버튼 모양, 손에 든 모습, 따라다니는 빛
       const lightMode = lightOf(state);
@@ -1571,6 +1780,11 @@ function boot() {
         if (ex !== state.explored) state = { ...state, explored: ex };
         const r = regionAt(pp.x, pp.z);
         if (lastRegion && r !== lastRegion) hud.toast(REGION_NAMES[r], 1600);
+        // 처음 마을 밖에 나가면 몬스터 이야기를 한 번 해 준다
+        if (lastRegion === 'village' && r !== 'village' && !seen('monsters') && !tutorialActive(state.tutorial)) {
+          markSeen('monsters');
+          setTimeout(() => hud.toast('마을 밖에는 몬스터가 살아요! 붉게 움츠리면 곧 들이받으니 물러나요 · 무기는 도구점에서', 5200), 1700);
+        }
         lastRegion = r;
       }
       // 안내: 목표를 이루면(창을 닫고 손을 뗀 뒤에) 다음 단계로
@@ -1595,6 +1809,7 @@ function boot() {
     if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
     const bubbles = npcs.labels(), mark = mode === 'play' ? tutorialMarker() : null;
     if (mark) bubbles.push(mark);
+    if (mode === 'play') bubbles.push(...monsters.labels(focus)); // 몬스터 이름 · 체력 줄
     const prompt = mode === 'play' ? showTargetCue(bubbles) : (cue.visible = false, null);
     if (prompt) bubbles.push(prompt);
     // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게)

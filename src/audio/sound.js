@@ -125,6 +125,23 @@ export function createSound(storage) {
     // 친밀도: 퐁퐁(오름), 하트가 늘면 반짝이는 아르페지오
     heart: () => [988, 1319].forEach((f, i) => tone({ freq: f, type: 'sine', start: i * 0.09, dur: 0.22, vol: 0.12 })),
     heartUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone({ freq: f, type: i % 2 ? 'triangle' : 'sine', start: i * 0.08, dur: i === 4 ? 0.6 : 0.2, vol: 0.11 })),
+    // 토벌(4단계): 휘두르기(휙), 맞히기(퍽), 맞기(아얏), 쓰러뜨리기(뿅), 기절, 몬스터가 노릴 때(으르릉)
+    swing: () => noise({ dur: 0.16, vol: 0.22, freq: 900, sweepTo: 3200, q: 1.4 }),
+    hit: () => {
+      noise({ dur: 0.08, vol: 0.32, freq: 420, type: 'lowpass' });
+      tone({ freq: 260, slideTo: 120, type: 'square', dur: 0.1, vol: 0.09 });
+      tone({ freq: 1320, type: 'triangle', start: 0.02, dur: 0.07, vol: 0.07 });
+    },
+    hurt: () => {
+      noise({ dur: 0.1, vol: 0.28, freq: 300, type: 'lowpass' });
+      tone({ freq: 880, slideTo: 440, type: 'triangle', start: 0.03, dur: 0.22, vol: 0.14 });
+    },
+    poof: () => {
+      noise({ dur: 0.22, vol: 0.24, freq: 1800, sweepTo: 600, q: 0.7 });
+      [1175, 1568, 2093].forEach((f, i) => tone({ freq: f, type: 'sine', start: 0.1 + i * 0.06, dur: 0.18, vol: 0.09 }));
+    },
+    growl: () => tone({ freq: 150, slideTo: 210, type: 'sawtooth', dur: 0.28, vol: 0.05 }),
+    faint: () => [659, 587, 523, 440, 330].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.16, dur: 0.3, vol: 0.12 })),
     // 아침: 해가 뜨며 올라가는 소리
     morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 }))
   };

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { WEED_KINDS, stagesOf } from '../core/weeding.js';
 import { regionAt, roadDist, shoreDist, VILLAGE_R } from '../core/layout.js';
+import { part, mergeParts } from '../render/merge.js';
 
 /**
  * 풀 10종이 자라는 곳. area 는 아래 AREAS 의 자리 고르기 규칙, n 은 그 자리에 동시에 자라는 수.
@@ -34,48 +35,6 @@ const REGROW_SECONDS = 20;
 const DRAW_DIST = 50;
 
 // ---------- 모양: 부품을 쌓아 만든 뒤 한 덩어리 도형으로 합친다(풀 하나 = 그리기 두 번: 몸 + 외곽선) ----------
-const tmpColor = new THREE.Color();
-/** 부품 하나(그리기용이 아닌 자리 잡기용 메시). */
-function part(parent, geo, color, { position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1] } = {}) {
-  const m = new THREE.Mesh(geo);
-  m.userData.color = color;
-  m.position.set(...position);
-  m.rotation.set(rotation[0], rotation[1], rotation[2], 'YXZ');
-  m.scale.set(...scale);
-  parent.add(m);
-  return m;
-}
-/** root 아래 부품들을 정점 색이 든 도형 하나로 합친다. */
-function mergeParts(root) {
-  root.updateMatrixWorld(true);
-  const pos = [], nor = [], col = [], idx = [];
-  const nm = new THREE.Matrix3();
-  root.traverse((m) => {
-    if (!m.isMesh) return;
-    const g = m.geometry, base = pos.length / 3;
-    const p = g.attributes.position, n = g.attributes.normal;
-    nm.getNormalMatrix(m.matrixWorld);
-    tmpColor.set(m.userData.color);
-    const v = new THREE.Vector3();
-    for (let i = 0; i < p.count; i++) {
-      v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
-      pos.push(v.x, v.y, v.z);
-      v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize();
-      nor.push(v.x, v.y, v.z);
-      col.push(tmpColor.r, tmpColor.g, tmpColor.b);
-    }
-    if (g.index) for (let i = 0; i < g.index.count; i++) idx.push(base + g.index.getX(i));
-    else for (let i = 0; i < p.count; i++) idx.push(base + i);
-  });
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  out.setIndex(idx);
-  out.computeBoundingSphere();
-  return out;
-}
-
 /** 원뿔 잎이 바깥으로 기울어 둥글게 퍼진 다발. */
 function leafFan(g, n, colors, { r = 0.07, h = 0.42, dh = 0.04, tilt = 0.35, flat = 1, y = 0, yaw0 = 0 } = {}) {
   for (let i = 0; i < n; i++) {
