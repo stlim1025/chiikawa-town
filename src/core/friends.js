@@ -10,7 +10,7 @@ export const FRIENDS = {
   chiikawa: { name: '치이카와', tag: '#ffd6e2', ink: '#8a3b52', play: true, gift: 'cushion' },
   hachiware: { name: '하치와레', tag: '#a9d4f2', ink: '#2f5577', play: true, gift: 'plant' },
   usagi: { name: '우사기', tag: '#f8e7a6', ink: '#7a5a12', play: true, gift: 'lamp' },
-  momonga: { name: '모몽가', tag: '#cfe6f7', ink: '#2f5577', play: true, gift: 'doll' },
+  momonga: { name: '모몽가', tag: '#cfe6f7', ink: '#2f5577', play: false, gift: 'doll' }, // 성격이 까칠해서 같이 놀아 주지 않는다
   kurimanju: { name: '쿠리만쥬', tag: '#ecc9a2', ink: '#6b4020', play: true, gift: 'stove' },
   rakko: { name: '랏코', tag: '#dcc8b0', ink: '#5a3d22', play: true, gift: 'rug' },
   shisa: { name: '시사', tag: '#ffd27a', ink: '#7a4a10', play: false, gift: 'table' },
@@ -41,8 +41,9 @@ export const CHATS = {
     ['이야~하!', '(풀을 한 움큼 들어 보인다)', '야하!']
   ],
   momonga: [
-    ['나 귀엽지? 귀엽다고 해!', '…흥, 알면 됐어.', '오늘도 귀여워해 줘야 해!'],
-    ['{name}, 나한테 뭐 맛있는 거 없어?', '없어? 흥!', '다음엔 꼭 가져와!']
+    ['왜 자꾸 말 걸어?', '할 말 있으면 빨리 해.', '없어? 그럼 저리 가! 흥!'],
+    ['{name}, 맛있는 거 가져왔어?', '없어? 그럼 왜 왔는데?!', '다음엔 빈손으로 오지 마. 흥!'],
+    ['너 지갑 좀 두툼하다?', '…아, 아무것도 아니야!', '쳐다보지 마! 흥!']
   ],
   kurimanju: [
     ['하아~', '오늘 하루도 수고했어.', '이따가 맛있는 안주 만들 건데… 하아~'],

@@ -6,7 +6,7 @@ const TALK = {
   chiikawa: ['…♪', '풀 뽑기 가야지…', '배고파…', '오늘은 뭐 먹지…', '히잉'],
   hachiware: ['오늘도 힘내자~', '뭐든 할 수 있어!', '같이 풀 뽑을래?', '와~ 날씨 좋다!'],
   usagi: ['우라!', '야하!', '하아?', '이야~하!'],
-  momonga: ['귀여워해!', '나 귀엽지?', '칭찬해!', '흥!'],
+  momonga: ['뭘 봐?', '흥!', '귀찮게 하지 마!', '…뭐, 귀엽긴 하지?'],
   kurimanju: ['하아~', '맥주 한 잔…', '안주 만들까…'],
   rakko: ['수련이다', '단련을 게을리하지 마', '훗'],
   shisa: ['라멘 먹으러 오세요~', '사부님~!', '오늘도 열심히!'],
@@ -28,7 +28,7 @@ const WORK = {
   chiikawa: { type: 'act', anim: 'talk', time: 3, lines: ['…♪', '쉬는 중…', '배고파…'] },
   hachiware: { type: 'act', anim: 'dance', time: 3, lines: ['노래 연습 중~ ♪', '휴~ 잠깐 쉬자'] },
   usagi: { type: 'act', anim: 'train', time: 3, lines: ['우라!', '(뒹굴뒹굴)'] },
-  momonga: { type: 'act', anim: 'dance', time: 3.5, lines: ['귀여워해!', '봐 봐, 나 귀엽지?'] },
+  momonga: { type: 'act', anim: 'dance', time: 3.5, lines: ['나 귀엽지? 대답 안 해?', '흥, 다들 나만 봐!'] },
   kurimanju: { type: 'act', anim: 'drink', time: 7, chance: 0.95, lines: ['캬~ 맥주 최고…', '하아~ 한 잔 더…', '맥주는 역시 거품이지…', '안주 만들어 볼까…'] }, // 거의 늘 맥주
   rakko: { type: 'act', anim: 'train', time: 4, lines: ['하앗!', '수련이다'] },
   shisa: { type: 'act', anim: 'sweep', time: 4.5, lines: ['쓱싹쓱싹~', '가게 앞은 깨끗하게!'] },

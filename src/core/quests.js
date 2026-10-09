@@ -70,8 +70,8 @@ export const QUESTS = {
   },
   treasure: {
     title: '모몽가의 보물 상자', giver: 'momonga', needHearts: 1, ask: '뭐 원하는 거 있어?',
-    offer: ['{name}! 나 반짝이는 게 갖고 싶어!', '숲에 사는 뿔벌레 뿔은 반짝반짝하대!', '그리고 밤에 나는 나방 날개 가루도!', '갖다주면… 음… 당분간 네 지갑은 안 노릴게! 흥!'],
-    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개 · 달빛 가루 1개를 모몽가에게', say: ['우와아~ 반짝반짝!!', '내 보물 상자에 넣어야지~ 흐흥♪', '약속은 약속이니까… 사흘 동안은 네 지갑 안 노릴게! 이 리본도 줄게! 흥!'] }],
+    offer: ['야, {name}. 나 반짝이는 게 필요해.', '숲 뿔벌레 뿔이랑, 밤에 나는 나방 날개 가루.', '…가져오면 당분간 네 지갑은 봐줄게. 흥!'],
+    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개 · 달빛 가루 1개를 모몽가에게', say: ['…흥, 생각보다 빨랐네.', '(보물 상자에 넣으며 몰래 흐뭇해한다)', '약속은 약속이야. 사흘은 봐줄게. 이 리본도 가져. 흥!'] }],
     reward: { bond: 3, accessory: 'ribbon', truce: 3 }
   },
   snack: {

@@ -844,17 +844,17 @@ function boot() {
   // 지갑이 텅 비었을 때의 첫마디
   const BROKE = {
     chiikawa: '돈이 하나도 없어… 일하러 가야 해…', hachiware: '요즘 좀 빠듯하네~ 열심히 일해야지!', usagi: '하아? (빈 지갑을 흔든다)',
-    kurimanju: '하아~ 술값이 모자라…', rakko: '수련만 하다 보니 돈이…', momonga: '돈 좀 줘! 귀여우니까!'
+    kurimanju: '하아~ 술값이 모자라…', rakko: '수련만 하다 보니 돈이…', momonga: '돈 없어! 쳐다보지 마!'
   };
   // 하트를 꽉 채운 친구에게 돈을 빌릴 때 · 쫓겨나서 하룻밤 묵을 때의 말
   const LOAN_ASK = {
     chiikawa: '…조금이라면…! 얼마…?', hachiware: '물론이지~ 얼마나 필요해?', usagi: '우라! (지갑을 활짝 연다)',
-    kurimanju: '하아~ 얼마나 필요한데?', rakko: '…곤란할 때는 서로 돕는 거다. 얼마냐.', momonga: '흥! 특별히 빌려줄게. 얼마?'
+    kurimanju: '하아~ 얼마나 필요한데?', rakko: '…곤란할 때는 서로 돕는 거다. 얼마냐.', momonga: '흥, 빌려는 줄게. 얼마? 빨리 말해.'
   };
   const LODGE = {
     chiikawa: ['…같이 자자…!', '(이불을 하나 더 꺼내 준다)'], hachiware: ['물론이지~ 동굴이 좀 좁지만 괜찮지?', '푹 자~ 내일 또 힘내자!'],
     usagi: ['우라!', '(옆자리를 툭툭 두드려 준다)'], kurimanju: ['하아~ 우리 집에서 자고 가.', '자기 전에 한 잔… 아니, 그냥 자자.'],
-    rakko: ['…좋다. 하룻밤이다.', '수련은 내일 아침 일찍이다.'], momonga: ['흥, 돈 냈으니까 재워 줄게!', '내 침대는 안 돼! 바닥에서 자!']
+    rakko: ['…좋다. 하룻밤이다.', '수련은 내일 아침 일찍이다.'], momonga: ['돈 냈으니까 들어와. 딱 하룻밤이야!', '내 침대 건드리면 쫓아낸다! 바닥에서 자!']
   };
   const sayAs = (n, lines, then) => guide.say(lines.map(fillName), then, whoOf(n));
   const askAs = (n, line, choices, then) => guide.ask(fillName(line), choices, then, whoOf(n));
@@ -895,6 +895,7 @@ function boot() {
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
     if (f.play && mode !== 'visit') opts.push(['play', '같이 놀자']); // 집 안에서는 뛰어놀 수 없다
+    else if (n.kind === 'momonga' && mode !== 'visit') opts.push(['snub', '같이 놀자']); // 까칠해서 안 놀아 준다
     // 하트 2개부터: 집에 놀러 가기(밤에는 안 된다)
     if (mode === 'play' && VILLAGERS[n.kind] && friendDoors()[n.kind] && hearts(friendOf(state, n.kind)) >= 2 && !isSleepHour(hourOf(state.clock))) opts.push(['visit', n.kind === 'hachiware' ? '동굴에 놀러 가도 돼?' : '집에 놀러 가도 돼?']);
     // 쿠리만쥬: 술 자격 공부(강의) · 자격을 따면 한 잔
@@ -915,12 +916,13 @@ function boot() {
       const k = opts[i][0];
       if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
       else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
-      else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`${QUESTS[id].title} · ${goalText(state, id)}`, '부탁해~!'], endTalk); }
+      else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`${QUESTS[id].title} · ${goalText(state, id)}`, n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'chat') sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       else if (k === 'play') askPlay(n);
+      else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거라면 몰라도. 흥!'], endTalk);
       else if (k === 'visit') {
-        sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : '응! 같이 가자~'], () => {
+        sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : n.kind === 'momonga' ? '…흥, 들어오든가. 아무것도 만지지 마!' : '응! 같이 가자~'], () => {
           endTalk();
           npcs.goIn(n);
           awayInfo[n.kind] = { why: 'visit', until: lifeClock }; // 내가 나오면 같이 나온다
@@ -1388,7 +1390,7 @@ function boot() {
       npcs.emote(n, 'cheer', r.up ? 1.6 : 0.9);
     }
     if (r.gift) {
-      sayAs(n, ['{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
+      sayAs(n, [n.kind === 'momonga' ? '흥! 이거 남아서 주는 거야. 착각하지 마!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
         hud.banner('선물을 받았어요!', `${FURNITURE[r.gift].name} · 집에서 '꾸미기'로 놓아요`, 3400);
         sound.play('done');
         endTalk();
@@ -1504,7 +1506,7 @@ function boot() {
     if (a && a.why === 'sleep') {
       if (isEvicted(state) && bedtime()) {
         beginTalk(n);
-        askAs(n, '…으음… 누구야…? 이 밤에…', [`하룻밤 재워 줘 (${won(LODGING_PRICE)})`, '미안, 그냥 갈게'], (i) => {
+        askAs(n, kind === 'momonga' ? '뭐야?! 이 밤에! 시끄러워!' : '…으음… 누구야…? 이 밤에…', [`하룻밤 재워 줘 (${won(LODGING_PRICE)})`, '미안, 그냥 갈게'], (i) => {
           if (i !== 0) { endTalk(); return; }
           if (state.money < LODGING_PRICE) { sayAs(n, ['…돈이 모자란 것 같아…'], endTalk); return; }
           commit(payVillager({ ...state, money: state.money - LODGING_PRICE }, kind, LODGING_PRICE, state.clock.day));
@@ -1550,9 +1552,9 @@ function boot() {
   /** 집에 들어가 있는 친구: kind → { why: 'sleep' | 'nap', until: 낮잠이 끝나는 마을 살림 시각 } */
   const awayInfo = {};
   const homeDoor = (kind) => (kind === 'hachiware' ? village.spots.hachiCave : village.homes && village.homes[kind]);
-  const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다.', momonga: '졸려! 나 잘 거야! 흥!' };
-  const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 쉬러 갈 거야!' };
-  const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다.', momonga: '나 일어났어! 귀엽지?' };
+  const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다.', momonga: '졸려. 말 걸지 마!' };
+  const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 귀찮게 하지 마!' };
+  const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다.', momonga: '…뭘 봐? 아침부터.' };
   const tireNpc = (kind, amount) => { state = villagerEnergy(state, kind, -amount, state.clock.day); };
   /** 집(동굴)으로 걸어가서 들어간다. */
   function npcGoHome(n, why) {
@@ -1730,7 +1732,7 @@ function boot() {
   function startThiefChase(m, amount) {
     cancelPull();
     npcs.flee(m, true);
-    npcs.say(m, '헤헤~ 귀여우니까 봐줘!');
+    npcs.say(m, '흥! 느림보~ 이건 내 거야!');
     tag = { n: m, t: 15, head: 0.6, thief: amount };
     hud.banner('소매치기다!', `모몽가가 ${won(amount)}을 훔쳐 갔어요! 잡아요!${worn(state) ? ' (포셰트 덕분에 절반만)' : ''}`, 2600);
     sound.play('stamp');
@@ -1741,7 +1743,7 @@ function boot() {
       beginTalk(m);
       player.cheerTime = 1.6;
       sound.play('coin');
-      sayAs(m, ['으앗, 잡혔다!', '…흥! 돌려주면 되잖아. 귀여우니까 용서해 줘!'], () => { endTalk(); hud.toast(`${won(amount)}을 돌려받았어요!`, 3000); });
+      sayAs(m, ['으앗, 잡혔다!', '…쳇, 돌려주면 되잖아! 흥!'], () => { endTalk(); hud.toast(`${won(amount)}을 돌려받았어요!`, 3000); });
     } else {
       commit(thiefKeeps(state, amount, state.clock.day));
       hud.toast(`모몽가가 ${won(amount)}을 들고 도망쳤어요…`, 3600);
