@@ -9,9 +9,9 @@ import { trySpend } from './state.js';
  *   missed: 연달아 못 낸 횟수(예전 저장에는 없다), evicted: 쫓겨났는지(예전 저장에는 없다) }
  */
 export const RENT = 300;
-export const HOUSE_PRICE = 6000;
-export const LOTTERY_FEE = 100;
-export const LOTTERY_PRICE = 1000;
+export const HOUSE_PRICE = 50000; // 내 집은 마지막 목표: 한참 모아야 산다
+export const LOTTERY_FEE = 500;
+export const LOTTERY_PRICE = 15000; // 당첨되면 집값의 30%
 export const LOTTERY_CHANCE = 0.015; // 1.5%: 진짜 청약처럼 잘 안 된다
 export const RENT_DAY = 1; // 월요일
 export const ANNOUNCE_DAY = 3; // 수요일

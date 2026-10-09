@@ -142,6 +142,48 @@ export function createHud(ui, input) {
   const bar = q(status, '.hud-bar');
   const dateEl = q(clock, '.dl'), skyEl = q(clock, '.sk'), hmEl = q(clock, '.hm'), apEl = q(clock, '.ap');
 
+  // ---------- 큰 소식 카드(notice): 차례로 하나씩 ----------
+  const noticeQueue = [];
+  function showNotice() {
+    const n = noticeQueue[0];
+    if (!n) return;
+    const wrap = el('div', 'notice-wrap');
+    wrap.innerHTML = `<div class="notice-card ${n.tone || 'info'}" role="alertdialog" aria-modal="true"><i class="nk"></i><b class="stamp"></b><p class="ns"></p><div class="nc"></div><button class="btn primary" type="button"></button></div>`;
+    q(wrap, '.nk').textContent = n.kicker || '';
+    q(wrap, '.stamp').textContent = n.stamp || '';
+    q(wrap, '.ns').textContent = n.sub || '';
+    const row = q(wrap, '.nc');
+    (n.chips || []).forEach((c) => {
+      const ch = el('i', 'banner-chip');
+      ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon || '') + '<em></em>';
+      ch.querySelector('em').textContent = c.text;
+      row.appendChild(ch);
+    });
+    if (!row.children.length) row.remove();
+    const ok = q(wrap, '.btn');
+    ok.textContent = n.ok || '확인';
+    const keys = (e) => {
+      if (!['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.type === 'keyup' && !e.repeat) close();
+    };
+    function close() {
+      if (!wrap.isConnected) return;
+      window.removeEventListener('keydown', keys, true);
+      window.removeEventListener('keyup', keys, true);
+      wrap.classList.add('out');
+      setTimeout(() => wrap.remove(), 220);
+      noticeQueue.shift();
+      n.onClose?.();
+      setTimeout(showNotice, 260);
+    }
+    ok.addEventListener('click', close);
+    window.addEventListener('keydown', keys, true);
+    window.addEventListener('keyup', keys, true);
+    ui.appendChild(wrap);
+    ok.focus({ preventScroll: true });
+  }
+
   return {
     /** 왼쪽 위 기둥(하치와레의 할 일 쪽지를 여기에 붙인다). */
     dock,
@@ -381,6 +423,15 @@ export function createHud(ui, input) {
       ui.appendChild(b);
       setTimeout(() => b.classList.add('out'), ms - 400);
       setTimeout(() => b.remove(), ms);
+    },
+    /**
+     * 꼭 봐야 하는 소식(청약 발표 같은): 화면 가운데 큰 카드에 도장을 쾅 찍어 보여 주고, 확인을 눌러야 닫힌다.
+     * { kicker: 위 작은 알약, stamp: 도장 글(당첨 · 낙첨), tone: 'good' | 'bad' | 'info', sub: 한 줄, chips: [{ icon, text }], ok: 버튼 글 }
+     * 엔터 · 스페이스로도 닫힌다(게임으로 새지 않게 막는다). 여러 개면 차례로 하나씩.
+     */
+    notice(n) {
+      noticeQueue.push(n);
+      if (noticeQueue.length === 1) showNotice();
     },
     /**
      * 잠깐 뜨는 알림. 글은 짧은 한 마디만, 덧붙일 것은 opts 로:

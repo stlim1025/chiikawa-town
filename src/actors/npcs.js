@@ -104,6 +104,24 @@ export function createNpcs(scene, village, weeds, berries) {
   };
   const say = (n, text) => { n.bubble = { text, t: 2.4 }; };
 
+  /**
+   * 게시판 · 작업대 · 라멘 가게처럼 여럿이 쓰는 곳의 자리 고르기: 다른 친구(와 나)가 서 있거나 가는 중인 자리는 피하고,
+   * 빈자리 중 가까운 곳부터. 다 찼으면 그중 덜 붐비는 곳. 한 자리만 있으면 먼저 온 친구가 쓰는 동안 다른 친구가 서성였다.
+   */
+  function pickSlot(n, slots) {
+    const others = [[lastPlayer.x, lastPlayer.z]];
+    for (const m of list) {
+      if (m === n || m.away) continue;
+      others.push([m.x, m.z]);
+      if (m.state === 'walk') others.push([m.tx, m.tz]);
+      const st = m.plan && m.plan[0];
+      if (st && st.do === 'walk' && st.x != null) others.push([st.x, st.z]);
+    }
+    const crowd = (p) => others.reduce((a, [x, z]) => a + (Math.hypot(x - p.x, z - p.z) < 0.75 ? 1 : 0), 0);
+    return slots.map((s) => nearFree(s.x, s.z)).map((p) => ({ p, c: crowd(p), d: Math.hypot(p.x - n.x, p.z - n.z) }))
+      .sort((a, b) => a.c - b.c || a.d - b.d)[0].p;
+  }
+
   /** 그 풀을 지금 어느 친구가 맡아 뽑으러 가거나 뽑는 중인지. */
   const claimed = (w) => list.some((m) => m.task && m.task.weed === w);
 
@@ -204,15 +222,17 @@ export function createNpcs(scene, village, weeds, berries) {
   }
 
   /**
-   * 일정(plan) 한 단계를 진행한다. 단계: walk { x, z } · weeds { kind, left, onPull } · berries { left, onPick }
-   * · act { anim, time, say } · say { text } · wait { time } · call { fn }. 다 하면 다음 단계로.
+   * 일정(plan) 한 단계를 진행한다. 단계: walk { x, z } 또는 { slots: [{ x, z }…], near } (갈 때 빈자리를 고른다)
+   * · weeds { kind, left, onPull } · berries { left, onPick } · act { anim, time, say, face: { x, z } } · say { text }
+   * · wait { time } · call { fn }. 다 하면 다음 단계로.
    */
   function runPlan(n) {
     const step = n.plan[0];
     const next = (timer = 0.2) => { n.plan.shift(); n.timer = timer; };
     if (step.do === 'walk') {
+      if (step.slots && step.x == null) { const p = pickSlot(n, step.slots); step.x = p.x; step.z = p.z; }
       const d = Math.hypot(step.x - n.x, step.z - n.z);
-      if (d < 0.9) { next(); return; }
+      if (d < (step.near ?? 0.9)) { next(); return; }
       step.tries = (step.tries || 0) + 1;
       if (step.tries > 5) { const p = nearFree(step.x, step.z); n.x = p.x; n.z = p.z; next(); return; } // 길이 막히면 슬쩍 건너간다
       clearRoute(n);
@@ -253,6 +273,7 @@ export function createNpcs(scene, village, weeds, berries) {
       clearRoute(n);
       n.tx = p.x; n.tz = p.z; n.state = 'walk';
     } else if (step.do === 'act') {
+      if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
       n.task = { type: 'act', anim: step.anim, time: step.time };
       n.state = 'work';
       n.workT = 0;

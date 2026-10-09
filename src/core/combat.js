@@ -39,7 +39,7 @@ export const MONSTERS = {
   pebble: { name: '데굴 돌멩이', region: 'mountain', hp: 6, dmg: 11, speed: 2.0, aggro: 7, drop: 'ore', size: 0.48, attack: 'roll', atk: '굴러오기', note: '바위산을 굴러다니는 돌멩이. 멀리서 데굴데굴 굴러와 튕긴다.' },
   ram: { name: '구름 산양', region: 'mountain', hp: 5, dmg: 12, speed: 2.6, aggro: 7, drop: 'wool', size: 0.52, attack: 'stomp', atk: '높이 뛰어 짓밟기', note: '구름 같은 털에 말린 뿔. 높이 뛰어올라 넓게 짓밟는다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 3, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
-  kingcap: { name: '바위산 왕버섯', region: 'boss', hp: 30, dmg: 16, speed: 1.5, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 포자, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  kingcap: { name: '바위산 왕버섯', region: 'boss', hp: 72, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
 /** 도감 · 안내서 순서(구역별로 셋씩). */

@@ -67,8 +67,16 @@ const ATK = {
   combo: { range: 1.25, wind: 0.4, n: 3, gap: 0.32, reach: 0.85, cool: 1.7, rec: 0.7 },
   spin: { range: 6, wind: 0.75, dur: 2.2, speed: 4.8, turn: 2.0, cool: 2.2, rec: 1.2 },
   // 왕버섯: 가까우면 넓게 내려찍기, 멀면 포자를 사방으로
-  bossSlam: { range: 3.2, wind: 1.0, radius: 2.9, cool: 1.6, rec: 1.0, kind: 'slam' },
-  bossShoot: { range: 10, wind: 0.85, n: 10, spread: (Math.PI * 2) / 10, ring: true, speed: 4.2, r: 0.32, life: 2.6, color: '#f08070', dmgK: 0.7, cool: 1.6, rec: 0.6, kind: 'shoot' }
+  bossSlam: { range: 3.2, wind: 0.9, radius: 2.9, cool: 1.4, rec: 0.8, kind: 'slam' },
+  // 화나면 곧바로 한 번 더 쿵(더 넓게, 예고는 짧게). range 99: 거리와 상관없이 바로 이어진다
+  bossSlam2: { range: 99, wind: 0.5, radius: 3.8, cool: 1.4, rec: 0.9, kind: 'slam' },
+  bossShoot: { range: 10, wind: 0.85, n: 10, spread: (Math.PI * 2) / 10, ring: true, speed: 4.2, r: 0.32, life: 2.6, color: '#f08070', dmgK: 0.7, cool: 1.6, rec: 0.6, kind: 'shoot' },
+  // 화나면 고리 둘(두 번째는 틈을 메우게 반 칸 비틀어 0.4초 뒤에)
+  bossShoot2: { range: 10, wind: 0.75, n: 14, spread: (Math.PI * 2) / 14, ring: true, twice: 0.4, speed: 4.6, r: 0.3, life: 2.6, color: '#f08070', dmgK: 0.7, cool: 1.5, rec: 0.5, kind: 'shoot' },
+  // 뛰어 덮치기: 내가 있던 자리로 쿵(멀리 떨어져 있어도 쫓아온다)
+  bossLeap: { range: 8.5, wind: 0.85, lock: 0.65, air: 0.95, radius: 2.3, height: 1.6, cool: 1.8, rec: 0.8, kind: 'stomp' },
+  // 포자 비: 내 자리와 둘레 몇 곳에 빨간 표시 → 잠시 뒤 포자가 쏟아진다(멈춰 있으면 맞는다)
+  bossRain: { range: 9.5, wind: 0.7, n: 5, spread: 3.4, radius: 1.35, warn: 1.15, dmgK: 0.8, cool: 2.2, rec: 0.6, kind: 'rain' }
 };
 Object.entries(ATK).forEach(([k, a]) => { if (!a.kind) a.kind = k; });
 /** 맞아도 움츠리기를 멈추지 않는 단단한 몬스터. */
@@ -647,12 +655,26 @@ export function createMonsters(scene, village, random = Math.random) {
     C?.onImpact?.(m, x, z);
     if (Math.hypot(P.x - x, P.z - z) < r + ME) hurt(m, dmg, x, z);
   }
-  /** 지금 쓸 공격(왕버섯은 거리에 따라 고른다). */
+  /** 왕버섯이 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
+  const rage = (m) => (!m.M.boss ? 0 : m.hp <= m.M.hp * 0.3 ? 2 : m.hp <= m.M.hp * 0.6 ? 1 : 0);
+  /**
+   * 지금 쓸 공격. 왕버섯: 가까우면 내려찍기, 아니면 뛰어 덮치기 · 포자 고리(화나면 포자 비 · 두 겹 고리)를 한 번 골라 둔다
+   * (매 프레임 다시 고르면 다가갈 거리가 흔들린다). 이어 치기(nextAtk)가 있으면 그것부터.
+   */
   function attackOf(m, dp) {
-    if (m.M.attack === 'boss') return dp < ATK.bossSlam.range + 0.6 ? ATK.bossSlam : ATK.bossShoot;
+    if (m.M.attack === 'boss') {
+      if (m.nextAtk) return m.nextAtk;
+      if (dp < ATK.bossSlam.range + 0.6) return ATK.bossSlam;
+      if (!m.bossPick) {
+        const r = rage(m), roll = random();
+        m.bossPick = r >= 1 && roll < 0.38 ? ATK.bossRain : roll < 0.68 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot;
+      }
+      return m.bossPick;
+    }
     return ATK[m.M.attack] || ATK.bump;
   }
   function startWind(m, A) {
+    if (m.M.boss) { if (A === m.nextAtk) m.nextAtk = null; else if (A === m.bossPick) m.bossPick = null; }
     m.state = 'wind';
     m.atk = A;
     m.wind = m.windMax = A.wind;
@@ -669,9 +691,10 @@ export function createMonsters(scene, village, random = Math.random) {
     hideTele(m);
   }
   function endAct(m, A, recK = 1) {
+    const r = rage(m);
     m.state = 'recover';
-    m.rec = A.rec * recK;
-    m.cool = A.cool;
+    m.rec = A.rec * recK * (1 - 0.25 * r); // 화날수록 쉬는 틈이 짧다
+    m.cool = A.cool * (1 - 0.2 * r);
     m.act = null;
     m.airY = 0; m.diveY = 0;
     m.strafe = random() < 0.5 ? -1 : 1;
@@ -688,6 +711,56 @@ export function createMonsters(scene, village, random = Math.random) {
     m.aim.x = x; m.aim.z = z;
   }
 
+  /** 왕버섯 부하 부르기: 화남 0 · 1 · 2 → 9 · 7 · 5초마다, 살아 있는 부하 4 · 5 · 6 까지, 한 번에 2 · 2 · 3(가장 화나면 독버섯 섞기). */
+  function summon(m) {
+    const r = rage(m);
+    m.summonT = [9, 7, 5][r];
+    const minions = list.filter((o) => o.summoned && !o.dead).length;
+    for (let k = 0; k < Math.min([2, 2, 3][r], [4, 5, 6][r] - minions); k++) {
+      const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * 2.4, sz = m.z + Math.cos(a) * 2.4;
+      if (!village.isFree(sx, sz, 0.4)) continue;
+      const f = add(r >= 2 && k === 0 ? 'shroom' : 'fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
+      f.born = 0.01; f.mesh.root.scale.setScalar(0.01);
+      poof(sx, 0.3, sz, 0.3);
+    }
+    C?.onSummon?.(m);
+  }
+
+  // ---------- 포자 비(왕버섯): 바닥 여러 곳에 빨간 표시가 차오르다 다 차면 그 자리를 친다 ----------
+  const hazards = [];
+  function hazard(m, x, z, r, warn, dmg) {
+    const g = new THREE.Group();
+    const mk = (geo, mat) => { const o = new THREE.Mesh(geo, mat); o.renderOrder = 3; g.add(o); return o; };
+    const base = mk(D_DISC, TELE_BASE), fill = mk(D_DISC, TELE_FILL), ring = mk(D_RING, TELE_EDGE);
+    base.scale.set(r, 1, r); ring.scale.set(r, 1, r); fill.scale.set(0.02, 1, 0.02);
+    g.position.set(x, 0.05, z);
+    scene.add(g);
+    hazards.push({ owner: m, x, z, r, warn, dmg, t: 0, g, fill });
+  }
+  function rain(m, A) {
+    const dmg = Math.round(m.M.dmg * (A.dmgK || 1)), spots = [{ x: P.x, z: P.z }];
+    for (let tries = 0; spots.length < A.n && tries < 40; tries++) {
+      const a = random() * Math.PI * 2, d = 1.4 + random() * A.spread, x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
+      if (Math.hypot(x, z) < FENCE + 0.5 || spots.some((s) => Math.hypot(s.x - x, s.z - z) < A.radius * 1.5)) continue;
+      spots.push({ x, z });
+    }
+    spots.forEach((s, i) => hazard(m, s.x, s.z, A.radius, A.warn + i * 0.12, dmg));
+    poof(m.x, 1.6, m.z, 0.5, 9);
+  }
+  function hazardStep(dt) {
+    for (let i = hazards.length - 1; i >= 0; i--) {
+      const h = hazards[i];
+      h.t += dt;
+      const f = Math.max(0.02, h.r * Math.min(1, h.t / h.warn));
+      h.fill.scale.set(f, 1, f);
+      if (h.t < h.warn) continue;
+      poof(h.x, 0.6, h.z, 0.35, 8);
+      impact(h.owner, h.x, h.z, h.r, h.dmg);
+      scene.remove(h.g);
+      hazards.splice(i, 1);
+    }
+  }
+
   /** 쫓기: 공격 방식마다 알맞은 거리까지 다가가고(멀리서 쏘는 몬스터는 거리를 지킨다), 닿으면 예고를 시작한다. */
   function chase(m, dt, dp, canSee) {
     if (!canSee) { m.state = 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; }
@@ -700,7 +773,7 @@ export function createMonsters(scene, village, random = Math.random) {
     else if (kind === 'combo' || kind === 'slam') { near = Math.max(M.size + 0.3, A.range * 0.55); trig = A.range; }
     else { near = Math.min(A.range * 0.6, 3.2); trig = A.range; }
     if (m.cool <= 0 && dp <= trig) { startWind(m, A); return false; }
-    const step = M.speed * dt, ux = (P.x - m.x) / (dp || 1), uz = (P.z - m.z) / (dp || 1);
+    const step = M.speed * (1 + 0.25 * rage(m)) * dt, ux = (P.x - m.x) / (dp || 1), uz = (P.z - m.z) / (dp || 1);
     let moving = false;
     if (A.keep && dp < A.keep - 1.4) { moveBy(m, -ux * step * 0.8, -uz * step * 0.8); moving = true; }
     else if (dp > near) { moveBy(m, ux * step, uz * step); moving = true; }
@@ -710,21 +783,10 @@ export function createMonsters(scene, village, random = Math.random) {
       if (moveBy(m, uz * s, -ux * s) < 0.5) m.strafe *= -1;
       moving = true;
     }
-    // 왕버섯: 쫓아오는 동안 이따금 포자를 뿜어 풀뭉치를 불러낸다(살아 있는 부하는 넷까지)
+    // 왕버섯: 쫓아오는 동안 이따금 포자를 뿜어 부하를 불러낸다(화날수록 자주 · 많이, 가장 화나면 독버섯도)
     if (M.boss) {
       m.summonT = (m.summonT ?? 4) - dt;
-      if (m.summonT <= 0) {
-        m.summonT = 9;
-        const minions = list.filter((o) => o.summoned && !o.dead).length;
-        for (let k = 0; k < Math.min(2, 4 - minions); k++) {
-          const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * 2.2, sz = m.z + Math.cos(a) * 2.2;
-          if (!village.isFree(sx, sz, 0.4)) continue;
-          const f = add('fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
-          f.born = 0.01; f.mesh.root.scale.setScalar(0.01);
-          poof(sx, 0.3, sz, 0.3);
-        }
-        C?.onSummon?.(m);
-      }
+      if (m.summonT <= 0) summon(m);
     }
     return moving;
   }
@@ -774,11 +836,19 @@ export function createMonsters(scene, village, random = Math.random) {
       m.act.bounce = A.bounce || 0;
       m.yaw = m.act.dir;
     } else if (kind === 'shoot' || kind === 'spit') {
-      fire(m, A, Math.atan2(P.x - m.x, P.z - m.z));
+      const aim = Math.atan2(P.x - m.x, P.z - m.z);
+      fire(m, A, aim);
+      if (A.twice) m.pendingShot = { t: A.twice, A, yaw: aim + A.spread / 2 };
       m.lunge = 0.15;
       endAct(m, A);
     } else if (kind === 'slam') {
       impact(m, m.x, m.z, A.radius, M.dmg);
+      endAct(m, A);
+      // 화난 왕버섯은 내려찍은 뒤 곧바로 한 번 더(더 넓게)
+      if (M.boss && A === ATK.bossSlam && rage(m) >= 1) { m.nextAtk = ATK.bossSlam2; m.rec = 0.15; m.cool = 0; }
+    } else if (kind === 'rain') {
+      rain(m, A);
+      m.lunge = 0.2;
       endAct(m, A);
     } else if (kind === 'tongue') {
       m.act.dir = m.yaw;
@@ -986,8 +1056,10 @@ export function createMonsters(scene, village, random = Math.random) {
         const committed = m.state === 'act' && m.atk && COMMITTED[m.atk.kind];
         const d = Math.hypot(m.x - x, m.z - z) || 1;
         const push = (HEAVY[m.species] ? 0.45 : 1.2) * knock;
-        if (m.species !== 'dummy' && !committed) { m.kx = ((m.x - x) / d) * push * 6; m.kz = ((m.z - z) / d) * push * 6; }
-        if (m.state === 'wind' && !HEAVY[m.species]) { cancel(m); m.stun = 0.35; }
+        // 왕버섯은 맞아도 밀리거나 멈칫하지 않는다(계속 때려서 묶어 둘 수 없게)
+        if (m.species !== 'dummy' && !committed && !m.M.boss) { m.kx = ((m.x - x) / d) * push * 6; m.kz = ((m.z - z) / d) * push * 6; }
+        if (m.M.boss) { /* 슈퍼 아머 */ }
+        else if (m.state === 'wind' && !HEAVY[m.species]) { cancel(m); m.stun = 0.35; }
         else if (m.state === 'chase' || m.state === 'recover') m.stun = 0.35;
         if (m.state === 'wander') { m.state = 'chase'; m.alert = 0.8; }
         const killed = m.hp <= 0;
@@ -1065,6 +1137,9 @@ export function createMonsters(scene, village, random = Math.random) {
         m.cool = Math.max(0, m.cool - dt);
         m.lunge = Math.max(0, (m.lunge || 0) - dt);
         m.pinch = Math.max(0, m.pinch - dt);
+        if (m.pendingShot) { m.pendingShot.t -= dt; if (m.pendingShot.t <= 0) { fire(m, m.pendingShot.A, m.pendingShot.yaw); m.pendingShot = null; } }
+        // 왕버섯이 더 화났다: 쿵 울리며 부하를 바로 부른다
+        if (M.boss) { const r = rage(m); if (r > (m.rage || 0)) { m.rage = r; wave(m.x, m.z, 3.2); poof(m.x, 1.2, m.z, 0.8, 12); m.flash = 0.3; summon(m); C?.onRage?.(m, r); } }
         let moving = false;
         // 밀려남
         if (!m.under && Math.abs(m.kx) + Math.abs(m.kz) > 0.01) {
@@ -1105,7 +1180,7 @@ export function createMonsters(scene, village, random = Math.random) {
             if (m.rec <= 0) m.state = 'chase';
           } else if (m.state === 'return') {
             const hx = m.home.x - m.x, hz = m.home.z - m.z, hd = Math.hypot(hx, hz);
-            if (hd < 1) { m.state = 'wander'; m.engaged = false; m.hp = M.hp; m.hitPlayer = false; }
+            if (hd < 1) { m.state = 'wander'; m.engaged = false; m.hp = M.hp; m.hitPlayer = false; m.rage = 0; m.nextAtk = null; m.bossPick = null; }
             else {
               const step = M.speed * 0.9 * dt;
               turnTo(m, m.home.x, m.home.z, dt, 6);
@@ -1139,6 +1214,7 @@ export function createMonsters(scene, village, random = Math.random) {
           md.scale.set(0.42, warn ? 0.2 : 0.13, 0.42);
         } else if (m.mound) m.mound.visible = false;
       }
+      hazardStep(dt);
       // 탄: 곧게 날아가다 나에게 닿거나 울타리에 닿거나 시간이 다 되면 톡 터진다
       for (let i = shots.length - 1; i >= 0; i--) {
         const s = shots[i];
