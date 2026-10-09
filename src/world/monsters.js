@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
 import { MONSTERS, inSwing } from '../core/combat.js';
-import { regionAt, shoreDist, VILLAGE_R, CAVE } from '../core/layout.js';
+import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE } from '../core/layout.js';
 
 /**
  * 마을 밖 몬스터(4단계): 이 게임만의 오리지널 생물. 모양은 부품을 쌓아 한 덩어리로 합치고(몸 + 외곽선, 얼굴),
@@ -61,7 +61,7 @@ const ATK = {
   roll: { range: 7.5, wind: 0.8, lock: 0.6, speed: 7.5, len: 11, width: 1.0, bounce: 1, cool: 2.2, rec: 1.0 },
   dive: { range: 6.5, wind: 0.7, lock: 0.6, speed: 10, len: 7, width: 0.95, cool: 1.8, rec: 0.6 },
   shoot: { keep: 4.6, range: 7, wind: 0.65, n: 3, spread: 0.34, speed: 5.6, r: 0.24, life: 1.9, color: '#c39be8', cool: 2.2, rec: 0.35 },
-  spit: { keep: 4.2, range: 6.6, wind: 0.65, n: 1, spread: 0, speed: 4.6, r: 0.38, life: 2.0, color: '#8fd3f4', cool: 1.9, rec: 0.35 },
+  spit: { keep: 4.2, range: 6.6, wind: 0.65, n: 1, spread: 0, speed: 4.6, r: 0.38, life: 2.0, color: '#4fa3e6', cool: 1.9, rec: 0.35 },
   slam: { range: 1.8, wind: 0.85, radius: 2.1, cool: 2.0, rec: 0.8 },
   tongue: { range: 3.6, wind: 0.75, lock: 0.5, len: 3.9, width: 0.5, show: 0.3, cool: 1.6, rec: 0.5 },
   combo: { range: 1.25, wind: 0.4, n: 3, gap: 0.32, reach: 0.85, cool: 1.7, rec: 0.7 },
@@ -128,18 +128,20 @@ const BUILD = {
     face(g, { y: 0.29 * k, z: 0.515 * k, dx: 0.095, r: 0.045, brow: 0.5, browY: 0.07, browLen: 0.065 });
     return { height: 0.95 };
   },
-  // 물방울 슬라임: 말랑한 물방울. 꼭대기가 살짝 뒤로 흐르고, 바닥은 웅덩이처럼 퍼진다
+  // 물방울 슬라임: 진한 파란 물방울(강물보다 진해서 물가에서도 잘 보인다). 꼭대기가 살짝 뒤로 흐르고, 바닥은 웅덩이처럼 퍼진다.
+  // 왼쪽 위에 밝은 물빛 · 하얀 반짝임, 앞에 큰 눈과 볼
   slime(g) {
-    part(g, GEO.sphere, '#7cc4ea', { position: [0, 0.04, 0], scale: [0.46, 0.07, 0.46] });
-    part(g, GEO.sphere, '#8fd3f4', { position: [0, 0.32, 0], scale: [0.4, 0.33, 0.4] });
-    part(g, GEO.cone, '#8fd3f4', { position: [0, 0.5, -0.04], rotation: [-0.35, 0, 0], scale: [0.17, 0.28, 0.17] });
-    part(g, GEO.sphere, '#bfe9fb', { position: [0, 0.3, 0.1], scale: [0.3, 0.24, 0.3] });
-    part(g, GEO.dot, SHINE, { position: [-0.17, 0.5, 0.25], rotation: [0, 0, 0.6], scale: [0.07, 0.035, 0.03], flat: true });
-    part(g, GEO.dot, SHINE, { position: [-0.24, 0.4, 0.27], scale: [0.025, 0.025, 0.02], flat: true });
-    face(g, { y: 0.35, z: 0.385, dx: 0.12, brow: null });
-    [-1, 1].forEach((sd) => part(g, GEO.dot, BLUSH, { position: [sd * 0.22, 0.27, 0.33], scale: [0.05, 0.025, 0.02], flat: true }));
-    part(g, GEO.dot, EYE, { position: [0, 0.26, 0.4], scale: [0.04, 0.03, 0.015], flat: true });
-    return { height: 0.95 };
+    const k = 1.2, P = (x, y, z) => [x * k, y * k, z * k];
+    part(g, GEO.sphere, '#3f8fd0', { position: P(0, 0.04, 0), scale: P(0.48, 0.07, 0.48) });
+    part(g, GEO.sphere, '#56aeea', { position: P(0, 0.33, 0), scale: P(0.42, 0.34, 0.42) });
+    part(g, GEO.cone, '#56aeea', { position: P(0, 0.53, -0.05), rotation: [-0.35, 0, 0], scale: P(0.17, 0.3, 0.17) });
+    part(g, GEO.sphere, '#9fdcfa', { position: P(-0.15, 0.47, 0.16), rotation: [0, 0, 0.5], scale: P(0.13, 0.08, 0.12) });
+    part(g, GEO.dot, SHINE, { position: P(-0.2, 0.5, 0.3), rotation: [0, 0, 0.6], scale: P(0.07, 0.035, 0.03), flat: true });
+    part(g, GEO.dot, SHINE, { position: P(-0.29, 0.38, 0.3), scale: P(0.028, 0.028, 0.02), flat: true });
+    face(g, { y: 0.36 * k, z: 0.405 * k, dx: 0.13 * k, r: 0.058, brow: null });
+    [-1, 1].forEach((sd) => part(g, GEO.dot, BLUSH, { position: P(sd * 0.24, 0.27, 0.35), scale: P(0.055, 0.028, 0.02), flat: true }));
+    part(g, GEO.dot, EYE, { position: P(0, 0.26, 0.41), scale: P(0.045, 0.032, 0.015), flat: true });
+    return { height: 1.1 };
   },
   // 이끼 거북: 바위 같은 등딱지에 이끼 방석과 새싹, 졸린 눈
   turtle(g) {
@@ -1101,7 +1103,7 @@ export function createMonsters(scene, village, random = Math.random) {
             if (od > 0.001 && od < min) moveBy(m, (ox / od) * (min - od) * 0.5, (oz / od) * (min - od) * 0.5);
           }
         }
-        root.position.set(m.x, 0, m.z);
+        root.position.set(m.x, groundY(m.x, m.z), m.z);
         root.rotation.y = m.yaw;
         animate(m, dt, t, moving);
         // 땅속을 파고드는 동안 흙더미가 따라 움직인다(튀어나오기 직전에는 들썩인다)

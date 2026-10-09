@@ -53,6 +53,19 @@ export function shoreDist(x, z) {
 }
 export const isWater = (x, z) => shoreDist(x, z) < 0;
 
+/** 다리 판: 길이(강 폭 + 양쪽 1.2) · 윗면 높이 · 양 끝 비탈 길이. */
+export const BRIDGE_LEN = RIVER.half * 2 + 2.4, BRIDGE_TOP = 0.2, BRIDGE_RAMP = 0.9;
+/** 발 디딜 높이: 다리 위면 판 높이(양 끝은 비탈을 따라 내려온다), 아니면 땅(0). 캐릭터 · 몬스터가 판에 파묻히지 않게. */
+export function groundY(x, z) {
+  for (const b of BRIDGES) {
+    if (Math.abs(x - b.x) > b.half + 0.15) continue;
+    const dz = Math.abs(z - riverZ(b.x)) - BRIDGE_LEN / 2;
+    if (dz < 0) return BRIDGE_TOP;
+    if (dz < BRIDGE_RAMP) return BRIDGE_TOP * (1 - dz / BRIDGE_RAMP);
+  }
+  return 0;
+}
+
 /** 흙길: 꺾이는 점들과 폭. 마을 안 큰길 넷, 상점가 · 주택가 길, 바깥 구역으로 나가는 길. */
 export const ROADS = [
   { id: 'main-ew', w: 1.4, pts: [[-VILLAGE_R, 0], [VILLAGE_R, 0]] },

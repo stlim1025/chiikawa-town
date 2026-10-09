@@ -1,5 +1,5 @@
 import { buildNpc, animateChibi, PROP_FOR } from './models.js';
-import { VILLAGE_R } from '../core/layout.js';
+import { VILLAGE_R, groundY } from '../core/layout.js';
 
 /** 말 걸면 하는 대사. */
 const TALK = {
@@ -459,7 +459,7 @@ export function createNpcs(scene, village, weeds, berries) {
           const nx = player.x + (px / pd) * min, nz = player.z + (pz / pd) * min;
           if (village.isFree(nx, nz, 0.3)) { n.x = nx; n.z = nz; }
         }
-        n.chibi.root.position.set(n.x, 0, n.z);
+        n.chibi.root.position.set(n.x, groundY(n.x, n.z), n.z);
         n.chibi.root.rotation.y = n.yaw;
         showProp(n, (PROP_FOR[n.kind] || {})[mode] || null); // 맥주 · 책 · 빗자루처럼 그 몸짓에 드는 물건
         animateChibi(n.chibi, mode, t, { phase: n.phase, power });

@@ -32,10 +32,11 @@ const MON = {
     <ellipse cx="32" cy="45" rx="11" ry="8" fill="#634230" ${S}/>
     <path d="M29 40l3-14 3 14z" fill="#f6e2b4" ${S}/>
     ${eyes(32, 46, 5, 2.1, 0.6)}`,
-  slime: () => `${shadow(20)}<ellipse cx="32" cy="53" rx="21" ry="5" fill="#7cc4ea" ${S}/>
-    <path d="M32 9q4 10 14 18q8 8 7 16q-1 12-21 12t-21-12q-1-8 7-16q10-8 14-18z" fill="#8fd3f4" ${S}/>
+  slime: () => `${shadow(20)}<ellipse cx="32" cy="53" rx="21" ry="5" fill="#3f8fd0" ${S}/>
+    <path d="M32 9q4 10 14 18q8 8 7 16q-1 12-21 12t-21-12q-1-8 7-16q10-8 14-18z" fill="#56aeea" ${S}/>
+    <ellipse cx="22" cy="28" rx="6" ry="3.4" fill="#9fdcfa" transform="rotate(-35 22 28)"/>
     <ellipse cx="21" cy="30" rx="4" ry="2.2" fill="#fff" transform="rotate(-35 21 30)"/><circle cx="17" cy="36" r="1.5" fill="#fff"/>
-    ${eyes(32, 40, 7, 2.6, null)}<ellipse cx="22" cy="45" rx="3" ry="1.6" fill="#ff9fb4"/><ellipse cx="42" cy="45" rx="3" ry="1.6" fill="#ff9fb4"/><ellipse cx="32" cy="47" rx="2" ry="1.6" fill="#2b2224"/>`,
+    ${eyes(32, 40, 7, 3, null)}<ellipse cx="22" cy="45" rx="3" ry="1.6" fill="#ff9fb4"/><ellipse cx="42" cy="45" rx="3" ry="1.6" fill="#ff9fb4"/><ellipse cx="32" cy="47" rx="2" ry="1.6" fill="#2b2224"/>`,
   turtle: () => `${shadow(22)}
     <ellipse cx="16" cy="51" rx="5" ry="3.6" fill="#a7b98a" ${S}/><ellipse cx="38" cy="52" rx="5" ry="3.6" fill="#a7b98a" ${S}/>
     <path d="M6 44q2-26 26-26t24 26z" fill="#a39a8f" ${S}/><path d="M4 44h48q2 5-2 6H8q-6-1-4-6z" fill="#7d756c" ${S}/>

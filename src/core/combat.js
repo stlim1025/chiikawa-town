@@ -32,7 +32,7 @@ export const MONSTERS = {
   beetle: { name: '도토리 뿔벌레', region: 'forest', hp: 4, dmg: 10, speed: 2.5, aggro: 7, drop: 'horn', size: 0.45, attack: 'charge', atk: '뿔 돌진', note: '도토리 껍데기를 쓴 벌레. 뿔을 겨누고 일직선으로 돌진한다.' },
   shroom: { name: '보라 독버섯', region: 'forest', hp: 3, dmg: 7, speed: 1.7, aggro: 7.5, drop: 'spore', size: 0.42, attack: 'shoot', atk: '포자 세 갈래', note: '숲 그늘의 꼬마 버섯. 거리를 두고 포자를 세 갈래로 뿜는다.' },
   stump: { name: '그루터기 장군', region: 'forest', hp: 7, dmg: 13, speed: 1.5, aggro: 5.5, drop: 'bark', size: 0.55, attack: 'slam', atk: '쿵! 내려찍기', note: '걸어 다니는 그루터기. 펄쩍 뛰어 둘레를 쿵 내려찍는다.' },
-  slime: { name: '물방울 슬라임', region: 'river', hp: 3, dmg: 8, speed: 1.9, aggro: 7, drop: 'jelly', size: 0.42, attack: 'spit', atk: '물방울 뱉기', note: '강가에서 뽀글뽀글 생긴다. 떨어져서 커다란 물방울을 뱉는다.' },
+  slime: { name: '물방울 슬라임', region: 'river', hp: 3, dmg: 8, speed: 1.9, aggro: 7, drop: 'jelly', size: 0.48, attack: 'spit', atk: '물방울 뱉기', note: '강가에서 뽀글뽀글 생긴다. 떨어져서 커다란 물방울을 뱉는다.' },
   frog: { name: '연잎 개구리', region: 'river', hp: 3, dmg: 9, speed: 2.4, aggro: 7, drop: 'lilypad', size: 0.42, attack: 'tongue', atk: '혀 채찍', note: '연잎 모자를 쓴 개구리. 긴 혀를 일직선으로 쭉 뻗는다.' },
   crab: { name: '조약돌 게', region: 'river', hp: 4, dmg: 6, speed: 2.6, aggro: 6, drop: 'pearl', size: 0.45, attack: 'combo', atk: '집게 세 번', note: '조약돌을 등에 진 게. 붙으면 집게로 세 번 연달아 꼬집는다.' },
   turtle: { name: '이끼 거북', region: 'mountain', hp: 8, dmg: 12, speed: 1.3, aggro: 6, drop: 'shell', size: 0.6, attack: 'spin', atk: '등껍질 회전', note: '이끼 낀 바위 거북. 등껍질에 숨어 빙글빙글 돌며 쫓아온다.' },

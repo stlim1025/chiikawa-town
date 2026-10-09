@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, LAKE, SOUTH_SHORE, CAVE, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, riverZ, roadDist, shoreDist } from '../core/layout.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const m4 = (x, y, z, sx, sy, sz, yaw = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
@@ -129,11 +129,13 @@ export function buildOutdoors(ctx) {
   }
   world.add(toonMesh(GEO.cylinder, null, { material: water, position: [LAKE.x, -0.03, LAKE.z], scale: [LAKE.rx, 0.05, LAKE.rz], outline: 0.04, shadow: false, receive: true }));
   world.add(toonMesh(GEO.box, null, { material: water, position: [0, -0.03, (SOUTH_SHORE + 140) / 2], scale: [280, 0.1, 140 - SOUTH_SHORE], outline: false, shadow: false, receive: true }));
-  // 다리: 나무 판과 양쪽 난간
+  // 다리: 나무 판과 양쪽 난간, 양 끝은 땅으로 내려오는 비탈 판(올라서도 발이 판에 묻히지 않게 core/layout 의 groundY 와 같은 높이)
   BRIDGES.forEach((b) => {
-    const zc = riverZ(b.x), len = RIVER.half * 2 + 2.4, wood = '#c49a6c', g = new THREE.Group();
+    const zc = riverZ(b.x), len = BRIDGE_LEN, wood = '#c49a6c', g = new THREE.Group(), T = 0.12;
     g.position.set(b.x, 0, zc);
-    g.add(toonMesh(GEO.box, wood, { position: [0, 0.14, 0], scale: [b.half * 2 + 0.2, 0.12, len], shell: true, receive: true }));
+    g.add(toonMesh(GEO.box, wood, { position: [0, BRIDGE_TOP - T / 2, 0], scale: [b.half * 2 + 0.2, T, len], shell: true, receive: true }));
+    const slope = Math.atan2(BRIDGE_TOP, BRIDGE_RAMP), rl = Math.hypot(BRIDGE_TOP, BRIDGE_RAMP);
+    [-1, 1].forEach((sd) => g.add(toonMesh(GEO.box, wood, { position: [0, BRIDGE_TOP / 2 - (T / 2) / Math.cos(slope), sd * (len / 2 + BRIDGE_RAMP / 2)], rotation: [sd * slope, 0, 0], scale: [b.half * 2 + 0.2, T, rl], shell: true, receive: true })));
     [-1, 1].forEach((sd) => {
       for (let k = 0; k <= 4; k++) g.add(toonMesh(GEO.box, wood, { position: [sd * (b.half + 0.05), 0.42, -len / 2 + (k / 4) * len], scale: [0.1, 0.56, 0.1], shell: true }));
       g.add(toonMesh(GEO.box, '#a77d5a', { position: [sd * (b.half + 0.05), 0.66, 0], scale: [0.08, 0.08, len], shell: true, shadow: false }));
