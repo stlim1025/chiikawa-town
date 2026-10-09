@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
-import { furnitureModel } from './interior.js';
+import { furnitureModel, placeOnDome } from './interior.js';
 
 /**
  * 친구 집 · 하치와레 동굴 안(3단계). 집주인이 안에 있을 때만(낮잠 · 밤잠) 들어갈 수 있다.
@@ -52,9 +52,11 @@ export function createRooms() {
       mesh(GEO.box, s.wall, { position: [0, 1.6, -3.05], scale: [7.2, 3.2, 0.12], shell: true, outline: 0.03 });
       [-1, 1].forEach((k) => mesh(GEO.box, s.wall, { position: [k * 3.62, 1.6, -0.1], scale: [0.12, 3.2, 6], shell: true, outline: 0.03 }));
       // 뒷벽 창(밖이 보이는 하늘색)과 걸레받이
-      mesh(GEO.box, '#c6e7f5', { position: [-0.9, 1.9, -2.98], scale: [1.1, 0.9, 0.04], shell: true, outline: 0.02 });
-      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.95], scale: [0.05, 0.86, 0.02], outline: false });
-      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.95], scale: [1.06, 0.05, 0.02], outline: false });
+      // (벽 안쪽 면 z = −2.99 보다 앞으로: 창틀 · 유리 · 살)
+      mesh(GEO.box, '#ffffff', { position: [-0.9, 1.9, -2.96], scale: [1.22, 1.02, 0.05], shell: true, outline: 0.02 });
+      mesh(GEO.box, '#c6e7f5', { position: [-0.9, 1.9, -2.93], scale: [1.08, 0.88, 0.02], outline: false });
+      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.91], scale: [0.05, 0.86, 0.02], outline: false });
+      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.91], scale: [1.06, 0.05, 0.02], outline: false });
       mesh(GEO.box, '#b08a62', { position: [0, 0.08, -2.97], scale: [7.1, 0.16, 0.04], outline: false });
       return { kind: 'rect', hx: 3.05, z0: -2.45, z1: 2.55, door: { x: 0, z: 2.55 } };
     }
@@ -86,8 +88,7 @@ export function createRooms() {
     wall.material.side = THREE.BackSide;
     room.add(wall);
     const win = new THREE.Group();
-    win.position.set(1.5, 2.0, -3.2);
-    win.rotation.y = -0.45;
+    placeOnDome(win, 4.0, 3.6, 0.44, 2.0); // 돔 벽면에 딱 붙게
     win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.8, 0.8, 0.05], shell: true, outline: 0.03 }));
     win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.76, 0.03], outline: false }));
     win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.76, 0.06, 0.03], outline: false }));

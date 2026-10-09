@@ -73,6 +73,18 @@ export function furnitureModel(id) {
   return g;
 }
 
+/**
+ * 돔(타원 반구: 반지름 R, 높이 H) 안쪽 벽면에 창 · 액자를 붙인다. a: 방위각(0 이 뒤쪽 −z, + 는 오른쪽), y: 높이,
+ * inset: 벽에서 안쪽으로 띄우는 거리. 높이에 따라 벽이 안으로 좁아지므로 그만큼 당기고, 벽 기울기만큼 위를 안쪽으로 눕힌다.
+ */
+export function placeOnDome(obj, R, H, a, y, inset = 0.1) {
+  const r = R * Math.sqrt(Math.max(0, 1 - (y * y) / (H * H))) - inset;
+  const x = Math.sin(a) * r, z = -Math.cos(a) * r;
+  obj.position.set(x, y, z);
+  obj.rotation.set(Math.atan2(y / (H * H), (r + inset) / (R * R)), Math.atan2(-x, -z), 0, 'YXZ');
+  return obj;
+}
+
 /** 집 안 장면. 밖 마을과 따로 그린다. */
 export function createInterior() {
   const scene = new THREE.Scene();
@@ -90,8 +102,7 @@ export function createInterior() {
   scene.add(wall);
   // 안쪽 벽의 십자 창
   const win = new THREE.Group();
-  win.position.set(-1.7, 2.1, -3.55);
-  win.rotation.y = 0.45;
+  placeOnDome(win, ROOM_R, ROOM_R * 0.9, -0.45, 2.1); // 돔 벽면에 딱 붙게(예전엔 벽 밖으로 파묻혀 있었다)
   win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.9, 0.9, 0.05], shell: true, outline: 0.03 }));
   win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.86, 0.03], outline: false }));
   win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.86, 0.06, 0.03], outline: false }));
