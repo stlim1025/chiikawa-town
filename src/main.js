@@ -367,6 +367,16 @@ function boot() {
    * 잠자기: 하루가 지나는 연출. 어두워진 사이에 아침으로 바꾸고, 해가 뜨면 다시 움직인다(집 안이면 집 안 그대로).
    * how: 'home'(내 집) · 'lodge'(친구 집에 돈을 내고) — 기운이 가득 / 'rough'(노숙) — 기운이 조금만 찬다.
    */
+  /** 침대에서: 잘지 한 번 묻고, '잘래요'면 다음 날 아침까지 잔다. */
+  const BED = { kind: null, name: '침대', tag: '#d9ecff', ink: '#2f5577' };
+  function askSleep() {
+    input.setEnabled(false);
+    hud.setAction(null);
+    guide.ask('잘까요? 다음 날 아침까지 푹 자요', ['잘래요', '아직이요'], (i) => {
+      if (i === 0) doSleep();
+      else if (mode === 'home') input.setEnabled(true);
+    }, BED);
+  }
   function doSleep(how = 'home', after = null) {
     if (sleeping) return;
     sleeping = true;
@@ -780,8 +790,8 @@ function boot() {
       else if (homeTarget.type === 'host') talkTo(npcs.byKind(visit.kind));
       return;
     }
-    if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating) {
-      if (homeTarget.type === 'bed') doSleep();
+    if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating && !guide.open) {
+      if (homeTarget.type === 'bed') askSleep();
       else if (homeTarget.type === 'wardrobe') { interior.faceCamera(); panels.openWardrobe(); }
       else if (homeTarget.type === 'door') exitHome();
       return;
@@ -1973,6 +1983,8 @@ function boot() {
       spots: village.spots,
       homes: () => friendDoors(),
       visitRoom: (kind) => enterVisit(kind),
+      homeStand: (x, z) => interior.standAt(x, z),
+      homeTarget: () => homeTarget && homeTarget.type,
       leaveRoom: () => exitVisit(),
       free: (x, z, r) => village.isFree(x, z, r),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
@@ -2041,7 +2053,7 @@ function boot() {
       npcs.update(dt, t, player.position);
       interior.resize(aspect);
       // 집 안을 걷는다(꾸미기 · 창 · 잠자기 중에는 멈춘다). 침대 · 옷장 · 문 앞이면 행동 안내
-      const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay;
+      const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay && !guide.open;
       if (free) interior.walk(dt, input.vector(), homeOf(state));
       homeTarget = free ? interior.target(homeOf(state)) : null;
       interior.setCue(homeTarget, t);

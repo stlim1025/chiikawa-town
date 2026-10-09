@@ -234,6 +234,8 @@ export function createInterior() {
       yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
       if (moving) phase += dt * 2.6 * len * 3.2;
     },
+    /** 그 자리에 바로 선다(확인용). */
+    standAt(x, z) { pos.x = x; pos.z = z; },
     /** 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null */
     target(home) {
       const opts = [];
