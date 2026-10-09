@@ -25,6 +25,7 @@ import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
+import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -99,6 +100,17 @@ function svgSpan(cls, html) {
 /** 창 머리: 기울어진 이름표 제목 + (가게면) 가진 돈 알약. */
 const head = (title, money) => h('div', { class: 'panel-head' }, h('h2', {}, title),
   money == null ? null : h('div', { class: 'wallet' }, svgSpan('wallet-ico', COIN), won(money)));
+
+/** 토벌 랭킹 왕관. */
+const CROWN = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 31 5 14l9 7 6-12 6 12 9-7-2 17z" fill="#fcd95b" stroke="#c98a2e" stroke-width="2.2" stroke-linejoin="round"/><path d="M8 31h24" stroke="#c98a2e" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="22" r="2.6" fill="#ff8aa6"/><circle cx="12" cy="24" r="1.8" fill="#9fd3ff"/><circle cx="28" cy="24" r="1.8" fill="#9fd3ff"/></svg>';
+/** 친구 얼굴(랭킹 · 알림). */
+const friendFace = (kind) => `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`;
+/** 내 얼굴(몸 색 동그라미 + 눈 + 볼): 랭킹 줄과 무기에 새긴 얼굴에 쓴다. */
+const myFace = (body) => `<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="21" r="15" fill="${body}" stroke="#5a4431" stroke-width="2.4"/>`
+  + `<circle cx="14.5" cy="19" r="2.2" fill="#5a4431"/><circle cx="25.5" cy="19" r="2.2" fill="#5a4431"/>`
+  + `<ellipse cx="11" cy="25" rx="3" ry="1.8" fill="#ffa8b8"/><ellipse cx="29" cy="25" rx="3" ry="1.8" fill="#ffa8b8"/><path d="M18 25q2 2 4 0" fill="none" stroke="#5a4431" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+/** 내 무기 그림(랭커가 얼굴을 새겼으면 내 얼굴이 박힌 그림). */
+const myWeaponArt = (s, id) => weaponSvg(id, engravedOf(s).includes(id) ? (s.profile.look && s.profile.look.body) || '#ffffff' : null);
 
 /** 노동 접수 창에서 고른 탭(마을 일 · 토벌 · 전리품). 창을 다시 열어도 그대로. */
 let boardTab = 'work';
@@ -382,11 +394,58 @@ export function createPanels(ui, handlers) {
           : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L[id].fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L[id].fee ? `${won(L[id].fee)} 부족` : `시험 보기 ${won(L[id].fee)}`);
         out.push(card(LIC_ART[id], L[id].name, side2, own ? [['check', `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요`]] : LINES[id]));
       }
+      // 토벌 랭킹: 내 순위(자격증이 있으면) · 랭커 특전(무기에 얼굴 새기기)
+      const me = ranking(s, s.profile.name).find((r) => r.who === 'me');
+      out.push(h('div', { class: 'row lic guide-row' },
+        h('div', { class: 'lic-top' }, svgSpan('lic-ico', CROWN),
+          h('div', {}, h('div', { class: 't' }, '토벌 랭킹'),
+            me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `${me.rank}위`), chip(null, '', `${me.points}점`))
+              : h('div', { class: 'd' }, '상위 랭커는 무기에 얼굴을 새겨요')),
+          h('button', { class: 'btn', type: 'button', onClick: () => show('ranking') }, '보기'))));
       out.push(h('div', { class: 'row lic guide-row' },
         h('div', { class: 'lic-top' }, svgSpan('lic-ico', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 10q8-3 15 1q7-4 15-1v21q-8-3-15 1q-7-4-15-1z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2" stroke-linejoin="round"/><path d="M20 11v21" stroke="#c98a5a" stroke-width="2"/><circle cx="12.5" cy="19" r="4" fill="#8fd16a"/><path d="M10.5 18.5h1M14 18.5h1" stroke="#335" stroke-width="1.4" stroke-linecap="round"/><path d="M23 17h8M23 21h8M23 25h5" stroke="#c9a77c" stroke-width="2" stroke-linecap="round"/></svg>'),
           h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, '몬스터 도감과 규칙')),
           h('button', { class: 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기'))));
       out.push(h('div', { class: 'actions' }, closeBtn()));
+      return out;
+    },
+    /**
+     * 토벌 랭킹(검정소): 자격증 있는 토벌꾼을 점수 순으로. 위에서 셋(최소 점수 이상)이 랭커.
+     * 아래에 아직 자격증을 준비 중인 친구들, 맨 아래에 랭커 특전(지금 든 무기에 내 얼굴 새기기).
+     */
+    ranking(s) {
+      const rows = ranking(s, s.profile.name), body = (s.profile.look && s.profile.look.body) || '#ffffff';
+      const out = [head('토벌 랭킹', s.money), h('p', { class: 'sub' }, `점수가 높은 ${RANKER_TOP}명이 랭커예요`)];
+      out.push(h('div', { class: 'ledger rank-list' }, rows.map((r) => h('div', { class: `rank-row${r.ranker ? ' ranker' : ''}${r.who === 'me' ? ' me' : ''}` },
+        h('b', { class: 'rank-no' }, String(r.rank)),
+        svgSpan('job-art', r.who === 'me' ? myFace(body) : friendFace(r.who)),
+        h('div', { class: 'job-main' },
+          h('b', { class: 'job-name' }, r.name, r.ranker ? h('span', { class: 'rank-badge' }, ico('star'), '랭커') : null),
+          h('span', { class: 'job-where' }, `${r.kills}마리 토벌`)),
+        h('div', { class: 'rank-pts' }, h('b', {}, String(r.points)), h('small', {}, '점'))))));
+      // 아직 자격증이 없는 사람들
+      const waiting = Object.keys(HUNTER_PROFILES).filter((k) => !licensed(s, k));
+      if (!licensed(s, 'me') || waiting.length) {
+        out.push(h('h3', { class: 'shop-sec' }, '자격증 준비 중'));
+        out.push(h('div', { class: 'rank-wait' },
+          !licensed(s, 'me') ? h('span', { class: 'chip' }, svgSpan('ico', myFace(body)), '나') : null,
+          ...waiting.map((k) => { const t = hunterOf(s, k).tries; return h('span', { class: 'chip' }, svgSpan('ico', friendFace(k)), HUNTER_PROFILES[k].name, t ? h('small', {}, `${t}번 떨어짐`) : null); })));
+      }
+      // 랭커 특전: 지금 든 무기에 얼굴 새기기
+      out.push(h('h3', { class: 'shop-sec' }, '랭커 특전'));
+      const held = s.weapon && s.weapon.held, ranker = isRanker(s, 'me');
+      let side, d;
+      if (!ranker) {
+        const third = rows.filter((r) => r.who !== 'me')[RANKER_TOP - 1];
+        const goal = Math.max(RANKER_MIN, third ? third.points + 1 : RANKER_MIN), mine = hunterOf(s, 'me').points;
+        side = h('span', { class: 'lic-badge' }, '랭커 전용');
+        d = licensed(s, 'me') ? chipLine(chip('star', '', `랭커까지 ${Math.max(1, goal - mine)}점`)) : h('div', { class: 'd' }, '토벌 자격증부터 따요');
+      } else if (!held) { side = h('span', { class: 'lic-badge' }, '무기를 들고 와요'); d = h('div', { class: 'd' }, '든 무기에 새겨요'); }
+      else if (engravedOf(s).includes(held)) { side = h('span', { class: 'lic-badge done' }, ico('check'), '새김'); d = h('div', { class: 'd' }, `${WEAPONS[held].name}에 내 얼굴이 있어요`); }
+      else { side = priceBtn(ENGRAVE_PRICE, s.money, after(handlers.engrave), 'btn pink'); d = h('div', { class: 'd' }, `${WEAPONS[held].name}에 새겨요`); }
+      out.push(h('div', { class: 'row engrave-row' }, svgSpan('job-art', held ? weaponSvg(held, ranker || engravedOf(s).includes(held) ? body : null) : myFace(body)),
+        h('div', {}, h('div', { class: 't' }, '무기에 얼굴 새기기'), d), side));
+      out.push(h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn()));
       return out;
     },
     // 검정소 토벌 안내서: 몬스터 카드 + 규칙(필기 범위)
@@ -538,7 +597,8 @@ export function createPanels(ui, handlers) {
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
         out.push(h('div', { class: `row license-card${own ? '' : ' none'}` },
-          h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요'))));
+          h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요'),
+            own && id === 'hunter' ? (() => { const me = ranking(s, s.profile.name).find((r) => r.who === 'me'); return me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `랭킹 ${me.rank}위`), chip(null, '', `${me.points}점`)) : null; })() : null)));
       }
       return out;
     },
@@ -670,7 +730,7 @@ export function createPanels(ui, handlers) {
       const sel = current.sel;
       const pick = (slot) => { current.sel = same(slot, current.sel) ? null : slot; render(); };
       const nameOf = (x) => (x.type === 'weapon' ? WEAPONS[x.id].name : itemInfo(x.id).name);
-      const artOf = (x) => (x.type === 'weapon' ? weaponSvg(x.id) : itemSvg(x.id));
+      const artOf = (x) => (x.type === 'weapon' ? myWeaponArt(s, x.id) : itemSvg(x.id));
       const grid = h('div', { class: 'pocket-grid', role: 'grid', 'aria-label': '주머니 칸' },
         Array.from({ length: SLOTS }, (_, i) => {
           const x = slots[i];
@@ -781,7 +841,7 @@ export function createPanels(ui, handlers) {
         if (!own) btn = priceBtn(W.price, s.money, after(() => handlers.buyWeapon(id)));
         else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '장착');
         else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '빼기');
-        out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', weaponSvg(id)),
+        out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', myWeaponArt(s, id)),
           h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg)), on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, W.note)),
           btn));
       }

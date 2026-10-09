@@ -177,4 +177,14 @@ const WEAPON = {
   })(),
   star: `<path d="M24 40L52 10" stroke="${L}" stroke-width="9" stroke-linecap="round"/><path d="M24 40L52 10" stroke="#cdeeff" stroke-width="5.4" stroke-linecap="round"/><path d="M30 33L48 14" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><path d="M16 36l12 12" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M16 36l12 12" stroke="#f2c94c" stroke-width="4" stroke-linecap="round"/><circle cx="22" cy="42" r="3" fill="#ff7a9a" ${S} stroke-width="1.6"/><path d="M12 52l8-8" stroke="${L}" stroke-width="7.4" stroke-linecap="round"/><path d="M12 52l8-8" stroke="#3a4a7a" stroke-width="4" stroke-linecap="round"/><path d="M54 4l1.6 3.4 3.4 1.6-3.4 1.6L54 14l-1.6-3.4L49 9l3.4-1.6z" fill="#ffd94a"/>`
 };
-export const weaponSvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow(16)}${WEAPON[id] || ''}</svg>`;
+/** 무기에 새긴 얼굴(토벌 랭커) 자리: 날 · 자루 가운데쯤. */
+const FACE_SPOT = { stick: [32, 32], sword: [40, 24], hammer: [27, 38], fork: [24, 42], star: [40, 24] };
+/** 새긴 얼굴: 몸 색 동그라미 + 두 눈 + 볼. */
+const faceBadge = (id, body) => {
+  const [x, y] = FACE_SPOT[id] || [32, 32];
+  return `<g transform="translate(${x} ${y})"><circle r="7.6" fill="${body}" stroke="${L}" stroke-width="2"/>`
+    + `<circle cx="-2.6" cy="-0.6" r="1.25" fill="${L}"/><circle cx="2.6" cy="-0.6" r="1.25" fill="${L}"/>`
+    + `<ellipse cx="-4.2" cy="2" rx="1.5" ry="0.9" fill="#ffa8b8"/><ellipse cx="4.2" cy="2" rx="1.5" ry="0.9" fill="#ffa8b8"/></g>`;
+};
+/** 무기 그림. face: 얼굴을 새겼으면 그 몸 색(토벌 랭커). */
+export const weaponSvg = (id, face = null) => `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow(16)}${WEAPON[id] || ''}${face ? faceBadge(id, face) : ''}</svg>`;

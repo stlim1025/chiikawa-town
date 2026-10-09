@@ -295,6 +295,22 @@ function held(def, arm, pose, parts) {
  * 소품 꼬리표 → 부품. 손에 드는 것은 HOLD 자세에서 손끝 기준으로 적는다(+z 앞, +x 오른쪽 바깥, +y 위).
  * 긴 막대는 원기둥 대신 상자로 만든다(원기둥 외곽선은 평균 크기로 밀어서 가늘고 길면 옆 선이 거의 안 보인다).
  */
+/**
+ * 무기에 새긴 얼굴(토벌 랭커): 날 · 자루 위(+y 면)에 몸 색 동그라미 + 두 눈 + 볼. 얼굴 위쪽이 무기 끝(+z)을 본다.
+ * body: 몸 색, z: 손끝에서 앞으로 잰 자리, y: 위로 띄울 높이, w: 반지름.
+ */
+function faceParts(body, z, y, w = 0.045) {
+  return [
+    { m: 'sphere', c: body, p: [0, y, z], s: [w, 0.016, w * 1.05] },
+    { m: 'dot', c: '#2b2224', p: [-w * 0.36, y + 0.014, z + w * 0.12], s: [w * 0.22, 0.008, w * 0.26], o: false },
+    { m: 'dot', c: '#2b2224', p: [w * 0.36, y + 0.014, z + w * 0.12], s: [w * 0.22, 0.008, w * 0.26], o: false },
+    { m: 'dot', c: '#ff8fa6', p: [-w * 0.6, y + 0.012, z - w * 0.25], s: [w * 0.22, 0.005, w * 0.16], o: false },
+    { m: 'dot', c: '#ff8fa6', p: [w * 0.6, y + 0.012, z - w * 0.25], s: [w * 0.22, 0.005, w * 0.16], o: false }
+  ];
+}
+/** 내 무기마다 얼굴을 새길 자리 [z, y, 반지름]. */
+const FACE_AT = { stick: [0.32, 0.03, 0.055], sword: [0.36, 0.02, 0.058], hammer: [0.47, 0.095, 0.075], fork: [0.5, 0.03, 0.055], star: [0.38, 0.02, 0.058] };
+
 const PROP_PARTS = {
   // 쿠리만쥬의 맥주잔: 거품이 넘칠 듯하고 손잡이는 바깥쪽
   beer: (def) => held(def, 'armR', HOLD.drink, [
@@ -322,11 +338,15 @@ const PROP_PARTS = {
     ]);
   },
   // 랏코의 칼: 손잡이 · 코등이 · 칼날(등에 멘 칼과 같은 색). 팔을 내렸을 때 코등이가 배에 박히지 않게 살짝 바깥으로
+  // 랏코의 칼: 이름난 토벌 랭커라 칼날에 제 얼굴을 새겼다
   sword: (def) => held(def, 'armR', HOLD.train, [
     { m: 'box', c: '#7a5236', p: [0.02, 0, -0.005], s: [0.045, 0.045, 0.13] },
     { m: 'box', c: '#c9a24a', p: [0.02, 0, 0.07], s: [0.13, 0.035, 0.045] },
-    { m: 'box', c: '#dfe4ea', p: [0.02, 0, 0.34], s: [0.05, 0.02, 0.5] }
+    { m: 'box', c: '#dfe4ea', p: [0.02, 0, 0.34], s: [0.05, 0.02, 0.5] },
+    ...faceParts(RAKKO, 0.36, 0.016, 0.034).map((pt) => ({ ...pt, p: [pt.p[0] + 0.02, pt.p[1], pt.p[2]] }))
   ]),
+  // 치이카와 · 하치와레의 사스마타(토벌 나갈 때)
+  fork: (def) => held(def, 'armR', HOLD.train, forkParts()),
   // 우사기의 막대
   stick: (def) => held(def, 'armR', HOLD.train, [
     { m: 'box', c: '#b07a45', p: [0, 0, 0.255], s: [0.04, 0.04, 0.75] }
@@ -393,7 +413,7 @@ const WEAPON_PARTS = {
 export const PROP_FOR = {
   kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' },
   rakko: { train: 'sword', drink: 'bowl' }, usagi: { train: 'stick', drink: 'bowl' },
-  hachiware: { dance: 'mic', drink: 'bowl' }, chiikawa: { drink: 'bowl' }, momonga: { drink: 'bowl' }
+  hachiware: { dance: 'mic', drink: 'bowl', train: 'fork' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };
 
 /** 그 친구가 쓰는 소품 부품에 꼬리표(tag)를 달아 덧붙인다(buildFromDef 가 숨겨 둔다). */
@@ -634,6 +654,8 @@ function playerDef(rawLook) {
   const arm = parts.find((pt) => pt.n === 'armR' && pt.m === 'sphere'), az = arm.r ? arm.r[2] : 0;
   pivots.weapon = [arm.p[0] + arm.s[1] * Math.sin(az), arm.p[1] - arm.s[1] * Math.cos(az), arm.p[2]];
   for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag }));
+  // 랭커가 무기에 새긴 내 얼굴(꼬리표 'wf-무기id', player.setEngraved 로 보인다)
+  for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }

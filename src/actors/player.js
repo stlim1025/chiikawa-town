@@ -10,11 +10,11 @@ export function createPlayer(scene, chibi, village) {
   const position = { x: 0, z: 2 };
   let yaw = 0, phase = 0, t = 0;
   let model = chibi;
-  let held = null, weapon = null, weaponShown = true;
+  let held = null, weapon = null, weaponShown = true, engraved = new Set(); // engraved: 얼굴을 새긴 무기(랭커)
   let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   const knock = { x: 0, z: 0 };
   const showHeld = () => {
-    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || !!(weaponShown && weapon && tag === 'w-' + weapon);
+    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = tag === held || !!(weaponShown && weapon && (tag === 'w-' + weapon || (tag === 'wf-' + weapon && engraved.has(weapon))));
   };
 
   const api = {
@@ -47,6 +47,8 @@ export function createPlayer(scene, chibi, village) {
     setHeld(tag) { if (held === tag) return; held = tag; showHeld(); },
     /** 오른손 무기 id | null(4단계). */
     setWeapon(id) { if (weapon === id) return; weapon = id; showHeld(); },
+    /** 얼굴을 새긴 무기들(토벌 랭커). */
+    setEngraved(list) { const key = (list || []).join(','); if ([...engraved].join(',') === key) return; engraved = new Set(list || []); showHeld(); },
     /** 무기를 휘두른다(seconds 동안 휘두르기 몸짓). */
     swing(seconds = 0.32, style = 'swing') { swingT = seconds; api.swingDur = seconds; swingStyle = style; },
     get swinging() { return swingT > 0; },

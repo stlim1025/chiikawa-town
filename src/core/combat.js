@@ -147,7 +147,8 @@ export function huntQuiz(n, random = Math.random) {
 }
 
 export function isValidWeapon(w) {
-  return !!w && Array.isArray(w.owned) && w.owned.every((id) => WEAPONS[id]) && (w.held === null || WEAPONS[w.held]);
+  return !!w && Array.isArray(w.owned) && w.owned.every((id) => WEAPONS[id]) && (w.held === null || WEAPONS[w.held])
+    && (w.engraved === undefined || (Array.isArray(w.engraved) && w.engraved.every((id) => WEAPONS[id]))); // engraved: 얼굴을 새긴 무기(랭커)
 }
 export function isValidHunted(h) {
   return !!h && typeof h === 'object' && !Array.isArray(h) && Object.entries(h).every(([k, n]) => MONSTERS[k] && typeof n === 'number' && n >= 0);

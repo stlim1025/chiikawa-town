@@ -184,11 +184,12 @@ export function createNpcs(scene, village, weeds, berries) {
     }
   }
 
-  /** 할 일을 끝내고(또는 그만두고) 잠깐 쉰다. */
+  /** 할 일을 끝내고(또는 그만두고) 잠깐 쉰다(토벌 중 휘두르기처럼 quick 이면 쉬지 않고 바로 다음). */
   function endTask(n) {
+    const quick = n.task && n.task.quick;
     n.task = null;
     n.state = 'idle';
-    n.timer = 1.5 + Math.random() * 3;
+    n.timer = quick ? 0.05 : 1.5 + Math.random() * 3;
     clearRoute(n);
   }
 
@@ -224,7 +225,7 @@ export function createNpcs(scene, village, weeds, berries) {
   /**
    * 일정(plan) 한 단계를 진행한다. 단계: walk { x, z } 또는 { slots: [{ x, z }…], near } (갈 때 빈자리를 고른다)
    * · weeds { kind, left, onPull } · berries { left, onPick } · act { anim, time, say, face: { x, z } } · say { text }
-   * · wait { time } · call { fn }. 다 하면 다음 단계로.
+   * · wait { time } · call { fn } · hunt { find(x, z, skip), hit(m), left, onKill(m) } (마을 밖 몬스터 토벌). 다 하면 다음 단계로.
    */
   function runPlan(n) {
     const step = n.plan[0];
@@ -272,6 +273,29 @@ export function createNpcs(scene, village, weeds, berries) {
       if (step.tries > 8) { n.x = p.x; n.z = p.z; n.timer = 0.2; return; }
       clearRoute(n);
       n.tx = p.x; n.tz = p.z; n.state = 'walk';
+    } else if (step.do === 'hunt') {
+      // 토벌: 가장 가까운 그 몬스터에게 걸어가서(마을 밖까지) 닿으면 휘두른다. 못 찾거나 못 가면 기다리다 그만둔다
+      if (step.left <= 0) { next(); return; }
+      step.skip = step.skip || new Set();
+      let m = step.target;
+      if (!m || m.dead) m = step.target = step.find(n.x, n.z, step.skip);
+      if (!m) { step.waits = (step.waits || 0) + 1; n.timer = 2; if (step.waits > 30) next(); return; }
+      const d = Math.hypot(m.x - n.x, m.z - n.z), reach = m.M.size + 0.8;
+      if (d > reach) {
+        step.tries = (step.tries || 0) + 1;
+        if (step.tries > 14) { step.skip.add(m); step.target = null; step.tries = 0; n.timer = 0.3; return; } // 그 녀석에게는 못 간다
+        clearRoute(n);
+        n.tx = m.x + ((n.x - m.x) / d) * (reach - 0.3);
+        n.tz = m.z + ((n.z - m.z) / d) * (reach - 0.3);
+        n.state = 'walk';
+        return;
+      }
+      step.tries = 0;
+      n.yaw = Math.atan2(m.x - n.x, m.z - n.z);
+      n.task = { type: 'act', anim: 'train', time: 0.75, quick: true };
+      n.state = 'work';
+      n.workT = 0;
+      if (step.hit(m)) { step.left--; step.target = null; step.onKill?.(m); }
     } else if (step.do === 'act') {
       if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
       n.task = { type: 'act', anim: step.anim, time: step.time };

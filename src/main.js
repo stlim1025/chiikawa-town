@@ -58,8 +58,11 @@ import { weaponSvg, monsterSvg } from './ui/monsterart.js';
 import { openQuiz, openHighball } from './ui/exams.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, decide, villagerTakesJob, payVillager, villagerSpend, villagerPay,
-  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY
+  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY,
+  boardOf, MAX_JOBS_PER_DAY
 } from './core/villagers.js';
+import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE } from './core/hunters.js';
+import { charSvg } from './ui/art.js';
 import { furnitureThumbs } from './world/thumbs.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
@@ -299,10 +302,20 @@ function boot() {
       player.cheerTime = 1.2;
       hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 3600, { icon: weaponSvg(id), chips: [{ text: `${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘두르기` }] });
     },
+    /** 토벌 랭커 특전: 지금 든 무기에 내 얼굴을 새긴다. */
+    engrave() {
+      const r = engraveWeapon(state);
+      if (!r.ok) { hud.toast({ ranker: '랭커만 새길 수 있어요', weapon: '무기를 들고 와요', done: '이미 새긴 무기예요', money: '돈이 부족해요' }[r.reason] || '새길 수 없어요'); return; }
+      commit(r.state);
+      sound.play('done');
+      player.cheerTime = 1.6;
+      const id = heldWeapon(state);
+      hud.banner('무기에 얼굴을 새겼어요!', WEAPONS[id].name, 3200);
+    },
     holdWeapon(id) {
       commit(holdWeapon(state, id));
       sound.play('click');
-      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 장착했어요` : '무기를 뺐어요', 1600, id ? { icon: weaponSvg(id) } : null);
+      hud.toast(id ? `${josa(WEAPONS[id].name, '을/를')} 장착했어요` : '무기를 뺐어요', 1600, id ? { icon: weaponSvg(id, engravedOf(state).includes(id) ? state.profile.look.body : null) } : null);
     },
     trackQuest(id) { commit({ ...state, questTrack: id }); },
     // 주머니에서 버리기: 마을을 돌아다닐 때만(집 · 친구 집 안에서는 안 된다). 발 앞에 나뭇잎 꾸러미로 떨어진다
@@ -1274,7 +1287,7 @@ function boot() {
   function onKill(m) {
     sound.play('poof');
     if (m.exam) { examDummyDown(); return; }
-    let s = recordHunt(state, m.species);
+    let s = addKill(recordHunt(state, m.species), 'me', m.species); // 토벌 점수(랭킹)
     if (m.species === 'kingcap') s = { ...s, story: { ...(s.story || {}), bossSeen: true, bossDown: true } };
     const before = s.job;
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
@@ -1287,6 +1300,7 @@ function boot() {
     if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌! 도감에 적었어요`, 3400);
     else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${m.M.name} 토벌 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1500);
     celebrateIfDone(before, state.job);
+    rankNews();
     // 이야기 속 왕버섯을 쓰러뜨렸다
     if (m.species === 'kingcap') {
       bossM = null;
@@ -1394,6 +1408,7 @@ function boot() {
     warnCool = Math.max(0, warnCool - dt);
     if (swingHit) { swingHit.t -= dt; if (swingHit.t <= 0) { const id = swingHit.id; swingHit = null; resolveSwing(id); } }
     player.setWeapon(weaponNow());
+    player.setEngraved(engravedOf(state));
     if (hunterExam) {
       hunterExam.t -= dt;
       hud.setTimer(['토벌 실기', { icon: monsterSvg('dummy'), text: `${hunterExam.left}개` }, { icon: ICO.clock, text: `${Math.max(0, Math.ceil(hunterExam.t))}초` }]);
@@ -1765,6 +1780,7 @@ function boot() {
     brainT -= dt;
     if (brainT > 0 || !state) return;
     brainT = 1.5;
+    if (!lastRankers) rankNews(); // 처음엔 지금 랭커들을 기억만 해 둔다(바뀔 때 알린다)
     const day = state.clock.day, hour = hourOf(state.clock);
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
@@ -1790,6 +1806,7 @@ function boot() {
       // 쿠리만쥬: 저녁(17 ~ 21시)에는 쉬던 것도 멈추고 맥주집 카운터 앞에서 한 잔(지쳤으면 먼저 쉰다)
       if (kind === 'kurimanju' && isPubHour(hour) && !tired && !isSleepHour(hour)) { npcPub(n); continue; }
       if (lifeClock < restUntil[kind] && !isSleepHour(hour) && !tired) continue;
+      if (!tired && !isSleepHour(hour) && npcHunterLife(n, kind, day, hour)) continue; // 토벌 자격증 시험 · 토벌 일감
       const plan = decide(state, kind, day, hour);
       if (plan.act === 'sleep' || plan.act === 'nap') npcGoHome(n, plan.act);
       else if (plan.act === 'work') npcWork(n, plan.typeId);
@@ -1840,6 +1857,107 @@ function boot() {
     });
     npcs.plan(n, steps);
   }
+  // ---------- 친구들의 토벌: 자격증 시험(검정소) → 토벌 일감(마을 밖에서 진짜 몬스터를) → 랭킹 ----------
+  const faceIcon = (kind) => `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`;
+  const nameOf = (kind) => (HUNTER_PROFILES[kind] ? HUNTER_PROFILES[kind].name : FRIENDS[kind] ? FRIENDS[kind].name : kind);
+  /** 친구가 검정소에 가서 토벌 자격증 시험을 본다(응시료는 친구 지갑에서). 붙으면 마을에 소식이 퍼진다. */
+  function npcExam(n) {
+    const ex = village.spots.exam, fee = LICENSES.hunter.fee;
+    const seats = [[0.7, 0.7], [1.5, 1.0], [0.1, 1.3]].map(([dx, dz]) => ({ x: ex.x + dx, z: ex.z + dz }));
+    npcs.plan(n, [
+      { do: 'walk', slots: seats, near: 0.45 },
+      { do: 'act', anim: 'read', face: { x: ex.x, z: ex.z - 2 }, time: 6, say: '토벌 자격증 시험 보는 중…' },
+      { do: 'call', fn: () => {
+        const day = state.clock.day;
+        if (!canTryExam(state, n.kind, day) || villagerOf(state, n.kind, day).money < fee) { n.plan = null; return; }
+        const r = tryExam(villagerSpend(state, n.kind, fee, day), n.kind, day);
+        commit(r.state, false);
+        const near = Math.hypot(n.x - player.position.x, n.z - player.position.z) < 14;
+        if (r.passed) {
+          npcs.say(n, n.kind === 'usagi' ? '우라~!! 합격!' : '붙었다…! 토벌 자격증!');
+          hud.toast(`${josa(nameOf(n.kind), '이/가')} 토벌 자격증을 땄어요!`, 3600, { icon: faceIcon(n.kind) });
+          rankNews();
+        } else {
+          npcs.say(n, n.kind === 'chiikawa' ? '…히잉, 떨어졌다…' : '떨어졌다… 다음엔 꼭!');
+          if (near) hud.toast(`${josa(nameOf(n.kind), '이/가')} 토벌 자격증 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
+        }
+        restUntil[n.kind] = lifeClock + 30 + Math.random() * 40;
+      } }
+    ]);
+  }
+  /**
+   * 친구의 토벌 일감: 게시판에서 받고 → 마을 밖 그 몬스터에게 걸어가 쓰러뜨리고(점수가 쌓인다) → 게시판에서 보수를 받는다.
+   * 몬스터는 친구를 쫓지 않는다(나만 노린다). 다 못 잡고 오래 헤매면 그만두고 일감을 돌려놓는다.
+   */
+  function npcHunt(n, typeId) {
+    const T = JOB_TYPES[typeId], power = HUNTER_PROFILES[n.kind].power, job = { day: 0, done: 0 };
+    const CRY = { usagi: ['우라!', '야하!', '이야~하!'], rakko: ['하앗!', '훗.', '…끝이다.'], chiikawa: ['…얏!', '에잇…!'], hachiware: ['에잇!', '해냈다~!'], kurimanju: ['하아~ 끝!', '안주 거리다~'] }[n.kind] || ['얏!'];
+    npcs.plan(n, [
+      { do: 'walk', slots: SLOTS.board(), near: 0.45 },
+      { do: 'call', fn: () => {
+        const r = villagerTakesJob(state, n.kind, typeId, state.clock.day);
+        if (!r.ok) { n.plan = null; npcs.say(n, '앗, 토벌 일감이 다 나갔네…'); restUntil[n.kind] = lifeClock + 20; return; }
+        job.day = state.clock.day;
+        commit(r.state, false);
+        npcs.say(n, `${T.title}, 다녀올게!`);
+      } },
+      { do: 'hunt', left: T.target,
+        find: (x, z, skip) => monsters.nearest(x, z, 140, (m) => m.species === T.kind && !m.summoned && !m.exam && !m.M.boss && !skip.has(m)),
+        hit: (m) => monsters.npcHit(m, power, n.x, n.z),
+        onKill: (m) => {
+          job.done++;
+          tireNpc(n.kind, 8);
+          commit(addKill(state, n.kind, m.species), false);
+          npcs.say(n, CRY[Math.floor(Math.random() * CRY.length)]);
+          rankNews();
+        } },
+      { do: 'walk', slots: SLOTS.board(), near: 0.45 },
+      { do: 'call', fn: () => {
+        if (job.done >= T.target) {
+          const pay = villagerPay(typeId);
+          commit(payVillager(state, n.kind, pay, state.clock.day), false);
+          npcs.say(n, `토벌 끝! +${won(pay)}`);
+        } else {
+          if (job.day === state.clock.day) commit(returnToBoard(state, typeId, job.day), false);
+          npcs.say(n, '오늘은 못 잡았다… 일감은 돌려놓을게');
+        }
+        restUntil[n.kind] = lifeClock + 40 + Math.random() * 60;
+      } }
+    ]);
+  }
+  /** 토벌꾼다운 일을 고른다: 자격증이 없으면(돈이 모이면) 시험, 있으면 토벌 일감. 했으면 true. */
+  function npcHunterLife(n, kind, day, hour) {
+    const P = HUNTER_PROFILES[kind];
+    if (!P || hour < 7 || hour >= 17 || tutorialActive(state.tutorial)) return false;
+    const v = villagerOf(state, kind, day);
+    if (canTryExam(state, kind, day)) {
+      if (v.money >= LICENSES.hunter.fee && Math.random() < P.want * 0.4) { npcExam(n); return true; }
+      return false;
+    }
+    if (!licensed(state, kind) || v.jobs >= MAX_JOBS_PER_DAY || Math.random() >= P.want * 0.45) return false;
+    const left = boardOf(state, day).left, open = Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0);
+    if (!open.length) return false;
+    npcHunt(n, open[Math.floor(Math.random() * open.length)]);
+    return true;
+  }
+  /**
+   * 랭킹이 바뀌었으면 알린다: 새로 랭커가 된 사람(나는 큰 배너 + 얼굴 새기기 안내, 친구는 알림).
+   * 처음 부를 때는 지금 랭커들을 기억만 한다.
+   */
+  let lastRankers = null;
+  function rankNews() {
+    const now = new Set(ranking(state, state.profile.name).filter((r) => r.ranker).map((r) => r.who));
+    if (lastRankers) {
+      for (const who of now) {
+        if (lastRankers.has(who)) continue;
+        if (who === 'me') { hud.banner('토벌 랭커가 됐어요!', '검정소에서 무기에 얼굴을 새길 수 있어요', 4200, [{ icon: 'coin', text: won(ENGRAVE_PRICE) }]); sound.play('done'); }
+        else hud.toast(`${josa(nameOf(who), '이/가')} 토벌 랭커가 됐어요!`, 3600, { icon: faceIcon(who) });
+      }
+      if (lastRankers.has('me') && !now.has('me')) hud.toast('랭커 자리에서 밀려났어요', 3000);
+    }
+    lastRankers = now;
+  }
+
   /** 친구가 라멘 로우에서 라멘을 사 먹는다(지갑에서 나간다). */
   function npcEat(n) {
     const r = village.spots.ramen;
@@ -2176,6 +2294,8 @@ function boot() {
       announce: (events) => announce(events),
       monsterHp: (id, hp) => { const m = monsters.list.find((o) => o.id === id); if (m) m.hp = hp; },
       npcEat: (kind) => npcEat(npcs.byKind(kind)),
+      npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),
+      npcExam: (kind) => npcExam(npcs.byKind(kind)),
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기

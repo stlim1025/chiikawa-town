@@ -778,6 +778,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .sell-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .sell-foot .sum { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; color: var(--ink-soft); }
 .sell-foot .sum b { display: inline-flex; align-items: center; gap: 4px; font-weight: inherit; font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* 토벌 랭킹(검정소): 노동 접수와 같은 장부 줄. 위 셋(랭커)은 금색 번호와 별, 내 줄은 노랗게 */
+.rank-row { display: grid; grid-template-columns: 30px 48px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 0; }
+.rank-row + .rank-row { border-top: 2px dashed var(--paper-3); }
+.rank-row.me { margin: 0 -14px; padding: 9px 14px; background: var(--butter); }
+.rank-no { font-weight: inherit; font-size: 26px; text-align: center; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.rank-row.ranker .rank-no { color: #d9a520; text-shadow: 0 2px 0 #fff3b8; }
+.rank-row .job-art svg { width: 44px; height: 44px; }
+.rank-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 0 9px 1px 5px; border-radius: 999px; background: #fff0b3; box-shadow: 0 1px 0 #e8c97a; color: #a8741a; font-size: 15px; vertical-align: 2px; }
+.rank-badge .ico { width: 15px; height: 15px; }
+.rank-pts { text-align: right; white-space: nowrap; }
+.rank-pts b { font-weight: inherit; font-size: 24px; font-variant-numeric: tabular-nums; }
+.rank-pts small { margin-left: 2px; font-size: 15px; color: var(--ink-soft); }
+.rank-wait { display: flex; flex-wrap: wrap; gap: 6px; }
+.rank-wait .chip .ico { width: 24px; height: 24px; margin: -3px 0; }
+.rank-wait .chip small { margin-left: 4px; font-size: 14px; color: var(--ink-soft); }
+.chip.ranker-chip { background: #fff0b3; color: #a8741a; }
+.panel .row.engrave-row { justify-content: flex-start; }
+.panel .row.engrave-row > div:not(.job-art) { flex: 1 1 auto; min-width: 0; }
+.engrave-row .job-art { width: 56px; height: 56px; }
+.engrave-row .job-art svg { width: 50px; height: 50px; }
 /* 휴대폰 가로처럼 낮은 화면: 줄을 촘촘하게(한 화면에 일감이 더 많이 보이게) */
 @media (max-height: 420px) {
   .board-meter { margin-top: 4px; gap: 2px 8px; }

@@ -1030,6 +1030,23 @@ export function createMonsters(scene, village, random = Math.random) {
     spawnAt(species, x, z, extra = {}) { return add(species, x, z, { ...extra, wobble: 0 }); },
     /** 조건에 맞는 몬스터를 없앤다(연기 없이). */
     clear(fn) { for (let i = list.length - 1; i >= 0; i--) if (fn(list[i])) removeAt(i); },
+    /**
+     * 마을 친구가 몬스터를 친다(토벌 일감): 밀어내지 않고 잠깐 멈칫, 체력만 깎는다. 몬스터는 친구를 쫓지 않는다(나만 노린다).
+     * → 쓰러뜨렸는지
+     */
+    npcHit(m, dmg, fromX, fromZ) {
+      if (m.dead || m.under || m.dormant) return false;
+      m.hp -= dmg;
+      m.flash = 0.13;
+      m.stun = Math.max(m.stun, 0.35);
+      if (m.state === 'wander') { m.goal = null; m.yaw = Math.atan2(fromX - m.x, fromZ - m.z); }
+      poof(m.x, 0.3 + m.mesh.hover, m.z, 0.12, 3);
+      if (m.hp > 0) return false;
+      m.dead = true; m.deadT = 0; hideTele(m);
+      if (m.tongue) setTongue(m, 0);
+      poof(m.x, 0.4 + m.mesh.hover, m.z, m.M.size);
+      return true;
+    },
     /** 살아 있는 것 중 (x, z) 에서 maxDist 안의 가장 가까운 몬스터(땅속에 숨은 것은 빼고). */
     nearest(x, z, maxDist, fn = null) {
       let best = null, bd = maxDist;

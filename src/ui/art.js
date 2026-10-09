@@ -186,6 +186,19 @@ const ART = {
     const can = `<rect x="179" y="112" width="18" height="28" rx="4"${paint('#e9826b', 3.6)}/>` + P('M179 120H197M179 128H197', null, 2.4);
     return P(body, T) + cap + P(body, null) + can +
       eyes(121, 15, 5, 6) + cheeks(131, 40, 13, 8, false) + mouth(133, 6);
+  },
+
+  rakko() {
+    const BR = '#9b7455', FACE_C = '#efe1c9';
+    // 해달: 갈색 몸에 작은 둥근 귀, 얼굴 아래쪽은 크림색. 진지한 눈매(눈썹), 등 뒤로 칼자루가 비죽
+    const body = bodyPath('mochi', { r: 'down', l: 'down' },
+      { p1: [52, 51.28], p2: [76, 39.48], left: 'A13.4 13.4 0 0 1 76 39.48', right: 'A13.4 13.4 0 0 1 148 51.28' });
+    const stroke = (d, c, w) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+    const hilt = stroke('M150 40L172 14', LINE, 11) + stroke('M150 40L172 14', '#7a5236', 6) + stroke('M139 47L161 33', LINE, 9) + stroke('M139 47L161 33', '#c9a24a', 4.5);
+    const muzzle = E(100, 124, 46, 32, FACE_C, 0);
+    const brows = P('M66 92L88 98', null, 3.4) + P('M134 92L112 98', null, 3.4);
+    return hilt + P(body, BR) + muzzle + P(body, null) + brows + eyes(108, 23, 5.2, 6.2) +
+      E(100, 117, 7, 4.6, LINE, 0) + mouth(127, 6) + cheeks(125, 44, 11, 7, false);
   }
 };
 
