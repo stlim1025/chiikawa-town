@@ -1,0 +1,643 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>치이카와 마을 생활</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+/* Layout: full-bleed 3D stage, HUD pinned to the edges (landscape first), Animal Crossing–style placement:
+   money · stamina · job stacked top-left, big date & time bottom-left, phone top-right, action button bottom-right,
+   dialogue box bottom-centre, notifications dropping in top-centre.
+   Look: cream speech-bubble shapes, warm brown text, soft offset shadows, yellow highlight for "selected". Single look by design. */
+:root {
+  --ink: #5a4431;        /* 갈색 글씨 */
+  --ink-soft: #7a634b;
+  --paper: #fffaeb;      /* 크림 */
+  --paper-2: #f6edd3;    /* 한 톤 진한 크림(목록 칸) */
+  --paper-3: #eadcb8;
+  --paper-soft: rgba(255, 250, 235, 0.95);
+  --sky: #d9eef7;
+  --yellow: #fcd95b;     /* 고른 것 · 주요 버튼 */
+  --yellow-deep: #ebb546;
+  --mint: #c4ebcf;
+  --mint-deep: #73c68e;
+  --pink: #ffd6e2;
+  --hatch: #f39aaa;
+  --butter: #fff3b8;
+  --warn: #f2a65a;
+  --shadow: rgba(120, 88, 48, 0.24);
+  --dim: rgba(84, 62, 38, 0.32);
+  /* 글씨는 전부 손글씨(Gaegu) 한 가지로: 깔끔한 고딕 본문체는 쓰지 않는다 */
+  --hand: "Gaegu", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: var(--hand);
+  --r: 30px 34px 32px 28px / 28px 32px 34px 30px; /* 말랑한 상자 */
+  --lift: 0 4px 0 var(--shadow);
+  --dots: radial-gradient(rgba(214, 192, 140, 0.3) 1.6px, transparent 1.9px) 0 0 / 20px 20px;
+  --leaf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4.5 19.5C3.6 11 9 4 20.5 3.6c.3 11.4-7 16.8-16 15.9z' fill='%2378c86a'/%3E%3Cpath d='M5 19 14.5 9.5' stroke='%234f9c47' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--sky); color: var(--ink); font-family: var(--body); font-weight: 700; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+#game { position: relative; width: 100%; height: 100%; overflow: hidden; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#ui { position: absolute; inset: 0; pointer-events: none; }
+/* 누를 수 없는 표시(왼쪽 위 기둥, 시계, 알림)와 집 안 화면 전체 틀은 화면 누름을 통과시킨다(집 안에서는 바닥을 눌러 가구를 놓는다) */
+#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui) { pointer-events: auto; }
+button { font-family: var(--hand); font-weight: 700; color: var(--ink); cursor: pointer; background: none; border: none; padding: 0; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep); outline-offset: 3px; }
+@keyframes pop { from { scale: 0.7; opacity: 0; } to { scale: 1; opacity: 1; } }
+
+.card { background: var(--paper-soft); border-radius: var(--r); box-shadow: var(--lift); }
+.btn { position: relative; min-height: 44px; padding: 6px 22px 8px; border-radius: 999px; background: var(--paper); font-size: 20px; line-height: 1.1; box-shadow: 0 3px 0 var(--shadow); transition: transform 0.08s, box-shadow 0.08s; }
+.btn.primary { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.btn.pink { background: var(--mint); box-shadow: 0 3px 0 var(--mint-deep); }
+.btn:active:not(:disabled), .icon-btn:active, .hud-phone:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); display: flex; align-items: center; justify-content: center; }
+.ico { width: 1em; height: 1em; display: block; flex: 0 0 auto; }
+
+/* 분홍 빗금 장식(원작의 볼 터치) */
+.blush { display: inline-block; width: 22px; height: 12px; border-radius: 50%; background: repeating-linear-gradient(-55deg, var(--hatch) 0 1.5px, transparent 1.5px 4px), var(--pink); vertical-align: middle; }
+
+/* ---------- HUD ---------- */
+.hud-left { position: absolute; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(380px, 46vw); }
+.hud-status { display: grid; grid-template-columns: auto auto; justify-items: start; align-items: center; gap: 6px 8px; }
+.hud-pill { display: flex; align-items: center; gap: 8px; padding: 3px 16px 5px 8px; border-radius: 999px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-variant-numeric: tabular-nums; }
+.hud-pill .ico { font-size: 26px; }
+.hud-money { font-size: 24px; }
+.hud-grade { padding: 1px 12px 3px; border-radius: 999px; background: var(--mint); box-shadow: 0 2px 0 var(--mint-deep); font-size: 17px; rotate: -3deg; }
+.hud-energy { grid-column: 1 / -1; font-size: 18px; }
+.hud-energy .ico { font-size: 22px; }
+.hud-bar { position: relative; width: 96px; height: 12px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.hud-bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: #ff9fb4; transition: width 0.3s; }
+.hud-bar.low > i { background: var(--warn); }
+.hud-energy .sv { min-width: 1.8em; text-align: right; color: var(--ink-soft); }
+.hud-job { display: flex; align-items: center; gap: 8px; padding: 5px 18px 7px 10px; border-radius: 20px 22px 20px 18px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
+.hud-job::before { content: ""; flex: 0 0 auto; width: 24px; height: 24px; background: no-repeat center / contain var(--leaf); }
+.hud-job.done { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); animation: job-done 0.8s ease-in-out infinite alternate; transform-origin: left center; }
+@keyframes job-done { from { scale: 1; } to { scale: 1.05; } }
+/* 날짜 · 시각: 왼쪽 아래에 크게(동물의 숲처럼 흰 글씨) */
+.hud-clock { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); color: #fffdf6; line-height: 1;
+  text-shadow: 0 2px 0 rgba(84, 62, 38, 0.55), 0 0 8px rgba(84, 62, 38, 0.45); transition: opacity 0.2s; }
+.hud-date { display: flex; align-items: center; gap: 6px; font-size: 21px; }
+.hud-date .ico { font-size: 24px; filter: drop-shadow(0 1px 1px rgba(84, 62, 38, 0.5)); }
+.hud-time { display: flex; align-items: baseline; gap: 6px; margin-top: -2px; }
+.hud-time b { font-size: 56px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.hud-time small { font-size: 22px; }
+#ui:has(.guide:not([hidden])) .hud-clock { opacity: 0; }
+/* 마을폰(설정) · 확대 */
+.hud-phone { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 58px; height: 58px; padding: 7px; border-radius: 50%; background: var(--paper-soft); box-shadow: var(--lift); }
+.hud-phone svg { width: 100%; height: 100%; display: block; }
+.hud-zoom { position: absolute; top: calc(max(10px, env(safe-area-inset-top)) + 72px); right: max(19px, calc(env(safe-area-inset-right) + 7px)); display: flex; flex-direction: column; gap: 8px; }
+/* 행동 버튼: 노란 동그라미가 퐁 하고 나타난다 */
+.hud-action { position: absolute; right: max(22px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); width: 92px; height: 92px; padding: 0 8px; border-radius: 50%; background: var(--yellow); font-size: 22px; line-height: 1.05;
+  box-shadow: 0 5px 0 var(--yellow-deep), 0 10px 18px rgba(120, 88, 48, 0.22); touch-action: none; animation: pop 0.25s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.hud-action:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--yellow-deep); }
+/* 풀 뽑기 힘 게이지 */
+.hud-meter { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(300px, 48vw); padding: 6px 16px 12px; text-align: center; border-radius: var(--r); background: var(--paper-soft); box-shadow: var(--lift); }
+.hud-meter .lab { font-size: 18px; margin-bottom: 6px; }
+.hud-meter .track { position: relative; height: 20px; border-radius: 999px; background: var(--paper-3); }
+.hud-meter .zone { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; background: var(--mint-deep); }
+.hud-meter .fill { position: absolute; top: 2px; bottom: 2px; left: 2px; border-radius: 999px; background: rgba(255, 159, 180, 0.45); }
+.hud-meter .needle { position: absolute; top: -5px; bottom: -5px; width: 4px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+/* 알림: 위 가운데로 톡 떨어진다 */
+.hud-toasts { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(440px, 50vw); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; z-index: 3; }
+.toast { display: flex; align-items: center; gap: 8px; padding: 5px 18px 7px 10px; border-radius: 999px; background: var(--paper); box-shadow: var(--lift); font-size: 19px; line-height: 1.25; text-align: center; animation: toast-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.toast::before { content: ""; flex: 0 0 auto; width: 22px; height: 22px; background: no-repeat center / contain var(--leaf); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-14px) scale(0.9); } to { opacity: 1; transform: none; } }
+/* 큰 소식(노동 완료, 내 집 마련, 청약 당첨) */
+.hud-banner { position: absolute; left: 50%; top: 32%; padding: 12px 36px 16px; text-align: center; color: var(--ink); background: var(--dots), var(--paper); border-radius: var(--r);
+  box-shadow: 0 0 0 6px var(--yellow), 0 10px 0 6px var(--yellow-deep), 0 18px 30px rgba(84, 62, 38, 0.25); pointer-events: none; z-index: 4; animation: banner-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; transition: opacity 0.4s; }
+.hud-banner b { display: block; font-size: 46px; line-height: 1; color: #e0745a; }
+.hud-banner span { display: block; margin-top: 6px; font-size: 21px; }
+.hud-banner.out { opacity: 0; }
+@keyframes banner-in { from { opacity: 0; transform: translate(-50%, -50%) rotate(-3deg) scale(1.6); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-3deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .hud-banner, .hud-job.done, .toast, .hud-action { animation: none; } }
+
+/* 월드 라벨: 간판은 나무 팻말, 대사는 크림색 말풍선 */
+.world-label { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; font-family: var(--hand); font-weight: 700; }
+.world-label.sign { padding: 1px 12px 3px; font-size: 16px; color: #fff8e6; background: #a7774a; border-radius: 8px 10px 7px 9px; box-shadow: 0 3px 0 #7a5233; }
+.world-label.bubble { padding: 4px 16px 6px; font-size: 19px; color: var(--ink); background: var(--paper); border-radius: 22px 26px 24px 20px / 20px 24px 26px 22px; box-shadow: 0 3px 0 var(--shadow); margin-top: -14px; }
+.world-label.bubble::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -8px; border: 8px solid transparent; border-top: 10px solid var(--paper); border-bottom: 0; }
+/* 하치와레 안내: 가야 할 곳 위에서 통통 튀는 표시 */
+.world-label.mark { padding: 3px 14px 5px; font-size: 20px; color: var(--ink); background: var(--yellow); border-radius: 999px; box-shadow: 0 3px 0 var(--yellow-deep); margin-top: -14px; animation: mark-bob 0.7s ease-in-out infinite alternate; }
+@keyframes mark-bob { from { translate: 0 0; } to { translate: 0 -8px; } }
+@media (prefers-reduced-motion: reduce) { .world-label.mark { animation: none; } }
+
+/* 조이스틱 */
+.stick { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; background: rgba(255, 250, 235, 0.4); box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.85); pointer-events: none; }
+.stick > i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: var(--paper); box-shadow: 0 3px 0 var(--shadow); }
+
+/* ---------- 창: 크림색 말랑 상자 + 기울어진 이름표 ---------- */
+.backdrop { position: absolute; inset: 0; background: var(--dim); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.panel { position: relative; width: min(520px, 100%); max-height: calc(100% - 32px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r); background: var(--dots), var(--paper);
+  box-shadow: 0 6px 0 var(--shadow), 0 16px 30px rgba(84, 62, 38, 0.22); animation: pop 0.28s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.panel h2 { margin: 0; display: inline-block; padding: 2px 22px 5px; border-radius: 999px; background: var(--tab, var(--yellow)); font-size: 27px; font-weight: 700; rotate: -2.5deg; box-shadow: 0 3px 0 var(--shadow); }
+.panel-realty { width: min(580px, 100%); }
+.panel-board { --tab: #fcd95b; } .panel-exam { --tab: #bfe0f7; } .panel-shop { --tab: #ffcaa3; } .panel-furniture { --tab: #a9e4cb; } .panel-realty { --tab: #dccdf3; }
+.wallet { display: inline-flex; align-items: center; gap: 6px; padding: 2px 14px 4px 6px; border-radius: 999px; background: var(--paper-2); font-size: 20px; font-variant-numeric: tabular-nums; }
+.wallet-ico, .wallet-ico svg { width: 24px; height: 24px; display: block; }
+/* 손글씨체는 작으면 읽기 어려워서: 설명 글씨도 크게, 줄 간격 넉넉하게 */
+.panel .sub { margin: 8px 2px 4px; font-size: 20px; line-height: 1.3; color: var(--ink-soft); }
+.panel .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 14px 12px; border-radius: 20px 22px 20px 18px; background: var(--paper-2); }
+.panel .row .t { font-size: 24px; line-height: 1.15; }
+.panel .row .d { margin-top: 2px; font-size: 19px; line-height: 1.25; color: var(--ink-soft); }
+.panel .row > div:first-child { flex: 1 1 auto; min-width: 0; }
+.panel .row > .btn { flex: 0 0 auto; }
+/* 버튼 대신 상태가 오면 작은 꼬리표로 */
+.panel .row > .d { flex: 0 1 auto; max-width: 42%; margin: 0; padding: 4px 12px 6px; border-radius: 14px 16px 14px 12px; background: var(--paper); text-align: center; font-size: 17px; }
+.panel .actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.panel .note { margin: 10px 4px 0; font-size: 19px; line-height: 1.3; color: var(--ink-soft); }
+.panel .hint { margin: 0 auto 0 4px; font-size: 18px; color: var(--ink-soft); }
+
+/* 가구점: 동물의 숲 카탈로그처럼 왼쪽 목록 · 오른쪽 큰 미리보기 */
+.panel-furniture { width: min(760px, 100%); }
+.panel-furniture .panel-body { display: flex; flex-direction: column; overflow: hidden; }
+.catalog { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 8px; }
+.cat-list { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px 6px 6px 2px; }
+.cat-item { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 14px 4px 6px; border-radius: 16px 18px 16px 14px; background: var(--paper-2); text-align: left; font-size: 20px; }
+.cat-item .thumb { width: 42px; height: 42px; border-radius: 12px; background: var(--paper); object-fit: contain; }
+.cat-item .nm { flex: 1 1 auto; min-width: 0; }
+.cat-item .pr { font-size: 18px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.cat-item[aria-pressed="true"] { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.cat-item[aria-pressed="true"] .pr { color: var(--ink); }
+.cat-view { min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; border-radius: var(--r); background: radial-gradient(circle at 50% 40%, #ffffff 0 30%, transparent 62%), var(--paper-2); }
+.cat-img { flex: 1 1 auto; min-height: 0; max-width: 100%; max-height: 200px; aspect-ratio: 1; object-fit: contain; }
+.cat-name { font-size: 26px; }
+.cat-meta { font-size: 18px; color: var(--ink-soft); }
+
+/* ---------- 마을폰: 민트 틀 안에 화면(상태 줄 + 앱 화면) + 아래 동그란 홈 버튼. 홈 · 자격증 · 지도가 한 폰 안에서 바뀐다 ---------- */
+.phone-backdrop { padding: 0; overflow: hidden; animation: phone-dim 0.24s ease-out; }
+.panel.phone { box-sizing: border-box; width: min(340px, 100% - 24px); height: min(640px, 100% - 24px); max-height: none; padding: 10px 10px 0; border-radius: 46px; background: #5ec4ad;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), 0 8px 0 #46a893, 0 18px 34px rgba(84, 62, 38, 0.3); animation: phone-up 0.42s cubic-bezier(0.2, 1.12, 0.4, 1); }
+@keyframes phone-up { from { transform: translateY(calc(50vh + 50%)); } to { transform: none; } }
+@keyframes phone-dim { from { background-color: rgba(84, 62, 38, 0); } }
+@media (prefers-reduced-motion: reduce) { .panel.phone, .phone-backdrop { animation: none; } }
+.phone-screen { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 37px; background: var(--dots), #fff8e8; box-shadow: 0 0 0 3px #46a893; }
+/* 상태 줄: 왼쪽 시각 · 가운데 카메라 · 오른쪽 날짜 */
+.phone-status { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px 20px 3px; font-size: 16px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.phone-time { font-size: 19px; }
+.phone-cam { width: 56px; height: 18px; border-radius: 999px; background: radial-gradient(circle at 75% 50%, #6f8ea8 0 2.6px, transparent 3.4px), #3b2e22; }
+.phone-date { justify-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+/* 앱 화면: 지도 말고는 안에서 스크롤한다 */
+.phone-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 14px 14px; }
+.phone[data-app="map"] .phone-body { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 10px; }
+.phone-home { flex: 0 0 auto; align-self: center; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: 6px 0; border-radius: 50%; background: #79d3bf;
+  box-shadow: inset 0 -3px 0 #46a893, 0 0 0 3px rgba(255, 255, 255, 0.28); }
+.phone-home::after { content: ""; width: 14px; height: 14px; border-radius: 5px; border: 2.5px solid #fff; }
+.phone-home:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 #46a893, 0 0 0 3px rgba(255, 255, 255, 0.28); }
+/* 앱 막대: ‹ 홈으로 · 앱 이름 · (지도) 지금 있는 곳 */
+.phone-bar { position: sticky; top: 0; z-index: 2; flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin: 0 -14px 4px; padding: 6px 14px 8px; background: #fff8e8; box-shadow: 0 2px 0 rgba(90, 68, 49, 0.08); }
+.phone-back { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding-bottom: 4px; border-radius: 50%; background: var(--paper-2); box-shadow: 0 3px 0 var(--shadow); font-size: 32px; line-height: 1; }
+.phone-back:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.phone .phone-bar h2 { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: none; box-shadow: none; rotate: 0deg; font-size: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone-tag { flex: 0 0 auto; padding: 1px 12px 3px; border-radius: 999px; background: var(--mint); box-shadow: 0 2px 0 var(--mint-deep); font-size: 16px; white-space: nowrap; }
+/* 폰 안 글씨는 한 단계 작게(폭이 좁아서) */
+.phone .sub { margin: 4px 4px 6px; font-size: 18px; }
+.phone .row { padding: 10px 14px 12px; }
+.phone .row .t { font-size: 21px; }
+.phone .row .d { font-size: 17px; }
+/* 홈 화면: 제목 + 앱 아이콘 3줄 + 저장 안내 */
+.phone .phone-title { display: block; margin: 6px 6px 0; padding: 0; background: none; box-shadow: none; rotate: 0deg; font-size: 30px; line-height: 1.2; }
+.apps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 6px; margin: 12px 0 10px; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 2px; border-radius: 18px; }
+.app-ico { position: relative; width: 66px; height: 66px; border-radius: 38%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 0 rgba(84, 62, 38, 0.18); }
+.app-ico svg { width: 42px; height: 42px; display: block; }
+.app.sfx .app-ico { background: #ff9f7a; } .app.music .app-ico { background: #8fb8f0; } .app.exit .app-ico { background: #f6c453; }
+.app.off .app-ico { background: #cfc6b4; }
+.app.off .app-ico::after { content: ""; position: absolute; width: 50px; height: 5px; border-radius: 3px; background: #fff; rotate: -40deg; }
+.app:active .app-ico { transform: translateY(2px); box-shadow: 0 2px 0 rgba(84, 62, 38, 0.18); }
+.app-label { font-size: 17px; line-height: 1.15; text-align: center; }
+.phone-note { margin: 4px 2px 0; padding: 6px 12px 8px; border-radius: 16px 18px 16px 14px; background: var(--paper-2); text-align: center; font-size: 15px; line-height: 1.3; color: var(--ink-soft); }
+/* 지도 앱: 남은 높이를 지도가 채우고, 아래 한 줄 안내 */
+.mapview { position: relative; flex: 1 1 0; min-height: 0; border-radius: 18px; border: 3px solid var(--ink); overflow: hidden; background: var(--paper-2); touch-action: none; }
+.mapview-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.mapview-north { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); font-size: 17px; line-height: 1; pointer-events: none; }
+.mapview-btns { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.mapview-btn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--paper); box-shadow: 0 3px 0 var(--shadow); font-size: 26px; line-height: 1; }
+.mapview-btn.mapview-me { width: auto; height: 34px; padding: 0 12px 2px; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); font-size: 16px; white-space: nowrap; }
+.mapview-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.mapview-btn.mapview-me:active { box-shadow: 0 1px 0 var(--yellow-deep); }
+.phone-foot { flex: 0 0 auto; margin: 8px 2px 0; text-align: center; font-size: 15px; line-height: 1.25; color: var(--ink-soft); }
+.phone-foot span, .phone-foot b { white-space: nowrap; }
+.phone-foot b { color: var(--ink); }
+/* 낮은 가로 화면(약 450px): 틀 · 아이콘을 줄여 지도와 앱이 들어가게 */
+@media (max-height: 500px) {
+  .panel.phone { padding: 8px 8px 0; border-radius: 40px; }
+  .phone-screen { border-radius: 33px; }
+  .phone-status { padding-top: 6px; }
+  .phone-home { width: 38px; height: 38px; margin: 5px 0; }
+  .phone-bar { padding: 4px 14px 6px; }
+  .phone-back { width: 36px; height: 36px; font-size: 28px; }
+  .phone .phone-title { font-size: 26px; }
+  .apps { gap: 8px 6px; margin: 8px 0 8px; }
+  .app { gap: 4px; }
+  .app-ico { width: 56px; height: 56px; }
+  .app-ico svg { width: 36px; height: 36px; }
+  .app.off .app-ico::after { width: 42px; }
+  .mapview-btn { width: 36px; height: 36px; font-size: 24px; }
+  .mapview-btn.mapview-me { height: 32px; }
+}
+
+/* ---------- 캐릭터 만들기 ---------- */
+.creator { position: absolute; inset: 0; background: var(--sky); display: flex; gap: 16px; padding: 16px; box-sizing: border-box; }
+.creator-preview { flex: 1 1 45%; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.creator-preview canvas { width: 100%; height: 100%; max-height: 480px; display: block; touch-action: none; cursor: grab; }
+.creator.turning .creator-preview canvas { cursor: grabbing; }
+.preview-hint { position: absolute; left: 0; right: 0; bottom: 2px; margin: 0; text-align: center; pointer-events: none; font-size: 18px; color: var(--ink-soft); }
+.creator.turning .preview-hint { opacity: 0; }
+/* 바깥 상자(.creator-form)는 제자리, 스크롤은 안쪽(.creator-scroll) */
+.creator-form { flex: 1 1 55%; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--dots), var(--paper); }
+.creator-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 20px 18px; }
+.creator-form h1 { margin: 0; display: inline-block; padding: 2px 20px 5px; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); font-size: 28px; font-weight: 700; rotate: -2deg; }
+.creator-form h2 { margin: 12px 0 6px; font-size: 20px; font-weight: 700; }
+.creator-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.tab { min-height: 42px; padding: 4px 18px 6px; border-radius: 999px; background: var(--paper-2); font-size: 20px; }
+.tab[aria-selected="true"] { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.tab-body { min-height: 220px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice { min-height: 44px; padding: 4px 14px 6px; border-radius: 16px 18px 16px 14px; background: var(--paper-2); font-size: 18px; }
+.choice[aria-pressed="true"] { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.swatch { width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 0 0 3px #ffffff, 0 3px 0 3px var(--shadow); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px #ffffff, 0 0 0 7px var(--yellow-deep); }
+.name-input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 4px 18px 6px; border: none; border-radius: 999px; font-family: var(--hand); font-weight: 700; font-size: 22px; color: var(--ink); background: var(--paper-2); }
+.creator-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+@media (orientation: portrait) { .creator { flex-direction: column; } .creator-preview { flex: 0 0 34%; } }
+
+/* ---------- 하치와레 대화 상자(동물의 숲처럼 아래 가운데) ---------- */
+.guide { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(640px, calc(100% - 48px)); box-sizing: border-box; min-height: 104px; padding: 24px 34px 30px;
+  background: var(--paper); border-radius: 46px 54px 50px 42px / 52px 46px 54px 48px; box-shadow: 0 5px 0 var(--shadow), 0 14px 26px rgba(84, 62, 38, 0.2); cursor: pointer; z-index: 5; animation: pop 0.25s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.guide-name { position: absolute; left: 34px; top: -18px; margin: 0; padding: 2px 18px 4px; border-radius: 999px; background: #a9d4f2; color: #2f5577; font-size: 21px; rotate: -5deg; box-shadow: 0 3px 0 rgba(60, 110, 150, 0.35); }
+.guide-text { margin: 0; font-size: 24px; line-height: 1.4; }
+.guide-next { position: absolute; left: 50%; bottom: 6px; width: 32px; height: 22px; margin-left: -16px;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 22'%3E%3Cpath d='M4 4h24L16 19z' fill='%23f2a43a' stroke='%23f2a43a' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E");
+  animation: next-bob 0.55s ease-in-out infinite alternate; }
+@keyframes next-bob { from { translate: 0 -2px; } to { translate: 0 4px; } }
+.guide-next:focus-visible { outline: none; filter: drop-shadow(0 0 3px var(--yellow-deep)); }
+/* 선택지: 대화 상자 오른쪽 위에 뜨는 말풍선(고른 줄은 노랗게 + ▶) */
+.guide-choices { position: absolute; right: 28px; bottom: calc(100% + 10px); min-width: 190px; max-height: calc(100vh - 200px); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 10px;
+  background: var(--paper); border-radius: 26px 30px 28px 24px; box-shadow: 0 4px 0 var(--shadow), 0 10px 22px rgba(84, 62, 38, 0.2); cursor: default; animation: pop 0.22s cubic-bezier(0.2, 1.5, 0.4, 1); transform-origin: bottom right; }
+.guide-choice { position: relative; padding: 4px 18px 6px 32px; border-radius: 999px; text-align: left; font-size: 21px; line-height: 1.2; white-space: nowrap; }
+/* 고른 줄(키보드 W/S · 마우스로 가리킨 줄 하나만) */
+.guide-choice:focus-visible { outline: none; }
+.guide-choice.sel { background: var(--yellow); }
+.guide-choice.sel::before { content: ""; position: absolute; left: 11px; top: 50%; margin-top: -7px; border: 7px solid transparent; border-left: 11px solid #f2a43a; border-right: 0; }
+/* 친밀도 하트(이름표 옆) */
+.guide-name .hearts { margin-left: 8px; font-size: 16px; color: #ef7f9c; letter-spacing: 1px; }
+.guide-name .hearts:empty { display: none; }
+.guide-name .note { margin-left: 8px; padding: 0 8px 1px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); font-size: 15px; }
+.guide-name .note:empty { display: none; }
+/* 술래잡기 남은 시간 */
+.hud-timer { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 4px 22px 7px; border-radius: 999px; background: var(--yellow); box-shadow: 0 4px 0 var(--yellow-deep);
+  font-size: 24px; font-variant-numeric: tabular-nums; z-index: 2; animation: pop 0.25s cubic-bezier(0.2, 1.6, 0.4, 1); }
+#ui:has(.hud-timer:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 56px); }
+/* 할 일 쪽지(왼쪽 위 기둥 맨 아래) */
+.guide-goal { display: flex; align-items: center; gap: 8px; padding: 4px 14px 6px 6px; border-radius: 16px 18px 16px 14px; background: var(--butter); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
+.guide-goal::before { content: "할 일"; flex: 0 0 auto; padding: 0 9px 2px; border-radius: 999px; background: var(--yellow-deep); color: #ffffff; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .guide, .guide-next { animation: none; } }
+@media (orientation: portrait) and (max-width: 640px) {
+  .guide { width: calc(100% - 24px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 110px); }
+}
+.cinematic .hud-left, .cinematic .hud-timer, .cinematic .hud-clock, .cinematic .hud-phone, .cinematic .hud-zoom, .cinematic .hud-action, .cinematic .hud-meter, .cinematic .stick { display: none !important; }
+
+/* ---------- 손그림 배경 일러스트(타이틀, 캐릭터 만들기, 세로 안내) ---------- */
+.scenery { position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+.scenery svg { width: 100%; height: 100%; display: block; }
+.scenery .cloud { animation: cloud-drift 18s ease-in-out infinite alternate; }
+.scenery .c2 { animation-duration: 24s; }
+.scenery .c3 { animation-duration: 20s; animation-direction: alternate-reverse; }
+@keyframes cloud-drift { from { transform: translateX(-30px); } to { transform: translateX(40px); } }
+.scenery .hopper { transform-box: fill-box; transform-origin: 50% 100%; animation: hop 1.4s ease-in-out infinite; }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1.04, 0.96); } 45% { transform: translateY(-6px) scale(0.97, 1.03); } 60% { transform: translateY(-7px); } }
+.scenery .sun-rays { transform-box: fill-box; transform-origin: center; animation: spin 40s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.title-screen > :not(.scenery), .creator > :not(.scenery), .notice > :not(.scenery) { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .scenery * { animation: none !important; } }
+
+/* ---------- 타이틀 ---------- */
+.title-screen { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding: max(24px, 15vh) 16px 16px; background: var(--sky); transition: opacity 0.45s; }
+.title-screen.leaving { opacity: 0; pointer-events: none; }
+.title-card { width: min(460px, 100%); padding: 16px 26px 22px; text-align: center; background: var(--dots), var(--paper); }
+.title-kicker { margin: 0; font-size: 20px; color: var(--ink-soft); }
+.title-name { margin: 2px 0 0; font-weight: 700; font-size: clamp(38px, 10vw, 62px); line-height: 1.05; white-space: nowrap; color: #6b4a2e; text-shadow: 0 3px 0 rgba(252, 217, 91, 0.9); }
+.title-sub { margin: 6px 0 16px; font-size: 19px; color: var(--ink-soft); }
+.title-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.title-actions .btn { min-width: min(260px, 100%); font-size: 23px; }
+/* 휴대폰 가로처럼 낮은 화면: 카드를 작게(버튼은 가로로 나란히) 위쪽에 두어 아래 친구들을 가리지 않게 */
+@media (max-height: 420px) {
+  .title-screen { padding-top: max(10px, 3vh); }
+  .title-card { width: min(560px, 100%); padding: 8px 20px 12px; }
+  .title-kicker { font-size: 16px; }
+  .title-name { font-size: 40px; }
+  .title-sub { margin: 2px 0 8px; font-size: 16px; }
+  .title-actions { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .title-actions .btn { min-width: 0; font-size: 19px; }
+  /* 대화 상자와 HUD 도 낮은 화면에서는 작게 */
+  .guide { min-height: 0; padding: 18px 28px 24px; }
+  .guide-name { font-size: 18px; top: -15px; }
+  .guide-text { font-size: 20px; line-height: 1.32; }
+  .hud-money { font-size: 21px; }
+  .hud-pill .ico { font-size: 22px; }
+  .hud-job, .guide-goal { font-size: 17px; }
+  .hud-time b { font-size: 44px; }
+  .hud-date { font-size: 18px; }
+  .hud-time small { font-size: 19px; }
+  .hud-action { width: 80px; height: 80px; font-size: 20px; }
+  .hud-phone { width: 52px; height: 52px; }
+  .hud-zoom { top: calc(max(10px, env(safe-area-inset-top)) + 64px); right: max(16px, calc(env(safe-area-inset-right) + 4px)); }
+  .toast { font-size: 17px; }
+  .guide-choice { font-size: 18px; padding: 3px 16px 4px 30px; }
+  .guide-choices { max-height: calc(100vh - 150px); padding: 8px; }
+  .home-tray { padding: 8px 12px 10px; gap: 6px 10px; }
+  .home-hint { font-size: 17px; }
+}
+.title-note { margin: 14px 0 0; font-size: 13px; color: var(--ink-soft); }
+.village-stamp { position: absolute; left: 50%; top: 24%; padding: 8px 28px 12px; text-align: center; font-weight: 700; color: #d9546b; background: rgba(255, 250, 235, 0.92);
+  border: 3px solid #d9546b; border-radius: 50% 46% 52% 48% / 46% 52% 48% 50%; transform: translate(-50%, -50%) rotate(-6deg); pointer-events: none; }
+.village-stamp span { display: block; font-size: 22px; }
+.village-stamp b { display: block; font-size: 42px; line-height: 1; }
+.village-stamp.show { animation: stamp-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both, stamp-out 0.6s ease-in 2.8s forwards; }
+@keyframes stamp-in { from { opacity: 0; transform: translate(-50%, -50%) rotate(-6deg) scale(1.9); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-6deg) scale(1); } }
+@keyframes stamp-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .village-stamp.show { animation: none; } }
+.skip-btn { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+
+/* ---------- 스티커 작업대: 컨베이어 위로 과일이 지나가고 가운데 틀에서 붙인다 ---------- */
+.sticker-game .panel { width: min(560px, 100%); --tab: #ffcaa3; }
+.belt { position: relative; height: 96px; margin: 10px 0 4px; border-radius: 18px; overflow: hidden; cursor: pointer; touch-action: none; box-shadow: inset 0 0 0 3px rgba(84, 62, 38, 0.25);
+  background: repeating-linear-gradient(90deg, #a69c8e 0 14px, #968c7f 14px 28px); }
+.belt-zone { position: absolute; top: 6px; bottom: 6px; left: 50%; width: 18%; transform: translateX(-50%); border: 3px dashed #ffffff; border-radius: 12px; background: rgba(255, 214, 226, 0.4); }
+.belt-zone i { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255, 255, 255, 0.85); }
+.belt-fruit { position: absolute; top: 50%; left: -10%; width: 64px; height: 64px; transform: translate(-50%, -50%); }
+.belt-fruit svg { width: 100%; height: 100%; display: block; }
+.belt-fruit.stuck::after { content: "★"; position: absolute; left: 38%; top: 36%; width: 24px; height: 24px; border-radius: 50%; background: var(--yellow); box-shadow: 0 2px 0 var(--yellow-deep); font-size: 14px; line-height: 23px; text-align: center; color: #e0745a; }
+.belt-say { margin: 4px 0 0; min-height: 28px; font-size: 22px; text-align: center; }
+.belt-say.clean { color: #e0745a; }
+.belt-say.none { color: var(--ink-soft); }
+.belt-count { margin-right: auto; align-self: center; font-size: 20px; }
+
+/* ---------- 집 안: 위쪽 문패, 아래쪽 버튼 줄 또는 꾸미기 쟁반 ---------- */
+.home-ui { position: absolute; inset: 0; }
+/* 화면 전체를 덮는 틀(.home-ui)은 누름을 통과시키고(맨 위 '#ui > *' 규칙에서 뺐다), 안의 버튼만 누른다 */
+.home-ui > * { pointer-events: auto; }
+.thumb { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 12px; background: var(--paper); object-fit: contain; }
+.home-title { position: absolute; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.home-title b { padding: 3px 20px 6px; border-radius: 999px; background: var(--paper-soft); box-shadow: var(--lift); font-size: 24px; rotate: -2deg; }
+.home-title .wallet { background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); }
+.home-bar { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: min(760px, calc(100% - 24px)); }
+.home-tray { position: absolute; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(820px, calc(100% - 24px)); box-sizing: border-box; padding: 10px 16px 12px; border-radius: var(--r); background: var(--dots), var(--paper);
+  box-shadow: 0 5px 0 var(--shadow); display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "hint hint" "pick pick" "items done"; gap: 8px 12px; align-items: center; }
+.home-hint { grid-area: hint; margin: 0; font-size: 19px; }
+.home-pick { grid-area: pick; display: flex; gap: 10px; flex-wrap: wrap; }
+.home-tray .items { grid-area: items; display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 6px; }
+.tray-actions { grid-area: done; display: flex; }
+/* 가진 가구: 동물의 숲 꾸미기처럼 네모 칸(그림 + 이름 + 개수) */
+.tile { position: relative; flex: 0 0 auto; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 18px; background: var(--paper-2); font-size: 15px; line-height: 1.1; }
+.tile .thumb { width: 54px; height: 54px; border-radius: 14px; }
+.tile .nm { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .cnt { position: absolute; top: 2px; right: 3px; padding: 0 6px 1px; border-radius: 999px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); font-size: 14px; }
+.tile[aria-pressed="true"] { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+.tile:disabled { opacity: 0.45; cursor: default; }
+/* 목록에서 바닥으로 끌기: 터치에서는 옆으로 밀면 목록이 스크롤되고 위로 끌면 가구를 집는다 */
+.tile:not(:disabled) { cursor: grab; touch-action: pan-x; }
+.tile .thumb { -webkit-user-drag: none; pointer-events: none; }
+.drag-ghost { position: absolute; width: 68px; height: 68px; margin: -34px 0 0 -34px; border-radius: 16px; background: var(--paper); box-shadow: 0 4px 0 var(--shadow); pointer-events: none; z-index: 6; }
+.home-ui.dragging .home-tray { opacity: 0.4; transition: opacity 0.15s; }
+.home-ui.dragging { cursor: grabbing; }
+
+/* ---------- 하루가 지나는 연출(잠자기): 밤하늘 → 해 뜨는 아침 ---------- */
+.sleep-fx { position: absolute; inset: 0; z-index: 8; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(#1c2650, #3d4f80); opacity: 0; transition: opacity 0.6s, background 1.2s; }
+.sleep-fx.in { opacity: 1; }
+.sleep-fx.out { opacity: 0; }
+.sleep-fx.morning { background: linear-gradient(#8ccbf0, #fff0e0); }
+.sleep-fx .star { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff3a6; animation: twinkle 1.2s ease-in-out infinite alternate; transition: opacity 0.8s; }
+.sleep-fx .moon { position: absolute; right: 18%; top: 14%; width: 84px; height: 84px; border-radius: 50%; box-shadow: 20px 10px 0 0 #fff3a6; transition: opacity 0.8s, transform 1.2s; }
+.sleep-fx .sun { position: absolute; left: 50%; top: 12%; width: 96px; height: 96px; margin-left: -48px; border-radius: 50%; background: #fff3a6; box-shadow: 0 0 0 6px rgba(255, 243, 166, 0.5); opacity: 0; transform: translateY(120px); transition: opacity 0.8s, transform 1.4s cubic-bezier(0.2, 1.2, 0.4, 1); }
+.sleep-fx.morning .star, .sleep-fx.morning .moon { opacity: 0; }
+.sleep-fx.morning .moon { transform: translateY(-40px); }
+.sleep-fx.morning .sun { opacity: 1; transform: none; }
+.sleep-text { position: relative; text-align: center; color: #fff; font-weight: 700; }
+.sleep-text b { display: block; font-size: 58px; line-height: 1; }
+.sleep-text p { margin: 8px 0 0; font-size: 30px; }
+.sleep-fx.morning .sleep-text { color: var(--ink); margin-top: 120px; }
+.zzz span { display: inline-block; animation: zzz 1.4s ease-in-out infinite; }
+.zzz span:nth-child(2) { animation-delay: 0.3s; font-size: 0.8em; }
+@keyframes zzz { 0%, 100% { translate: 0 0; opacity: 0.4; } 50% { translate: 6px -14px; opacity: 1; } }
+@keyframes twinkle { from { opacity: 0.3; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sleep-fx .star, .zzz span { animation: none; } }
+
+/* ---------- 안내(세로 화면) ---------- */
+.notice { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--sky); text-align: center; }
+.notice .card { padding: 16px 22px 20px; max-width: 420px; font-size: 19px; background: var(--dots), var(--paper); }
+.notice h2 { margin: 0 0 6px; font-weight: 700; font-size: 28px; }
+
+/* 세로로 그냥 하기: 왼쪽 위 기둥은 화면 폭만큼, 알림은 화면 가운데쯤, 가구점 미리보기는 목록 위 */
+@media (orientation: portrait) and (max-width: 640px) {
+  .hud-left { max-width: calc(100% - 100px); }
+  .hud-toasts { top: 42%; max-width: calc(100% - 24px); }
+  .catalog { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .cat-view { order: -1; flex-direction: row; flex-wrap: wrap; }
+  .cat-img { flex: 0 0 auto; width: 96px; }
+}
+
+/* ---------- 라멘 로우 주방: 재료가 그림으로 늘어선 조리대(알바 · 슈퍼 알바이터 실기) ---------- */
+.kitchen-wrap { padding: 8px; }
+.panel.kitchen { width: min(1040px, 100%); height: calc(100% - 2px); max-height: none; background: #b7834b; box-shadow: 0 6px 0 rgba(84, 62, 38, 0.4), 0 16px 30px rgba(84, 62, 38, 0.3); }
+.kitchen-scene { position: relative; overflow: hidden; display: grid; gap: 8px; padding: 10px 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 0.8fr);
+  grid-template-areas: "top top top" "trays tray soups" "boil shelf shelf";
+  background: repeating-linear-gradient(90deg, rgba(84, 52, 20, 0.06) 0 2px, transparent 2px 140px), linear-gradient(#cf9c61, #b98449); }
+/* 위: 주문표 칠판 · 레시피 깃발 · 내기 간판 */
+.k-top { grid-area: top; display: flex; gap: 10px; align-items: stretch; min-height: 0; }
+.k-board { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 10px 8px; border-radius: 14px; background: #2f4a3f; color: #f4f0e2; box-shadow: inset 0 0 0 4px #6b4a2c, 0 3px 0 rgba(0, 0, 0, 0.25); }
+.k-board-head { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.k-board-head b { margin-right: auto; font-size: 19px; }
+.k-timer, .k-earn { padding: 0 10px 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); font-variant-numeric: tabular-nums; }
+.k-timer { background: var(--yellow); color: var(--ink); }
+.k-quit { padding: 1px 12px 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); color: #f4f0e2; font-size: 15px; }
+.k-counter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seat { display: flex; align-items: center; gap: 6px; min-height: 56px; padding: 3px 8px; border-radius: 6px 6px 12px 12px; background: #fffaeb; color: var(--ink); text-align: left; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); }
+.seat.empty { justify-content: center; background: rgba(255, 255, 255, 0.07); color: rgba(244, 240, 226, 0.5); box-shadow: none; cursor: default; }
+.seat.sel { background: var(--yellow); box-shadow: 0 0 0 3px #fff3b8, 0 2px 0 rgba(0, 0, 0, 0.25); }
+.seat .face { flex: 0 0 44px; height: 44px; }
+.seat .face svg { width: 100%; height: 100%; display: block; }
+.seat .ticket { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.seat .ticket small { font-size: 13px; color: var(--ink-soft); }
+.seat .ticket b { font-size: 18px; line-height: 1.1; }
+.patience { display: block; height: 7px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.patience i { display: block; height: 100%; border-radius: 999px; background: var(--mint-deep); }
+.patience i.mid { background: #f2b84b; }
+.patience i.low { background: #e9705a; }
+.k-recipe { flex: 0 0 74px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 14px; border-radius: 6px 6px 0 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 86%, 0 100%);
+  background: repeating-linear-gradient(135deg, #e4523f 0 10px, #f2b84b 10px 20px); box-shadow: inset 0 6px 0 #7a4a2a; }
+.k-recipe span { padding: 2px 8px 4px; border-radius: 8px; background: #fffaeb; color: #b8432f; font-size: 17px; }
+.k-serve { flex: 0 0 124px; position: relative; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #4a2e16;
+  background: linear-gradient(#e0ae74, #b67d45); box-shadow: inset 0 0 0 4px #8a5a30, 0 4px 0 #6b4424; }
+.k-serve b { font-size: 30px; rotate: -4deg; }
+.k-serve .bell { position: absolute; left: -4px; top: -4px; width: 30px; height: 30px; border-radius: 50% 50% 40% 40%; background: radial-gradient(circle at 35% 30%, #ffe9a0, #e3a92c 60%, #b8801a); box-shadow: 0 2px 0 #8a5d12; }
+.k-serve:active, .k-item:active, .k-pot:active, .k-recipe:active { transform: translateY(2px); }
+/* 가운데: 트레이 · 빨간 쟁반 위 그릇 · 수프 통 */
+.k-trays, .k-soups { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.k-trays { grid-area: trays; }
+.k-soups { grid-area: soups; }
+.k-item { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; border-radius: 14px; }
+.k-item .art { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.k-item .art svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 3px 0 rgba(84, 62, 38, 0.25)); }
+.k-item .lab { flex: 0 0 auto; padding: 0 8px 1px; border-radius: 999px; background: rgba(255, 250, 235, 0.88); font-size: 14px; line-height: 1.3; white-space: nowrap; }
+.k-item:hover, .k-item:focus-visible { background: rgba(255, 250, 235, 0.25); outline: none; }
+.bump { animation: bump 0.22s ease-out; }
+@keyframes bump { 50% { scale: 1.08; } }
+.k-traybox { grid-area: tray; position: relative; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 22px;
+  background: #d24c3f; box-shadow: inset 0 0 0 6px #b33b30, inset 0 12px 0 rgba(255, 255, 255, 0.12), 0 4px 0 rgba(84, 62, 38, 0.35); }
+.k-bowl { width: 88%; height: 94%; display: flex; align-items: center; justify-content: center; }
+.k-bowl svg { width: 100%; height: 100%; display: block; }
+.k-say { position: absolute; left: 50%; top: 6px; z-index: 1; max-width: 96%; transform: translateX(-50%); margin: 0; padding: 3px 14px 5px; overflow: hidden; border-radius: 999px;
+  background: var(--paper); box-shadow: 0 3px 0 var(--shadow); font-size: 17px; white-space: nowrap; text-overflow: ellipsis; }
+/* 아래: 면 삶는 냄비(게이지) · 선반(면 바구니 · 토핑 · 쓰레기통) */
+.k-boil, .k-shelf { min-height: 0; border-radius: 16px; background: #8f6236; box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.18); }
+.k-boil { grid-area: boil; display: flex; padding: 4px; }
+.k-pot { position: relative; flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 78px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); align-items: center; gap: 2px 4px; padding: 4px 6px; border-radius: 14px; }
+.k-pot .gauge { grid-row: 1; grid-column: 1; }
+.k-pot .gauge svg { width: 78px; display: block; }
+.k-pot .gauge .needle { transform-box: view-box; transform-origin: 50px 52px; }
+.k-pot .pot-art { grid-row: 1 / 3; grid-column: 2; height: 100%; min-height: 0; display: flex; align-items: center; }
+.k-pot .pot-art svg { width: 100%; height: 100%; display: block; }
+.k-pot .pot-say { grid-row: 2; grid-column: 1; align-self: start; font-size: 13px; line-height: 1.15; color: #fff6df; text-align: center; }
+.k-pot[data-state="ready"] { background: rgba(115, 198, 142, 0.35); box-shadow: 0 0 0 3px #73c68e; animation: pot-ready 0.6s ease-in-out infinite alternate; }
+.k-pot[data-state="soggy"] { background: rgba(233, 112, 90, 0.3); }
+@keyframes pot-ready { from { scale: 1; } to { scale: 1.03; } }
+.k-shelf { grid-area: shelf; display: flex; align-items: stretch; gap: 4px; padding: 4px 8px; }
+.k-shelf .k-item { flex: 1 1 0; }
+.k-sep { flex: 0 0 3px; margin: 6px 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.2); }
+.k-trash { flex: 0.8 1 0; }
+/* 레시피 북 · 결과 */
+.k-book { position: absolute; inset: 8px; z-index: 2; overflow-y: auto; padding: 12px 16px; border-radius: var(--r); background: var(--dots), var(--paper); box-shadow: 0 6px 0 var(--shadow); }
+.k-book-head { display: flex; justify-content: space-between; align-items: center; font-size: 22px; }
+.recipe-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 8px; }
+.recipe-card { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 10px; border-radius: 18px; background: var(--paper-2); }
+.recipe-card b { font-size: 21px; }
+.recipe-card .chips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 16px; }
+.ing-chip { display: inline-flex; align-items: center; gap: 6px; }
+.ing-chip i { width: 14px; height: 14px; flex: 0 0 auto; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(84, 62, 38, 0.35); }
+.k-result { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; text-align: center; background: var(--dots), var(--paper); }
+.k-result b { font-size: 38px; color: #e0745a; }
+.k-result p { margin: 0; font-size: 20px; }
+@media (max-height: 420px) {
+  .kitchen-scene { gap: 6px; padding: 8px 10px; }
+  .k-board { padding: 4px 8px 6px; gap: 4px; }
+  .k-board-head b { font-size: 17px; }
+  .seat { min-height: 44px; }
+  .seat .face { flex-basis: 34px; height: 34px; }
+  .seat .ticket b { font-size: 16px; }
+  .k-serve { flex-basis: 104px; }
+  .k-serve b { font-size: 24px; }
+  .k-item .lab { font-size: 12px; }
+  .k-pot { grid-template-columns: 62px minmax(0, 1fr); }
+  .k-pot .gauge svg { width: 62px; }
+  .k-say { font-size: 15px; }
+}
+@media (orientation: portrait) and (max-width: 640px) {
+  .kitchen-scene { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 0.7fr);
+    grid-template-areas: "top top" "tray tray" "trays trays" "soups soups" "boil boil" "shelf shelf"; }
+  .k-trays, .k-soups { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+  .k-counter { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 검정소 시험지(필기) · 하이볼 실기 ---------- */
+.panel.exam-sheet { width: min(560px, 100%); --tab: #bfe0f7; }
+.exam-q { margin: 12px 4px; font-size: 24px; line-height: 1.35; }
+/* 문제마다 남은 시간 */
+.exam-clock { display: flex; align-items: center; gap: 8px; margin: 8px 4px 0; }
+.exam-clock span { flex: 1 1 auto; height: 10px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.exam-clock i { display: block; height: 100%; width: 100%; border-radius: 999px; background: var(--mint-deep); }
+.exam-clock i.low { background: #e9705a; }
+.exam-clock b { min-width: 2.6em; text-align: right; font-size: 17px; font-variant-numeric: tabular-nums; }
+.exam-choices { display: flex; flex-direction: column; gap: 4px; }
+.exam-choice { font-size: 22px; white-space: normal; }
+.exam-choice.right { background: var(--mint); }
+.exam-choice.right::after { content: " ○"; color: var(--mint-deep); }
+.exam-choice.wrong { background: #f7c7bf; }
+.exam-choice.wrong::after { content: " ✕"; color: #d0563e; }
+.exam-tip { margin: 10px 4px 0; font-size: 16px; color: var(--ink-soft); }
+.exam-score { margin: 12px 4px 4px; font-size: 26px; }
+.hb { display: flex; gap: 22px; align-items: center; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+.hb-glass { position: relative; flex: 0 0 auto; width: 110px; height: 190px; overflow: hidden; border-radius: 10px 10px 22px 22px; background: rgba(214, 236, 245, 0.55); box-shadow: inset 0 0 0 4px #b9d6e3, 0 4px 0 var(--shadow); }
+.hb-glass .band { position: absolute; left: 0; right: 0; border-top: 2px dashed; border-bottom: 2px dashed; z-index: 2; }
+.band.whisky { background: rgba(247, 201, 72, 0.22); border-color: #e4a52a; }
+.band.soda { background: rgba(120, 180, 230, 0.2); border-color: #6aa6d6; }
+.hb-glass .liq { position: absolute; left: 4px; right: 4px; bottom: 0; height: 0; }
+.liq.whisky { background: #d98a2b; border-radius: 0 0 18px 18px; }
+.liq.soda { background: rgba(255, 228, 160, 0.9); }
+.hb-glass .ice { position: absolute; left: 22px; bottom: 30px; width: 30px; height: 26px; z-index: 1; border-radius: 6px; background: rgba(255, 255, 255, 0.7); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.95); }
+.hb-glass .ice.two { left: 54px; bottom: 62px; rotate: 18deg; }
+.hb-side { display: flex; flex-direction: column; gap: 10px; max-width: 280px; }
+.hb-say { margin: 0; font-size: 21px; line-height: 1.35; }
+.hb-pour { min-height: 60px; font-size: 22px; touch-action: none; }
+.hb-pour.on { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
+@media (max-height: 420px) { .hb-glass { height: 150px; width: 92px; } .exam-q { font-size: 21px; margin: 8px 4px; } }
+
+/* 자격증 지갑(마을폰) */
+.panel .row.license-card { background: linear-gradient(120deg, #fff4cf, #e6f5ec); box-shadow: 0 3px 0 var(--shadow); }
+.panel .row.license-card.none { background: var(--paper-2); box-shadow: none; opacity: 0.7; }
+
+/* 게시판: 오늘 남은 일감을 한눈에(큰 숫자 + 막대), 일감마다 남은 건수 알약(하루 몫만큼 동그라미) */
+.board-sum { --c: var(--mint-deep); margin-top: 8px; padding: 8px 16px 10px; border-radius: 20px 22px 20px 18px; background: var(--butter); box-shadow: 0 3px 0 var(--shadow); }
+.board-sum.low { --c: var(--warn); }
+.board-sum.out { --c: #bfae8a; background: var(--paper-2); }
+.board-sum-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
+.board-sum-top .lab { font-size: 21px; }
+.board-sum-top b { font-size: 48px; line-height: 1; color: var(--c); font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8); }
+.board-sum.out .board-sum-top b { color: var(--ink-soft); }
+.board-sum-top .of { font-size: 22px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.board-bar { position: relative; height: 16px; margin-top: 6px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.board-bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--c); transition: width 0.3s; }
+.board-sum .who { margin: 6px 0 0; font-size: 17px; line-height: 1.3; color: var(--ink-soft); }
+.panel .job-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.left-pill { --c: var(--mint-deep); --bg: var(--mint); display: inline-flex; align-items: center; gap: 7px; padding: 2px 12px 4px 9px; border-radius: 999px; background: var(--bg); box-shadow: 0 2px 0 var(--c);
+  font-size: 18px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.left-pill.last { --c: var(--warn); --bg: #fde0c2; }
+.left-pill.out { --c: #bfae8a; --bg: var(--paper-3); color: var(--ink-soft); box-shadow: none; }
+.left-pill .dots { display: inline-flex; gap: 3px; }
+.left-pill .dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 2px var(--c); }
+.left-pill .dots i.on { background: var(--c); }
+.panel .row.job.soldout .t { color: var(--ink-soft); }
+
+/* 부동산: 쫓겨났을 때 · 집세가 밀렸을 때 경고(주황 테두리) */
+.panel .row.evict { flex-wrap: wrap; background: #fde3d6; box-shadow: inset 0 0 0 3px var(--warn); }
+.panel .row.evict .t { display: flex; align-items: center; gap: 8px; color: #b8543c; }
+.panel .row.evict .t::before, .panel .note.warn::before { content: "!"; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--warn); color: #fff; font-size: 19px; line-height: 1; }
+.panel .row.evict > .btn { margin-left: auto; }
+.panel .note.warn { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px 10px; border-radius: 16px 18px 16px 14px; background: #fde3d6; color: #a14a32; }
+
+/* 포셰트 가게: 포셰트 그림 + 이름 · 값 + 버튼, 메는 중인 줄은 노랗게 */
+.panel-pochette { --tab: var(--pink); }
+.panel .row.pochette > div { flex: 1 1 auto; min-width: 0; }
+.pochette-art { flex: 0 0 auto; width: 58px; height: 58px; border-radius: 16px 18px 16px 14px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.pochette-art svg { width: 100%; height: 100%; display: block; }
+.panel .row.pochette.worn { background: var(--butter); box-shadow: inset 0 0 0 3px var(--yellow-deep); }
+@media (max-width: 480px) {
+  /* 좁은 화면: 그림 · 이름은 한 줄, 버튼은 아래 오른쪽으로 */
+  .panel .row.pochette { flex-wrap: wrap; }
+  .panel .row.pochette > div { flex-basis: calc(100% - 70px); }
+  .panel .row.pochette > .btn { margin-left: auto; }
+  .board-sum-top b { font-size: 40px; }
+}
+
+/* 헌책방 · 도구점 · 지도 앱 · 등불 버튼 */
+.panel-books { --tab: var(--mint); }
+.panel-tools { --tab: var(--yellow); }
+.hud-light[aria-pressed="true"] { background: var(--yellow); }
+.app.map .app-ico { background: #7fb6e2; }
+</style>
+
+<div id="game">
+  <canvas id="scene" aria-label="치이카와 마을. 내 캐릭터를 움직여 풀을 뽑고 일감을 해요."></canvas>
+  <div id="ui"></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+
+</body></html>
