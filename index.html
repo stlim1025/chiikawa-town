@@ -632,6 +632,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .panel-tools { --tab: var(--yellow); }
 .hud-light[aria-pressed="true"] { background: var(--yellow); }
 .app.map .app-ico { background: #7fb6e2; }
+
+/* 풀 도감(마을폰): 급수 머리표 + 풀 칸(그림 · 이름 · 뽑은 수 · 자라는 곳 · 요령). 아직 못 뽑는 급수는 흐리게 */
+.app.weeds .app-ico { background: #8cc46d; } .app.card .app-ico { background: #f2a7bb; }
+.weed-grade { display: flex; align-items: center; gap: 8px; margin: 14px 4px 0; font-size: 19px; }
+.weed-grade b { padding: 0 12px 2px; border-radius: 999px; background: var(--mint); box-shadow: 0 2px 0 var(--mint-deep); }
+.weed-grade.locked b { background: var(--paper-3); box-shadow: none; color: var(--ink-soft); }
+.weed-grade span { font-size: 15px; color: var(--ink-soft); }
+.panel .row.weed-card { align-items: flex-start; gap: 10px; }
+.weed-ico { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 16px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.weed-ico svg { width: 100%; height: 100%; display: block; }
+.weed-card .t { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.weed-count { padding: 0 8px 1px; border-radius: 999px; background: var(--butter); color: var(--ink-soft); font-size: 14px; white-space: nowrap; }
+.weed-card.unseen .weed-count { background: var(--paper-3); }
+.phone .row .d.weed-tip { font-size: 15px; }
+.weed-card.locked { opacity: 0.72; }
+.weed-card.locked .weed-ico { filter: grayscale(1) opacity(0.6); }
 </style>
 
 <div id="game">

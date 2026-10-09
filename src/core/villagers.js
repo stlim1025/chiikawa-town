@@ -8,12 +8,18 @@ import { JOB_TYPES } from './jobs.js';
  * state.villagers = { kind: { money, jobs: 그날 받은 일감 수, day } }
  * state.theftDay = 모몽가가 마지막으로 소매치기를 노린 날
  */
-export const DAILY_JOBS = { weed8: 4, sticker10: 3, berry6: 3, thorny3: 2 };
+export const DAILY_JOBS = {
+  weed8: 4, clover6: 3, sticker10: 3, berry6: 3, // 5급
+  foxtail6: 2, vine4: 2, // 4급
+  thorny3: 2, reed5: 2, // 3급
+  rockmoss4: 2, moon3: 1, // 2급
+  giant2: 1, poison3: 1 // 1급
+};
 
 /** 일하는 친구들: 처음 지갑, 부지런함(일감을 받을 확률), 할 줄 아는 일감, 밥 먹으러 갈 확률. */
 export const VILLAGERS = {
-  chiikawa: { start: 60, diligence: 0.55, jobs: ['weed8', 'berry6', 'sticker10'], eat: 0.25 },
-  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6'], eat: 0.25 },
+  chiikawa: { start: 60, diligence: 0.55, jobs: ['weed8', 'berry6', 'sticker10', 'clover6'], eat: 0.25 },
+  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6', 'clover6'], eat: 0.25 },
   usagi: { start: 200, diligence: 0.7, jobs: ['weed8', 'thorny3', 'berry6'], eat: 0.35 },
   kurimanju: { start: 300, diligence: 0.3, jobs: ['sticker10', 'berry6'], eat: 0.5 },
   rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8'], eat: 0.2 },
@@ -27,7 +33,8 @@ export const THEFT = { minMoney: 50, min: 30, max: 90 };
 /** 오늘 게시판(날이 바뀌면 새 일감이 올라온다). */
 export function boardOf(state, day) {
   const b = state.board;
-  return b && b.day === day ? b : { day, left: { ...DAILY_JOBS } };
+  // 예전 저장의 게시판에는 새 일감 칸이 없으니 그날 몫으로 채운다
+  return b && b.day === day ? { day, left: { ...DAILY_JOBS, ...b.left } } : { day, left: { ...DAILY_JOBS } };
 }
 const withLeft = (state, day, id, delta) => {
   const b = boardOf(state, day);

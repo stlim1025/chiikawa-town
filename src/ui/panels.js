@@ -15,6 +15,8 @@ import { exploredCount, N } from '../core/explore.js';
 import { timeLabel } from '../core/clock.js';
 import { REGION_NAMES, regionAt } from '../core/layout.js';
 import { createMapView } from './mapapp.js';
+import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core/weeding.js';
+import { weedSvg } from './weedart.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -22,7 +24,9 @@ const APP_ICON = {
   music: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M16 27V10l15-3v17" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><ellipse cx="12.5" cy="28" rx="5" ry="4" fill="#fff"/><ellipse cx="27.5" cy="25" rx="5" ry="4" fill="#fff"/></svg>',
   exit: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 19 20 8l13 11" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 17v15h18V17" fill="#fff"/><rect x="17" y="23" width="6" height="9" rx="2" fill="#f4a261"/></svg>',
   card: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="10" width="28" height="20" rx="4" fill="#fff"/><circle cx="14" cy="19" r="4" fill="#7fb6e2"/><path d="M9 27q5 -5 10 0" fill="#7fb6e2"/><path d="M22 17h8M22 22h6" stroke="#b9a37a" stroke-width="2.4" stroke-linecap="round"/></svg>',
-  map: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 10l9-3 10 3 9-3v23l-9 3-10-3-9 3z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M15 7v23M25 10v23" stroke="#7fb6e2" stroke-width="2.4"/><circle cx="20" cy="17" r="3" fill="#f06a8f"/></svg>'
+  map: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 10l9-3 10 3 9-3v23l-9 3-10-3-9 3z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M15 7v23M25 10v23" stroke="#7fb6e2" stroke-width="2.4"/><circle cx="20" cy="17" r="3" fill="#f06a8f"/></svg>',
+  // 풀 도감: 펼친 책 위에 새싹
+  weeds: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14q8-3 15 1q7-4 15-1v18q-8-3-15 1q-7-4-15-1z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 15v18" stroke="#8cc46d" stroke-width="2"/><path d="M20 15q-1-6-7-8q0 6 7 8zM20 13q2-6 8-6q-1 6-8 6z" fill="#4f9f58"/></svg>'
 };
 
 function h(tag, attrs = {}, ...children) {
@@ -90,7 +94,7 @@ function pochetteSvg(id, P) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'licenses', 'map'];
+  const PHONE_APPS = ['settings', 'licenses', 'map', 'weeds'];
   // 마을폰을 열 때 받은 것({ storage }). 폰 안에서 화면을 옮겨도 그대로 쓴다
   let phoneExtra = {};
 
@@ -179,8 +183,8 @@ export function createPanels(ui, handlers) {
 
   const BUILD = {
     board(s) {
-      const left = boardOf(s, s.clock.day).left;
-      const total = Object.values(DAILY_JOBS).reduce((a, b) => a + b, 0), remain = Object.values(left).reduce((a, b) => a + b, 0);
+      const left = boardOf(s, s.clock.day).left, mine = availableJobs(s.license.grade);
+      const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
       const out = [head('노동 접수'), h('p', { class: 'sub' }, remain > 0 ? '빠른 사람이 임자! 날이 바뀌면 새 일감이 올라와요.' : '오늘 일감은 다 나갔어요. 날이 바뀌면 새로 올라와요.')];
       // 오늘 남은 일감: 큰 숫자 + 남은 만큼 찬 막대(한눈에 보이게). 적게 남으면 주황, 다 나가면 회색
       const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;
@@ -214,7 +218,8 @@ export function createPanels(ui, handlers) {
       // 지금 급수 · 보수 배율과 승급 안내를 각각 다른 줄에(한 줄에 몰리면 읽기 어렵다)
       out.push(h('div', { class: 'row' },
         h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${mult}배`))));
-      out.push(h('p', { class: 'note' }, '승급 시험은 동쪽 검정소에서 봐요.'));
+      const nextJobs = s.license.grade > 1 ? Object.values(JOB_TYPES).filter((j) => j.needGrade === s.license.grade - 1) : [];
+      out.push(h('p', { class: 'note' }, nextJobs.length ? `${s.license.grade - 1}급이 되면 ${nextJobs.map((j) => WEED_KINDS[j.kind]?.name || j.title).join(' · ')} 일감도 받을 수 있어요. 승급 시험은 동쪽 검정소에서 봐요.` : '최고 급수라 모든 일감을 받을 수 있어요.'));
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
@@ -222,11 +227,12 @@ export function createPanels(ui, handlers) {
       const lic = s.license, mult = PAY_MULT[lic.grade];
       const out = [head('검정소', s.money), h('p', { class: 'sub' }, '여러 자격을 따는 곳. 자격이 있으면 할 수 있는 일이 늘어나요.')];
       let examRow;
-      if (s.exam) examRow = h('div', { class: 'd' }, `시험 중 · 깔끔하게 연속 ${EXAM_STREAK}번 (지금 ${s.exam.streak}번)`);
+      const names = kindsOfGrade(lic.grade).map((k) => WEED_KINDS[k].name).join(' · ');
+      if (s.exam) examRow = h('div', { class: 'd' }, `시험 중 · 깔끔하게 연속 ${s.exam.need || 5}번 (지금 ${s.exam.streak}번)`);
       else if (canTakeExam(lic)) examRow = h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.startExam) }, `${lic.grade - 1}급 승급 시험 보기`);
       else if (lic.grade > 1) examRow = h('div', { class: 'd' }, `다음 시험까지 경험치 ${lic.xp} / ${XP_TO_EXAM[lic.grade]}`);
       else examRow = h('div', { class: 'd' }, '최고 급수인 1급이에요!');
-      out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${lic.grade}급`), h('div', { class: 'd' }, `보수 ${mult}배 · 깔끔하게 연속 ${EXAM_STREAK}번 뽑으면 승급`)), examRow));
+      out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${lic.grade}급`), h('div', { class: 'd' }, lic.grade > 1 ? `보수 ${mult}배 · ${josa(names, '을/를')} 깔끔하게 연속 ${EXAM_STREAK[lic.grade]}번 뽑으면 승급` : `보수 ${mult}배 · 모든 풀을 뽑을 수 있어요`)), examRow));
       // 술 자격 · 슈퍼 알바이터: 필기 + 실기
       const INFO = {
         liquor: `필기 ${LICENSES.liquor.questions}문제(${LICENSES.liquor.pass}개 이상, 문제당 ${LICENSES.liquor.seconds}초) + 하이볼 실기 · 쿠리만쥬에게 위스키 강의를 다 듣고 와요`,
@@ -271,7 +277,7 @@ export function createPanels(ui, handlers) {
     // 마을폰 '자격증' 앱(폰 안 화면: 닫기는 아래 홈 버튼)
     licenses(s) {
       const out = [appBar('자격증'), h('p', { class: 'sub' }, `${s.profile.name}의 자격증 지갑`)];
-      out.push(h('div', { class: 'row license-card' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${PAY_MULT[s.license.grade]}배`))));
+      out.push(h('div', { class: 'row license-card' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), h('div', { class: 'd' }, `보수 ${PAY_MULT[s.license.grade]}배 · 풀 ${WEED_ORDER.filter((k) => canPullKind(s.license.grade, k)).length}종 뽑기`))));
       for (const id of ['liquor', 'arbeiter']) {
         const own = hasLicense(s, id);
         out.push(h('div', { class: `row license-card${own ? '' : ' none'}` },
@@ -410,6 +416,28 @@ export function createPanels(ui, handlers) {
       out.push(h('p', { class: 'note' }, '오른쪽 등불 버튼으로 끄고 켜요.'), h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
+    // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
+    weeds(s) {
+      const log = s.weedLog || {}, grade = s.license.grade;
+      const found = WEED_ORDER.filter((k) => log[k] > 0).length;
+      const out = [appBar('풀 도감', `${found} / ${WEED_ORDER.length}종`),
+        h('p', { class: 'sub' }, `지금 제초 검정 ${grade}급 · 급수가 오르면 뽑을 수 있는 풀이 늘어나요`)];
+      for (const g of [5, 4, 3, 2, 1]) {
+        const open = grade <= g;
+        out.push(h('div', { class: `weed-grade${open ? '' : ' locked'}` }, h('b', {}, `${g}급 풀`), open ? null : h('span', {}, `${g}급부터`)));
+        for (const k of kindsOfGrade(g)) {
+          const W = WEED_KINDS[k], n = log[k] || 0;
+          const how = [W.stages > 1 ? `${W.stages}번에 나눠 뽑기` : null, W.drift ? '초록 칸이 흔들림' : null, W.poison ? '끊기면 독' : null, W.night ? '밤에만' : null].filter(Boolean).join(' · ');
+          out.push(h('div', { class: `row weed-card${open ? '' : ' locked'}${n ? '' : ' unseen'}` },
+            svgSpan('weed-ico', weedSvg(k)),
+            h('div', {},
+              h('div', { class: 't' }, W.name, h('span', { class: 'weed-count' }, n ? `${n}개 뽑음` : '아직 못 뽑았어요')),
+              h('div', { class: 'd' }, `${W.where}${how ? ' · ' + how : ''}`),
+              h('div', { class: 'd weed-tip' }, W.tip))));
+        }
+      }
+      return out;
+    },
     // 마을폰 '지도' 앱: 앱 막대 아래를 지도가 꽉 채운다(끌기 · 확대는 mapapp.js 의 createMapView, render 에서 붙인다)
     map(s) {
       const p = handlers.playerPos();
@@ -434,6 +462,7 @@ export function createPanels(ui, handlers) {
           sound('music', '배경음악'),
           hasTool(s, 'map') ? app('map', APP_ICON.map, '지도', () => show('map')) : null,
           app('card', APP_ICON.card, '자격증', () => show('licenses')),
+          app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
         // 저장 안내: 폰을 열 때 저장 여부를 받지 못했으면(지도 · 자격증으로 바로 열었을 때) 안 보인다
@@ -456,6 +485,7 @@ export function createPanels(ui, handlers) {
     openBooks: () => show('books'),
     openTools: () => show('tools'),
     openMap: () => show('map'),
+    openWeeds: () => show('weeds'),
     openSettings: (extra) => show('settings', extra)
   };
 }

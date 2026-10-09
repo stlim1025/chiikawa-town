@@ -180,7 +180,7 @@ export function createNpcs(scene, village, weeds, berries) {
     if (!job) return false;
     if (job.type === 'weed') {
       // 내가 뽑고 있는 풀(busy)과 다른 친구가 맡은 풀은 빼고
-      const free = weeds.list.filter((w) => w.kind === 'weed' && !w.busy && !claimed(w));
+      const free = weeds.list.filter((w) => w.kind === 'weed' && !w.busy && !w.stage && weeds.usable(w) && !claimed(w));
       if (free.length < MIN_WEEDS_FOR_FRIENDS) return false;
       let best = null, bd = 9;
       for (const w of free) {
@@ -221,7 +221,7 @@ export function createNpcs(scene, village, weeds, berries) {
       if (step.left <= 0) { next(); return; }
       let best = null, bd = 99;
       for (const w of weeds.list) {
-        if (w.kind !== step.kind || w.busy || claimed(w) || step.skip?.has(w) || Math.hypot(w.x - lastPlayer.x, w.z - lastPlayer.z) < 2.5) continue; // skip: 길이 막혀 못 간 풀
+        if (w.kind !== step.kind || w.busy || w.stage || !weeds.usable(w) || claimed(w) || step.skip?.has(w) || Math.hypot(w.x - lastPlayer.x, w.z - lastPlayer.z) < 2.5) continue; // skip: 길이 막혀 못 간 풀
         const d = Math.hypot(w.x - n.x, w.z - n.z);
         if (d < bd) { bd = d; best = w; }
       }

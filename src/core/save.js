@@ -7,6 +7,7 @@ import { isValidBoard, isValidVillagers } from './villagers.js';
 import { isValidPochette } from './pochette.js';
 import { isValidExplored } from './explore.js';
 import { isValidTools } from './tools.js';
+import { isValidWeedLog } from './weeding.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -39,6 +40,7 @@ export function isValidState(s) {
   if (s.pochette !== undefined && !isValidPochette(s.pochette)) return false; // 예전 저장에는 없다
   if (s.explored !== undefined && !isValidExplored(s.explored)) return false; // 예전 저장에는 없다
   if (s.tools !== undefined && !isValidTools(s.tools)) return false;
+  if (s.weedLog !== undefined && !isValidWeedLog(s.weedLog)) return false; // 풀 도감(2단계부터)
   return true;
 }
 

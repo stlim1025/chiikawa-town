@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { JOB_TYPES, isComplete } from '../core/jobs.js';
-import { EXAM_STREAK } from '../core/license.js';
 import { MAX_STAMINA } from '../core/state.js';
 import { hourOf, phaseOf } from '../core/clock.js';
 import { dateLabel, todayISO } from '../core/calendar.js';
@@ -116,10 +115,10 @@ export function createHud(ui, input) {
       }
       let text;
       const done = !state.exam && !!state.job && isComplete(state.job);
-      if (state.exam) text = `승급 시험 ${state.exam.streak} / ${EXAM_STREAK} · 깔끔하게 연속으로`;
+      if (state.exam) text = `승급 시험 ${state.exam.streak} / ${state.exam.need || 5} · 깔끔하게 연속으로`;
       else if (state.job) {
         const type = JOB_TYPES[state.job.typeId];
-        text = done ? `${type.title} 완료! · 노동 접수에서 보수 받기` : `${type.title} ${state.job.count} / ${type.target}`;
+        text = done ? `${type.title} 완료! · 노동 접수에서 보수 받기` : `${type.title} ${state.job.count} / ${type.target}${type.id === 'weed8' ? '' : ' · ' + type.where}`;
       } else text = '일감 없음 · 노동 접수에서 받아요';
       if (text !== lastText) { job.textContent = text; lastText = text; job.classList.toggle('done', done); }
       // 시각은 동물의 숲처럼 12시간제 큰 숫자 + 오전/오후
@@ -136,8 +135,11 @@ export function createHud(ui, input) {
       if (label && action.textContent !== label) action.textContent = label;
     },
     /** 힘 게이지. zone = { from, to } (0..1) */
-    showMeter(power, zone) {
+    /** 힘 게이지. label 을 주면 위 글씨를 바꾼다(풀 이름 · 몇 번째인지). */
+    showMeter(power, zone, label = '꾹 눌렀다가 초록에서 떼요') {
       meter.hidden = false;
+      const lab = q(meter, '.lab');
+      if (lab.textContent !== label) lab.textContent = label;
       const z = q(meter, '.zone');
       z.style.left = zone.from * 100 + '%';
       z.style.width = (zone.to - zone.from) * 100 + '%';

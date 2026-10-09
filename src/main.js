@@ -1,8 +1,17 @@
+/*
+ * 《치이카와 마을 생활》 큰 업데이트 계획(사용자 요구사항 → 단계)
+ *  1단계 ✅ 맵 개편: 넓어진 마을 · 집 배치, 마을 밖 네 구역(숲 · 바위산 · 들판 · 강가), 지도(가 본 곳만 밝게), 랜턴 · 손전등
+ *  2단계 ✅ 급수별 풀: 5급~1급 풀 10종(core/weeding.js), 구역별로 자람(world/weeds.js), 뽑는 방식(흔들림 · 여러 번 · 독),
+ *          급수별 일감, 어려운 풀일수록 경험치 많이, 승급 시험은 지금 급수의 풀로, 마을폰 '풀 도감' 앱
+ *  3단계: 마을 생활 — 친구들 기력(일하면 줄고, 모자라면 라멘 · 집에 들어가 잠), 친구 집 · 하치와레 동굴 안에 들어가기, 마을 다듬기
+ *  4단계: 토벌 — 도구점 무기, 검정소 토벌 자격증, 마을 밖 몬스터(오리지널 디자인), 노동 접수 토벌 일감
+ *  5단계: 퀘스트 · 스토리 — 친구마다 고충 퀘스트(친밀도 · 돈 · 가구 · 도구 보상), 마을 스토리라인, 퀘스트 앱
+ */
 import * as THREE from 'three';
 import { createScene } from './render/scene.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
-import { createWeeds } from './world/weeds.js';
+import { createWeeds, stageLabel } from './world/weeds.js';
 import { buildChibi } from './actors/models.js';
 import { setCelLight } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
@@ -16,9 +25,9 @@ import { createIntro } from './ui/intro.js';
 import { createOrientationGuard } from './ui/orientation.js';
 import { createState, addMoney, useStamina, restoreStamina, MAX_STAMINA } from './core/state.js';
 import { advance, hourOf, sleepUntilMorning } from './core/clock.js';
-import { STAMINA_PER_PULL, startPull, chargePull, releasePull } from './core/weeding.js';
-import { JOB_TYPES, acceptJob, recordPull, isComplete, payout } from './core/jobs.js';
-import { gainXp, canTakeExam, startExam, examStep, promote } from './core/license.js';
+import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
+import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
+import { gainXp, canTakeExam, startExam, examStep, examCounts, promote } from './core/license.js';
 import { buy } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { createSound } from './audio/sound.js';
@@ -149,9 +158,10 @@ function boot() {
     },
     startExam() {
       if (!canTakeExam(state.license)) return;
-      commit({ ...state, exam: startExam() });
+      const exam = startExam(state.license.grade), names = kindsOfGrade(state.license.grade).map((k) => WEED_KINDS[k].name).join(' · ');
+      commit({ ...state, exam });
       sound.play('job');
-      hud.toast('승급 시험 시작! 잡초를 깔끔하게 연속 5번 뽑아요', 3200);
+      hud.toast(`승급 시험 시작! ${josa(names, '을/를')} 깔끔하게 연속 ${exam.need}번 뽑아요`, 3600);
     },
     buy(itemId) {
       const r = buy(state, 'ramen', itemId);
@@ -484,11 +494,13 @@ function boot() {
 
   // ---------- 풀 뽑기 ----------
   function beginPull(weed) {
-    if (weed.kind === 'thorny' && state.license.grade > 3) { hud.toast('위험한 풀은 3급부터 뽑을 수 있어요'); return; }
+    const W = WEED_KINDS[weed.kind];
+    if (!canPullKind(state.license.grade, weed.kind)) { hud.toast(`${josa(W.name, '은/는')} ${W.grade}급부터 뽑을 수 있어요`, 2600); return; }
     if (state.stamina < STAMINA_PER_PULL) { hud.toast('기운이 없어요. 라멘을 먹거나 집에서 쉬어요'); return; }
     if (npcs.isWorkingOn(weed)) { hud.toast('친구가 뽑으려는 풀이에요. 다른 풀을 찾아봐요'); return; }
     // 초록 구간은 뽑을 때마다 다른 자리에, 기운이 낮을수록 좁고 빠르게
-    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA }) };
+    const st = stageLabel(weed);
+    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA }), label: weed.kind === 'weed' ? undefined : `${W.name}${st ? ' ' + st : ''} · 초록에서 떼요` };
     weed.busy = 'player'; // 친구들이 이 풀을 노리지 않게
     if (state.stamina <= MAX_STAMINA * 0.3 && !seen('tired-pull')) {
       markSeen('tired-pull');
@@ -523,23 +535,41 @@ function boot() {
     hud.hideMeter();
     weeds.tug(weed, 0);
     delete weed.busy;
-    const result = releasePull(pull);
-    sound.play(result === 'clean' ? 'clean' : result === 'snapped' ? 'snap' : 'none');
-    if (result === 'none') { hud.toast('조금 더 꾹 눌러요'); return; }
+    const step = releasePull(pull), W = WEED_KINDS[weed.kind];
+    sound.play(step === 'clean' ? 'clean' : step === 'snapped' ? 'snap' : 'none');
+    if (step === 'none') { hud.toast('조금 더 꾹 눌러요'); return; }
 
-    let next = useStamina(state, STAMINA_PER_PULL).state;
-    next = { ...next, license: gainXp(next.license, result), stats: { pulled: next.stats.pulled + 1, clean: next.stats.clean + (result === 'clean' ? 1 : 0) } };
+    let next = useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
+    if (W.poison && step === 'snapped') hud.toast('윽, 독이 튀었다! 기운이 쭉 빠졌어요', 2200);
+    // 여러 번에 나눠 뽑는 풀: 아직 남았으면 조금 올라온 채로 두고 다시 누르게
+    const prog = advanceWeed({ stage: weed.stage, flawed: weed.flawed }, weed.kind, step);
+    if (!prog.done) {
+      weed.flawed = prog.flawed;
+      weeds.loosen(weed, prog.stage);
+      if (!(W.poison && step === 'snapped')) hud.toast(`${step === 'clean' ? '쑥 올라왔다!' : '조금 끊겼지만 올라왔다'} 한 번 더! (${prog.stage} / ${W.stages || 1})`, 1600);
+      state = next;
+      save();
+      return;
+    }
+    const result = prog.final;
+    const log = state.weedLog || {}, first = !log[weed.kind];
+    next = {
+      ...next, license: gainXp(next.license, result, weed.kind), weedLog: { ...log, [weed.kind]: (log[weed.kind] || 0) + 1 },
+      stats: { pulled: next.stats.pulled + 1, clean: next.stats.clean + (result === 'clean' ? 1 : 0) }
+    };
     if (next.job) next = { ...next, job: recordPull(next.job, weed.kind, result) };
     weeds.remove(weed, result);
-    hud.toast(result === 'clean' ? '깔끔하게 뽑았다!' : '앗, 끊어졌다…', 1400);
+    if (first && weed.kind !== 'weed') hud.banner('새 풀!', `${josa(W.name, '을/를')} 처음 뽑았어요 · 마을폰 풀 도감에 적었어요`, 2600);
+    else if (!(W.poison && step === 'snapped')) hud.toast(result === 'clean' ? `깔끔하게 뽑았다! (${W.name})` : `앗, 끊어졌다… (${W.name})`, 1400);
 
-    if (next.exam && weed.kind === 'weed') {
+    if (next.exam && examCounts(next.exam, weed.kind)) {
       const exam = examStep(next.exam, result);
       if (exam.done) {
         if (exam.passed) {
           next = { ...next, exam: null, license: promote(next.license) };
           sound.play('pass');
-          hud.toast(`합격! 제초 검정 ${next.license.grade}급이 됐어요`, 3600);
+          const unlocked = kindsOfGrade(next.license.grade).map((k) => WEED_KINDS[k].name).join(' · ');
+          hud.banner(`제초 검정 ${next.license.grade}급!`, unlocked ? `이제 ${unlocked}도 뽑을 수 있어요` : '승급 축하해요!', 3600);
           player.cheerTime = 2;
         } else {
           next = { ...next, exam: null };
@@ -605,8 +635,13 @@ function boot() {
       if (b && Math.hypot(b.x - player.position.x, b.z - player.position.z) > 1.6) return { id: 'guide', x: b.x, y: 1.4, z: b.z, text: '열매!', kind: 'mark' };
     }
     if (step === 'pull' && player) {
-      const w = weeds.nearest(player.position.x, player.position.z, 40);
+      const w = weeds.nearest(player.position.x, player.position.z, 40, 'weed');
       if (w && Math.hypot(w.x - player.position.x, w.z - player.position.z) > 1.4) return { id: 'guide', x: w.x, y: 1.1, z: w.z, text: '풀!', kind: 'mark' };
+    }
+    // 잡초 말고 다른 풀 일감: 가까이(30 안)에 그 풀이 있으면 위에 이름표
+    if (kind && kind !== 'weed' && WEED_KINDS[kind] && player && !jobDone) {
+      const w = weeds.nearest(player.position.x, player.position.z, 30, kind);
+      if (w && Math.hypot(w.x - player.position.x, w.z - player.position.z) > 1.6) return { id: 'guide', x: w.x, y: (kind === 'giantweed' ? 1.9 : 1.1), z: w.z, text: WEED_KINDS[kind].name, kind: 'mark' };
     }
     return null;
   }
@@ -950,7 +985,7 @@ function boot() {
         npcs.say(n, `${T.title}, 내가 할게!`);
       }
     }];
-    if (T.kind === 'weed' || T.kind === 'thorny') steps.push({ do: 'weeds', kind: T.kind, left: T.target, onPull: () => { job.done++; } });
+    if (isWeedJob(T)) steps.push({ do: 'weeds', kind: T.kind, left: T.target, onPull: () => { job.done++; } });
     else if (T.kind === 'berry') steps.push({ do: 'berries', left: T.target, onPick: () => { job.done++; } });
     else steps.push({ do: 'walk', x: bench.x, z: bench.z }, { do: 'act', anim: 'read', time: T.target * 1.5, say: '스티커 붙이는 중…' }, { do: 'call', fn: () => { job.done = T.target; } });
     steps.push({ do: 'walk', ...b }, {
@@ -1045,10 +1080,15 @@ function boot() {
     // 친구가 뽑으러 가거나 뽑는 중인 풀은 건너뛴다
     let weed = null, wd = 1.3;
     for (const w of weeds.list) {
+      if (!weeds.usable(w)) continue;
       const d = Math.hypot(w.x - p.x, w.z - p.z);
       if (d < wd && !npcs.isWorkingOn(w)) { wd = d; weed = w; }
     }
-    if (weed) options.push({ d: Math.hypot(weed.x - p.x, weed.z - p.z), t: { type: 'weed', weed, label: '뽑기' } });
+    if (weed) {
+      const W = WEED_KINDS[weed.kind], st = stageLabel(weed);
+      const label = !canPullKind(state.license.grade, weed.kind) ? `${W.grade}급 풀` : st ? `뽑기 ${st}` : '뽑기';
+      options.push({ d: Math.hypot(weed.x - p.x, weed.z - p.z), t: { type: 'weed', weed, label } });
+    }
     const bush = berries.nearestReady(p.x, p.z, 1.4);
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
     const npc = npcs.nearest(p.x, p.z, 1.6);
@@ -1178,15 +1218,19 @@ function boot() {
     }
   }
 
+  let skipRender = false; // 디버그 step 중에는 그리지 않는다
   // 로컬 확인용: 주소에 ?debug 가 있을 때만 시간을 직접 흘리는 훅을 연다
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) {
     window.__town = {
-      step(seconds, dt = 1 / 30) { for (let s = 0; s < seconds; s += dt) tick(dt); },
+      // 시간을 흘린다. 그리기는 마지막 한 번만(느린 확인 환경에서도 빨리 돌게)
+      step(seconds, dt = 1 / 30) { skipRender = true; try { for (let s = 0; s < seconds; s += dt) tick(dt); } finally { skipRender = false; } },
       get state() { return state; },
       get target() { return target && { type: target.type, label: target.label }; },
       player: () => player && { ...player.position },
       teleport(x, z) { player.setPosition(x, z); },
-      weeds: () => weeds.list.map((w) => ({ kind: w.kind, x: w.x, z: w.z })),
+      weeds: () => weeds.list.map((w) => ({ kind: w.kind, area: w.area, x: w.x, z: w.z, stage: w.stage, hidden: !!w.hidden, visible: w.mesh.visible })),
+      weedCounts: () => weeds.counts(),
+      pull: () => pulling && { kind: pulling.weed.kind, power: pulling.pull.power, from: pulling.pull.greenFrom, to: pulling.pull.greenTo, label: pulling.label },
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기
@@ -1219,14 +1263,14 @@ function boot() {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
       newDayCheck();
       villageLife(dt);
-      weeds.update(dt);
+      weeds.update(dt, { night: nightNow, focus: player.position });
       berries.update(dt);
       npcs.update(dt, t, player.position);
       interior.resize(aspect);
       interior.update(dt, t);
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
-      gfx.renderer.render(interior.scene, interior.camera);
+      if (!skipRender) gfx.renderer.render(interior.scene, interior.camera);
       hud.placeLabels([], cam.camera);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
@@ -1234,7 +1278,7 @@ function boot() {
     }
     cam.setAspect(aspect);
     village.update(dt, player ? player.position : null);
-    weeds.update(dt);
+    weeds.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza });
     berries.update(dt);
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
@@ -1252,7 +1296,7 @@ function boot() {
         sound.chargeUpdate(player.power);
         if (before < pulling.pull.greenFrom && player.power >= pulling.pull.greenFrom) sound.play('zone'); // 지금 떼면 깔끔하게!
         weeds.tug(pulling.weed, pulling.pull.power);
-        hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo });
+        hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
       }
       target = pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() ? null : findTarget();
       updateFun(dt);
@@ -1292,7 +1336,7 @@ function boot() {
       cam.set(titlePos, titleLook);
     }
     gfx.followSun(focus.x, focus.z);
-    gfx.render(cam.camera);
+    if (!skipRender) gfx.render(cam.camera);
     if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
     const bubbles = npcs.labels(), mark = mode === 'play' ? tutorialMarker() : null;
     if (mark) bubbles.push(mark);
