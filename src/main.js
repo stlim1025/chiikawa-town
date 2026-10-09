@@ -2084,7 +2084,7 @@ function boot() {
       player.update(dt, input);
       intro.update(dt);
     } else if (state && player && mode === 'play') {
-      if ((!panels.isOpen() || panels.isPhone()) && !sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 마을폰을 보는 동안에도 시간은 흐른다
+      if (!sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 창(노동 접수 · 가게 · 마을폰 …)을 보는 동안에도 시간은 흐른다
       panels.tick(state);
       newDayCheck();
       player.update(dt, input);
