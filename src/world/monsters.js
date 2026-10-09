@@ -55,7 +55,7 @@ const ME = 0.32;
 const ATK = {
   bump: { reach: 0.5, wind: 0.45, cool: 1.0, rec: 0.3 },
   leap: { range: 5.2, wind: 0.6, lock: 0.6, air: 0.6, radius: 1.0, height: 1.3, cool: 1.5, rec: 0.6 },
-  stomp: { range: 5.6, wind: 0.8, lock: 0.55, air: 0.85, radius: 1.45, height: 2.3, cool: 2.0, rec: 0.9 },
+  stomp: { range: 5.6, wind: 0.8, lock: 0.55, air: 0.85, radius: 1.45, height: 1.45, cool: 2.0, rec: 0.9 }, // 너무 높이 뛰면 화면 위로 나가 사라진 것처럼 보인다
   burrow: { range: 7, wind: 0.5, travel: 4.4, maxT: 2.6, warn: 0.65, radius: 1.05, cool: 2.0, rec: 0.8 },
   charge: { range: 6, wind: 0.7, lock: 0.65, speed: 9.5, len: 6.5, width: 0.95, cool: 1.8, rec: 0.7 },
   roll: { range: 7.5, wind: 0.8, lock: 0.6, speed: 7.5, len: 11, width: 1.0, bounce: 1, cool: 2.2, rec: 1.0 },
