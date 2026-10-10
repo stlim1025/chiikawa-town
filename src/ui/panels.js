@@ -700,7 +700,7 @@ export function createPanels(ui, handlers) {
       const owned = (ids, has) => `${ids.filter(has).length}/${ids.length}`;
       const tabs = [
         { id: 'pochette', label: '포셰트', n: owned(Object.keys(POCHETTES), (id) => pc.owned.includes(id)) },
-        { id: 'accessory', label: '꾸미기', n: owned(Object.keys(ACCESSORY_ITEMS), (id) => wd.owned.includes(id)) }
+        { id: 'accessory', label: '꾸미기', n: owned(Object.keys(ACCESSORY_ITEMS).filter((id) => !ACCESSORY_ITEMS[id].gift || wd.owned.includes(id)), (id) => wd.owned.includes(id)) }
       ];
       out.push(h('div', { class: 'board-tabs-wrap' }, h('div', { class: 'board-tabs', role: 'tablist', 'aria-label': '포셰트 가게' }, tabs.map((t) =>
         h('button', { class: 'board-tab', type: 'button', role: 'tab', 'aria-selected': String(t.id === pochetteTab),
@@ -710,6 +710,7 @@ export function createPanels(ui, handlers) {
         // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
         Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
           const own = wd.owned.includes(id);
+          if (A.gift && !own) return; // 선물로만 받는 것(귀 달린 잠옷)은 가졌을 때만 보인다
           out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
             h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
             own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
@@ -909,6 +910,7 @@ export function createPanels(ui, handlers) {
         row('우사기의 집', '바로 시작(밤 9시 광장 · 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
         row('우사기 클럽', '춤만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.club(); } }, '가기')),
         row('피자호빵 소식', '라멘 로우 새 메뉴 · 우사기 이야기 표시', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pizzaNews(); } }, '띄우기')),
+        row('잠옷 밤나들이', '밤 9시 · 내 집 앞(귀 달린 잠옷 입고)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajama(); } }, '가기')),
         row('하치와레 구덩이', '숲 구덩이 앞 · 덩굴풀 3개 들고', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.hachiPit(); } }, '가기')),
         row('시사의 슈퍼 알바이터', '저녁 공부 · 시험 날 바로', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaStudy(); } }, '공부'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaExam(); } }, '시험')),
         ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),

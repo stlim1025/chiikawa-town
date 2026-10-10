@@ -122,7 +122,7 @@ export function createPlayer(scene, chibi, village) {
       if (show !== weaponShown) { weaponShown = show; showHeld(); }
       // 맞은 뒤 무적 시간에는 깜빡인다
       if (blinkT > 0) { blinkT = Math.max(0, blinkT - dt); model.root.visible = blinkT === 0 || Math.floor(blinkT * 14) % 2 === 0; }
-      model.root.position.set(position.x, groundY(position.x, position.z), position.z); // 다리 위면 판 높이
+      model.root.position.set(position.x, groundY(position.x, position.z) + (api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로
       model.root.rotation.y = yaw;
       animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0, moving, eat: eatT > 0 ? 1 - eatT / eatDur : undefined });
     }

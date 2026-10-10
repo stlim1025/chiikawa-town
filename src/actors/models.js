@@ -56,6 +56,14 @@ function partPattern(dark, light) {
 // 앞(얼굴)이 트인 머리카락 껍질: theta 는 정수리에서 아래로 내려오는 정도
 const CAP_OPEN = 1.9; // 앞쪽으로 트인 폭(라디안)
 const CAPE_OPEN = 2.9; // 망토 앞이 트인 폭(팔은 망토 밖으로 나온다)
+// 잠옷 후드: 얼굴 쪽이 동그랗게 트인 머리 껍질(뒤 · 옆 · 아래) + 이마를 덮는 앞머리 조각
+const HOOD_OPEN = 1.55;
+const hoodGeo = {
+  back: new THREE.SphereGeometry(1, 32, 18, Math.PI / 2 + HOOD_OPEN / 2, Math.PI * 2 - HOOD_OPEN, 0, Math.PI * 0.9),
+  brow: new THREE.SphereGeometry(1, 16, 8, Math.PI / 2 - HOOD_OPEN / 2, HOOD_OPEN, 0, Math.PI * 0.36)
+};
+/** 잠옷 색: 내 캐릭터 · 친구마다(원작 파자마 파티처럼 파스텔). */
+export const PAJAMA_COLORS = { me: '#c9b3ef', chiikawa: '#f6a6bd', hachiware: '#a7d78f', usagi: '#fbfaf5' };
 const hairCaps = {
   cap: new THREE.SphereGeometry(1, 36, 20, Math.PI / 2 + CAP_OPEN / 2, Math.PI * 2 - CAP_OPEN, 0, Math.PI * 0.62),
   top: new THREE.SphereGeometry(1, 36, 14, 0, Math.PI * 2, 0, Math.PI * 0.32),
@@ -719,7 +727,7 @@ function playerDef(rawLook) {
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
   for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
-  const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout'].includes(look.accessory) ? 0.15 : 0;
+  const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
 
@@ -786,7 +794,9 @@ function buildFromDef(def) {
 
 /** 내 캐릭터 모델. 빠진 항목은 기본값을 쓴다. */
 export function buildChibi(look) {
-  return buildFromDef(playerDef(look));
+  const c = buildFromDef(playerDef(look));
+  if (look && look.accessory === 'pajama') wearPajama(c, true, PAJAMA_COLORS.me); // 귀 달린 잠옷은 온몸에 입힌다
+  return c;
 }
 
 /** 마을 친구 모델. 몸짓 소품(PROP_FOR)은 숨겨 두고, 등에 멘 칼('sheathed')만 처음부터 보인다. */
@@ -795,6 +805,60 @@ export function buildNpc(kind) {
   (chibi.props.sheathed || []).forEach((m) => { m.visible = true; });
   chibi.kind = kind;
   return chibi;
+}
+
+/**
+ * 귀 달린 잠옷(잠옷 밤나들이 · 옷장의 '귀 달린 잠옷'): 몸통 · 팔다리를 잠옷 색 껍질로 감싸고, 얼굴만 트인 후드와 동그란 귀,
+ * 배에 단추 셋. 원래 귀(머리 위로 솟은 부품)는 후드 속으로 숨긴다. on = false 면 벗긴다. 어떤 캐릭터 모델에나(가장 큰 부품을 기준으로).
+ */
+export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
+  const P = chibi.pivots || {};
+  if (chibi.pajama) {
+    chibi.pajama.forEach((m) => m.parent && m.parent.remove(m));
+    (chibi.pajamaHidden || []).forEach((m) => { m.visible = true; });
+    chibi.pajama = null; chibi.pajamaHidden = null;
+  }
+  if (!on) return;
+  const added = [], hidden = [], mat = celMaterial(color, { doubleSide: true }), white = celMaterial('#fffaf0');
+  const vol = (m) => m.scale.x * m.scale.y * m.scale.z;
+  const biggest = (g) => { let b = null; (g ? g.children : []).forEach((m) => { if (m.isMesh && (!b || vol(m) > vol(b))) b = m; }); return b; };
+  const put = (parent, geo, material, pos, scale, outline = 0.022) => {
+    const m = new THREE.Mesh(geo, material);
+    m.position.copy(pos);
+    m.scale.copy(scale);
+    if (outline) addOutline(m, outline, true);
+    parent.add(m);
+    added.push(m);
+    return m;
+  };
+  // 몸통 · 팔다리: 조금 크게 덮는 껍질(소매 · 바짓단까지 잠옷)
+  const body = biggest(P.body);
+  if (body) {
+    const sh = put(P.body, body.geometry, mat, body.position, body.scale.clone().multiplyScalar(1.06));
+    sh.rotation.copy(body.rotation);
+    [0.22, 0, -0.22].forEach((k) => put(P.body, partGeometry('sphere', 0.03), white,
+      new THREE.Vector3(body.position.x, body.position.y + body.scale.y * k, body.position.z + body.scale.z * 1.04 * Math.sqrt(1 - k * k)),
+      new THREE.Vector3(0.026, 0.026, 0.018), 0.012));
+  }
+  ['armL', 'armR', 'legL', 'legR'].forEach((k) => (P[k] ? P[k].children : []).filter((m) => m.isMesh).forEach((m) => {
+    const sh = put(P[k], m.geometry, mat, m.position, m.scale.clone().multiplyScalar(1.16));
+    sh.rotation.copy(m.rotation);
+  }));
+  // 후드: 머리 부품보다 살짝 크게, 얼굴 쪽은 트였다. 머리 위로 솟은 원래 귀는 숨기고 동그란 귀 둘
+  const head = biggest(P.head);
+  if (head) {
+    P.head.children.forEach((m) => { if (m !== head && m.isMesh && m.visible && m.position.y > head.position.y + head.scale.y * 0.55) { m.visible = false; hidden.push(m); } });
+    ['earL', 'earR'].forEach((k) => { if (P[k] && P[k].visible) { P[k].visible = false; hidden.push(P[k]); } }); // 토끼 귀처럼 따로 노는 귀
+    const sc = head.scale.clone().multiplyScalar(1.09);
+    put(P.head, hoodGeo.back, mat, head.position, sc);
+    put(P.head, hoodGeo.brow, mat, head.position, sc, 0);
+    [-1, 1].forEach((sd) => {
+      const at = new THREE.Vector3(head.position.x + sd * head.scale.x * 0.6, head.position.y + head.scale.y * 0.86, head.position.z - head.scale.z * 0.08);
+      put(P.head, partGeometry('sphere', 0.1), mat, at, new THREE.Vector3(head.scale.x * 0.27, head.scale.y * 0.3, head.scale.z * 0.2));
+    });
+  }
+  chibi.pajama = added;
+  chibi.pajamaHidden = hidden;
 }
 
 /**

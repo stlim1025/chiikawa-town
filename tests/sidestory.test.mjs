@@ -175,3 +175,20 @@ test('하치와레가 구덩이에!: 말로는 시작 안 함(숲에서 발견) 
   assert.equal(I.bagOf(r.state).items.vine || 0, 0, '밧줄로 엮었다');
   assert.ok(F.friendOf(r.state, 'chiikawa').pts > 0, '달려온 치이카와와도');
 });
+
+test('잠옷 밤나들이: 포셰트 갑옷 씨에게 이야기 표시(여섯째 날부터 낮) → 받으면 귀 달린 잠옷 → 밤에 내 집 앞', async () => {
+  const W = await import(G + 'wardrobe.js');
+  assert.ok(W.ACCESSORY_ITEMS.pajama && W.ACCESSORY_ITEMS.pajama.gift, '귀 달린 잠옷은 선물로만');
+  let s = fresh(6, 11);
+  assert.ok(Q.canOffer(s, 'pajamaNight'));
+  assert.equal(Q.markOf(s, 'pochette'), 'story');
+  assert.ok(!Q.canOffer({ ...s, clock: at(5, 11) }, 'pajamaNight'), '여섯째 날부터');
+  assert.ok(!Q.canOffer({ ...s, clock: at(6, 21) }, 'pajamaNight'), '가게가 여는 낮에만');
+  assert.deepEqual(Q.QUESTS.pajamaNight.start, { accessory: 'pajama' }, '받자마자 잠옷');
+  const step = Q.QUESTS.pajamaNight.steps[0];
+  assert.equal(step.scene, 'pajamaNight');
+  assert.ok(Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 21) && !Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 15), '밤에 내 집 앞');
+  const r = Q.completeStep(Q.startQuest(s, 'pajamaNight'), 'pajamaNight', 7);
+  assert.ok(r.finished);
+  for (const k of ['chiikawa', 'hachiware']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
+});

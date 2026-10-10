@@ -10,7 +10,8 @@ export const ACCESSORY_ITEMS = {
   sprout: { name: '새싹 머리띠', price: 150, note: '머리 위에 새싹 둘' },
   glasses: { name: '동글 안경', price: 400, note: '똑똑해 보이는 안경' },
   cap: { name: '빨간 모자', price: 500, note: '햇빛 가리개 모자' },
-  crown: { name: '반짝 왕관', price: 3000, note: '반짝이는 황금 왕관' }
+  crown: { name: '반짝 왕관', price: 3000, note: '반짝이는 황금 왕관' },
+  pajama: { name: '귀 달린 잠옷', price: 0, gift: true, note: '포셰트 갑옷 씨가 만든 후드 잠옷(선물). 입으면 온몸이 폭신한 연보라' }
 };
 
 export function wardrobeOf(state) {

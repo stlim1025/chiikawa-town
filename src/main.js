@@ -20,7 +20,7 @@ import { createLod } from './render/lod.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
-import { buildChibi, setCrying } from './actors/models.js';
+import { buildChibi, setCrying, wearPajama, PAJAMA_COLORS } from './actors/models.js';
 import { setCelLight } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
 import { createNpcs } from './actors/npcs.js';
@@ -98,6 +98,8 @@ import { createRhythm } from './ui/rhythm.js';
 import { createUsagiClub } from './stories/usagiclub.js';
 import { createShisaStory } from './stories/shisa.js';
 import { createHachiPit } from './stories/hachipit.js';
+import { createPajamaStory } from './stories/pajama.js';
+import { createCliff } from './world/cliff.js';
 import { createPit } from './world/pit.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
@@ -259,6 +261,18 @@ function boot() {
         s = addItem(s, 'vine', 3).state;
         commit(s);
         player.setPosition(pit.front.x, pit.front.z + 6);
+        cam.snap(player.position);
+      },
+      /** 잠옷 밤나들이: 귀 달린 잠옷을 받은 상태로 밤 9시 내 집 앞(가까이 가면 둘이 달려온다). */
+      pajama() {
+        const qs = { ...(state.quests || {}) };
+        delete qs.pajamaNight;
+        const w = wardrobeOf(state);
+        const s = startQuest({ ...state, quests: qs, wardrobe: { owned: w.owned.includes('pajama') ? w.owned : [...w.owned, 'pajama'], wear: 'pajama' } }, 'pajamaNight');
+        commit({ ...s, clock: { day: Math.max(6, state.clock.day), t: (21 - 6) / 24 } });
+        refreshLook();
+        const h = village.spots.home;
+        player.setPosition(h.x + 4, h.z + 3);
         cam.snap(player.position);
       },
       /** 우사기 클럽 춤만 바로(보상 없음). */
@@ -501,6 +515,7 @@ function boot() {
       usagiClub.reset();
       shisaStory.reset();
       hachiPit.reset();
+      pajama.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1037,8 +1052,9 @@ function boot() {
   let starShow = null; // 별똥별 소원 연출 중(아래 별똥별 밤 참고)
   let usagiClub = null; // 사이드스토리 '우사기의 집' 연출(stories/usagiclub.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
+  let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -1215,6 +1231,12 @@ function boot() {
       commit(startQuest(state, id));
       sound.play('job');
       endTalk();
+      if (Q.start && Q.start.accessory) { // 받자마자 주는 선물(귀 달린 잠옷): 옷장에 넣고 바로 입는다
+        const w = wardrobeOf(state), a = Q.start.accessory;
+        commit({ ...state, wardrobe: { owned: w.owned.includes(a) ? w.owned : [...w.owned, a], wear: a } });
+        refreshLook();
+        setTimeout(() => hud.toast(`${ACCESSORY_ITEMS[a].name}을 받았어요!`, 3200, { icon: accessorySvg(a) }), 400);
+      }
       if (Q.steps[0].type === 'scene') { questSceneStep(id); return; } // 받자마자 장면(우사기랑 클럽 가기)
       if (isBuddyStep(Q.steps[0])) startBuddy(n); // 일상 부탁: 같이 하자며 따라나선다
       hud.announce({ kicker: Q.side ? '사이드스토리 시작!' : Q.story ? '이야기 시작!' : Q.daily ? '일상 부탁!' : '새 부탁!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
@@ -1325,6 +1347,7 @@ function boot() {
     if (step.scene) { // 사이드스토리 장면(stories/): 다 보고 나면 마무리 대사 · 보상
       const done = () => finishQuestStep(id, null, lines);
       if (step.scene === 'shisaExam') shisaStory.exam(done);
+      else if (step.scene === 'pajamaNight') pajama.play(done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
@@ -1399,7 +1422,7 @@ function boot() {
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
@@ -2047,6 +2070,15 @@ function boot() {
     fill: (lines) => lines.map(fillName), getPlayer: () => player, regionAt,
     startStory: (id) => { commit(startQuest(state, id)); sound.play('job'); hud.announce({ kicker: '사이드스토리 시작!', title: QUESTS[id].title, sub: shortGoal(state, id).goal, to: 'quest', id }); },
     finishStory: (id) => { const st = stepOf(state, id), lines = [...st.say]; lines.speaker = st.speaker || QUESTS[id].giver; questScene = true; input.setEnabled(false); finishQuestStep(id, null, lines); }
+  });
+  // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js): 귀 달린 잠옷을 입은 셋이 연못가에서 별 보다 잠들기
+  const cliff = createCliff(scene, village); // 마을 밖 남쪽 바다가 보이는 절벽 · 통나무
+  pajama = createPajamaStory({
+    npcs, village, hud, guide, input, staged, who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    getPlayer: () => player, cam, cliff, get starfall() { return starfall; }, // starfall 은 아래에서 만든다(그때그때 읽는다)
+    wear: (chibi, kind, on) => wearPajama(chibi, on, PAJAMA_COLORS[kind]),
+    sleepHere: (after) => doSleep('home', after),
+    wakeBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); delete awayInfo[kind]; setDoing(kind, null, null); }
   });
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
@@ -3927,6 +3959,7 @@ function boot() {
       usagiClub.update(dt);
       shisaStory.update(dt);
       hachiPit.update(dt);
+      pajama.update(dt);
       updateCryFx(dt);
       if (pulling) {
         const before = pulling.pull.power;
@@ -4000,7 +4033,7 @@ function boot() {
     npcs.update(dt, t, focus);
     if (mode !== 'play') streaks.setActive(false);
     applySky(starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 }); // 별똥별맨 미리 보기 동안은 하늘만 밤
-    if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else cam.follow(focus, dt); }
+    if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else { const pp = pajama.camPose(dt); if (pp) cam.set(pp.pos, pp.look); else cam.follow(focus, dt); } }
     else if (mode === 'title') {
       // 타이틀: 마을 위를 천천히 돈다
       const a = t * 0.07;
@@ -4018,7 +4051,7 @@ function boot() {
       if (homeSign.text !== tx) { homeSign.text = tx; homeSign.html = signHtml(tx, homeSign.key); }
     }
     // 타이틀 · 처음 마을에 들어오는 장면에서는 간판 · 말풍선을 띄우지 않는다(마을에 들어온 뒤부터 톡톡 나타난다)
-    if (mode !== 'play' || closeup) { cue.visible = false; hud.placeLabels([], cam.camera); return; } // 얼굴 클로즈업 동안은 간판 · 말풍선도 숨긴다
+    if (mode !== 'play' || closeup || pajama.phase === 'stars') { cue.visible = false; hud.placeLabels([], cam.camera); return; } // 얼굴 클로즈업 · 별 보기 동안은 간판 · 말풍선도 숨긴다
     const bubbles = npcs.labels(), mark = tutorialMarker();
     if (mark) bubbles.push(mark);
     bubbles.push(...monsters.labels(focus), ...questMarks(focus), ...doingLabels(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?, 친구가 하는 일

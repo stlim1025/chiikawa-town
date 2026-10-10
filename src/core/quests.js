@@ -51,7 +51,8 @@ export const PLACES = {
   pub: { name: '맥주집', r: 3 },
   bridge: { name: '강가 다리', r: 3.4 },
   plaza: { name: '광장', r: 4.5 },
-  exam: { name: '검정소', r: 3 }
+  exam: { name: '검정소', r: 3 },
+  home: { name: '내 집 앞', r: 2.6 }
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -193,6 +194,17 @@ export const QUESTS = {
       say: ['영차~ 하고 끌어올려 줘서 고마워, {name}!', '구덩이 속에서 하늘만 보고 있으니까 조금 무서웠어~', '이제 발밑 조심할게! 헤헤.']
     }],
     reward: { bond: 4, friends: { chiikawa: 2 }, money: 300 }
+  },
+  // 잠옷 밤나들이(원작 애니 10화: 갑옷 씨가 준 잠옷을 입고 셋이 밤에 놀며 별을 본다) — 받자마자 잠옷(start), 밤에 내 집 앞에서(stories/pajama.js)
+  pajamaNight: {
+    title: '잠옷 밤나들이', giver: 'pochette', side: true, minDay: 6, hours: [9, 18], needHearts: 0, ask: '새로 만든 거 있어요?',
+    offer: ['어서 오세요~! 아, {name} 님!', '새로 만든 잠옷이 있는데요… 귀 달린 후드까지 있는 폭신폭신한 잠옷이에요!', '치이카와 님이랑 하치와레 님 것도 만들었어요. 다 같이 입으면 귀여울 것 같아서~', '오늘 밤에 입고 셋이서 놀아 보는 건 어때요?'],
+    start: { accessory: 'pajama' },
+    steps: [{
+      type: 'visit', place: 'home', hours: [20, 24], scene: 'pajamaNight', speaker: 'hachiware', goal: '밤에 잠옷 입고 내 집 앞으로 (밤 8시 ~ 12시)',
+      say: ['헤헤… 밖에서 자 버렸네~', '잠옷 입고 밤에 노는 거 진짜 재밌었다!', '또 하자, {name}! 다음엔 간식도 챙겨 오자~']
+    }],
+    reward: { bond: 2, friends: { chiikawa: 3, hachiware: 3 } }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
@@ -365,6 +377,7 @@ function baseOffer(state, id) {
   if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
   if (Q.after && !isDone(state, Q.after)) return false;
+  if (Q.minDay && state.clock && state.clock.day < Q.minDay) return false;
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
   if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;
   if (isStorySide(id) && sideBusy(state)) return false;
@@ -568,6 +581,7 @@ export function checkQuestData() {
     if (R.furniture && !FURNITURE[R.furniture]) errs.push(id + ': furniture');
     if (R.friends) for (const k of Object.keys(R.friends)) if (!FRIENDS[k]) errs.push(id + ': friend ' + k);
     if (Q.after && !QUESTS[Q.after]) errs.push(id + ': after');
+    if (Q.start && Q.start.accessory && !ACCESSORY_ITEMS[Q.start.accessory]) errs.push(id + ': start accessory');
     for (const L of Q.offer || []) if (typeof L !== 'string' && !(L && L.text && (!L.who || FRIENDS[L.who]))) errs.push(id + ': offer line');
     if (R.items) for (const it of Object.keys(R.items)) if (!itemInfo(it)) errs.push(id + ': reward item ' + it);
   }

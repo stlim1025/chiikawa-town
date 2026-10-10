@@ -37,6 +37,8 @@ export const BRIDGES = [{ x: 0, half: 1.4 }, { x: -40, half: 1.2 }];
 export const LAKE = { x: -48, z: 60, rx: 15, rz: 10 };
 /** 이보다 남쪽은 넓은 호수(월드 남쪽 끝). */
 export const SOUTH_SHORE = 72;
+/** 남쪽 바다가 보이는 절벽(잠옷 밤나들이에서 별 보는 곳): 해안 앞 바다를 아래로 낮춘 만(cove: x0 ~ x1, 해안 ~ z1, 수면 y)과 가장자리 통나무(log). */
+export const CLIFF = { cove: { x0: 19, x1: 33, z1: 82, y: -3 }, log: { x: 26, z: 70.4, r: 0.3, len: 3.6 } };
 /** 북쪽 바위산의 하치와레 동굴: 바위 덩어리 가운데, 크기, 입구 앞. */
 export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };
 

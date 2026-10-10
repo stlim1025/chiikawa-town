@@ -628,6 +628,7 @@ export function buildVillage(scene) {
   // 먼 언덕과 구름
   for (let h = 0; h < 26; h++) {
     const a = (h / 26) * Math.PI * 2 + rand() * 0.3, d = 104 + rand() * 10, w = 10 + rand() * 5;
+    if (Math.cos(a) > 0.6) continue; // 남쪽은 바다: 수평선이 트이게(바다 절벽에서 별 볼 때)
     world.add(toonMesh(GEO.sphere, h % 2 ? '#aee08f' : '#95d488', { position: [Math.sin(a) * d, -0.6, Math.cos(a) * d], scale: [w, 4 + rand() * 4, w], outline: false, shadow: false }));
   }
   for (let c = 0; c < 10; c++) {

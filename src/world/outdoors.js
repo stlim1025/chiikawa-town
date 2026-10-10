@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, riverZ, roadDist, shoreDist } from '../core/layout.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const m4 = (x, y, z, sx, sy, sz, yaw = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
@@ -128,7 +128,11 @@ export function buildOutdoors(ctx) {
     world.add(river);
   }
   world.add(toonMesh(GEO.cylinder, null, { material: water, position: [LAKE.x, -0.03, LAKE.z], scale: [LAKE.rx, 0.05, LAKE.rz], outline: 0.04, shadow: false, receive: true }));
-  world.add(toonMesh(GEO.box, null, { material: water, position: [0, -0.03, (SOUTH_SHORE + 140) / 2], scale: [280, 0.1, 140 - SOUTH_SHORE], outline: false, shadow: false, receive: true }));
+  // 바다: 절벽 앞 만(灣) 자리는 비운다(world/cliff.js 가 아래로 낮춘 물과 바위벽을 깐다)
+  {
+    const C = CLIFF.cove, sea = (x0, x1, z0) => world.add(toonMesh(GEO.box, null, { material: water, position: [(x0 + x1) / 2, -0.03, (z0 + 140) / 2], scale: [x1 - x0, 0.1, 140 - z0], outline: false, shadow: false, receive: true }));
+    sea(-140, C.x0, SOUTH_SHORE); sea(C.x1, 140, SOUTH_SHORE); sea(C.x0, C.x1, C.z1);
+  }
   // 다리: 나무 판과 양쪽 난간, 양 끝은 땅으로 내려오는 비탈 판(올라서도 발이 판에 묻히지 않게 core/layout 의 groundY 와 같은 높이)
   BRIDGES.forEach((b) => {
     const zc = riverZ(b.x), len = BRIDGE_LEN, wood = '#c49a6c', g = new THREE.Group(), T = 0.12;
@@ -151,7 +155,7 @@ export function buildOutdoors(ctx) {
   // 물가 나무 몇 그루
   for (let k = 0, made = 0; k < 60 && made < 10; k++) {
     const x = (rand() - 0.5) * 140, z = 42 + rand() * 26;
-    if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5)) continue;
+    if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5) || Math.hypot(x - CLIFF.log.x, z - CLIFF.log.z) < 9) continue; // 절벽 위는 탁 트이게
     made++;
     tree(x, z, 1.0 + rand() * 0.3, '#6cc77e', zones.groupAt(x, z));
   }
