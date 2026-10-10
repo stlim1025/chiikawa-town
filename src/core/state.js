@@ -43,12 +43,11 @@ export function useStamina(state, amount) {
 }
 
 /** 자고 일어나면 기운이 이만큼까지만 찬다(꽉 차지 않는다). 노숙은 ROUGH_GAIN 만큼만, 그래도 이보다 넘지는 않는다. */
-export const SLEEP_STAMINA = 60;
+export const SLEEP_GAIN = 60;
 const ROUGH_GAIN = 30; // housing.js 의 ROUGH_REST(노숙 안내 문구)와 같은 값
-/** 잔 뒤의 기운: how 'home' · 'lodge'(침대) 면 SLEEP_STAMINA 까지, 'rough'(노숙)면 ROUGH_GAIN 만큼(SLEEP_STAMINA 까지). 이미 더 있으면 그대로. */
+/** 잔 뒤의 기운: how 'home' · 'lodge'(침대) 면 SLEEP_GAIN, 'rough'(노숙)면 ROUGH_GAIN 만큼 찬다(MAX_STAMINA 까지). */
 export function sleepStamina(state, how = 'home') {
-  const to = how === 'rough' ? Math.min(SLEEP_STAMINA, state.stamina + ROUGH_GAIN) : SLEEP_STAMINA;
-  return { ...state, stamina: Math.max(state.stamina, to) };
+  return restoreStamina(state, how === 'rough' ? ROUGH_GAIN : SLEEP_GAIN);
 }
 
 /** 기운을 채운다(최대 100). */

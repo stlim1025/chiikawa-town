@@ -449,7 +449,7 @@ function boot() {
 
   /**
    * 잠자기: 하루가 지나는 연출. 어두워진 사이에 아침으로 바꾸고, 해가 뜨면 다시 움직인다(집 안이면 집 안 그대로).
-   * how: 'home'(내 집) · 'lodge'(친구 집에 돈을 내고) — 기운이 60쯤까지 / 'rough'(노숙) — 기운이 조금만 찬다.
+   * how: 'home'(내 집) · 'lodge'(친구 집에 돈을 내고) — 기운이 60 찬다 / 'rough'(노숙) — 30 만 찬다(100 까지).
    */
   /** 침대에서: 잘지 한 번 묻고, '잘래요'면 다음 날 아침까지 잔다. */
   const BED = { kind: null, name: '침대', tag: '#d9ecff', ink: '#2f5577' };
@@ -471,7 +471,7 @@ function boot() {
     // 아침까지가 아니라 SLEEP_HOURS 시간만 흐른다. 그사이 친구들도 그 시간을 보낸다(저녁 · 밤잠 · 다음 날 아침)
     const to = sleepFor(state.clock), spans = asleepSpans(state.clock, to), wakeHour = hourOf(to);
     const lived = liveWhileAsleep(spans);
-    const rolled = rollDays(sleepStamina({ ...lived.state, clock: to }, how)); // 꽉 차지 않고 60쯤까지(노숙은 조금만)
+    const rolled = rollDays(sleepStamina({ ...lived.state, clock: to }, how)); // 기운이 60 찬다(노숙은 30)
     const next = rolled.state, phase = phaseOf(to);
     const onDark = () => {
       commit(next);
