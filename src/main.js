@@ -3230,7 +3230,9 @@ function boot() {
   const titlePos = new THREE.Vector3(), titleLook = new THREE.Vector3(0, 0, 1);
   function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
+    // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
     try {

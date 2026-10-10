@@ -1175,7 +1175,8 @@ export function createMonsters(scene, village, random = Math.random) {
           continue;
         }
         root.visible = true;
-        if (m.born > 0) { m.born = Math.min(1, m.born + dt * 2.2); root.scale.setScalar(m.born >= 1 ? 1 : m.born); if (m.born >= 1) m.born = 0; }
+        if (m.born > 0) { m.born = Math.min(1, m.born + Math.max(0, dt) * 2.2); root.scale.setScalar(m.born >= 1 ? 1 : m.born); if (m.born >= 1) m.born = 0; }
+        else if (m.born < 0 || root.scale.x <= 0) { m.born = 0; root.scale.setScalar(1); } // 크기가 0 이하로 굳은 몬스터(뒤집혀 땅속)는 바로잡는다
         m.flash = Math.max(0, m.flash - dt);
         m.alert = Math.max(0, m.alert - dt);
         m.stun = Math.max(0, m.stun - dt);
