@@ -1,6 +1,7 @@
 import { trySpend } from './state.js';
 import { registerItems, bagOf, takeItem } from './inventory.js';
 import { josa } from './weeding.js';
+import { hasLicense } from './licenses.js';
 
 /**
  * 토벌(4단계): 무기 · 몬스터 · 토벌 자격증. 몬스터는 이 게임만의 오리지널 생물이다.
@@ -72,12 +73,13 @@ export const FAINT_LOSS = 0.1, FAINT_LOSS_MAX = 300, FAINT_STAMINA = 25;
 export const weaponOf = (state) => state.weapon || { owned: [], held: null };
 export const heldWeapon = (state) => { const w = weaponOf(state); return w.held && WEAPONS[w.held] ? w.held : null; };
 
-/** 무기를 산다(사면 바로 든다). */
+/** 무기를 산다(사면 바로 든다). 토벌 자격증이 있어야 판다. → { ok, state, reason: 'none' | 'owned' | 'license' | 'money' } */
 export function buyWeapon(state, id) {
   const W = WEAPONS[id];
   if (!W) return { ok: false, reason: 'none', state };
   const w = weaponOf(state);
   if (w.owned.includes(id)) return { ok: false, reason: 'owned', state };
+  if (!hasLicense(state, 'hunter')) return { ok: false, reason: 'license', state };
   const paid = trySpend(state, W.price);
   if (!paid.ok) return { ok: false, reason: 'money', state };
   return { ok: true, state: { ...paid.state, weapon: { owned: [...w.owned, id], held: id } } };

@@ -6,6 +6,7 @@ const C = await import(G + 'combat.js');
 const I = await import(G + 'inventory.js');
 const S = await import(G + 'save.js');
 const St = await import(G + 'state.js');
+const Lc = await import(G + 'licenses.js');
 
 const fresh = () => ({ ...St.createState({ name: 't', look: {} }), money: 5000, player: { x: 0, z: 0 } });
 
@@ -45,7 +46,7 @@ test('pick up only what fits in the bag', () => {
   assert.equal(Gr.pickUp(s, 1).reason, 'full');
 });
 test('drop and pick up weapons', () => {
-  let s = fresh();
+  let s = Lc.grant(fresh(), 'hunter', 1); // 무기는 토벌 자격증이 있어야 산다
   s = C.buyWeapon(s, 'fork').state;
   s = C.buyWeapon(s, 'sword').state; // 목검을 든다
   let r = Gr.dropWeapon(s, 'sword', 0, 0);

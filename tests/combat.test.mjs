@@ -11,8 +11,17 @@ const Lc = await import(G + 'licenses.js');
 
 const fresh = () => ({ ...St.createState({ name: 't', look: {} }), money: 5000, player: { x: 0, z: 0 } });
 
+test('weapons need the hunter license', () => {
+  const s = fresh();
+  const r = C.buyWeapon(s, 'fork');
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'license');
+  assert.equal(r.state.money, 5000, 'no money taken');
+  assert.deepEqual(C.weaponOf(r.state).owned, []);
+  assert.ok(C.buyWeapon(Lc.grant(s, 'hunter', 1), 'fork').ok);
+});
 test('buy and hold weapons', () => {
-  let s = fresh();
+  let s = Lc.grant(fresh(), 'hunter', 1);
   let r = C.buyWeapon(s, 'stick');
   assert.ok(r.ok); s = r.state;
   assert.equal(s.money, 4700);

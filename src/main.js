@@ -452,7 +452,7 @@ function boot() {
     // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
     buyWeapon(id) {
       const r = buyWeapon(state, id);
-      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 무기예요'); return; }
+      if (!r.ok) { hud.toast({ money: '돈이 부족해요', license: '무기는 토벌 자격증이 있어야 살 수 있어요', owned: '이미 가진 무기예요' }[r.reason] || '살 수 없어요'); return; }
       const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('coin');

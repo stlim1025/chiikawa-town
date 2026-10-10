@@ -460,7 +460,7 @@ export function createPanels(ui, handlers) {
           rule('faint', '기운 0이면 기절', '마을 입구에서 깨고 돈을 조금 잃어요'),
           rule('safe', '마을 안은 안전', ''),
           rule('dodge', '빨간 표시는 피하기', ''),
-          rule('shop', '무기는 도구점', '전리품은 노동 접수에서 팔아요')),
+          rule('shop', '무기는 도구점', '토벌 자격증이 있어야 사요 · 전리품은 노동 접수에서 팔아요')),
         h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
@@ -883,12 +883,14 @@ export function createPanels(ui, handlers) {
             : held ? h('span', { class: 'lic-badge done' }, ico('check'), '장착 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '장착')));
       }
       // 무기(4단계): 사면 바로 들고, 가진 무기는 바꿔 들거나 넣어 둔다
-      const wp = weaponOf(s);
+      // 무기는 토벌 자격증이 있어야 판다(없으면 값 대신 '자격증 필요'). 이미 가진 무기는 그대로 바꿔 든다
+      const wp = weaponOf(s), hunter = hasLicense(s, 'hunter');
       out.push(h('h3', { class: 'shop-sec' }, '무기'));
+      if (!hunter) out.push(h('p', { class: 'note warn' }, '무기는 토벌 자격증이 있어야 살 수 있어요. 검정소에서 따요(실기 때 무기는 빌려줘요).'));
       for (const id of WEAPON_ORDER) {
         const W = WEAPONS[id], own = wp.owned.includes(id), on = wp.held === id;
         let btn;
-        if (!own) btn = priceBtn(W.price, s.money, after(() => handlers.buyWeapon(id)));
+        if (!own) btn = hunter ? priceBtn(W.price, s.money, after(() => handlers.buyWeapon(id))) : h('span', { class: 'lic-badge' }, '자격증 필요');
         else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '장착');
         else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '빼기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', myWeaponArt(s, id)),
