@@ -6,6 +6,7 @@ import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, 
 import { createZones } from './zones.js';
 import { buildOutdoors } from './outdoors.js';
 import { DESIGNS } from './buildings.js';
+import { batchStatic, mergedGeometry, mergeUnit } from '../render/batch.js';
 
 /** 흙길까지의 거리(음수면 길 위). berries.js 가 쓴다. */
 export const pathDist = roadDist;
@@ -67,6 +68,16 @@ function rng(seed) {
 }
 
 /** 마을 전체를 장면에 만든다. */
+// 나무 잎 덩어리 넷(위치 · 반지름): 진한 잎 · 밝은 잎을 번갈아 꼭짓점 색으로 칠해 한 도형으로(나무마다 그리기 잎 4번 + 외곽선 4번 → 1번 + 1번).
+// 잎 색이 같은 나무끼리 도형을 같이 쓴다
+const CANOPY = [[0, 1.65, 0, 0.82], [0.48, 1.35, 0.18, 0.58], [-0.42, 1.42, -0.12, 0.6], [0.05, 1.3, -0.45, 0.55]];
+const canopyGeos = new Map();
+const canopyGeometry = (leaf, light) => {
+  const key = leaf + '|' + light;
+  if (!canopyGeos.has(key)) canopyGeos.set(key, mergedGeometry(CANOPY.map(([x, y, z, r], i) => ({ geometry: GEO.sphereMid, position: [x, y, z], scale: [r, r * 0.92, r], color: i % 2 ? light : leaf }))));
+  return canopyGeos.get(key);
+};
+
 export function buildVillage(scene) {
   const rand = rng(7);
   const obstacles = createObstacleIndex(4), labels = [], spots = {}, clouds = [];
@@ -93,6 +104,8 @@ export function buildVillage(scene) {
   // 연못은 장애물 대신 isFree 가 물로 막는다
 
   const place = (parent, mesh) => { parent.add(mesh); return mesh; };
+  /** 반투명 켜고 끄기: 셰이더가 불투명용 · 반투명용으로 달라서 바뀔 때만 다시 고르게 한다(three r152+ 의 OPAQUE). */
+  const seeThrough = (m, on) => { if (m.transparent !== on) { m.transparent = on; m.needsUpdate = true; } };
   /**
    * 건물 · 가판대가 실제로 차지하는 바닥을 장애물로: 몸에 닿는 높이(바닥 위 0.25 ~ 0.85)에 걸친 조각마다 네모(둥근 벽 · 고깔은 원).
    * 예전처럼 건물 전체를 감싸는 큰 원 하나로 막으면 벽에서 한참 떨어진 곳에서도 걸려 답답했다.
@@ -166,12 +179,9 @@ export function buildVillage(scene) {
     g.scale.setScalar(s);
     place(g, toonMesh(GEO.cylinder, '#b88c66', { scale: [0.16, 1.1, 0.16], outline: 0.03 }));
     const light = new THREE.Color(leaf).lerp(new THREE.Color('#ffffff'), 0.14).getStyle();
-    const mats = [toonMaterial(leaf, { unique: true }), toonMaterial(light, { unique: true })];
-    mats.forEach((m) => { m.transparent = true; });
-    const canopy = [];
-    [[0, 1.65, 0, 0.82], [0.48, 1.35, 0.18, 0.58], [-0.42, 1.42, -0.12, 0.6], [0.05, 1.3, -0.45, 0.55]].forEach(([px, py, pz, r], i) => {
-      canopy.push(place(g, toonMesh(GEO.sphereMid, null, { material: mats[i % 2], position: [px, py, pz], scale: [r, r * 0.92, r], outline: 0.04 })));
-    });
+    const mats = [toonMaterial('#ffffff', { unique: true, vertexColors: true })]; // 나무마다 재질 하나(가릴 때 그 나무만 반투명하게)
+    mats[0].transparent = true;
+    const canopy = [place(g, toonMesh(canopyGeometry(leaf, light), null, { material: mats[0], outline: 0.04 }))];
     parent.add(g);
     obstacles.push({ x, z, r: 0.6 * s });
     trees.push({ x, z, s, mats, canopy, fade: 1 });
@@ -696,6 +706,13 @@ export function buildVillage(scene) {
   /** (ox, oz) 에서 (nx, nz) 로 가려 할 때 실제로 갈 자리: 막히면 장애물을 따라 미끄러진다(core/obstacles.js slideMove). */
   const move = (ox, oz, nx, nz, radius = 0.35) => slideMove(isFree, obstacles.pushOut, ox, oz, nx, nz, radius);
 
+  // ---------- 가볍게: 움직이지 않는 소품은 덩어리로 합치고(render/batch.js) 위치를 굳힌다. 구름 · 나비 · 추첨 통은 움직여서 뺀다 ----------
+  // 집 · 가게 · 문은 반투명해지려고 재질을 따로 둬서 아래 배칭에서 빠진다 → 한 채 안에서 같은 재질 부품끼리 합친다(집마다 그리기 수십 번 → 몇 번)
+  const unitOf = (m) => { let u = m; while (u.parent && u.parent !== world) u = u.parent; return u; };
+  for (const o of [...houses, ...gates]) if (o.meshes.length) o.meshes = mergeUnit(unitOf(o.meshes[0]), o.meshes);
+  batchStatic(world, { skip: [...clouds, ...butterflies.map((b) => b.g), raffleDrum] });
+  for (const m of [...trees, ...houses, ...gates].flatMap((o) => o.mats)) seeThrough(m, false);
+
   return {
     /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
@@ -774,7 +791,7 @@ export function buildVillage(scene) {
           const hiding = covers(t, focus) || (nearOthers && others.some((p) => covers(t, p)));
           t.fade += ((hiding ? 0.3 : 1) - t.fade) * Math.min(1, dt * 8);
           if (t.fade > 0.995) t.fade = 1;
-          t.mats.forEach((m) => { m.opacity = t.fade; m.depthWrite = t.fade > 0.95; });
+          t.mats.forEach((m) => { m.opacity = t.fade; m.depthWrite = t.fade > 0.95; seeThrough(m, t.fade < 1); });
           t.canopy.forEach((c) => { c.children[0].visible = t.fade > 0.95; });
         }
         // 집: 내 캐릭터보다 카메라 쪽(남쪽)에 있으면서 옆으로 가까우면 반투명하게
@@ -782,16 +799,18 @@ export function buildVillage(scene) {
           const dz = h.z - focus.z, dx = Math.abs(h.x - focus.x);
           const hiding = dz > -0.6 && dz < h.half + 5 && dx < h.half + 0.9;
           h.fade += ((hiding ? 0.3 : 1) - h.fade) * Math.min(1, dt * 8);
-          h.mats.forEach((m) => { m.opacity = h.fade; m.depthWrite = h.fade > 0.95; });
-          h.meshes.forEach((m) => { if (m.children[0]) m.children[0].visible = h.fade > 0.95; });
+          if (h.fade > 0.995) h.fade = 1;
+          h.mats.forEach((m) => { m.opacity = h.fade; m.depthWrite = h.fade > 0.95; seeThrough(m, h.fade < 1); });
+          h.meshes.forEach((m) => { for (const c of m.children) c.visible = h.fade > 0.95; }); // 외곽선(합친 부품은 여럿일 수 있다)
         }
         // 문: 내 캐릭터가 문 바로 뒤(북쪽)에 있으면 반투명하게
         for (const gt of gates) {
           const dz = gt.z - focus.z, dx = Math.abs(gt.x - focus.x);
           const under = dz > -0.4 && dz < 6 && dx < 3;
           gt.fade += ((under ? 0.3 : 1) - gt.fade) * Math.min(1, dt * 8);
-          gt.mats.forEach((m) => { m.opacity = gt.fade; m.depthWrite = gt.fade > 0.95; });
-          gt.meshes.forEach((m) => { if (m.children[0]) m.children[0].visible = gt.fade > 0.95; });
+          if (gt.fade > 0.995) gt.fade = 1;
+          gt.mats.forEach((m) => { m.opacity = gt.fade; m.depthWrite = gt.fade > 0.95; seeThrough(m, gt.fade < 1); });
+          gt.meshes.forEach((m) => { for (const c of m.children) c.visible = gt.fade > 0.95; });
         }
       }
       for (const b of butterflies) {

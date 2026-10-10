@@ -11,6 +11,8 @@ export function createScene(canvas) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
+  // 장면 자체는 움직이지 않는다: 켜 두면 매 장면 '위치 다시 계산' 신호가 꼭대기부터 모든 물체로 번져 굳혀 둔 정적 물체까지 다시 계산했다
+  scene.matrixAutoUpdate = false;
   scene.background = new THREE.Color(0xd9eef7);
   scene.fog = new THREE.Fog(0xe2f5fb, 46, 125);
 

@@ -26,7 +26,7 @@ export function toonMaterial(color, opts = {}) {
   if (!opts.unique && toonCache.has(key)) return toonCache.get(key);
   const m = new THREE.MeshToonMaterial({ color, gradientMap: gradientMap(), vertexColors: !!opts.vertexColors, side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide });
   if (opts.emissive) { m.emissive = new THREE.Color(opts.emissive); m.emissiveIntensity = opts.emissiveIntensity ?? 1; }
-  if (!opts.unique) toonCache.set(key, m);
+  if (!opts.unique) { toonCache.set(key, m); m.userData.shared = true; } // 같은 색끼리 나눠 쓰는 재질(따로 바뀌지 않는다 → batch.js 가 색을 꼭짓점에 칠해 합친다)
   return m;
 }
 
@@ -105,10 +105,12 @@ const outlineCache = new Map();
  * 정점을 법선 방향으로 밀어낸 뒷면만 그리는 외곽선 재질. thickness 는 메시 로컬 단위.
  * hand 면 붓펜으로 그은 듯 굵기가 조금씩 들쭉날쭉하고 아래쪽이 더 굵다.
  */
-function outlineMaterial(thickness, hand = false) {
+export function outlineMaterial(thickness, hand = false) {
   const key = (hand ? 'hand:' : '') + thickness;
   if (outlineCache.has(key)) return outlineCache.get(key);
   const m = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide, ...NO_GHOST });
+  m.userData.thickness = thickness; // 덩어리로 합칠 때(batch.js) 굵기를 월드 단위로 바꾸려고
+  m.userData.hand = hand;
   const push = hand
     ? `float wob = 0.8 + 0.4 * (0.5 + 0.5 * sin(position.x * 5.0 + position.y * 3.0) * sin(position.z * 4.0 - position.y * 3.0 + 1.3));
 float press = 1.0 + 0.3 * clamp(-normal.y, 0.0, 1.0);
