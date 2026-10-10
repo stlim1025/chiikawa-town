@@ -1146,7 +1146,7 @@ function boot() {
     }));
     if (Q.story) {
       hud.banner('이야기 완료!', Q.title, 5200, chips);
-      npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, 'cheer', 3); });
+      npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, joyAnim(m.kind), 3); });
     } else hud.banner('부탁 완료!', Q.title, 4200, chips);
     if (reward.gifts.length) setTimeout(() => hud.toast('선물을 받았어요!', 3000, { chips: reward.gifts.map((g) => ({ text: FURNITURE[g].name })) }), 4400);
     refreshLook();
@@ -1520,7 +1520,7 @@ function boot() {
       const at = mode === 'visit' ? rooms.hostAnchor() : { x: n.x, y: n.chibi.height + 0.5, z: n.z };
       hud.hearts({ ...at, gained: r.gained, up: r.up, hearts: r.hearts, name: F.name, tag: F.tag });
       sound.play(r.up ? 'heartUp' : 'heart');
-      npcs.emote(n, 'cheer', r.up ? 1.6 : 0.9);
+      npcs.emote(n, joyAnim(n.kind), r.up ? 1.6 : 0.9);
     }
     if (r.gift) {
       sayAs(n, [n.kind === 'momonga' ? '흥! 남아서 주는 거야!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
@@ -1560,7 +1560,7 @@ function boot() {
       const theirs = pick(HANDS), res = rps(HANDS[i][0], theirs[0]), said = `나는 ${theirs[1]}!`;
       if (res === 'draw') { playRps(n, `${said} 비겼다! 한 번 더, 뭐 낼래?`); return; }
       if (res === 'win') { player.cheerTime = 1.6; sound.play('pass'); }
-      else { npcs.emote(n, 'cheer', 1.6); sound.play('none'); }
+      else { npcs.emote(n, joyAnim(n.kind), 1.6); sound.play('none'); }
       sayAs(n, [said, res === 'win' ? '으앗, 졌다…! {name} 잘한다~' : '내가 이겼다~! 헤헤'], () => {
         askAs(n, '한 판 더 할래?', ['한 판 더!', '그만할래'], (k) => { if (k === 0) playRps(n, '가위바위보! 뭐 낼래?'); else reward(n, 'play'); });
       });
@@ -1582,7 +1582,7 @@ function boot() {
     npcs.flee(n, false);
     if (stolen) { endThiefChase(n, stolen, caught); return; }
     beginTalk(n);
-    if (caught) { player.cheerTime = 1.6; sound.play('pass'); } else npcs.emote(n, 'cheer', 1.6);
+    if (caught) { player.cheerTime = 1.6; sound.play('pass'); } else npcs.emote(n, joyAnim(n.kind), 1.6);
     sayAs(n, caught ? ['으앗, 잡혔다~!', '{name} 진짜 빠르다! 재밌었어~'] : ['못 잡았지롱~!', '헤헤, 다음엔 꼭 잡아 봐~'], () => reward(n, 'play'));
   }
   /** 같이 춤추기: 둘이 4초 동안 춤춘다. */
@@ -1871,7 +1871,7 @@ function boot() {
     commit({ ...state, stamina: Math.max(0, state.stamina - (ok ? DRILL.cost : DRILL.failCost)) });
     beginTalk(n);
     if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '오늘은 네 무기에 힘이 더 실릴 거다.', '몬스터 앞에서 써 봐라.'], () => {
-      rooms.hostPose('cheer', 1.2);
+      rooms.hostPose(joyAnim(n.kind), 1.2); // 랏코: 고개를 끄덕이거나 박수
       hud.banner('수련 성공!', '', 2600, [{ text: `💪 공격 +${DRILL.bonus}` }, { icon: 'energy', text: `기운 −${DRILL.cost}` }]);
       sound.play('done');
       reward(n, 'home');
@@ -2324,13 +2324,17 @@ function boot() {
     return c.act;
   }
 
+  /** 기쁠 때 몸짓: 친구마다 성격대로 여러 가지 중 하나(늘 두 팔 들고 방방만 하지 않게). 갑옷 씨들 · 시사 · 카니는 STAFF_JOY. */
+  const JOY = { chiikawa: ['cheer', 'hop', 'shy', 'clap'], hachiware: ['wave', 'clap', 'sway', 'cheer'], usagi: ['hop', 'spin', 'cheer'], kurimanju: ['clap', 'sway', 'wave'], rakko: ['think', 'clap', 'wave'], momonga: ['pose', 'spin', 'hop'] };
+  const STAFF_JOY = ['clap', 'wave', 'cheer'];
+  const joyAnim = (kind) => pickLine(JOY[kind] || STAFF_JOY);
   /** 모은 돈으로 목표(무기는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
   function npcShop(n) {
     const g = goalOf(state, n.kind), door = g && (g.kind === 'weapon' ? village.spots.tools : village.spots.furniture);
     if (!door) { restHere(n.kind, 5); return; }
     setDoing(n.kind, 'star', `${g.kind === 'weapon' ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
-    npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: 'cheer', time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
+    npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
       do: 'call',
       fn: () => {
         const r = buyGoal(state, n.kind, state.clock.day); // 오는 사이 돈을 써 버렸으면 못 산다
@@ -2398,7 +2402,7 @@ function boot() {
     const steps = (n) => {
       const s = [];
       if (n === a) s.push({ do: 'walk', x: b.x + (a.x > b.x ? 1 : -1), z: b.z, near: 1.4 }, { do: 'act', anim: 'talk', face: { x: b.x, z: b.z }, time: 2.6, say: fillLine(MEAL_INVITE[a.kind] || '{w} 라멘 먹자', { w: nameOf(b.kind) }), quick: true });
-      else s.push({ do: 'sync', group: invite, face: { x: a.x, z: a.z }, max: 30 }, { do: 'act', anim: 'cheer', time: 1.4, say: pickLine(SMALLTALK.reply[n.kind] || ['응!']), quick: true });
+      else s.push({ do: 'sync', group: invite, face: { x: a.x, z: a.z }, max: 30 }, { do: 'act', anim: joyAnim(n.kind), time: 1.4, say: pickLine(SMALLTALK.reply[n.kind] || ['응!']), quick: true });
       if (n === a) s.push({ do: 'sync', group: invite, max: 30 });
       s.push(...ramenSeatSteps(n, () => { group.cancel = true; }), { do: 'sync', group, face, max: RAMEN_WAIT + 15, ramen: true }); // 짝이 줄 서 있으면 앉아서 기다려 준다
       if (n === a) s.push({ do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) });
@@ -2434,12 +2438,13 @@ function boot() {
       for (let i = 0; i < 4; i++) {
         const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 5, p = village.nearestFree(at.x + Math.sin(a) * r, at.z + Math.cos(a) * r, 0.5);
         if (Math.hypot(p.x, p.z) > VILLAGE_R - 3) continue;
-        steps.push({ do: 'walk', x: p.x, z: p.z, near: 0.7, run: true }, { do: 'act', anim: 'cheer', time: 0.9, say: Math.random() < 0.6 ? pickLine(H.lines) : undefined, quick: true });
+        steps.push({ do: 'walk', x: p.x, z: p.z, near: 0.7, run: true }, { do: 'act', anim: joyAnim(n.kind), time: 0.9, say: Math.random() < 0.6 ? pickLine(H.lines) : undefined, quick: true });
       }
     } else {
-      const anim = { pond: 'idle', study: 'read', stars: 'idle', snack: 'drink', dojo: 'train', showoff: 'dance' }[hobby] || 'idle';
-      for (let i = 0; i < 3; i++) steps.push({ do: 'act', anim, face: at.face, time: 3.4 + Math.random() * 1.6, say: Math.random() < 0.7 ? pickLine(H.lines) : undefined, quick: true });
-      if (hobby === 'pond' || hobby === 'stars') steps.push({ do: 'act', anim: 'cheer', face: at.face, time: 1.2, say: pickLine(H.lines), quick: true });
+      // 취미마다 몸짓: 연못가에선 앉아서 두리번, 별 구경은 하늘 보기, 모몽가 귀여운 척은 여러 포즈
+      const ANIMS = { pond: ['sit', 'look', 'sit'], study: ['read', 'think', 'read'], stars: ['gaze', 'gaze', 'sit'], snack: ['drink', 'sway', 'drink'], dojo: ['train', 'stretch', 'train'], showoff: ['pose', 'spin', 'dance'] }[hobby] || ['idle', 'look', 'idle'];
+      for (let i = 0; i < 3; i++) steps.push({ do: 'act', anim: ANIMS[i], face: at.face, time: 3.4 + Math.random() * 1.6, say: Math.random() < 0.7 ? pickLine(H.lines) : undefined, quick: true });
+      if (hobby === 'pond' || hobby === 'stars') steps.push({ do: 'act', anim: joyAnim(n.kind), face: at.face, time: 1.2, say: pickLine(H.lines), quick: true });
     }
     steps.push({ do: 'call', fn: () => restHere(kind, 6 + Math.random() * 10) });
     npcs.plan(n, steps);
@@ -2485,7 +2490,7 @@ function boot() {
     const me = s.meT >= 10;
     happen({ type: 'sing', who: n.kind, n: s.audience.size + (me ? 1 : 0) });
     npcs.say(n, SHOW.thanks);
-    const steps = [{ do: 'act', anim: 'cheer', time: 2.4, quick: true }];
+    const steps = [{ do: 'act', anim: 'wave', time: 2.4, quick: true }]; // 공연 끝: 관객에게 손 흔들기
     if (me) steps.push({ do: 'call', fn: () => {
       npcs.say(n, fillLine(SHOW.thanksMe, { me: myName() }));
       const r = befriend(state, n.kind, 'watch', state.clock.day);
@@ -2503,7 +2508,7 @@ function boot() {
     setDoing(n.kind, 'note', `${nameOf(s.by)} 공연 구경`);
     const hurry = Math.hypot(s.x - n.x, s.z - n.z) > 8; // 공연이 끝나기 전에 닿게 뛰어간다
     const steps = [{ do: 'walk', slots: around, near: 0.5, run: hurry }, { do: 'call', fn: () => { if (show !== s) { n.plan = null; restHere(n.kind, 3); return; } s.audience.add(n.kind); } }];
-    for (let t = 0; t < Math.max(5, s.until - lifeClock); t += 5) steps.push({ do: 'act', anim: 'idle', face, time: 3.6, quick: true }, { do: 'act', anim: 'cheer', face, time: 1.3, say: Math.random() < 0.55 ? pickLine(cheer) : undefined, quick: true });
+    for (let t = 0; t < Math.max(5, s.until - lifeClock); t += 5) steps.push({ do: 'act', anim: Math.random() < 0.5 ? 'sway' : 'idle', face, time: 3.6, quick: true }, { do: 'act', anim: pickLine(['clap', 'clap', 'cheer', 'wave']), face, time: 1.3, say: Math.random() < 0.55 ? pickLine(cheer) : undefined, quick: true });
     steps.push({ do: 'call', fn: () => { happen({ type: 'watch', who: n.kind, with: null }); restHere(n.kind, 8 + Math.random() * 10); } });
     npcs.plan(n, steps);
   }
@@ -2529,11 +2534,11 @@ function boot() {
       do: 'call', fn: () => {
         if (mode !== 'play') { n.plan = null; restHere(kind, 5); return; }
         npcs.say(n, line);
-        npcs.emote(n, 'cheer', 0.8);
+        npcs.emote(n, 'wave', 0.8);
         if (story) m.told.add(story.ev);
       }
     }, { do: 'act', anim: 'talk', time: npcs.lineTime(line) + 0.3, quick: true }];
-    if (gift) steps.push({ do: 'call', fn: () => giftFrom(n, gift) }, { do: 'act', anim: 'cheer', time: 2.4, quick: true });
+    if (gift) steps.push({ do: 'call', fn: () => giftFrom(n, gift) }, { do: 'act', anim: joyAnim(n.kind), time: 2.4, quick: true });
     steps.push({ do: 'act', anim: 'idle', time: 2.5, quick: true }, { do: 'call', fn: () => restHere(kind, 10 + Math.random() * 10) });
     npcs.plan(n, steps);
   }
@@ -2650,7 +2655,7 @@ function boot() {
     npcs.plan(n, [{ do: 'walk', x: at.x, z: at.z, near: 0.8 },
       { do: 'act', anim: 'talk', face: { x: w.x, z: w.z }, time: npcs.lineTime(line) + 0.2, say: line, quick: true },
       { do: 'call', fn: () => { if (!w.away && Math.hypot(w.x - n.x, w.z - n.z) < 4.5) npcs.say(w, PRAISED[w.kind] || '네!'); } },
-      { do: 'act', anim: 'idle', face: { x: w.x, z: w.z }, time: 2.2, quick: true }, ...backToPost(n)]);
+      { do: 'act', anim: 'clap', face: { x: w.x, z: w.z }, time: 2.2, quick: true }, ...backToPost(n)]); // 격려하고 박수
     return true;
   }
   /** 점심: 라멘 가게 앞에 앉아 한 그릇(노동 갑옷 씨). */
@@ -2688,7 +2693,7 @@ function boot() {
     setDoing(n.kind, 'step', '심부름');
     npcs.say(n, staffLine(n.kind, 'errand'));
     npcs.plan(n, [{ do: 'walk', x: p.x, z: p.z, near: 0.7 }, { do: 'act', anim: 'talk', time: 2.5, quick: true },
-      { do: 'walk', x: n.home.x, z: n.home.z, near: 0.6 }, { do: 'act', anim: 'cheer', time: 1.4, say: staffLine(n.kind, 'back'), quick: true }, { do: 'call', fn: () => restHere(n.kind, 10 + Math.random() * 10) }]);
+      { do: 'walk', x: n.home.x, z: n.home.z, near: 0.6 }, { do: 'act', anim: joyAnim(n.kind), time: 1.4, say: staffLine(n.kind, 'back'), quick: true }, { do: 'call', fn: () => restHere(n.kind, 10 + Math.random() * 10) }]);
   }
   /** 갑옷 씨들의 하루: 시간대마다 할 만한 일에 무게를 매겨 하나 고른다. */
   function staffDecide(n, kind, hour) {
@@ -2708,7 +2713,7 @@ function boot() {
         [hour >= 9 && hour < 18 ? 1.8 : 0, () => cheerWorker(n, 'cheer', 'eye', '격려') || atPost(n, 'talk', 'call', 'dots', '손님 부르기', 1, south(n.home))],
         [hour >= 11.5 && hour < 13.5 ? 6 : 0, () => staffLunch(n)],
         [hour >= 17 ? 2.5 : 0.3, () => atPost(n, 'sweep', 'sweep', 'broom', '게시판 앞 정리', 2)],
-        [0.6, () => atPost(n, 'cheer', 'stretch', null, '쉬는 중', 1)]
+        [0.6, () => atPost(n, 'stretch', 'stretch', null, '쉬는 중', 1)]
       ];
     } else if (kind === 'ramen') {
       const r = S.ramen, shisa = npcs.byKind('shisa');
@@ -2724,7 +2729,7 @@ function boot() {
         [3, () => atPost(n, 'read', 'sew', 'needle', '바느질', 3)],
         [1.5, () => goAndDo(n, { x: st.x + (Math.random() - 0.5) * 2.4, z: st.z + 1 }, 'talk', 'display', 'dots', '손님 부르기', 3.5, south(st))],
         [v ? 1.7 : 0, () => together(n, v, [['pochette', staffLine('pochette', 'compliment')], [v.kind, PRAISED[v.kind] || '헤헤']], { icon: 'heart', text: (o) => (o === 'pochette' ? '칭찬 듣기' : `${nameOf(o)} 칭찬`) })],
-        [hour >= 10 && hour < 18 ? 1 : 0.2, () => goAndDo(n, { x: S.plaza.x + (Math.random() - 0.5) * 4, z: S.plaza.z + 2 }, 'dance', 'show', 'heart', '신상 자랑', 5, south(S.plaza))]
+        [hour >= 10 && hour < 18 ? 1 : 0.2, () => goAndDo(n, { x: S.plaza.x + (Math.random() - 0.5) * 4, z: S.plaza.z + 2 }, 'pose', 'show', 'heart', '신상 자랑', 5, south(S.plaza))]
       ];
     } else if (kind === 'captain') {
       const ex = S.exam, rk = npcs.byKind('rakko');
@@ -2752,7 +2757,7 @@ function boot() {
     const p = player.position;
     if (Math.hypot(p.x - n.x, p.z - n.z) > 5.5 || lifeClock - (staffGreetAt[kind] ?? -999) < 120 || Math.random() > 0.35) return;
     staffGreetAt[kind] = lifeClock;
-    npcs.emote(n, 'cheer', 0.8);
+    npcs.emote(n, 'wave', 0.8);
     npcs.say(n, staffLine(kind, kind === 'labor' && !Object.values(boardOf(state, state.clock.day).left).some((c) => c > 0) ? 'greetNone' : 'greet'));
   }
 

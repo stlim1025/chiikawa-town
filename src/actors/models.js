@@ -730,12 +730,14 @@ export function buildNpc(kind) {
 const ZERO = [0, 0, 0];
 /**
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
- * opts: { phase (걷기 위상), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이) }
+ *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
+ *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기
+ * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이) }
  */
 export function animateChibi(chibi, mode, t, opts = {}) {
   const a = {};
   const phase = opts.phase || 0, s = Math.sin(phase);
-  let bob = 0, lean = 0, waddle = 0;
+  let bob = 0, lean = 0, waddle = 0, spin = 0;
   if (mode === 'walk') {
     a.armL = [s * 0.7, 0, 0]; a.armR = [-s * 0.7, 0, 0];
     a.legL = [-s * 0.65, 0, 0]; a.legR = [s * 0.65, 0, 0];
@@ -749,10 +751,10 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.legL = [0.25, 0, 0]; a.legR = [0.25, 0, 0];
     lean = 0.32 - power * 0.38;
   } else if (mode === 'cheer') {
-    const w = Math.sin(t * 12);
+    const w = Math.sin(t * 12 + phase);
     a.armL = [0, 0, -2.3 - w * 0.2]; a.armR = [0, 0, 2.3 + w * 0.2];
     a.head = [-0.15, 0, 0];
-    bob = Math.abs(Math.sin(t * 8)) * 0.12;
+    bob = Math.abs(Math.sin(t * 8 + phase)) * 0.12;
   } else if (mode === 'talk') {
     a.head = [Math.sin(t * 9) * 0.08, opts.look || 0, 0];
     a.armR = [0, 0, 0.5 + Math.sin(t * 7) * 0.15];
@@ -809,11 +811,77 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     lean = -0.25;
   } else if (mode === 'dance') {
     // 포즈: 두 팔을 번쩍, 통통 뛰며 몸을 흔든다
-    const w = Math.sin(t * 7);
+    const w = Math.sin(t * 7 + phase);
     a.armL = [0, 0, -2.0 - w * 0.3]; a.armR = [0, 0, 2.0 - w * 0.3];
     a.head = [-0.1, 0, w * 0.15];
-    bob = Math.abs(Math.sin(t * 7)) * 0.1;
+    bob = Math.abs(Math.sin(t * 7 + phase)) * 0.1;
     waddle = w * 0.12;
+  } else if (mode === 'wave') {
+    // 손 흔들기: 오른팔을 높이 들고 좌우로 흔든다
+    const w = Math.sin(t * 10 + phase);
+    a.armR = [-0.2, 0, 2.3 + w * 0.35]; a.armL = [0, 0, -0.15];
+    a.head = [-0.08, 0, -0.08 + w * 0.05];
+  } else if (mode === 'clap') {
+    // 박수: 두 손을 가슴 앞에서 모았다 폈다
+    const k = (Math.sin(t * 16 + phase) + 1) / 2;
+    a.armL = [-1.05, 0, -0.1 + k * 0.6]; a.armR = [-1.05, 0, 0.1 - k * 0.6];
+    a.head = [-0.06, 0, Math.sin(t * 4 + phase) * 0.06];
+    bob = k * 0.025;
+  } else if (mode === 'stretch') {
+    // 기지개: 천천히 두 팔을 쭉 올리며 몸을 뒤로 젖혔다 내린다
+    const u = (Math.sin(t * 1.8 + phase) + 1) / 2;
+    a.armL = [-0.25 * u, 0, -0.35 - u * 2.35]; a.armR = [-0.25 * u, 0, 0.35 + u * 2.35];
+    a.head = [-0.32 * u, 0, 0];
+    lean = -0.14 * u; bob = u * 0.035;
+  } else if (mode === 'look') {
+    // 두리번두리번: 뒷짐을 지고 고개를 좌우로 천천히 돌려 둘러본다
+    const y = Math.sin(t * 1.1 + phase);
+    a.head = [Math.sin(t * 2.3 + phase) * 0.05, y * 0.85, -y * 0.06];
+    a.armL = [0.35, 0, -0.18]; a.armR = [0.35, 0, 0.18];
+  } else if (mode === 'sway') {
+    // 흥얼흥얼: 몸을 좌우로 살랑살랑, 팔도 따라 흔든다
+    const w = Math.sin(t * 2.8 + phase);
+    a.armL = [0, 0, -0.35 - w * 0.25]; a.armR = [0, 0, 0.35 - w * 0.25];
+    a.head = [-0.05, 0, w * 0.14];
+    waddle = w * 0.13; bob = Math.abs(Math.cos(t * 2.8 + phase)) * 0.03;
+  } else if (mode === 'hop') {
+    // 제자리 깡충깡충: 팔을 아래로 벌리고 통통 뛴다
+    const j = Math.abs(Math.sin(t * 6 + phase));
+    a.armL = [0, 0, -0.55 - j * 0.35]; a.armR = [0, 0, 0.55 + j * 0.35];
+    a.legL = [-0.35 * j, 0, 0]; a.legR = [-0.35 * j, 0, 0];
+    a.head = [-0.1, 0, 0];
+    bob = j * 0.22;
+  } else if (mode === 'spin') {
+    // 빙글빙글: 팔을 벌리고 제자리에서 돈다
+    spin = (t * 5 + phase) % (Math.PI * 2);
+    a.armL = [0, 0, -1.35]; a.armR = [0, 0, 1.35];
+    a.head = [-0.12, 0, 0];
+    bob = Math.abs(Math.sin(t * 10 + phase)) * 0.04;
+  } else if (mode === 'sit') {
+    // 털썩 앉기: 다리를 앞으로 뻗고 앉아 손은 무릎에, 가끔 고개를 돌린다
+    a.legL = [-1.35, 0, 0.08]; a.legR = [-1.35, 0, -0.08];
+    a.armL = [-0.55, 0, 0.12]; a.armR = [-0.55, 0, -0.12];
+    a.head = [0.06 + Math.sin(t * 1.3 + phase) * 0.04, Math.sin(t * 0.6 + phase) * 0.35, 0];
+    bob = -0.11;
+  } else if (mode === 'think') {
+    // 갸웃: 한 손을 턱에 대고 고개를 기울인다
+    a.armR = [-1.45, 0, -0.5]; a.armL = [-0.55, 0, 0.45];
+    a.head = [0.08 + Math.sin(t * 2 + phase) * 0.03, 0, 0.2];
+  } else if (mode === 'shy') {
+    // 부끄부끄: 두 손으로 얼굴을 가리고 몸을 배배 꼰다
+    a.armL = [-1.5, 0, 0.55]; a.armR = [-1.5, 0, -0.55];
+    a.head = [0.22, 0, Math.sin(t * 3 + phase) * 0.1];
+    waddle = Math.sin(t * 3 + phase) * 0.08;
+  } else if (mode === 'pose') {
+    // 귀여운 척: 한 손은 볼에, 한 손은 허리에 대고 고개를 갸웃(가끔 톡 튄다)
+    a.armL = [-1.3, 0, 0.6]; a.armR = [0, 0, 0.95];
+    a.head = [-0.05, 0, 0.26];
+    lean = 0.05; bob = Math.max(0, Math.sin(t * 3 + phase)) * 0.06;
+  } else if (mode === 'gaze') {
+    // 하늘 보기(별 구경): 고개를 들고 뒷짐을 진 채 천천히 둘러본다
+    a.head = [-0.55, Math.sin(t * 0.5 + phase) * 0.3, 0];
+    a.armL = [0.45, 0, -0.18]; a.armR = [0.45, 0, 0.18];
+    lean = -0.06;
   } else {
     const br = Math.sin(t * 2 + phase) * 0.08;
     a.head = [Math.sin(t * 1.7 + phase) * 0.04, opts.look || 0, 0];
@@ -829,5 +897,5 @@ export function animateChibi(chibi, mode, t, opts = {}) {
   }
   chibi.inner.position.y = bob;
   if (mode !== 'thrust') chibi.inner.position.z = 0;
-  chibi.inner.rotation.set(lean, 0, waddle, 'YXZ');
+  chibi.inner.rotation.set(lean, spin, waddle, 'YXZ');
 }

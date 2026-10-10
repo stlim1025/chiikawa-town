@@ -534,10 +534,16 @@ export function createPanels(ui, handlers) {
     },
     shop(s) {
       const shop = SHOPS.ramen;
+      // 메뉴마다 그림(맥주집처럼)
+      const ART = {
+        ramen: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M15 10q1-3 0-5M20 10q1-3 0-5M25 10q1-3 0-5" stroke="#c9b9a6" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M5 17h30a15 13 0 0 1-30 0z" fill="#d9675b" stroke="#a8433a" stroke-width="2"/><path d="M7 17q6-4 13-1t13 1z" fill="#fff3d6"/><path d="M10 16q3-3 6 0M17 16q3-3 6 0M24 16q3-3 6 0" fill="none" stroke="#efce6f" stroke-width="1.6" stroke-linecap="round"/><circle cx="14" cy="15" r="3" fill="#fff"/><circle cx="14" cy="15" r="1.4" fill="#f6b73c"/><circle cx="26" cy="15" r="2.6" fill="#fff" stroke="#f39aaa" stroke-width="1.2"/><rect x="11" y="31" width="18" height="3" rx="1.5" fill="#a8433a"/></svg>',
+        onigiri: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 6q3 0 5 3l9 16q2 5-3 7H9q-5-2-3-7l9-16q2-3 5-3z" fill="#fffdf6" stroke="#d9cfb8" stroke-width="2"/><rect x="13" y="23" width="14" height="10" rx="2" fill="#3f4a3c"/><circle cx="17" cy="15" r="1" fill="#e9dfc8"/><circle cx="23" cy="18" r="1" fill="#e9dfc8"/></svg>',
+        highball: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 6h16l-2 28H14z" fill="#eaf6fb" stroke="#9cc4d6" stroke-width="2"/><path d="M13 14h14l-1.4 19H14.4z" fill="#f2c25e" opacity=".85"/><rect x="16" y="16" width="6" height="5" rx="1.2" fill="#fff" opacity=".8"/><rect x="19" y="22" width="5" height="4.5" rx="1.2" fill="#fff" opacity=".7"/><circle cx="27" cy="9" r="4.5" fill="#f8e36a" stroke="#d8b733" stroke-width="1.5"/><path d="M27 4.5v9M22.5 9h9" stroke="#d8b733" stroke-width="1"/></svg>'
+      };
       const out = [head(shop.name, s.money), h('p', { class: 'sub' }, `지금 기운 ${s.stamina} / ${MAX_STAMINA}`)];
       shop.items.forEach((item) => {
         const lock = item.needs && !hasLicense(s, item.needs), full = s.stamina >= MAX_STAMINA;
-        out.push(h('div', { class: 'row' },
+        out.push(h('div', { class: 'row pub-row' }, ART[item.id] ? svgSpan('lic-ico', ART[item.id]) : null,
           h('div', {}, h('div', { class: 't' }, item.name), h('div', { class: 'd' }, `기운 +${item.stamina}`)),
           lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
             : priceBtn(item.price, s.money, after(() => handlers.buy(item.id)))));
@@ -823,9 +829,13 @@ export function createPanels(ui, handlers) {
     // 도구점: 랜턴 · 손전등(4단계에 무기)
     tools(s) {
       const out = [head('도구점', s.money), h('h3', { class: 'shop-sec' }, '불')];
+      const LIGHT_ART = {
+        lantern: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="22" r="13" fill="#ffd56b" opacity=".2"/><path d="M15 6h10" stroke="#7a5233" stroke-width="2.4" stroke-linecap="round"/><path d="M17 6v4M23 6v4" stroke="#7a5233" stroke-width="2"/><path d="M13 10h14l-1 3H14z" fill="#a8743c"/><rect x="13" y="13" width="14" height="17" rx="3" fill="#ffe7a3" stroke="#a8743c" stroke-width="2"/><ellipse cx="20" cy="22" rx="3.6" ry="5" fill="#ffb44a"/><ellipse cx="20" cy="23" rx="1.8" ry="2.8" fill="#fff3c4"/><rect x="12" y="30" width="16" height="4" rx="1.5" fill="#a8743c"/></svg>',
+        flashlight: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="16" cy="20" r="13" fill="#fff6c8" opacity=".35"/><path d="M24 15l13-7v24l-13-7z" fill="#fff6c8" opacity=".85"/><rect x="4" y="15" width="13" height="10" rx="3" fill="#7fb6e2" stroke="#4b82ad" stroke-width="2"/><path d="M17 13h5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5z" fill="#5d9bd0" stroke="#4b82ad" stroke-width="2"/><circle cx="10.5" cy="20" r="1.8" fill="#ffd56b"/></svg>'
+      };
       for (const id of ['lantern', 'flashlight']) {
         const T = TOOLS[id], own = hasTool(s, id), held = lightOf(s) === id;
-        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
+        out.push(h('div', { class: `row pochette${held ? ' worn' : ''}` }, svgSpan('pochette-art', LIGHT_ART[id]), h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
           !own ? priceBtn(T.price, s.money, after(() => handlers.buyTool(id)))
             : held ? h('span', { class: 'lic-badge done' }, ico('check'), '장착 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '장착')));
       }

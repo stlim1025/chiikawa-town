@@ -20,23 +20,23 @@ const TALK = {
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 /**
- * 친구마다 쉬는 동안 하는 몸짓(anim, models.js 의 animateChibi 모드)을 time 초 동안 하며 가끔 혼잣말(lines).
+ * 친구마다 쉬는 동안 하는 몸짓(anims 중 그때그때 하나, 없으면 anim — models.js 의 animateChibi 모드)을 time 초 동안 하며 가끔 혼잣말(lines).
  * chance 는 쉬다가 이 몸짓을 할 확률(없으면 0.7, 나머지는 산책). 몸짓에 맞는 소품은 models.js 의 PROP_FOR.
  * 일(풀 뽑기 · 열매 따기 · 스티커)은 게시판에서 일감을 받았을 때만 plan 으로 한다(main 의 마을 살림).
  */
 const WORK = {
-  chiikawa: { type: 'act', anim: 'talk', time: 3, lines: ['…♪', '쉬는 중…', '배고파…'] },
-  hachiware: { type: 'act', anim: 'dance', time: 3, lines: ['노래 연습 중~ ♪', '휴~ 잠깐 쉬자'] },
-  usagi: { type: 'act', anim: 'train', time: 3, lines: ['우라!', '(뒹굴뒹굴)'] },
-  momonga: { type: 'act', anim: 'dance', time: 3.5, lines: ['나 귀엽지? 대답 안 해?', '흥, 다들 나만 봐!'] },
-  kurimanju: { type: 'act', anim: 'drink', time: 7, chance: 0.95, lines: ['캬~ 맥주 최고…', '하아~ 한 잔 더…', '맥주는 역시 거품이지…', '안주 만들어 볼까…'] }, // 거의 늘 맥주
-  rakko: { type: 'act', anim: 'train', time: 4, lines: ['하앗!', '수련이다'] },
-  shisa: { type: 'act', anim: 'sweep', time: 4.5, lines: ['쓱싹쓱싹~', '가게 앞은 깨끗하게!'] },
-  kani: { type: 'act', anim: 'read', time: 6, lines: ['(책 읽는 중…)', '재밌다…'] },
-  pochette: { type: 'act', anim: 'talk', time: 3, lines: ['신상 들어왔어요~', '구경하고 가요~'] },
-  labor: { type: 'act', anim: 'talk', time: 3, lines: ['일감 있어요~!', '빠른 사람이 임자!'] },
-  ramen: { type: 'act', anim: 'sweep', time: 4, lines: ['면 삶는 중~', '오늘 라멘도 맛있어요'] },
-  captain: { type: 'act', anim: 'talk', time: 3, lines: ['승급 시험은 여기서!', '흠흠, 규칙은 규칙이다'] }
+  chiikawa: { type: 'act', anim: 'talk', anims: ['talk', 'look', 'sit', 'shy', 'stretch', 'gaze'], time: 3, lines: ['…♪', '쉬는 중…', '배고파…'] },
+  hachiware: { type: 'act', anim: 'sway', anims: ['sway', 'wave', 'dance', 'look', 'clap'], time: 3, lines: ['노래 연습 중~ ♪', '휴~ 잠깐 쉬자'] },
+  usagi: { type: 'act', anim: 'train', anims: ['train', 'hop', 'spin', 'look', 'stretch'], time: 3, lines: ['우라!', '(뒹굴뒹굴)'] },
+  momonga: { type: 'act', anim: 'pose', anims: ['pose', 'spin', 'dance', 'look'], time: 3.5, lines: ['나 귀엽지? 대답 안 해?', '흥, 다들 나만 봐!'] },
+  kurimanju: { type: 'act', anim: 'drink', anims: ['drink', 'drink', 'sit', 'stretch', 'sway'], time: 7, chance: 0.95, lines: ['캬~ 맥주 최고…', '하아~ 한 잔 더…', '맥주는 역시 거품이지…', '안주 만들어 볼까…'] }, // 거의 늘 맥주
+  rakko: { type: 'act', anim: 'train', anims: ['train', 'train', 'think', 'stretch', 'look'], time: 4, lines: ['하앗!', '수련이다'] },
+  shisa: { type: 'act', anim: 'sweep', anims: ['sweep', 'sweep', 'wave', 'stretch'], time: 4.5, lines: ['쓱싹쓱싹~', '가게 앞은 깨끗하게!'] },
+  kani: { type: 'act', anim: 'read', anims: ['read', 'read', 'look', 'think'], time: 6, lines: ['(책 읽는 중…)', '재밌다…'] },
+  pochette: { type: 'act', anim: 'talk', anims: ['talk', 'wave', 'pose', 'clap'], time: 3, lines: ['신상 들어왔어요~', '구경하고 가요~'] },
+  labor: { type: 'act', anim: 'talk', anims: ['talk', 'wave', 'stretch', 'clap'], time: 3, lines: ['일감 있어요~!', '빠른 사람이 임자!'] },
+  ramen: { type: 'act', anim: 'sweep', anims: ['sweep', 'stretch', 'look', 'think'], time: 4, lines: ['면 삶는 중~', '오늘 라멘도 맛있어요'] },
+  captain: { type: 'act', anim: 'talk', anims: ['talk', 'think', 'look', 'stretch'], time: 3, lines: ['승급 시험은 여기서!', '흠흠, 규칙은 규칙이다'] }
 };
 const WEED_PULL_SECONDS = 2.4;
 const STEER = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]; // 가려는 쪽이 막히면 이만큼(라디안) 옆으로 틀어 본다
@@ -126,6 +126,20 @@ export function createNpcs(scene, village, weeds, berries) {
 
   /** 그 풀을 지금 어느 친구가 맡아 뽑으러 가거나 뽑는 중인지. */
   const claimed = (w) => list.some((m) => m.task && m.task.weed === w);
+  /**
+   * 풀 w 를 뽑을 때 설 자리: 내 쪽 0.55 부터, 막혔으면(나무 · 집 옆) 풀 둘레를 돌며 걸어서 설 수 있는 빈 곳. 없으면 null.
+   * (예전엔 늘 내 쪽 0.55 라 나무 쪽에서 다가오면 설 자리가 나무 안이 되어 영영 닿지 못하고 맴돌았다)
+   */
+  function weedSpot(n, w) {
+    const base = Math.atan2(n.x - w.x, n.z - w.z);
+    for (const r of [0.55, 0.75, 0.95]) {
+      for (const off of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) {
+        const a = base + off, x = w.x + Math.sin(a) * r, z = w.z + Math.cos(a) * r;
+        if (village.isFree(x, z, 0.36)) return { x, z };
+      }
+    }
+    return null;
+  }
 
   /** 지금 목적지(tx, tz)까지 집 · 나무 · 울타리를 돌아가는 길을 찾아 둔다(못 찾으면 null: 곧장 간다). */
   function route(n) {
@@ -168,6 +182,8 @@ export function createNpcs(scene, village, weeds, berries) {
     n.sz = n.z;
     if (went >= 0.2) { n.stuck = 0; return; }
     n.stuck = (n.stuck || 0) + 1;
+    // 풀 바로 옆에서 막혔으면 비켜서기를 되풀이하지 말고 거기서 뽑는다(내 캐릭터처럼 조금 떨어져서도 뽑을 수 있다)
+    if (n.task && n.task.type === 'weed' && Math.hypot(n.task.weed.x - n.x, n.task.weed.z - n.z) < 0.9) { arrive(n); return; }
     if (n.stuck >= 3) {
       const near = n.task && n.task.type === 'weed' ? 0.6 : 1.2;
       if (Math.hypot(n.tx - n.x, n.tz - n.z) < near) arrive(n); // 거의 다 왔으면 여기서 한다
@@ -237,15 +253,16 @@ export function createNpcs(scene, village, weeds, berries) {
         if (d < bd && Math.hypot(w.x - lastPlayer.x, w.z - lastPlayer.z) > 2.5) { bd = d; best = w; }
       }
       if (!best) return false;
-      const k = bd > 0.01 ? 0.55 / bd : 0;
+      const spot = weedSpot(n, best);
+      if (!spot) return false;
       n.task = { type: 'weed', weed: best };
       clearRoute(n);
-      n.tx = best.x + (n.x - best.x) * k;
-      n.tz = best.z + (n.z - best.z) * k;
+      n.tx = spot.x;
+      n.tz = spot.z;
       n.state = 'walk';
       return true;
     }
-    n.task = { type: 'act', anim: job.anim, time: job.time * (0.8 + Math.random() * 0.4) };
+    n.task = { type: 'act', anim: job.anims ? pick(job.anims) : job.anim, time: job.time * (0.8 + Math.random() * 0.4) }; // 쉬는 몸짓도 그때그때 여러 가지
     n.state = 'work';
     n.workT = 0;
     if (Math.random() < 0.55) say(n, pick(job.lines));
@@ -283,14 +300,15 @@ export function createNpcs(scene, village, weeds, berries) {
         if (d < bd) { bd = d; best = w; }
       }
       if (!best) { step.waits = (step.waits || 0) + 1; n.timer = 2; if (step.waits > 40) next(); return; } // 풀이 다시 자랄 때까지
-      const k = bd > 0.01 ? 0.55 / bd : 0;
+      const spot = weedSpot(n, best);
+      if (!spot) { (step.skip = step.skip || new Set()).add(best); n.timer = 0.2; return; } // 설 자리가 없는 풀은 건너뛴다
       n.task = {
         type: 'weed', weed: best, onDone: () => { step.left--; step.onPull?.(); },
         onFail: () => (step.skip = step.skip || new Set()).add(best) // 다음엔 다른 풀을 고른다
       };
       clearRoute(n);
-      n.tx = best.x + (n.x - best.x) * k;
-      n.tz = best.z + (n.z - best.z) * k;
+      n.tx = spot.x;
+      n.tz = spot.z;
       n.state = 'walk';
     } else if (step.do === 'berries') {
       if (step.left <= 0 || !berries) { next(); return; }

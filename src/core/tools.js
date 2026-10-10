@@ -7,7 +7,7 @@ import { trySpend } from './state.js';
 export const TOOLS = {
   map: { name: '마을 지도', price: 500, shop: 'books', note: '다녀온 곳이 다 보여요' },
   lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 밝혀요' },
-  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '앞쪽을 멀리 밝혀요' }
+  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '둘레는 넓게, 앞은 멀리 밝혀요' }
 };
 export const LIGHT_ORDER = ['off', 'lantern', 'flashlight'];
 
