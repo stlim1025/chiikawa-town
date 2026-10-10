@@ -129,8 +129,7 @@ export function openHighball(ui, { onDone, sound }) {
       <div class="hb-side">
         <p class="hb-say" aria-live="polite"></p>
         <button class="btn primary hb-pour" type="button">꾹 눌러서 붓기</button>
-        <p class="exam-tip">위스키 1 : 탄산수 3 이 딱 좋아요</p>
-        <p class="exam-tip">스페이스를 꾹 눌러도 돼요</p>
+        <p class="exam-tip">위스키 1 : 탄산수 3</p>
       </div>
     </div>`;
   const sayEl = s.body.querySelector('.hb-say'), pourBtn = s.body.querySelector('.hb-pour');
