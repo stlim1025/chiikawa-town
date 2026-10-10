@@ -63,7 +63,8 @@ import {
 } from './core/villagers.js';
 import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, killPoints, PARTY_HEARTS } from './core/hunters.js';
 import { lineOf } from './core/npclines.js';
-import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA } from './core/brain.js';
+import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
+import { liveOffscreen } from './core/offscreen.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED
@@ -412,9 +413,10 @@ function boot() {
     input.setEnabled(false);
     hud.setAction(null);
     sound.play('sleep');
-    const rolled = rollDays(restoreStamina({ ...state, clock: sleepUntilMorning(state.clock) }, how === 'rough' ? ROUGH_REST : MAX_STAMINA));
+    const lived = liveWhileAsleep(); // 내가 잠든 사이 친구들도 밤 9시까지 저녁을 마저 보낸다
+    const rolled = rollDays(restoreStamina({ ...lived, clock: sleepUntilMorning(state.clock) }, how === 'rough' ? ROUGH_REST : MAX_STAMINA));
     const next = rolled.state;
-    playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day) }, () => commit(next), () => sound.play('morning')).then(() => {
+    playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day) }, () => { commit(next); villageOvernight(); }, () => sound.play('morning')).then(() => {
       sleeping = false;
       if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
       homeUI.refresh();
@@ -1805,8 +1807,43 @@ function boot() {
     setDoing(n.kind, 'moon', why === 'sleep' ? '자러 가는 중' : '낮잠 자러 가는 중');
     npcs.plan(n, [{ do: 'walk', x: d.x, z: d.z + 0.3 }, {
       do: 'call',
-      fn: () => { npcs.goIn(n); awayInfo[n.kind] = { why, until: lifeClock + 45 + Math.random() * 30 }; }
+      fn: () => { npcs.goIn(n); awayInfo[n.kind] = { why, until: lifeClock + 45 + Math.random() * 30 }; setDoing(n.kind, 'moon', why === 'sleep' ? '자는 중' : '낮잠 자는 중'); }
     }]);
+  }
+  /** 내가 잠든 사이 친구들도 밤 9시까지 저녁을 마저 보낸다(core/offscreen.js). 그날 일은 친구들이 기억해 다음 날 이야기한다. → 바뀐 state */
+  function liveWhileAsleep() {
+    const day = state.clock.day;
+    const r = liveOffscreen(state, minds, { day, fromHour: hourOf(state.clock), skip: tutorialActive(state.tutorial) ? ['hachiware'] : [] });
+    for (const [k, m] of Object.entries(r.minds)) minds[k] = { ...mindOf(k), ...m }; // 기억 · 하는 일 칸이 없는 마음이 들어오지 않게
+    r.events.forEach((ev) => happen({ ...ev, day }));
+    return r.state;
+  }
+  /**
+   * 하룻밤이 지났다(내가 자는 동안 화면이 깜깜할 때): 하던 일 · 같이 토벌 · 공연은 끝나고, 친구들은 각자 집에서 자다가
+   * 아침에 저마다 일어나 나온다(core/brain.js 의 WAKE). 갑옷 씨들 · 시사 · 카니는 가게 자리로 돌아가 있다.
+   * 내가 묵는 집의 친구와 첫날 안내 중인 하치와레는 그대로 둔다.
+   */
+  function villageOvernight() {
+    show = null;
+    partyEnd(null, null);
+    for (const kind of Object.keys(VILLAGERS)) {
+      const n = npcs.byKind(kind);
+      if (!n || (visit && visit.kind === kind) || (kind === 'hachiware' && tutorialActive(state.tutorial))) continue;
+      npcs.lead(kind, null);
+      if (n.flee) npcs.flee(n, false);
+      npcs.goIn(n);
+      awayInfo[kind] = { why: 'sleep', until: 0 };
+      minds[kind] = { ...mindOf(kind), ...freshMind() }; // 푹 자고 나면 심심함 · 외로움도 가신다
+      restUntil[kind] = 0;
+      setDoing(kind, 'moon', '자는 중');
+    }
+    for (const kind of STAFF) {
+      const n = npcs.byKind(kind);
+      if (!n || n.away) continue;
+      npcs.plan(n, []);
+      npcs.comeOut(n, n.home.x, n.home.z);
+      restHere(kind, 5 + Math.random() * 10);
+    }
   }
   /** 1.5초마다 친구들이 다음에 할 일을 고른다(밤에는 집에 가서 자고, 기운이 모자라면 밥이나 낮잠). */
   function villageLife(dt) {
@@ -1822,10 +1859,10 @@ function boot() {
       const n = npcs.byKind(kind);
       if (!n) continue;
       if (!n.away) minds[kind] = growNeeds(mindOf(kind), kind, 1.5); // 깨어 있으면 심심함 · 외로움이 조금씩 찬다
-      // 집 안: 밤잠은 아침이 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
+      // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
       if (n.away) {
         const a = awayInfo[kind] || { why: 'sleep', until: 0 };
-        const wake = !isSleepHour(hour) && (a.why === 'sleep' || lifeClock >= a.until);
+        const wake = !isSleepHour(hour) && (a.why === 'sleep' ? hour >= wakeHourOf(kind) : lifeClock >= a.until);
         if (wake && !(visit && visit.kind === kind)) {
           const d = homeDoor(kind);
           npcs.comeOut(n, d.x, d.z + 0.6);

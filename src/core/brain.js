@@ -1,4 +1,4 @@
-import { TIRED, MEAL_PRICE, isSleepHour } from './villagers.js';
+import { TIRED, MEAL_PRICE, WAKE_HOUR, isSleepHour } from './villagers.js';
 
 /**
  * 마을 친구들의 두뇌: 욕구(기운 · 돈 · 심심함 · 외로움) + 성격 + 시간대 일과로 다음에 할 일을 고른다.
@@ -40,6 +40,13 @@ export function routineAt(kind, hour) {
   const row = (ROUTINE[kind] || []).find(([a, b]) => hour >= a && hour < b);
   return row ? row[2] : {};
 }
+
+/**
+ * 아침에 일어나 집을 나서는 시각(시). 밤잠이 끝나는 6시 반부터 차례로: 랏코는 일어나자마자 수련, 우사기 · 치이카와 · 하치와레가 뒤따르고,
+ * 모몽가는 느지막이, 쿠리만쥬는 늦잠. 한꺼번에 우르르 나오지 않게 한다.
+ */
+export const WAKE = { rakko: 6.5, usagi: 6.6, chiikawa: 6.75, hachiware: 6.9, momonga: 7.4, kurimanju: 8.2 };
+export const wakeHourOf = (kind) => WAKE[kind] ?? WAKE_HOUR;
 
 /** 심심함 · 외로움이 1초에 차는 양(성격 1 기준): 심심함은 2분, 외로움은 2분 반이면 꽉 찬다. */
 export const NEED_RATE = { fun: 1 / 120, social: 1 / 150 };
