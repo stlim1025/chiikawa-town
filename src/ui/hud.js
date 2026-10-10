@@ -89,7 +89,7 @@ export function createHud(ui, input) {
   action.hidden = true;
   const meter = el('div', 'hud-meter');
   meter.hidden = true;
-  meter.innerHTML = '<div class="lab">꾹 눌렀다가 초록에서 떼요</div><div class="track"><span class="zone"></span><span class="fill"></span><span class="needle"></span></div>';
+  meter.innerHTML = '<div class="lab">초록에서 떼요</div><div class="track"><span class="zone"></span><span class="fill"></span><span class="needle"></span></div>';
   const toasts = el('div', 'hud-toasts');
   /**
    * 짧은 조각 여러 개를 한 줄에: 글 하나('초록에서 떼요') 또는 [글 | { icon, text, pill }] 목록.
@@ -316,7 +316,7 @@ export function createHud(ui, input) {
     /** 힘 게이지. zone = { from, to } (0..1) */
     /** 힘 게이지. label 을 주면 위 글씨를 바꾼다(풀 이름 · 몇 번째인지). */
     /** label: 글 하나 또는 조각 목록(fillParts). */
-    showMeter(power, zone, label = '꾹 눌렀다가 초록에서 떼요') {
+    showMeter(power, zone, label = '초록에서 떼요') {
       meter.hidden = false;
       fillParts(q(meter, '.lab'), label);
       const z = q(meter, '.zone');

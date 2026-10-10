@@ -114,8 +114,8 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     if (!chips.length) {
       const e = document.createElement('span');
       e.className = 'kx-hint';
-      e.textContent = exam ? '수프 → 면 → 토핑 순서로 담아요' : '주문표를 고르면 무엇이 들어가는지 보여요';
-      chips.push(e);
+      e.textContent = exam ? '수프 → 면 → 토핑' : '';
+      if (e.textContent) chips.push(e);
     }
     checkEl.replaceChildren(...chips);
   }
@@ -155,7 +155,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
 
   function serve() {
     const c = seats[sel];
-    if (!c) { say('라멘을 낼 손님의 주문표를 먼저 눌러요'); return; }
+    if (!c) { say('주문표 먼저!'); return; }
     if (!Object.keys(bowl.items).length) { say('그릇이 비어 있어요'); return; }
     if (bowlMatches(bowl, c.order)) {
       const pay = servePay(c.patience);
@@ -173,7 +173,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     wrong++;
     sound?.play('none');
     play(bowlEl, 'shake');
-    if (exam) { finish(false, `${RECIPES[c.order].name}와 다른 라멘을 냈어요`); return; }
+    if (exam) { finish(false, '주문과 다른 라멘'); return; }
     c.arrived -= c.wait * 0.3; // 틀리면 인내심이 확 줄어든다
     say(`${FACE_NAME[c.kind]}: 이거 주문한 거 아닌데…`);
     bowl = emptyBowl();
@@ -183,7 +183,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     if (INGREDIENTS[id].kind === 'noodle') {
       if (pot) { say('냄비에 면이 이미 있어요'); return; }
       pot = { type: id, start: now() };
-      say('고리가 초록이 되면 건져요');
+      say('초록일 때 건지기');
       sound?.play('click');
       return;
     }
@@ -193,9 +193,9 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
   }
   function potClick() {
     const st = potState(pot, now());
-    if (st === 'empty') say('왼쪽 면 채반을 누르면 냄비에서 삶아져요');
+    if (st === 'empty') say('면부터 삶아요');
     else if (st === 'boiling') say('아직 덜 삶아졌어요');
-    else if (st === 'soggy') { pot = null; say('면이 퍼져 버렸어요… 버리고 다시 삶아요'); sound?.play('none'); }
+    else if (st === 'soggy') { pot = null; say('면이 퍼졌어요…'); sound?.play('none'); }
     else { const type = pot.type; bowl = addToBowl(bowl, type); pot = null; renderBowl(type); play(bowlEl, 'bump'); sound?.play('click'); }
   }
   function renderPot(t) {

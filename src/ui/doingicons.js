@@ -1,7 +1,7 @@
 /**
  * 친구가 지금 하는 일 아이콘(머리 위 작은 동그라미 · 친구 앱). 20 × 20 SVG.
  * leaf 일감 · star 스티커/구경 · bowl 라멘 · sword 토벌/수련 · pen 시험 · dots 수다 · note 노래 · book 공부
- * · zap 뛰어다니기 · mug 맥주/안주 · heart 인사/축하 · moon 잠 · step 산책
+ * · zap 뛰어다니기 · mug 맥주/안주 · heart 인사/축하 · moon 잠 · step 산책 · broom 청소 · needle 바느질 · eye 순찰/살피기 · pot 요리
  */
 const S = (body) => `<svg viewBox="0 0 20 20" aria-hidden="true">${body}</svg>`;
 export const DOING_ICONS = {
@@ -17,5 +17,9 @@ export const DOING_ICONS = {
   mug: S('<rect x="3.5" y="5.5" width="9.5" height="11" rx="1.8" fill="#ffc94a" stroke="#c98f1c" stroke-width="1.3"/><path d="M13 8h1.8a2 2 0 0 1 0 5H13" fill="none" stroke="#c98f1c" stroke-width="1.3"/><path d="M3.5 6.5q2-2.5 4.7-1 2.6-1.5 4.8 1" fill="#fff" stroke="#d9cdb4" stroke-width="1.1"/>'),
   heart: S('<path d="M10 17.5S2.5 12.8 2.5 7.6A4 4 0 0 1 10 5.4a4 4 0 0 1 7.5 2.2c0 5.2-7.5 9.9-7.5 9.9z" fill="#ff8fab" stroke="#d65a7c" stroke-width="1.3" stroke-linejoin="round"/>'),
   moon: S('<path d="M13.5 2.5a7.5 7.5 0 1 0 4 12.5A6.5 6.5 0 0 1 13.5 2.5z" fill="#ffe08a" stroke="#c9a33a" stroke-width="1.3" stroke-linejoin="round"/>'),
+  broom: S('<path d="M13 2.5 9.5 10" stroke="#a8743c" stroke-width="1.8" stroke-linecap="round"/><path d="M6.5 9.5h6l1.5 8h-9z" fill="#ffd45e" stroke="#c98f1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 12.5v4M10.5 12.5v4" stroke="#c98f1c" stroke-width="1"/>'),
+  needle: S('<path d="M4 16 15.5 4.5" stroke="#9aa5b1" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="15" cy="5" rx="1.4" ry="2" transform="rotate(45 15 5)" fill="none" stroke="#9aa5b1" stroke-width="1.1"/><path d="M15 5q3 4-1 7t-8 3" fill="none" stroke="#f06a8f" stroke-width="1.4" stroke-linecap="round"/>'),
+  eye: S('<path d="M2 10q8-8 16 0-8 8-16 0z" fill="#fff" stroke="#7a8794" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="10" r="3" fill="#5a4431"/><circle cx="11" cy="9" r="1" fill="#fff"/>'),
+  pot: S('<path d="M3 8h14v5a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z" fill="#9aa5b1" stroke="#5f6b77" stroke-width="1.3" stroke-linejoin="round"/><path d="M1.5 9h1.5M17 9h1.5" stroke="#5f6b77" stroke-width="1.6" stroke-linecap="round"/><path d="M7 6c0-1.5 1-1.5 1-3M11 6c0-1.5 1-1.5 1-3" stroke="#c9b99a" stroke-width="1.2" stroke-linecap="round" fill="none"/>'),
   step: S('<ellipse cx="7" cy="12" rx="2.6" ry="3.6" fill="#d9b48a" stroke="#9a7650" stroke-width="1.2"/><ellipse cx="13.5" cy="7" rx="2.4" ry="3.3" fill="#d9b48a" stroke="#9a7650" stroke-width="1.2"/>')
 };

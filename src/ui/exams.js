@@ -50,7 +50,7 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
   function render() {
     const q = questions[i];
     s.step.textContent = `${i + 1} / ${questions.length}`;
-    s.body.innerHTML = `${seconds ? '<div class="exam-clock" aria-hidden="true"><span><i></i></span><b></b></div>' : ''}<p class="exam-q"></p><div class="exam-choices" role="menu"></div><p class="exam-tip">W/S 로 고르고 스페이스로 정해요</p>`;
+    s.body.innerHTML = `${seconds ? '<div class="exam-clock" aria-hidden="true"><span><i></i></span><b></b></div>' : ''}<p class="exam-q"></p><div class="exam-choices" role="menu"></div><p class="exam-tip"></p>`;
     s.body.querySelector('.exam-q').textContent = `Q${i + 1}. ${q.q}`;
     const box = s.body.querySelector('.exam-choices');
     box.append(...q.choices.map((c, k) => {
@@ -94,8 +94,8 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
     s.step.textContent = '결과';
     s.body.innerHTML = '<p class="exam-score"></p><p class="exam-count"></p><p class="exam-tip"></p><div class="actions"><button class="btn primary" type="button">확인</button></div>';
     s.body.querySelector('.exam-score').textContent = passed ? '필기 합격!' : '필기 불합격…';
-    s.body.querySelector('.exam-count').textContent = `${questions.length}문제 중 ${correct}문제 맞혔어요`;
-    s.body.querySelector('.exam-tip').textContent = passed ? '이어서 실기 시험이에요' : `${pass}문제 이상 맞혀야 합격이에요`;
+    s.body.querySelector('.exam-count').textContent = `${correct} / ${questions.length}`;
+    s.body.querySelector('.exam-tip').textContent = passed ? '이어서 실기!' : `합격 ${pass}개`;
     const ok = s.body.querySelector('button');
     ok.addEventListener('click', () => { stopClock(); s.close(); onDone?.(correct, passed); });
     ok.focus();
@@ -144,7 +144,7 @@ export function openHighball(ui, { onDone, sound }) {
     sodaEl.style.height = Math.max(0, Math.min(1.05, total) - whisky) * 100 + '%';
   }
   function guide() {
-    sayEl.textContent = stage === 'whisky' ? '1단계: 위스키를 노란 선까지' : '2단계: 탄산수를 파란 선까지';
+    sayEl.textContent = stage === 'whisky' ? '위스키 노란 선까지' : '탄산수 파란 선까지';
     s.step.textContent = stage === 'whisky' ? '1단계' : '2단계';
   }
   /** 지금까지 부은 양을 누른 시간으로 맞춘다. */
@@ -184,7 +184,7 @@ export function openHighball(ui, { onDone, sound }) {
   function judge() {
     done = true;
     const ok = pourOk(whisky, total);
-    const why = ok ? '시원~한 하이볼 완성! 실기 합격!'
+    const why = ok ? '하이볼 완성!'
       : whisky < WHISKY_BAND[0] ? '위스키가 너무 적었어요…' : whisky > WHISKY_BAND[1] ? '위스키가 너무 많았어요…'
         : total > SODA_BAND[1] ? '넘쳐 버렸어요…' : '탄산수가 모자랐어요…';
     sayEl.textContent = why;

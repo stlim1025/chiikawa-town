@@ -140,7 +140,7 @@ function monsterCards(s, withCount) {
     const shields = h('span', { class: 'tough', 'aria-label': `단단함 ${tough} / 5` }, Array.from({ length: 5 }, (_, i) => h('i', { class: i < tough ? 'on' : '' })));
     return h('div', { class: `row mon-card${withCount && !n ? ' unseen' : ''}` }, svgSpan('mon-ico', monsterSvg(k)),
       h('div', {},
-        h('div', { class: 't' }, M.name, withCount ? h('span', { class: 'weed-count' }, n ? `${n}마리 잡음` : '아직 못 잡았어요') : null),
+        h('div', { class: 't' }, M.name, withCount ? h('span', { class: 'weed-count' }, n ? `${n}마리` : '아직') : null),
         h('div', { class: 'mon-chips' },
           chip('zap', 'atk-chip', M.atk),
           chip('shield', 'tough-chip', '단단함', shields),
@@ -359,13 +359,12 @@ export function createPanels(ui, handlers) {
     },
     exam(s) {
       const lic = s.license, mult = PAY_MULT[lic.grade];
-      const out = [head('검정소', s.money), h('p', { class: 'sub' }, '자격을 따면 할 수 있는 일이 늘어요')];
+      const out = [head('검정소', s.money)];
       // 자격 한 장: 위 줄에 이름 · 상태(버튼), 아래에 아이콘 한 줄씩
       const card = (art, title, side, lines) => h('div', { class: 'row lic' },
         h('div', { class: 'lic-top' }, svgSpan('lic-ico', art), h('div', { class: 't' }, title), side),
         facts(lines));
       // 제초 검정
-      const names = kindsOfGrade(lic.grade).map((k) => WEED_KINDS[k].name).join(', ');
       let side;
       if (s.exam) side = h('span', { class: 'lic-badge going' }, `시험 중 ${s.exam.streak} / ${s.exam.need || 5}번`);
       else if (canTakeExam(lic)) side = h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.startExam) }, `${lic.grade - 1}급 시험 보기`);
@@ -373,8 +372,8 @@ export function createPanels(ui, handlers) {
       const xpNeed = XP_TO_EXAM[lic.grade];
       out.push(card('<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V18" stroke="#5e9f80" stroke-width="3" stroke-linecap="round"/><path d="M20 20q-2-9-11-11q0 9 11 11zM20 17q2-9 11-10q-1 9-11 10z" fill="#8fd16a" stroke="#5e9f80" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 33h20" stroke="#c9a77c" stroke-width="3" stroke-linecap="round"/></svg>', `제초 검정 ${lic.grade}급`, side, [
         ['coin', `보수 ${mult}배`],
-        lic.grade > 1 ? ['up', `승급: ${names}`, h('br'), `깔끔하게 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀을 뽑을 수 있어요'],
-        lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `다음 시험까지 경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
+        lic.grade > 1 ? ['up', `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
+        lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
       ]));
       // 술 자격 · 슈퍼 알바이터 · 토벌: 필기 · 실기 · 준비를 한 줄씩
       const LIC_ART = {
@@ -382,11 +381,11 @@ export function createPanels(ui, handlers) {
         arbeiter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 19h28a14 13 0 0 1-28 0z" fill="#d9675b"/><path d="M9 19q5-4 11 0t11 0" fill="none" stroke="#fcd95b" stroke-width="2.6" stroke-linecap="round"/><path d="M24 6l-6 13M29 7l-7 12" stroke="#c9a77c" stroke-width="2.4" stroke-linecap="round"/></svg>',
         hunter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 33 22 19" stroke="#f3a6b8" stroke-width="3.4" stroke-linecap="round"/><path d="M19 15a7 7 0 1 0 6 6" fill="none" stroke="#f3a6b8" stroke-width="3.2" stroke-linecap="round"/><path d="M27 13l4-1M28 18l4 1M22 11l1-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>'
       };
-      const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].questions}문제 중 ${L[id].pass}개 맞히면 합격`, h('br'), `문제당 ${L[id].seconds}초`];
+      const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].pass} / ${L[id].questions}`];
       const LINES = {
-        liquor: [test('liquor'), ['hand', '실기: 하이볼 만들기'], ['book', '준비: 쿠리만쥬의 위스키 강의']],
-        arbeiter: [test('arbeiter'), ['hand', '실기: 레시피 북 없이 손님 3명'], ['book', '준비: 레시피 북과 면 삶는 시간']],
-        hunter: [test('hunter'), ['hand', `실기: 허수아비 ${L.hunter.dummies}개를 ${L.hunter.practical}초 안에`], ['book', '준비: 토벌 안내서'], ['shield', '무기는 빌려줘요']]
+        liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
+        arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명'], ['book', '레시피 북']],
+        hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개`], ['book', '토벌 안내서']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
@@ -400,7 +399,7 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'lic-top' }, svgSpan('lic-ico', CROWN),
           h('div', {}, h('div', { class: 't' }, '토벌 랭킹'),
             me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `${me.rank}위`), chip(null, '', `${me.points}점`))
-              : h('div', { class: 'd' }, '상위 랭커는 무기에 얼굴을 새겨요')),
+              : chipLine(chip('star', '', `상위 ${RANKER_TOP}명`))),
           h('button', { class: 'btn', type: 'button', onClick: () => show('ranking') }, '보기'))));
       out.push(h('div', { class: 'row lic guide-row' },
         h('div', { class: 'lic-top' }, svgSpan('lic-ico', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 10q8-3 15 1q7-4 15-1v21q-8-3-15 1q-7-4-15-1z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2" stroke-linejoin="round"/><path d="M20 11v21" stroke="#c98a5a" stroke-width="2"/><circle cx="12.5" cy="19" r="4" fill="#8fd16a"/><path d="M10.5 18.5h1M14 18.5h1" stroke="#335" stroke-width="1.4" stroke-linecap="round"/><path d="M23 17h8M23 21h8M23 25h5" stroke="#c9a77c" stroke-width="2" stroke-linecap="round"/></svg>'),
@@ -415,7 +414,7 @@ export function createPanels(ui, handlers) {
      */
     ranking(s) {
       const rows = ranking(s, s.profile.name), body = (s.profile.look && s.profile.look.body) || '#ffffff';
-      const out = [head('토벌 랭킹', s.money), h('p', { class: 'sub' }, `점수가 높은 ${RANKER_TOP}명이 랭커예요`)];
+      const out = [head('토벌 랭킹', s.money)];
       out.push(h('div', { class: 'ledger rank-list' }, rows.map((r) => h('div', { class: `rank-row${r.ranker ? ' ranker' : ''}${r.who === 'me' ? ' me' : ''}` },
         h('b', { class: 'rank-no' }, String(r.rank)),
         svgSpan('job-art', r.who === 'me' ? myFace(body) : friendFace(r.who)),
@@ -458,12 +457,12 @@ export function createPanels(ui, handlers) {
         shop: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 18h32l-3 22H11z" fill="#fcd95b" stroke="#d9a520" stroke-width="2" stroke-linejoin="round"/><path d="M17 18v-3a7 7 0 0 1 14 0v3" fill="none" stroke="#d9a520" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="5" fill="#fff8dc"/><path d="M22 27.5l1 3 1-2 1 2 1-3" fill="none" stroke="#a57412" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       };
       const rule = (art, title, sub) => h('div', { class: 'rule-card' }, svgSpan('rule-ico', RULE_ART[art]), h('div', {}, h('b', {}, title), h('span', {}, sub)));
-      return [head('토벌 안내서'), h('p', { class: 'sub' }, '알고 나가면 안전해요!'),
+      return [head('토벌 안내서'),
         h('div', { class: 'rule-grid' },
-          rule('faint', '맞으면 기운이 줄어요', '0이 되면 기절해서 돈을 조금 잃어요'),
-          rule('safe', '마을 안은 안전해요', '울타리 안으로 못 들어와요'),
-          rule('dodge', '빨간 표시를 피해요', '곧 그 자리로 공격이 와요'),
-          rule('shop', '무기는 도구점에서', '전리품은 노동 접수에서 팔아요')),
+          rule('faint', '기운 0이면 기절', ''),
+          rule('safe', '마을 안은 안전', ''),
+          rule('dodge', '빨간 표시는 피하기', ''),
+          rule('shop', '무기는 도구점', '')),
         h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
@@ -507,7 +506,7 @@ export function createPanels(ui, handlers) {
       const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko'].includes(kind)
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
-      const out = [appBar('친구', `하트 ${total}개`), h('p', { class: 'sub' }, '하루 한 번씩 하트가 늘어요')];
+      const out = [appBar('친구', `하트 ${total}개`)];
       if (live.news.length) {
         out.push(h('h3', { class: 'shop-sec' }, '오늘 마을 소식'));
         out.push(h('ul', { class: 'news-list' }, live.news.map((e) => h('li', {},
@@ -598,7 +597,7 @@ export function createPanels(ui, handlers) {
       return out;
     },
     recipes() {
-      return [head('레시피 북'), h('p', { class: 'sub' }, '개수까지 똑같이 만들어요'), recipeCards(),
+      return [head('레시피 북'), recipeCards(),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('shop') }, '가게로'), closeBtn())];
     },
     // 마을폰 '자격증' 앱(폰 안 화면: 닫기는 아래 홈 버튼)
@@ -637,7 +636,7 @@ export function createPanels(ui, handlers) {
       return [
         head('가구점', s.money),
         h('div', { class: 'catalog' }, h('div', { class: 'cat-list' }, items), view),
-        h('div', { class: 'actions' }, h('p', { class: 'hint' }, "산 가구는 집에서 '꾸미기'로 놓아요"), closeBtn())
+        h('div', { class: 'actions' }, closeBtn())
       ];
     },
     realty(s) {
@@ -657,7 +656,7 @@ export function createPanels(ui, handlers) {
           // 밀린 집세만 먼저 갚을 수도 있다(쫓겨난 건 그대로지만, 갚아야 집을 살 수 있다)
           if (hs.unpaid > 0) {
             out.push(h('div', { class: 'row' },
-              h('div', {}, h('div', { class: 't' }, '밀린 집세만 내기'), h('div', { class: 'd' }, '갚아야 집을 살 수 있어요')),
+              h('div', {}, h('div', { class: 't' }, '밀린 집세만 내기'), null),
               h('button', { class: 'btn', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `${won(hs.unpaid)} 내기`)));
           }
         } else {
@@ -701,7 +700,7 @@ export function createPanels(ui, handlers) {
       const pc = pochetteOf(s), wearing = worn(s);
       const guard = THEFT_GUARD === 0.5 ? '절반만' : `${Math.round(THEFT_GUARD * 100)}%만`;
       const out = [head('포셰트 가게', s.money),
-        h('p', { class: 'sub' }, `메고 다니면 소매치기 피해 ${guard}`)];
+        chipLine(chip('coin', '', `소매치기 피해 ${guard}`))];
       Object.entries(POCHETTES).forEach(([id, P]) => {
         const own = pc.owned.includes(id), on = wearing === id;
         let btn;
@@ -814,7 +813,7 @@ export function createPanels(ui, handlers) {
       const pc = pochetteOf(s), wd = wardrobeOf(s);
       const tile = (on, art, name, fn) => h('button', { class: 'bag-tile', type: 'button', 'aria-pressed': String(on), onClick: after(fn) }, svgSpan('bag-ico', art), h('span', { class: 'nm' }, name));
       const none = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="16" fill="none" stroke="#b9a37a" stroke-width="4"/><path d="M21 43L43 21" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/></svg>';
-      const out = [head('옷장'), h('p', { class: 'sub' }, '고르면 바로 바뀌어요')];
+      const out = [head('옷장')];
       out.push(h('h3', { class: 'shop-sec' }, '포셰트'));
       out.push(h('div', { class: 'bag-grid' }, tile(!pc.wear, none, '없음', () => handlers.wearPochette(null)),
         pc.owned.map((id) => tile(pc.wear === id, pochetteSvg(id, POCHETTES[id]), POCHETTES[id].name, () => handlers.wearPochette(id)))));

@@ -133,9 +133,9 @@ export function createHomeUI(ui, h) {
     }));
     const pickedItem = picked && home.placed.find((p) => p.cx === picked.cx && p.cz === picked.cz);
     pickRow.hidden = !pickedItem;
-    hint.textContent = note || (pickedItem ? `${FURNITURE[pickedItem.id].name}: 어떻게 할까요?`
-      : selected ? `${FURNITURE[selected].name}을(를) 놓을 빈 칸을 눌러요`
-        : owned.length ? '끌어서 옮기고 누르면 돌려요' : '마을 가구점에서 가구를 사 와요');
+    hint.textContent = note || (pickedItem ? FURNITURE[pickedItem.id].name
+      : selected ? '빈 칸 누르기'
+        : owned.length ? '끌어서 옮기기' : '가구점에서 사 와요');
   }
 
   const setDecor = (on) => { decor = on; selected = null; picked = null; note = ''; h.showGrid(on); h.highlight(null); h.onDecor?.(on); render(); };

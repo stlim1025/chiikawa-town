@@ -66,7 +66,7 @@ import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA } from './core/brain.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
-  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine
+  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED
 } from './core/villagetalk.js';
 import { DOING_ICONS } from './ui/doingicons.js';
 import { charSvg } from './ui/art.js';
@@ -187,7 +187,7 @@ function boot() {
       sound.play('job');
       const T = JOB_TYPES[typeId];
       panels.close();
-      hud.announce({ kicker: '새 일감!', title: T.title, sub: sub.moved ? `가방에 있던 ${sub.moved}개를 바로 냈어요` : '',
+      hud.announce({ kicker: '새 일감!', title: T.title, sub: '',
         chips: sub.moved ? [{ icon: ICO.check, text: `${state.job.count} / ${T.target}` }]
           : [{ icon: ICO.pin, text: T.where }, { icon: 'coin', text: `${won(Math.round(T.base * (T.hunt ? 1 : PAY_MULT[state.license.grade])))}부터` }] });
       celebrateIfDone(before.job, state.job);
@@ -199,23 +199,24 @@ function boot() {
       commit({ ...addMoney(state, pay), job: null });
       sound.play('coin');
       hud.toast(`보수 ${pay.toLocaleString('ko-KR')}원을 받았어요!`);
+      staffSay('labor', 'paid', 9, player.position);
       player.cheerTime = 1.2;
     },
     startExam() {
       if (!canTakeExam(state.license)) return;
-      const exam = startExam(state.license.grade), names = kindsOfGrade(state.license.grade).map((k) => WEED_KINDS[k].name).join(', ');
+      const exam = startExam(state.license.grade);
       commit({ ...state, exam });
       sound.play('job');
       panels.close();
-      hud.announce({ kicker: '승급 시험 시작!', title: `${names} 연속 ${exam.need}번`, sub: '초록에서 깔끔하게! 한 번이라도 끊기면 불합격' });
+      hud.announce({ kicker: '승급 시험 시작!', title: `깔끔하게 연속 ${exam.need}번`, sub: '', chips: kindsOfGrade(state.license.grade).map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })) });
     },
     buy(itemId, shopId = 'ramen') {
       const r = buy(state, shopId, itemId);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : r.reason === 'license' ? '술 자격이 있어야 해요' : '지금은 배불러요'); return; }
       commit(r.state);
       sound.play('eat');
-      const SAY = { ramen: '후루룩! 기운이 났어요', highball: '캬~ 시원하다! 기운이 났어요', beer: '캬~ 거품 가득 생맥주! 기운이 났어요', edamame: '짭짤한 풋콩! 기운이 조금 났어요' };
-      hud.toast(SAY[itemId] || '냠냠! 기운이 조금 났어요');
+      const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
+      hud.toast(SAY[itemId] || '냠냠!', 2000);
     },
     // 맥주집: 쿠리만쥬가 와 있는지 · 오늘 건배했는지, 건배하기
     pubInfo: () => ({ here: !!kuriAtPub(), cheered: friendOf(state, 'kurimanju').drink === state.clock.day }),
@@ -230,7 +231,7 @@ function boot() {
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 3000, { chips: [{ text: '집 꾸미기에서 놓기' }] });
+      hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 2600);
     },
     // 부동산
     dayLabel: (day) => dateLabel(state.startDate, day),
@@ -240,14 +241,14 @@ function boot() {
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast('밀린 집세를 다 냈어요!', 3000, isEvicted(state) ? { chips: [{ text: '다시 세 들 수 있어요' }] } : null);
+      hud.toast('밀린 집세를 다 냈어요!', 2600);
     },
     rentAgain() {
       const r = rentAgain(state);
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.banner('다시 세 들었어요', '이제 집에 들어가서 잘 수 있어요', 3000);
+      hud.banner('다시 세 들었어요', '', 2600);
     },
     // 포셰트 가게
     buyPochette(id) {
@@ -257,7 +258,7 @@ function boot() {
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 장착했어요!`, 3400, { chips: [{ text: '소매치기 피해 ½' }] });
+      hud.toast(`${josa(POCHETTES[id].name, '을/를')} 장착했어요!`, 2800);
     },
     wearPochette(id) {
       commit(wearPochette(state, id));
@@ -298,7 +299,7 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가지고 있어요'); return; }
       commit(r.state);
       sound.play('coin');
-      hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 3200, id === 'map' ? { chips: [{ text: '마을폰에서 보기' }] } : null);
+      hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
     // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
@@ -308,7 +309,7 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       player.cheerTime = 1.2;
-      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 3600, { icon: weaponSvg(id), chips: [{ text: `${input.mode === 'desk' ? '클릭' : '버튼'}으로 휘두르기` }] });
+      hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 2800, { icon: weaponSvg(id) });
     },
     /** 토벌 랭커 특전: 지금 든 무기에 내 얼굴을 새긴다. */
     engrave() {
@@ -361,7 +362,7 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 신청했어요'); return; }
       commit(r.state);
       sound.play('job');
-      hud.toast('청약을 넣었어요! 수요일 발표를 기다려요', 3000);
+      hud.toast('청약 신청 완료!', 2800, { chips: [{ icon: ICO.clock, text: '수요일 발표' }] });
     },
     buyByLottery() {
       const r = buyByLottery(state, state.clock.day);
@@ -399,7 +400,7 @@ function boot() {
   function askSleep() {
     input.setEnabled(false);
     hud.setAction(null);
-    guide.ask('잘까요? 다음 날 아침까지 푹 자요', ['잘래요', '아직이요'], (i) => {
+    guide.ask('잘까요?', ['잘래요', '아직이요'], (i) => {
       if (i === 0) doSleep();
       else if (mode === 'home') input.setEnabled(true);
     }, BED);
@@ -442,20 +443,20 @@ function boot() {
   /** 새 날의 소식을 띄운다. */
   function announce(events) {
     for (const e of events) {
-      if (e.type === 'rentPaid') { hud.toast(`월요일이라 집세 ${won(e.amount)}을 냈어요`, 3200); sound.play('coin'); }
+      if (e.type === 'rentPaid') { hud.toast('집세를 냈어요', 2600, { chips: [{ icon: 'coin', text: `−${won(e.amount)}` }] }); sound.play('coin'); }
       else if (e.type === 'rentUnpaid') hud.toast('집세를 못 냈어요!', 4800, { chips: [{ icon: 'coin', text: won(e.unpaid) }, { text: '월요일까지' }] });
       else if (e.type === 'evicted') evicted(e.unpaid);
-      else if (e.type === 'rentSoon') hud.toast(`내일(월)은 집세 ${won(RENT)}을 내는 날이에요`, 3200);
+      else if (e.type === 'rentSoon') hud.toast('내일은 집세 날', 2800, { chips: [{ icon: 'coin', text: won(RENT) }] });
       // 청약 발표(수요일 아침)는 놓치지 않게 화면 가운데 큰 카드에 도장으로
       else if (e.type === 'lotteryWon') {
         const lot = housingOf(state).lottery;
-        hud.notice({ kicker: '주택 청약 발표', stamp: '당첨!', tone: 'good', sub: '부동산에서 집을 살 수 있어요',
+        hud.notice({ kicker: '주택 청약 발표', stamp: '당첨!', tone: 'good', sub: '',
           chips: [{ icon: 'coin', text: won(LOTTERY_PRICE) }, { icon: ICO.clock, text: `${lot && lot.until ? dateLabel(state.startDate, lot.until) : '일주일'}까지` }], ok: '좋아요!' });
         sound.play('done');
       } else if (e.type === 'lotteryLost') {
-        hud.notice({ kicker: '주택 청약 발표', stamp: '낙첨', tone: 'bad', sub: '다음 주에 다시 넣어 봐요' });
+        hud.notice({ kicker: '주택 청약 발표', stamp: '낙첨', tone: 'bad', sub: '' });
         sound.play('fail');
-      } else if (e.type === 'lotteryExpired') hud.notice({ kicker: '주택 청약', stamp: '기한 끝', tone: 'info', sub: '당첨된 집을 사는 기한이 지났어요' });
+      } else if (e.type === 'lotteryExpired') hud.notice({ kicker: '주택 청약', stamp: '기한 끝', tone: 'info', sub: '' });
     }
   }
   /** 집세를 두 번 연달아 못 내서 쫓겨났다: 집 안이면 밖으로 나온다. */
@@ -463,7 +464,7 @@ function boot() {
     if (mode === 'home') exitHome();
     hud.banner('집에서 쫓겨났어요…', `밀린 집세 ${won(unpaid)}`, 4200);
     sound.play('fail');
-    setTimeout(() => { if (state && isEvicted(state)) hud.toast('밤엔 친구 집에서 자거나 노숙해요', 4800); }, 4400);
+    setTimeout(() => { if (state && isEvicted(state)) hud.toast('밤엔 친구 집이나 노숙', 3600); }, 4400);
   }
   /** 밤(18시 ~ 다음 날 6시): 쫓겨났으면 잘 곳을 찾을 시간. */
   const bedtime = () => { const h = hourOf(state.clock); return h >= 18 || h < 6; };
@@ -484,7 +485,7 @@ function boot() {
 
   /** 내 집 마련! */
   function celebrateHouse() {
-    hud.banner('내 집 마련!', '이제 집세를 내지 않아요', 3200);
+    hud.banner('내 집 마련!', '', 3200);
     sound.play('done');
     player.cheerTime = 1.8;
   }
@@ -601,7 +602,7 @@ function boot() {
   /** 이번 작업으로 일감을 다 했으면 크게 알린다(가운데 도장 + 빰빠밤 + 만세). */
   function celebrateIfDone(before, after) {
     if (after && isComplete(after) && !(before && isComplete(before))) {
-      hud.banner('노동 완료!', '노동 접수에서 보수를 받아요', 2800);
+      hud.banner('노동 완료!', '', 2600, [{ icon: ICO.pin, text: '노동 접수' }]);
       sound.play('done');
       player.cheerTime = 1.8;
     }
@@ -613,9 +614,9 @@ function boot() {
   const jobKind = () => state.job && JOB_TYPES[state.job.typeId].kind;
 
   function startSticker() {
-    if (jobKind() !== 'sticker') { hud.toast('노동 접수에서 \'과일 스티커\' 일감을 받아 와요'); return; }
-    if (isComplete(state.job)) { hud.toast('다 붙였어요! 노동 접수에서 보수를 받아요'); return; }
-    if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2400, { chips: [{ icon: 'energy', text: '먹거나 쉬기' }] }); return; }
+    if (jobKind() !== 'sticker') { hud.toast('스티커 일감이 없어요', 2400, { chips: [{ icon: ICO.pin, text: '노동 접수' }] }); return; }
+    if (isComplete(state.job)) { hud.toast('다 붙였어요!'); return; }
+    if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
     input.setEnabled(false);
     hud.setAction(null);
     const type = JOB_TYPES[state.job.typeId];
@@ -634,11 +635,11 @@ function boot() {
   }
 
   function pickBerry(bush) {
-    if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2400, { chips: [{ icon: 'energy', text: '먹거나 쉬기' }] }); return; }
+    if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
     if (jobKind() !== 'berry' || isComplete(state.job)) {
       // 일감이 아니면 가방에(먹거나, 나중에 열매 일감에 낸다)
       const a = addItem(useStamina(state, WORK_STAMINA).state, 'berry', 1, 1);
-      if (!a.added) { hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)'); return; }
+      if (!a.added) { hud.toast('가방이 꽉 찼어요'); return; }
       berries.pick(bush);
       commit(a.state);
       sound.play('clean');
@@ -653,19 +654,19 @@ function boot() {
     sound.play('clean');
     player.face(bush.x, bush.z);
     player.cheerTime = 0.6;
-    if (!isComplete(state.job)) hud.toast(`빨간 열매를 땄다! ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1400);
+    if (!isComplete(state.job)) hud.toast(`${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1300, { icon: itemSvg('berry') });
     celebrateIfDone(before, state.job);
   }
 
   // ---------- 풀 뽑기 ----------
   function beginPull(weed) {
     const W = WEED_KINDS[weed.kind];
-    if (!canPullKind(state.license.grade, weed.kind)) { hud.toast(`${josa(W.name, '은/는')} ${W.grade}급부터 뽑을 수 있어요`, 2600); return; }
-    if (state.stamina < STAMINA_PER_PULL) { hud.toast('기운이 없어요', 2400, { chips: [{ icon: 'energy', text: '먹거나 쉬기' }] }); return; }
+    if (!canPullKind(state.license.grade, weed.kind)) { hud.toast(`${W.grade}급부터`, 2200, { icon: itemSvg(weed.kind) }); return; }
+    if (state.stamina < STAMINA_PER_PULL) { hud.toast('기운이 없어요', 2000); return; }
     if (npcs.isWorkingOn(weed)) { hud.toast('친구가 뽑으려는 풀이에요'); return; }
     // 초록 구간은 뽑을 때마다 다른 자리에, 기운이 낮을수록 좁고 빠르게
     const st = stageLabel(weed);
-    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA }), label: weed.kind === 'weed' ? undefined : [{ text: `${W.name}${st ? ' ' + st : ''}` }, '초록에서 떼요'] };
+    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA }), label: [{ icon: itemSvg(weed.kind), text: `${W.name}${st ? ' ' + st : ''}` }] };
     weed.busy = 'player'; // 친구들이 이 풀을 노리지 않게
     if (state.stamina <= MAX_STAMINA * 0.3 && !seen('tired-pull')) {
       markSeen('tired-pull');
@@ -705,13 +706,13 @@ function boot() {
     if (step === 'none') { hud.toast('조금 더 꾹 눌러요'); return; }
 
     let next = useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
-    if (W.poison && step === 'snapped') hud.toast('윽, 독이 튀었다! 기운이 쭉 빠졌어요', 2200);
+    if (W.poison && step === 'snapped') hud.toast('윽, 독이 튀었다!', 2000, { icon: itemSvg(weed.kind) });
     // 여러 번에 나눠 뽑는 풀: 아직 남았으면 조금 올라온 채로 두고 다시 누르게
     const prog = advanceWeed({ stage: weed.stage, flawed: weed.flawed }, weed.kind, step);
     if (!prog.done) {
       weed.flawed = prog.flawed;
       weeds.loosen(weed, prog.stage);
-      if (!(W.poison && step === 'snapped')) hud.toast(`${step === 'clean' ? '쑥 올라왔다!' : '조금 끊겼지만 올라왔다'} 한 번 더! (${prog.stage} / ${W.stages || 1})`, 1600);
+      if (!(W.poison && step === 'snapped')) hud.toast('한 번 더!', 1400, { icon: itemSvg(weed.kind), chips: [{ text: `${prog.stage} / ${W.stages || 1}` }] });
       state = next;
       save();
       return;
@@ -728,11 +729,11 @@ function boot() {
       // 일감에 안 세는 풀은 가방에 모아 둔다(일감을 받으면 바로 낼 수 있다)
       const a = addItem(next, weed.kind, 1, result === 'clean' ? 1 : 0);
       next = a.state;
-      if (a.added) hud.bagBump(); else hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)');
+      if (a.added) hud.bagBump(); else hud.toast('가방이 꽉 찼어요');
     }
     weeds.remove(weed, result);
-    if (first && weed.kind !== 'weed') hud.banner('새 풀!', `${josa(W.name, '을/를')} 처음 뽑았어요`, 2600);
-    else if (!(W.poison && step === 'snapped')) hud.toast(result === 'clean' ? `깔끔하게 뽑았다! (${W.name})` : `앗, 끊어졌다… (${W.name})`, 1400);
+    if (first && weed.kind !== 'weed') hud.banner('새 풀!', W.name, 2400);
+    else if (!(W.poison && step === 'snapped')) hud.toast(result === 'clean' ? '깔끔하게!' : '끊어졌다…', 1200, { icon: itemSvg(weed.kind) });
 
     if (next.exam && examCounts(next.exam, weed.kind)) {
       const exam = examStep(next.exam, result);
@@ -740,13 +741,14 @@ function boot() {
         if (exam.passed) {
           next = { ...next, exam: null, license: promote(next.license) };
           sound.play('pass');
-          const unlocked = kindsOfGrade(next.license.grade).map((k) => WEED_KINDS[k].name).join(', ');
-          hud.banner(`제초 검정 ${next.license.grade}급!`, unlocked ? `이제 ${unlocked}도 뽑을 수 있어요` : '승급 축하해요!', 3600);
+          const unlocked = kindsOfGrade(next.license.grade);
+          hud.banner(`제초 검정 ${next.license.grade}급!`, '', 3400, unlocked.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })));
+          staffSay('captain', 'pass', 16, player.position);
           player.cheerTime = 2;
         } else {
           next = { ...next, exam: null };
           sound.play('fail');
-          hud.toast('불합격… 다시 도전해요', 3000);
+          hud.toast('불합격…', 2400);
         }
       } else next = { ...next, exam };
     }
@@ -754,7 +756,7 @@ function boot() {
     state = next;
     if (!counted && !state.exam && !seen('bag-herb')) {
       markSeen('bag-herb');
-      hud.toast('뽑은 풀은 주머니에 모여요', 4000);
+      hud.toast('뽑은 풀은 주머니로', 2600);
     }
     if (canTakeExam(state.license) && !state.exam && !seen('exam-' + state.license.grade)) {
       markSeen('exam-' + state.license.grade);
@@ -764,7 +766,7 @@ function boot() {
   }
 
   // ---------- 하치와레의 첫날 안내 ----------
-  const GOALS = { house: '하치와레를 따라 내 집 찾아가기', board: '서쪽 노동 접수에서 일감 받기', pull: '풀 앞에서 꾹 눌렀다 초록에서 떼기', report: '노동 접수에서 보수 받기' };
+  const GOALS = { house: '하치와레 따라가기', board: '노동 접수에서 일감 받기', pull: '풀 뽑기', report: '보수 받기' };
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
   const nearHome = () => !!player && Math.hypot(player.position.x - village.spots.home.x, player.position.z - village.spots.home.z) < 2.6;
@@ -787,7 +789,7 @@ function boot() {
     npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : null);
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
-    else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => { enterTutorial('done', 'tips'); hud.toast('안내 끝! 마음껏 지내 봐요', 3000); });
+    else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => { enterTutorial('done', 'tips'); hud.toast('안내 끝!', 2400); });
     else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board);
     else if (TUTORIAL_LINES[step]) sayGuide(TUTORIAL_LINES[step]);
   }
@@ -981,11 +983,11 @@ function boot() {
       else if (k === 'party') askParty(n);
       else if (k === 'unparty') sayAs(n, [lineOf(n.kind, 'partyLeave')], () => { endTalk(); partyEnd([n.kind], null); });
       else if (k === 'play') askPlay(n);
-      else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거라면 몰라도. 흥!'], endTalk);
+      else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거면 몰라도! 흥!'], endTalk);
       else if (k === 'homeact') { endTalk(); doHomeAct(n.kind); }
       else if (k === 'snack') giveSnack(n);
       else if (k === 'visit') {
-        sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : n.kind === 'momonga' ? '…흥, 들어오든가. 아무것도 만지지 마!' : '응! 같이 가자~'], () => {
+        sayAs(n, [n.kind === 'hachiware' ? '좋아~! 내 동굴 구경시켜 줄게!' : n.kind === 'usagi' ? '야하!' : n.kind === 'momonga' ? '…흥! 아무것도 만지지 마!' : '응! 같이 가자~'], () => {
           endTalk();
           npcs.goIn(n);
           awayInfo[n.kind] = { why: 'visit', until: lifeClock }; // 내가 나오면 같이 나온다
@@ -995,10 +997,10 @@ function boot() {
       else if (k === 'study') {
         const i = (state.liquorLesson || 0) % LIQUOR_LESSONS.length;
         commit({ ...state, liquorLesson: i + 1 });
-        sayAs(n, [...LIQUOR_LESSONS[i], `(술 공부 ${i + 1} / ${LIQUOR_LESSONS.length}) 다 들으면 동쪽 검정소에서 시험을 봐~ 하아~`], () => reward(n, 'talk'));
+        sayAs(n, [...LIQUOR_LESSONS[i], { text: '오늘 강의 끝~ 하아~', chips: [{ icon: ICO.book, text: `${i + 1} / ${LIQUOR_LESSONS.length}` }] }], () => reward(n, 'talk'));
       } else if (k === 'drink') {
         // 맥주집에 와 있을 때만 같이 건배(하루 한 번 · 두 잔 값). 다른 데서는 저녁에 맥주집으로 오라고 한다
-        if (!kuriAtPub()) { sayAs(n, [isPubHour(hourOf(state.clock)) ? '좋지~ 맥주집으로 가자! 먼저 가 있을게. 하아~' : '하아~ 맥주는 역시 맥주집이지.', '저녁 5시 ~ 9시엔 늘 마을 동쪽 맥주집에 있어~ 거기서 건배하자!'], () => { if (isPubHour(hourOf(state.clock))) npcPub(n); endTalk(); }); return; }
+        if (!kuriAtPub()) { sayAs(n, [isPubHour(hourOf(state.clock)) ? '좋지~ 맥주집에서 기다릴게! 하아~' : { text: '하아~ 맥주는 맥주집이지', chips: [{ icon: ICO.clock, text: '저녁 5 ~ 9시' }] }], () => { if (isPubHour(hourOf(state.clock))) npcPub(n); endTalk(); }); return; }
         cheersWith(n);
       } else if (k === 'shop') { endTalk(); panels.openPochette(); }
       else if (k === 'borrow') askLoan(n);
@@ -1161,7 +1163,7 @@ function boot() {
     // 처음으로 부탁할 친구가 생기면 한 번 알려 준다
     if (!questHint && !seen('quest-intro') && !tutorialActive(state.tutorial) && free) {
       const any = npcs.list.some((m) => markOf(state, m.kind) === '!');
-      if (any) { questHint = true; markSeen('quest-intro'); hud.toast('! 가 뜬 친구의 고민을 들어 봐요', 4800); }
+      if (any) { questHint = true; markSeen('quest-intro'); hud.toast('! 가 뜬 친구에게 말 걸기', 3200); }
     }
   }
   /** 머리 위 ! · ? 표시(가까운 친구만). */
@@ -1193,7 +1195,7 @@ function boot() {
     const e = groundOf(state).find((o) => o.g === g);
     if (!e) return;
     const r = pickUp(state, g);
-    if (!r.ok) { hud.toast('주머니가 꽉 찼어요(한 칸에 99개까지)'); sound.play('none'); return; }
+    if (!r.ok) { hud.toast('주머니가 꽉 찼어요'); sound.play('none'); return; }
     commit(r.state);
     ground.sync(groundOf(state), groundKind);
     player.face(e.x, e.z);
@@ -1233,7 +1235,8 @@ function boot() {
       commit(grant(state, id, state.clock.day));
       endOverlay();
       happen({ type: 'playerLicense', who: 'me', lic: L.name });
-      hud.banner(`${L.name} 합격!`, id === 'liquor' ? '이제 생맥주와 하이볼을 마셔요' : id === 'hunter' ? '이제 토벌 일감을 받아요' : '이제 라멘 로우에서 알바해요', 3600);
+      staffSay('captain', 'pass', 16, player.position);
+      hud.banner(`${L.name} 합격!`, '', 3200);
       sound.play('done');
       player.cheerTime = 1.8;
     };
@@ -1253,7 +1256,7 @@ function boot() {
     const can = canWorkRamen(state, state.clock.day);
     if (!can.ok) { hud.toast(can.reason === 'today' ? '오늘 근무는 끝났어요' : '슈퍼 알바이터 자격이 있어야 해요'); return; }
     const used = useStamina(state, 15);
-    if (!used.ok) { hud.toast('기운이 없어요', 2400, { chips: [{ icon: 'energy', text: '먹거나 쉬기' }] }); return; }
+    if (!used.ok) { hud.toast('기운이 없어요', 2000); return; }
     commit(workedRamen(used.state, state.clock.day));
     beginOverlay();
     openRamenShop(ui, {
@@ -1322,9 +1325,9 @@ function boot() {
     if (drop) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
     commit(s);
     if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: `+${DROPS[drop].name}`, kind: 'drop' }); hud.bagBump(); }
-    else if (drop) hud.toast('가방이 꽉 찼어요(한 칸에 99개까지)');
-    if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌! 도감에 적었어요`, 3400);
-    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${m.M.name} 토벌 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1500);
+    else if (drop) hud.toast('가방이 꽉 찼어요');
+    if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌!`, 2600, { icon: monsterSvg(m.species) });
+    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1300, { icon: monsterSvg(m.species) });
     celebrateIfDone(before, state.job);
     rankNews();
     // 이야기 속 왕버섯을 쓰러뜨렸다
@@ -1332,7 +1335,7 @@ function boot() {
       bossM = null;
       happen({ type: 'playerBoss', who: 'me' }); // 온 마을에 소문이 난다
       monsters.clear((o) => o.summoned);
-      hud.banner('왕버섯을 쓰러뜨렸다!', '바위산에 조용한 바람이 불어요', 3000);
+      hud.banner('왕버섯을 쓰러뜨렸다!', '', 3000);
       if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
     }
   }
@@ -1350,7 +1353,7 @@ function boot() {
     hud.hurt();
     hud.floatText({ x: p.x, y: 1.6, z: p.z, text: `기운 −${dmg}`, kind: 'hurt' });
     if (next <= 0) startFaint();
-    else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요! 마을로 돌아가 쉬어요', 3000); }
+    else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요!', 2400); }
   }
   /** 기절: 화면이 어두워졌다가 마을 입구(쓰러진 쪽 문 안)에서 깨어난다. 돈을 조금 잃고, 두 시간이 지나 있다. */
   function startFaint() {
@@ -1390,7 +1393,7 @@ function boot() {
     hunterExam = { t: L.practical, left: spots.length, pass, fail };
     player.face(ex.x, ex.z + 2);
     sound.play('job');
-    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: '가까이 가서 버튼(PC 는 스페이스)으로 휘둘러요',
+    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: '',
       chips: [{ icon: ICO.clock, text: `${L.practical}초 안에` }, heldWeapon(state) ? null : { icon: weaponSvg('fork'), text: '사스마타 빌려줌' }].filter(Boolean) });
   }
   function endHunterExam() {
@@ -1451,7 +1454,7 @@ function boot() {
   /** 몬스터가 나를 알아챘다: 으르릉(너무 자주는 말고), 무기가 없으면 도망치라고 알려 준다. */
   function onAggro() {
     if (growlCool <= 0) { sound.play('growl'); growlCool = 1.6; }
-    if (!weaponNow() && warnCool <= 0) { warnCool = 25; hud.toast('몬스터다! 무기가 없으면 마을로!', 3200); }
+    if (!weaponNow() && warnCool <= 0) { warnCool = 25; hud.toast('몬스터다!', 2200); }
   }
 
   /** 친밀도를 올리고(하루에 한 번), 하트가 늘거나 선물을 주면 알린다. */
@@ -1467,8 +1470,8 @@ function boot() {
       npcs.emote(n, 'cheer', r.up ? 1.6 : 0.9);
     }
     if (r.gift) {
-      sayAs(n, [n.kind === 'momonga' ? '흥! 이거 남아서 주는 거야. 착각하지 마!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
-        hud.banner('선물을 받았어요!', FURNITURE[r.gift].name, 3400, [{ text: '집 꾸미기에서 놓기' }]);
+      sayAs(n, [n.kind === 'momonga' ? '흥! 남아서 주는 거야!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
+        hud.banner('선물을 받았어요!', FURNITURE[r.gift].name, 3000);
         sound.play('done');
         endTalk();
       });
@@ -1562,7 +1565,7 @@ function boot() {
       escort = false;
       const h = npcs.byKind('hachiware');
       beginTalk(h);
-      sayAs(h, ['여기가 네 집이야! 피곤하면 들어가서 푹 쉬어~'], () => { npcs.lead('hachiware', null); endTalk(); });
+      sayAs(h, ['여기가 네 집이야!'], () => { npcs.lead('hachiware', null); endTalk(); });
     }
   }
 
@@ -1779,7 +1782,7 @@ function boot() {
     beginTalk(n);
     if (ok) sayAs(n, ['…훗. 좋은 일격이다.', '오늘은 네 무기에 힘이 더 실릴 거다.', '몬스터 앞에서 써 봐라.'], () => {
       rooms.hostPose('cheer', 1.2);
-      hud.banner('수련 성공!', '오늘 하루 무기가 더 세져요', 2800, [{ text: `💪 공격 +${DRILL.bonus}` }, { icon: 'energy', text: `기운 −${DRILL.cost}` }]);
+      hud.banner('수련 성공!', '', 2600, [{ text: `💪 공격 +${DRILL.bonus}` }, { icon: 'energy', text: `기운 −${DRILL.cost}` }]);
       sound.play('done');
       reward(n, 'home');
     });
@@ -1847,6 +1850,13 @@ function boot() {
       if (lifeClock < restUntil[kind] && !isSleepHour(hour) && !tired) continue;
       lifeDecide(n, kind, day, hour); // 두뇌: 욕구 · 성격 · 일과로 다음 할 일(core/brain.js)
     }
+    // 갑옷 씨들 · 시사 · 카니: 지나가면 인사하고, 쉴 때가 지나면 일과대로 다음 일
+    for (const kind of STAFF) {
+      const n = npcs.byKind(kind);
+      if (!n || n.away || npcs.busy(n) || n === talking) continue;
+      staffGreet(n, kind);
+      if (lifeClock >= restUntil[kind]) staffDecide(n, kind, hour);
+    }
     maybeSteal(day, hour);
   }
   /**
@@ -1886,6 +1896,7 @@ function boot() {
           commit(payVillager(state, n.kind, pay, state.clock.day), false);
           npcs.say(n, lineOf(n.kind, 'jobDone', { pay: `+${won(pay)}` }));
           happen({ type: 'job', who: n.kind, title: T.title });
+          setTimeout(() => staffSay('labor', 'paid', 8, n), 1600);
         } else {
           if (job.day === state.clock.day) commit(returnToBoard(state, typeId, job.day), false); // 그날 일감이면 다시 건다
           npcs.say(n, lineOf(n.kind, 'jobFail'));
@@ -1977,7 +1988,7 @@ function boot() {
     if (lastRankers) {
       for (const who of now) {
         if (lastRankers.has(who)) continue;
-        if (who === 'me') { happen({ type: 'playerRanker', who: 'me' }); hud.banner('토벌 랭커가 됐어요!', '검정소에서 무기에 얼굴을 새길 수 있어요', 4200, [{ icon: 'coin', text: won(ENGRAVE_PRICE) }]); sound.play('done'); }
+        if (who === 'me') { happen({ type: 'playerRanker', who: 'me' }); hud.banner('토벌 랭커가 됐어요!', '', 3600, [{ icon: ICO.pin, text: '검정소에서 얼굴 새기기' }]); sound.play('done'); }
         else hud.toast(`${josa(nameOf(who), '이/가')} 토벌 랭커가 됐어요!`, 3600, { icon: faceIcon(who) });
       }
       if (lastRankers.has('me') && !now.has('me')) hud.toast('랭커 자리에서 밀려났어요', 3000);
@@ -2035,7 +2046,7 @@ function boot() {
       const F = FRIENDS[kind];
       commit(b.state, false);
       hud.hearts({ x: n.x, y: n.chibi.height + 0.5, z: n.z, gained: b.gained, up: b.up, hearts: b.hearts, name: F.name, tag: F.tag });
-      if (b.gift) hud.banner('선물을 받았어요!', FURNITURE[b.gift].name, 3400, [{ icon: faceIcon(kind), text: F.name }, { text: '집 꾸미기에서 놓기' }]);
+      if (b.gift) hud.banner('선물을 받았어요!', FURNITURE[b.gift].name, 3000, [{ icon: faceIcon(kind), text: F.name }]);
       happen({ type: 'partyHunt', who: kind, with: 'me' }); // 그날 처음 같이 잡았을 때만(하루 한 번 하트와 같이)
     }
     onKill(m);
@@ -2059,7 +2070,7 @@ function boot() {
   function npcEat(n) {
     const r = village.spots.ramen;
     setDoing(n.kind, 'bowl', '라멘 먹기');
-    npcs.plan(n, [{ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat') }, {
+    npcs.plan(n, [{ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat') }, {
       do: 'call',
       fn: () => {
         commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
@@ -2080,9 +2091,9 @@ function boot() {
   const isVillager = (k) => !!VILLAGERS[k];
   const withName = (k, pair = '이랑/랑') => josa(nameOf(k), pair);
   /** 지금 하는 일(머리 위 아이콘 · 친구 앱). icon 이 없으면 아이콘 없이 글만. */
-  function setDoing(kind, icon, text) { if (isVillager(kind)) mindOf(kind).doing = text ? { icon, text } : null; }
+  function setDoing(kind, icon, text) { if (isVillager(kind) || STAFF.includes(kind)) mindOf(kind).doing = text ? { icon, text } : null; }
   /** 잠깐 그 자리에서 쉰다(몸짓 · 혼잣말은 친구 쪽에서). */
-  function restHere(kind, sec) { restUntil[kind] = lifeClock + sec; setDoing(kind, null, '쉬는 중'); }
+  function restHere(kind, sec) { restUntil[kind] = lifeClock + sec; setDoing(kind, null, STAFF.includes(kind) ? '가게 지키는 중' : '쉬는 중'); }
   /** 그 친구가 이 일을 기억한다(어제 · 오늘 것만 12개까지). */
   function remember(kind, e) {
     if (!isVillager(kind) || !state) return;
@@ -2213,6 +2224,7 @@ function boot() {
       else s.push({ do: 'sync', group: invite, face: { x: a.x, z: a.z }, max: 30 }, { do: 'act', anim: 'cheer', time: 1.4, say: pickLine(SMALLTALK.reply[n.kind] || ['응!']), quick: true });
       if (n === a) s.push({ do: 'sync', group: invite, max: 30 });
       s.push({ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'sync', group, face });
+      if (n === a) s.push({ do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) });
       s.push({ do: 'act', anim: 'drink', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true });
       for (const [who, text] of conv.lines) {
         const t = npcs.lineTime(text) + 0.25;
@@ -2282,7 +2294,7 @@ function boot() {
         show = { by: n.kind, x: st.x, z: st.z, until: lifeClock + 42, audience: new Set(), meT: 0 };
         npcs.say(n, SHOW.start);
         for (const k of Object.keys(VILLAGERS)) if (k !== n.kind) restUntil[k] = Math.min(restUntil[k], lifeClock + Math.random() * 4); // 둘레 친구들이 곧 알아챈다
-        if (mode === 'play' && Math.hypot(player.position.x - st.x, player.position.z - st.z) < 24) hud.toast('하치와레가 광장에서 노래해요', 2600, { icon: faceIcon(n.kind), chips: [{ text: '가까이 가서 듣기' }] });
+        if (mode === 'play' && Math.hypot(player.position.x - st.x, player.position.z - st.z) < 24) hud.toast('광장 공연 시작!', 2400, { icon: faceIcon(n.kind) });
       }
     }, { do: 'act', anim: 'talk', face, time: 2.4, quick: true }];
     for (let i = 0; i < 9; i++) steps.push({ do: 'act', anim: 'dance', face, time: 4.5, say: lyrics[i % lyrics.length], quick: true });
@@ -2392,7 +2404,7 @@ function boot() {
   /** 머리 위 하는 일 아이콘: 내 둘레 친구들만, 머리 오른쪽 위에 작게(말풍선이 뜨면 잠깐 숨는다). */
   function doingLabels(focus) {
     const out = [];
-    for (const kind of Object.keys(VILLAGERS)) {
+    for (const kind of [...Object.keys(VILLAGERS), ...STAFF]) {
       const n = npcs.byKind(kind), d = minds[kind] && minds[kind].doing;
       if (!n || n.away || n.bubble || !d || !d.icon || !DOING_ICONS[d.icon] || Math.hypot(n.x - focus.x, n.z - focus.z) > 15) continue;
       out.push({ id: 'do-' + kind, x: n.x, y: n.chibi.height + 0.3, z: n.z, text: '', kind: 'doing', icon: d.icon, svg: DOING_ICONS[d.icon] });
@@ -2409,8 +2421,161 @@ function boot() {
       const icon = n && n.party ? 'sword' : n && n.away ? 'moon' : d && d.icon;
       doing[kind] = { text, svg: icon ? DOING_ICONS[icon] : null };
     }
+    for (const kind of STAFF) {
+      const d = minds[kind] && minds[kind].doing;
+      doing[kind] = { text: d ? d.text : '가게 지키는 중', svg: d && d.icon ? DOING_ICONS[d.icon] : null };
+    }
     const today = state.clock.day;
     return { doing, news: villageNews.filter((e) => e.day === today).slice(-8).reverse().map((e) => ({ ...e, faces: e.kinds.map(faceIcon) })) };
+  }
+
+  // ---------- 갑옷 씨들 · 시사 · 카니: 가게를 지키다가 일과대로 움직이고, 지나가는 나와 친구들에게 먼저 말을 건다 ----------
+  const STAFF = ['labor', 'ramen', 'captain', 'pochette', 'shisa', 'kani'];
+  const staffGreetAt = {}; // 나에게 마지막으로 인사한 때
+  STAFF.forEach((k) => { restUntil[k] = 3 + Math.random() * 12; });
+  const staffLine = (kind, key) => fillLine(pickLine(STAFF_TALK[kind][key]), { me: myName() });
+  /** 그 갑옷 씨가 가까이(from 에서 maxD 안) 있고 한가하면 한마디. */
+  function staffSay(kind, key, maxD, from) {
+    const n = npcs.byKind(kind);
+    if (!n || n.away || n.talk > 0 || n === talking || !STAFF_TALK[kind][key] || Math.hypot(n.x - from.x, n.z - from.z) > maxD) return;
+    npcs.say(n, staffLine(kind, key));
+  }
+  /** 가게 자리로 돌아와 잠깐 쉰다. */
+  const backToPost = (n) => [{ do: 'walk', x: n.home.x, z: n.home.z, near: 0.6 }, { do: 'call', fn: () => restHere(n.kind, 10 + Math.random() * 15) }];
+  /** 가게 자리에서 몸짓 몇 번(가끔 혼잣말). */
+  function atPost(n, anim, key, icon, text, times = 3, face = null) {
+    setDoing(n.kind, icon, text);
+    const steps = [];
+    if (Math.hypot(n.x - n.home.x, n.z - n.home.z) > 0.8) steps.push({ do: 'walk', x: n.home.x, z: n.home.z, near: 0.5 });
+    for (let i = 0; i < times; i++) steps.push({ do: 'act', anim, face, time: 3.2 + Math.random() * 1.5, say: i === 0 || Math.random() < 0.4 ? staffLine(n.kind, key) : undefined, quick: true });
+    steps.push({ do: 'call', fn: () => restHere(n.kind, 8 + Math.random() * 12) });
+    npcs.plan(n, steps);
+  }
+  /** 어딘가에 다녀온다: 가서 몸짓하고 가게로 돌아온다. */
+  function goAndDo(n, at, anim, key, icon, text, time = 5, face = null) {
+    const p = village.nearestFree(at.x, at.z, 0.45);
+    setDoing(n.kind, icon, text);
+    npcs.plan(n, [{ do: 'walk', x: p.x, z: p.z, near: 0.6 }, { do: 'act', anim, face, time, say: key ? staffLine(n.kind, key) : undefined, quick: true }, ...backToPost(n)]);
+  }
+  /** 일감 중인 친구(풀 · 열매 · 스티커) 중 가까운 하나. */
+  function workerNear(n, maxD) {
+    return Object.keys(VILLAGERS).map((k) => npcs.byKind(k))
+      .filter((v) => v && !v.away && minds[v.kind] && minds[v.kind].doing && ['leaf', 'star'].includes(minds[v.kind].doing.icon) && Math.hypot(v.x - n.x, v.z - n.z) < maxD)
+      .sort((a, b) => Math.hypot(a.x - n.x, a.z - n.z) - Math.hypot(b.x - n.x, b.z - n.z))[0] || null;
+  }
+  /** 일하는 친구 옆에 가서 한마디(친구는 하던 일을 계속하며 대답만 한다). */
+  function cheerWorker(n, key, icon, text) {
+    const w = workerNear(n, 26);
+    if (!w) return false;
+    const d = Math.hypot(w.x - n.x, w.z - n.z) || 1, k = Math.max(0, (d - 1.6) / d);
+    const at = village.nearestFree(n.x + (w.x - n.x) * k, n.z + (w.z - n.z) * k, 0.45), line = staffLine(n.kind, key);
+    setDoing(n.kind, icon, `${nameOf(w.kind)} ${text}`);
+    npcs.plan(n, [{ do: 'walk', x: at.x, z: at.z, near: 0.8 },
+      { do: 'act', anim: 'talk', face: { x: w.x, z: w.z }, time: npcs.lineTime(line) + 0.2, say: line, quick: true },
+      { do: 'call', fn: () => { if (!w.away && Math.hypot(w.x - n.x, w.z - n.z) < 4.5) npcs.say(w, PRAISED[w.kind] || '네!'); } },
+      { do: 'act', anim: 'idle', face: { x: w.x, z: w.z }, time: 2.2, quick: true }, ...backToPost(n)]);
+    return true;
+  }
+  /** 점심: 라멘 가게 앞에 앉아 한 그릇(노동 갑옷 씨). */
+  function staffLunch(n) {
+    const r = village.spots.ramen, face = { x: r.x, z: r.z - 1.5 };
+    setDoing(n.kind, 'bowl', '점심 라멘');
+    npcs.plan(n, [{ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) },
+      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true }, ...backToPost(n)]);
+  }
+  /** 대장 갑옷 씨 순찰: 광장과 문 몇 곳을 돌며 둘러본다. */
+  function patrol(n) {
+    const k = (VILLAGE_R - 4.5) / VILLAGE_R, pl = village.spots.plaza;
+    const stops = [pl, ...Object.values(GATES).map((g) => ({ x: g.x * k, z: g.z * k, out: g }))].sort(() => Math.random() - 0.5).slice(0, 2);
+    setDoing(n.kind, 'eye', '마을 순찰');
+    const steps = [];
+    for (const s of stops) {
+      const p = village.nearestFree(s.x, s.z, 0.5);
+      steps.push({ do: 'walk', x: p.x, z: p.z, near: 0.8 }, { do: 'act', anim: 'idle', face: s.out || { x: p.x, z: p.z + 3 }, time: 2.6, say: Math.random() < 0.6 ? staffLine(n.kind, 'patrol') : undefined, quick: true });
+    }
+    npcs.plan(n, [...steps, ...backToPost(n)]);
+  }
+  /** 대장 갑옷 씨: 가까운 풀을 살피러 간다. */
+  function inspectWeeds(n) {
+    const near = weeds.list.filter((w) => weeds.usable(w) && Math.hypot(w.x - n.x, w.z - n.z) < 22);
+    if (!near.length) return patrol(n);
+    const w = near[Math.floor(Math.random() * near.length)], d = Math.hypot(w.x - n.x, w.z - n.z) || 1, k = Math.max(0, (d - 1.2) / d);
+    goAndDo(n, { x: n.x + (w.x - n.x) * k, z: n.z + (w.z - n.z) * k }, 'read', 'weeds', 'eye', '풀 살피기', 4, { x: w.x, z: w.z });
+    return true;
+  }
+  /** 시사 심부름: 가게 몇 곳을 돌고 온다. */
+  function errand(n) {
+    const S = village.spots, list = [S.pochette, S.books, S.plaza, S.tools].filter(Boolean), dest = list[Math.floor(Math.random() * list.length)];
+    const p = village.nearestFree(dest.x, dest.z + 0.6, 0.45);
+    setDoing(n.kind, 'step', '심부름');
+    npcs.say(n, staffLine(n.kind, 'errand'));
+    npcs.plan(n, [{ do: 'walk', x: p.x, z: p.z, near: 0.7 }, { do: 'act', anim: 'talk', time: 2.5, quick: true },
+      { do: 'walk', x: n.home.x, z: n.home.z, near: 0.6 }, { do: 'act', anim: 'cheer', time: 1.4, say: staffLine(n.kind, 'back'), quick: true }, { do: 'call', fn: () => restHere(n.kind, 10 + Math.random() * 10) }]);
+  }
+  /** 갑옷 씨들의 하루: 시간대마다 할 만한 일에 무게를 매겨 하나 고른다. */
+  function staffDecide(n, kind, hour) {
+    if (hour < 7 || hour >= 20.5) { // 가게 문 닫은 시간: 자리로 돌아가 쉰다
+      setDoing(kind, 'moon', '가게 문 닫음');
+      if (Math.hypot(n.x - n.home.x, n.z - n.home.z) > 1) npcs.plan(n, backToPost(n)); else restUntil[kind] = lifeClock + 20;
+      return;
+    }
+    const S = village.spots, south = (p) => ({ x: p.x, z: p.z + 4 });
+    const freeVillager = () => Object.keys(VILLAGERS).map((k) => npcs.byKind(k)).filter((v) => isFree(v) && Math.hypot(v.x - n.x, v.z - n.z) < 24)[0];
+    let opts = [];
+    if (kind === 'labor') {
+      const b = S.board, left = Object.values(boardOf(state, state.clock.day).left).reduce((a, c) => a + c, 0);
+      opts = [
+        [hour < 10 ? 3 : 0.4, () => goAndDo(n, { x: b.x - 0.4, z: b.z }, 'read', 'post', 'pen', '일감 붙이기', 4.5, { x: b.x, z: b.z - 1.65 })],
+        [2, () => atPost(n, 'talk', left > 0 ? 'call' : 'callNone', 'dots', '손님 부르기', 2, south(n.home))],
+        [hour >= 9 && hour < 18 ? 1.8 : 0, () => cheerWorker(n, 'cheer', 'eye', '격려') || atPost(n, 'talk', 'call', 'dots', '손님 부르기', 1, south(n.home))],
+        [hour >= 11.5 && hour < 13.5 ? 6 : 0, () => staffLunch(n)],
+        [hour >= 17 ? 2.5 : 0.3, () => atPost(n, 'sweep', 'sweep', 'broom', '게시판 앞 정리', 2)],
+        [0.6, () => atPost(n, 'cheer', 'stretch', null, '쉬는 중', 1)]
+      ];
+    } else if (kind === 'ramen') {
+      const r = S.ramen, shisa = npcs.byKind('shisa');
+      opts = [
+        [3, () => atPost(n, 'sweep', 'cook', 'pot', '국물 우리기', 3, { x: r.x, z: r.z - 2 })],
+        [shisa && !npcs.busy(shisa) && shisa !== talking ? 1.6 : 0, () => together(n, shisa, pickLine(STAFF_SCRIPTS.coach), { at: { x: r.x + 0.2, z: r.z + 1.0 }, icon: 'pot', text: (o) => (o === 'shisa' ? '시사 가르치기' : '면 삶기 배우기') })],
+        [1, () => goAndDo(n, SLOTS.ramen()[Math.floor(Math.random() * 4)], 'sweep', 'wipe', 'broom', '테이블 닦기', 4)],
+        [hour >= 14.5 && hour < 16.5 ? 3 : 0.2, () => goAndDo(n, Math.random() < 0.5 ? { x: POND.x + 1, z: POND.z - POND.r - 1 } : S.plaza, 'idle', 'rest', 'step', '바람 쐬기', 6)]
+      ];
+    } else if (kind === 'pochette') {
+      const st = S.pochette, v = freeVillager();
+      opts = [
+        [3, () => atPost(n, 'read', 'sew', 'needle', '바느질', 3)],
+        [1.5, () => goAndDo(n, { x: st.x + (Math.random() - 0.5) * 2.4, z: st.z + 1 }, 'talk', 'display', 'dots', '손님 부르기', 3.5, south(st))],
+        [v ? 1.7 : 0, () => together(n, v, [['pochette', staffLine('pochette', 'compliment')], [v.kind, PRAISED[v.kind] || '헤헤']], { icon: 'heart', text: (o) => (o === 'pochette' ? '칭찬 듣기' : `${nameOf(o)} 칭찬`) })],
+        [hour >= 10 && hour < 18 ? 1 : 0.2, () => goAndDo(n, { x: S.plaza.x + (Math.random() - 0.5) * 4, z: S.plaza.z + 2 }, 'dance', 'show', 'heart', '신상 자랑', 5, south(S.plaza))]
+      ];
+    } else if (kind === 'captain') {
+      const ex = S.exam, rk = npcs.byKind('rakko');
+      opts = [
+        [hour < 9.5 ? 3 : 0.3, () => goAndDo(n, { x: ex.x + 0.6, z: ex.z + 0.2 }, 'read', 'prep', 'pen', '시험 준비', 5, { x: ex.x, z: ex.z - 2 })],
+        [hour >= 8 && hour < 18 ? 2.2 : 0.5, () => patrol(n)],
+        [1.2, () => inspectWeeds(n)],
+        [hour >= 9 && hour < 18 ? 1.4 : 0, () => cheerWorker(n, 'watch', 'eye', '지켜보기') || patrol(n)],
+        [hour >= 16 && isFree(rk) ? 2 : 0, () => together(n, rk, STAFF_SCRIPTS.spar[0], { at: { x: S.dojo.x, z: S.dojo.z + 0.8 }, anim: 'train', listen: 'train', icon: 'sword', text: (o) => `${withName(o)} 대련`, done: () => happen({ type: 'train', who: 'captain', with: 'rakko' }) })]
+      ];
+    } else if (kind === 'shisa') {
+      opts = [[3, () => atPost(n, 'sweep', 'sweep', 'broom', '가게 앞 청소', 3)], [hour >= 9 && hour < 17 ? 1 : 0, () => errand(n)]];
+    } else if (kind === 'kani') {
+      opts = [[3, () => atPost(n, 'read', 'read', 'book', '책 읽기', 3)],
+        [hour >= 10 && hour < 18 ? 1 : 0, () => goAndDo(n, { x: POND.x - 1.2, z: POND.z - POND.r - 1 }, 'read', 'out', 'book', '연못가 독서', 9, { x: POND.x, z: POND.z })]];
+    }
+    const total = opts.reduce((a, [w]) => a + w, 0);
+    let r = Math.random() * total;
+    for (const [w, fn] of opts) { if ((r -= w) <= 0) { fn(); return; } }
+    restHere(kind, 10);
+  }
+  /** 내가 가게 앞을 지나가면 먼저 인사한다(가끔). */
+  function staffGreet(n, kind) {
+    if (mode !== 'play' || funBusy() || panels.isOpen() || guide.open || sleeping) return;
+    const p = player.position;
+    if (Math.hypot(p.x - n.x, p.z - n.z) > 5.5 || lifeClock - (staffGreetAt[kind] ?? -999) < 120 || Math.random() > 0.35) return;
+    staffGreetAt[kind] = lifeClock;
+    npcs.emote(n, 'cheer', 0.8);
+    npcs.say(n, staffLine(kind, kind === 'labor' && !Object.values(boardOf(state, state.clock.day).left).some((c) => c > 0) ? 'greetNone' : 'greet'));
   }
 
   // ---------- 맥주집: 저녁이면 쿠리만쥬가 와 있고, 같이 건배하면 친해진다 ----------
@@ -2496,7 +2661,7 @@ function boot() {
       remember(f.kind, seen);
       if (THEFT_SEEN[f.kind] && !npcs.busy(f)) npcs.say(f, THEFT_SEEN[f.kind]);
     }
-    hud.banner('소매치기다!', `모몽가가 ${won(amount)}을 훔쳐 갔어요! 잡아요!${worn(state) ? ' (포셰트 덕분에 절반만)' : ''}`, 2600);
+    hud.banner('소매치기다!', '잡아요!', 2600, [{ icon: 'coin', text: `−${won(amount)}` }, worn(state) ? { text: '포셰트 덕에 ½' } : null].filter(Boolean));
     sound.play('stamp');
   }
   function endThiefChase(m, amount, caught) {
@@ -2820,7 +2985,7 @@ function boot() {
       if (drill) {
         drill.t += dt;
         drill.cool = Math.max(0, drill.cool - dt);
-        hud.showMeter(drillK(), DRILL.zone, [`초록에서 ${input.mode === 'desk' ? 'Space' : '치기'}!`, { icon: ICO.check, text: `${drill.hits}/${DRILL.need}` }, `${DRILL.tries - drill.tries}번 남음`]);
+        hud.showMeter(drillK(), DRILL.zone, [{ icon: ICO.check, text: `${drill.hits}/${DRILL.need}` }, `${DRILL.tries - drill.tries}번 남음`]);
         hud.setAction('치기!');
       } else hud.setAction(homeTarget ? homeTarget.label : null);
       rooms.update(dt, t, !!talking);
@@ -2925,7 +3090,7 @@ function boot() {
         // 처음 마을 밖에 나가면 몬스터 이야기를 한 번 해 준다
         if (lastRegion === 'village' && r !== 'village' && !seen('monsters') && !tutorialActive(state.tutorial)) {
           markSeen('monsters');
-          setTimeout(() => hud.toast('마을 밖엔 몬스터가 있어요! 붉게 깜빡이면 피해요', 5200), 1700);
+          setTimeout(() => hud.toast('마을 밖은 몬스터 조심!', 3200), 1700);
         }
         lastRegion = r;
       }
