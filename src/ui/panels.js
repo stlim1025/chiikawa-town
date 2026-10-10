@@ -116,6 +116,7 @@ const myWeaponArt = (s, id) => weaponSvg(id, engravedOf(s).includes(id) ? (s.pro
 
 /** 노동 접수 창에서 고른 탭(마을 일 · 토벌 · 전리품). 창을 다시 열어도 그대로. */
 let boardTab = 'work';
+let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
@@ -689,10 +690,33 @@ export function createPanels(ui, handlers) {
     },
     // 포셰트 가게: 사면 바로 메고, 가진 포셰트는 바꿔 메거나 벗는다
     pochette(s) {
-      const pc = pochetteOf(s), wearing = worn(s);
+      const pc = pochetteOf(s), wearing = worn(s), wd = wardrobeOf(s);
       const guard = THEFT_GUARD === 0.5 ? '절반만' : `${Math.round(THEFT_GUARD * 100)}%만`;
-      const out = [head('포셰트 가게', s.money),
-        chipLine(chip('coin', '', `소매치기 피해 ${guard}`))];
+      const out = [head('포셰트 가게', s.money)];
+      // 탭(노동 접수 탭과 같은 모양): 포셰트 | 꾸미기 — 한 번에 한 묶음만, 옆 숫자는 가진 것 / 전부
+      const owned = (ids, has) => `${ids.filter(has).length}/${ids.length}`;
+      const tabs = [
+        { id: 'pochette', label: '포셰트', n: owned(Object.keys(POCHETTES), (id) => pc.owned.includes(id)) },
+        { id: 'accessory', label: '꾸미기', n: owned(Object.keys(ACCESSORY_ITEMS), (id) => wd.owned.includes(id)) }
+      ];
+      out.push(h('div', { class: 'board-tabs-wrap' }, h('div', { class: 'board-tabs', role: 'tablist', 'aria-label': '포셰트 가게' }, tabs.map((t) =>
+        h('button', { class: 'board-tab', type: 'button', role: 'tab', 'aria-selected': String(t.id === pochetteTab),
+          onClick: () => { if (pochetteTab === t.id) return; pochetteTab = t.id; render(); current.panel.scrollTop = 0; } },
+        t.label, h('span', { class: 'n' }, t.n))))));
+      if (pochetteTab === 'accessory') {
+        // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
+        out.push(h('p', { class: 'sub' }, '사면 바로 달아요. 집 옷장에서 바꿔 달 수 있어요.'));
+        Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
+          const own = wd.owned.includes(id);
+          out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
+            h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
+            own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
+              : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)))));
+        });
+        out.push(h('div', { class: 'actions' }, closeBtn()));
+        return out;
+      }
+      out.push(chipLine(chip('coin', '', `소매치기 피해 ${guard}`)));
       Object.entries(POCHETTES).forEach(([id, P]) => {
         const own = pc.owned.includes(id), on = wearing === id;
         let btn;
@@ -703,16 +727,6 @@ export function createPanels(ui, handlers) {
           svgSpan('pochette-art', pochetteSvg(id, P)),
           h('div', {}, h('div', { class: 't' }, P.name, on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, P.note)),
           btn));
-      });
-      // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
-      const wd = wardrobeOf(s);
-      out.push(h('h3', { class: 'shop-sec' }, '꾸미기 소품'));
-      Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
-        const own = wd.owned.includes(id);
-        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
-          h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
-          own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
-            : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)))));
       });
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
