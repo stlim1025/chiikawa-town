@@ -28,7 +28,6 @@ import { createPanels, ICO } from './ui/panels.js';
 import { openCreator } from './ui/creator.js';
 import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
-import { createOrientationGuard } from './ui/orientation.js';
 import { createState, addMoney, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
@@ -163,7 +162,6 @@ function boot() {
   const npcs = createNpcs(scene, village, weeds, berries);
   const input = createInput(ui, canvas);
   const hud = createHud(ui, input);
-  createOrientationGuard(ui);
   const store = createStore(safeStorage());
   // 소리: 브라우저는 첫 누름 전까지 소리를 막으므로 누를 때마다 깨운다. 버튼을 누르면 딸깍.
   const sound = createSound(safeStorage());
@@ -3626,6 +3624,7 @@ function boot() {
       hold(on) { holdRender = skipRender = !!on; },
       pause(on) { pauseLoop = !!on; },
       hud,
+      panels, // 창을 바로 열어 보기(휴대폰 화면 확인용)
       get state() { return state; },
       get target() { return target && { type: target.type, label: target.label }; },
       player: () => player && { ...player.position },

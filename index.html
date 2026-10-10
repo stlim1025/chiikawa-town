@@ -1335,12 +1335,365 @@ button.pocket-slot:hover { transform: translateY(-2px); }
 .switch.on { background: #d6f0dc; color: #2f6b45; }
 .switch.on i { background: var(--mint-deep); }
 .switch.on i::after { transform: translateX(22px); }
+
+/* ---------- 휴대폰 화면 다듬기 ----------
+   홈 화면 앱(전체화면)에서는 노치 · 홈 막대를 HUD 가 env(safe-area-inset-*) 로 직접 비켜 가므로 문서 바깥 여백은 뺀다(겹치면 위아래에 빈 띠가 생긴다).
+   큰 카드(노동 완료 · 새 일감)는 가운데 기준(left: 50%)이라 폭이 화면 반으로 줄어 글이 세로로 꺾였다 → 글 폭만큼 넓히고 화면 안으로만 제한한다.
+   큰 소식 카드가 화면보다 크면 위가 잘려 못 보던 것 → 넘치면 위부터 스크롤, 남으면 가운데. */
+:root { padding: 0; }
+.hud-banner { width: max-content; max-width: calc(100% - 48px); box-sizing: border-box; }
+.task-card { width: max-content; }
+.notice-wrap, .raffle-wrap { align-items: flex-start; overflow-y: auto; }
+.notice-card, .raffle-stage { margin: auto; }
+.creator { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.home-bar { width: min(760px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+.home-tray { width: min(820px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+
+/* 휴대폰(세로 폭 480px 이하 · 가로 높이 500px 이하): 글씨 · 칸 · 버튼을 한 단계 작게, 줄 간격을 촘촘하게(한 화면에 더 많이 → 스크롤 덜) */
+@media (max-width: 480px), (max-height: 500px) {
+  .hud-left { gap: 5px; }
+  .hud-status { gap: 4px 6px; }
+  .hud-pill { gap: 6px; padding: 2px 13px 4px 6px; }
+  .hud-pill .ico { font-size: 20px; }
+  .hud-money { font-size: 19px; }
+  .hud-grade { padding: 0 10px 2px; font-size: 14px; }
+  .hud-buff { font-size: 13px; }
+  .hud-energy { font-size: 15px; }
+  .hud-energy .ico { font-size: 17px; }
+  .hud-bar { width: 74px; height: 9px; }
+  .hud-job, .guide-goal { gap: 6px; padding: 3px 10px 5px 6px; font-size: 15px; }
+  .hud-job::before { width: 20px; height: 20px; }
+  .guide-goal::before { padding: 0 8px 1px; font-size: 12px; }
+  .hud-quest { padding: 3px 12px 5px 8px; }
+  .hud-quest b { font-size: 14px; }
+  .hud-quest > span { font-size: 13px; }
+  .hud-quest .q-chip svg { width: 20px; height: 20px; }
+  .hud-party { font-size: 14px; }
+  .hud-party .pt-face { width: 28px; height: 28px; }
+  .hud-party .pt-face svg { width: 30px; height: 30px; }
+  .hud-clock { left: max(14px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); }
+  .hud-date { gap: 4px; font-size: 15px; }
+  .hud-date .ico { font-size: 18px; }
+  .hud-time b { font-size: 36px; }
+  .hud-time small { font-size: 16px; }
+  .hud-phone { top: max(8px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 46px; height: 46px; padding: 5px; }
+  .hud-bag { top: max(10px, calc(env(safe-area-inset-top) + 2px)); right: max(64px, calc(env(safe-area-inset-right) + 54px)); width: 42px; height: 42px; padding: 5px; }
+  .hud-zoom { top: calc(max(8px, env(safe-area-inset-top)) + 56px); right: max(13px, calc(env(safe-area-inset-right) + 3px)); gap: 6px; }
+  .hud-zoom .icon-btn { width: 40px; height: 40px; }
+  .hud-action { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); width: 72px; height: 72px; font-size: 18px; }
+  .hud-meter { bottom: max(12px, env(safe-area-inset-bottom)); padding: 4px 14px 9px; }
+  .hud-meter .lab { margin-bottom: 4px; font-size: 15px; }
+  .hud-meter .track { height: 16px; }
+  .hud-toasts { gap: 6px; }
+  .toast { padding: 3px 14px 5px; font-size: 15px; }
+  .toast .t-ico { width: 28px; height: 28px; margin: -5px -2px -5px -4px; }
+  .toast .t-chip { font-size: 13px; }
+  .hud-timer { padding: 3px 18px 5px; font-size: 20px; }
+  .hud-banner { padding: 10px 28px 12px; }
+  .hud-banner b { font-size: 36px; }
+  .hud-banner span { margin-top: 4px; font-size: 17px; }
+  .banner-chip { font-size: 16px; }
+  .banner-chip svg { width: 22px; height: 22px; }
+  .task-card { gap: 10px; padding: 10px 20px 12px 12px; }
+  .task-ico svg { width: 40px; height: 40px; }
+  .task-txt i { font-size: 15px; }
+  .task-txt b { font-size: 24px; }
+  .task-txt span { font-size: 15px; }
+  .quest-done { padding: 28px 20px 12px; }
+  .quest-done .qd-ribbon { top: -18px; padding: 4px 22px 7px; font-size: 22px; }
+  .quest-done .qd-sub { font-size: 19px; }
+  .notice-card { padding: 14px 20px 16px; }
+  .notice-card .nk { font-size: 15px; }
+  .notice-card .stamp { margin: 10px auto 6px; padding: 3px 18px 6px; font-size: 40px; }
+  .notice-card .ns { font-size: 17px; }
+  .notice-card .btn { margin-top: 12px; }
+  .vt-name { font-size: 36px; }
+  .vt-kicker { font-size: 19px; }
+  .sleep-text b { font-size: 44px; }
+  .sleep-text p { font-size: 22px; }
+  .world-label.bubble { padding: 3px 13px 5px; font-size: 16px; }
+  .world-label.prompt { padding: 2px 12px 4px; font-size: 16px; }
+  .world-label.mark { padding: 2px 12px 4px; font-size: 17px; }
+  .world-label.sign { font-size: 14px; }
+  /* 대화 상자 */
+  .guide { min-height: 0; padding: 14px 24px 20px; border-radius: 34px 40px 38px 32px / 40px 34px 40px 36px; }
+  .guide-name { left: 24px; top: -14px; padding: 1px 14px 3px; font-size: 16px; }
+  .guide-text { font-size: 18px; line-height: 1.35; }
+  .guide-next { bottom: 3px; width: 26px; height: 18px; margin-left: -13px; }
+  .guide-chips { margin-top: 6px; }
+  .g-chip { font-size: 15px; }
+  .g-chip svg { width: 20px; height: 20px; }
+  .guide-choices { right: 16px; min-width: 150px; padding: 6px; }
+  .guide-choice { padding: 3px 14px 4px 28px; font-size: 17px; }
+  /* 창 */
+  .backdrop:not(.phone-backdrop) { padding: 8px; }
+  .panel { max-height: calc(100% - 16px); }
+  .panel-body { padding: 12px 14px; }
+  .panel-head { gap: 8px; }
+  .panel h2 { padding: 1px 16px 3px; font-size: 21px; }
+  .wallet { padding: 1px 12px 3px 5px; font-size: 16px; }
+  .wallet-ico, .wallet-ico svg { width: 20px; height: 20px; }
+  .panel .sub { margin: 6px 2px 2px; font-size: 15px; }
+  .panel .row { gap: 8px; margin-top: 6px; padding: 6px 12px 8px; border-radius: 16px 18px 16px 14px; }
+  .panel .row .t { font-size: 18px; }
+  .panel .row .d { font-size: 14px; }
+  .panel .row > .d { padding: 2px 10px 4px; font-size: 14px; }
+  .panel .note { margin-top: 8px; font-size: 15px; }
+  .panel .hint { font-size: 15px; }
+  .panel .actions { gap: 8px; margin-top: 10px; }
+  .btn { min-height: 38px; padding: 4px 16px 6px; font-size: 17px; }
+  .shop-sec { margin: 10px 4px 2px; font-size: 16px; }
+  .chip { padding: 2px 9px 3px 6px; font-size: 14px; }
+  .pochette-art, .weed-ico { width: 44px; height: 44px; border-radius: 12px; }
+  .mon-ico, .panel .row.mon-card .mon-ico { width: 46px; height: 46px; border-radius: 12px; }
+  .q-face { width: 42px; height: 42px; border-radius: 12px; }
+  .job-ico, .lic-ico { width: 38px; height: 38px; border-radius: 11px; }
+  .rule-ico { width: 38px; height: 38px; }
+  .rule-card b { font-size: 16px; }
+  .rule-card span { font-size: 14px; }
+  .facts { gap: 3px; padding-left: 4px; }
+  .facts li { font-size: 15px; }
+  .weed-grade { margin-top: 10px; font-size: 16px; }
+  .mon-region { margin: 10px 0 4px; font-size: 16px; }
+  .exam-q { margin: 8px 4px; font-size: 19px; }
+  .exam-choice { font-size: 17px; }
+  .examiner .ex-say { font-size: 18px; }
+  .exam-result .stamp { font-size: 40px; }
+  .prize-row { grid-template-columns: 24px 54px 32px minmax(0, 1fr); padding: 3px 10px; }
+  .prize-rank, .prize-name { font-size: 16px; }
+  .prize-art svg { width: 30px; height: 30px; }
+  .bag-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; }
+  .bag-ico { width: 44px; height: 44px; }
+  .bag-tile { font-size: 13px; }
+  .pocket { padding: 10px 10px 12px; }
+  .pocket-grid { gap: 6px; }
+  .pocket-empty { font-size: 17px; }
+  .switch { min-height: 34px; gap: 6px; padding: 3px 10px 3px 3px; font-size: 14px; }
+  .switch i { width: 44px; height: 26px; }
+  .switch i::after { width: 20px; height: 20px; }
+  .switch.on i::after { transform: translateX(18px); }
+  /* 가구점 */
+  .catalog { gap: 10px; }
+  .cat-item { min-height: 44px; gap: 8px; font-size: 17px; }
+  .cat-item .thumb { width: 36px; height: 36px; }
+  .cat-item .pr { font-size: 15px; }
+  .cat-name { font-size: 20px; }
+  .cat-meta { font-size: 15px; }
+  /* 노동 접수 */
+  .board-meter .lab { font-size: 15px; }
+  .board-meter .num b { font-size: 20px; }
+  .board-tabs-wrap { top: -12px; margin: 0 -14px; padding: 8px 14px 0; }
+  .board-tab { min-height: 34px; font-size: 16px; }
+  .ledger { padding: 0 12px; }
+  .job-row { grid-template-columns: 38px minmax(0, 1fr) auto auto; gap: 8px; padding: 6px 0; }
+  .job-art, .job-now > .job-art { width: 38px; height: 38px; border-radius: 10px; }
+  .job-art svg { width: 32px; height: 32px; }
+  .job-name { font-size: 17px; }
+  .job-where { font-size: 13px; }
+  .job-pay b { font-size: 16px; }
+  .job-pay small { font-size: 13px; }
+  .btn.take { min-height: 34px; padding: 3px 12px 5px; font-size: 16px; }
+  .job-now { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding: 8px 12px; }
+  .rank-row { grid-template-columns: 26px 38px minmax(0, 1fr) auto; gap: 8px; padding: 6px 0; }
+  .rank-no { font-size: 20px; }
+  .rank-pts b { font-size: 19px; }
+  /* 마을폰 */
+  .phone .sub { margin: 4px; font-size: 15px; }
+  .phone .row { padding: 6px 12px 8px; }
+  .phone .row .t { font-size: 18px; }
+  .phone .row .d { font-size: 14px; }
+  .phone .phone-bar h2 { font-size: 21px; }
+  .phone-tag { font-size: 14px; }
+  .phone .phone-title { font-size: 24px; }
+  .apps { gap: 8px 4px; margin: 8px 0; }
+  .app { gap: 3px; }
+  .app-ico { width: 52px; height: 52px; }
+  .app-ico svg { width: 32px; height: 32px; }
+  .app.off .app-ico::after { width: 40px; height: 4px; }
+  .app-label { font-size: 14px; }
+  .phone-note { font-size: 13px; }
+  .news-list li { padding: 4px 10px 5px 6px; font-size: 14px; }
+  .f-next, .f-now { font-size: 13px; }
+  .phone-foot { font-size: 13px; }
+  /* 타이틀 · 캐릭터 만들기 */
+  .title-kicker { font-size: 16px; }
+  .title-sub { font-size: 16px; }
+  .title-actions .btn { font-size: 19px; }
+  .creator { gap: 10px; }
+  .creator-scroll { padding: 10px 14px 12px; }
+  .creator-form h1 { padding: 1px 16px 3px; font-size: 21px; white-space: nowrap; }
+  .creator-form h2 { margin: 8px 0 4px; font-size: 16px; }
+  .tabs { gap: 5px; margin-top: 8px; }
+  .tab { min-height: 36px; padding: 2px 14px 4px; font-size: 17px; }
+  .tab-body { min-height: 0; }
+  .choices { gap: 6px; }
+  .choice { min-height: 36px; padding: 2px 12px 4px; font-size: 15px; }
+  .swatch { width: 36px; height: 36px; }
+  .name-input { min-height: 40px; font-size: 19px; }
+  .creator-actions { margin-top: 10px; }
+  .preview-hint { font-size: 15px; }
+  /* 집 안 */
+  .home-title b { padding: 2px 16px 4px; font-size: 19px; }
+  .home-hint { font-size: 15px; }
+  .home-tray { padding: 8px 12px 10px; gap: 6px 10px; }
+  .tile { width: 72px; font-size: 13px; }
+  .tile .thumb { width: 46px; height: 46px; }
+}
+
+/* 가로로 든 휴대폰: 마을폰을 옆으로 넓게 눕혀 앱이 한 줄에 다 들어가게(세로로 좁으면 앱이 아래로 밀려 스크롤해야 했다) */
+@media (orientation: landscape) and (max-height: 500px) {
+  .panel.phone { width: min(620px, 100% - 24px); }
+  .apps { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+}
+
+/* 세로로 든 휴대폰: 노동 접수 줄은 보수를 이름 아래로(한 글자씩 꺾이지 않게), 마을폰 앱은 한 줄에 넷 */
+@media (orientation: portrait) and (max-width: 480px) {
+  .guide-choice { white-space: normal; }
+  .job-row { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 2px 10px; }
+  .job-row > .job-art { grid-row: 1 / span 2; }
+  .job-pay { grid-column: 2; grid-row: 2; display: flex; align-items: baseline; gap: 8px; text-align: left; }
+  .job-row > .btn.take, .job-row > .job-stamp { grid-column: 3; grid-row: 1 / span 2; }
+  .apps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .creator { gap: 6px; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .creator-preview { flex-basis: 30%; }
+}
+
+/* 아주 낮은 가로 화면(높이 340px 이하: 위에 브라우저 띠가 붙은 휴대폰 가로): 한 단계 더 작게, 창은 높이를 다 쓰고 마을폰은 옆으로 눕힌다 */
+@media (max-height: 340px) {
+  .hud-left { top: max(6px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); gap: 4px; }
+  .hud-pill { padding: 1px 12px 3px 6px; }
+  .hud-pill .ico { font-size: 17px; }
+  .hud-money { font-size: 16px; }
+  .hud-grade { padding: 0 8px 1px; font-size: 12px; }
+  .hud-energy { font-size: 13px; }
+  .hud-energy .ico { font-size: 15px; }
+  .hud-bar { width: 64px; height: 8px; }
+  .hud-job, .guide-goal { padding: 2px 9px 3px 5px; font-size: 13px; }
+  .hud-job::before { width: 16px; height: 16px; }
+  .guide-goal::before { padding: 0 6px 1px; font-size: 11px; }
+  .hud-quest { padding: 2px 10px 4px 7px; }
+  .hud-quest b { font-size: 13px; }
+  .hud-quest > span { font-size: 12px; }
+  .hud-clock { left: max(10px, env(safe-area-inset-left)); bottom: max(5px, env(safe-area-inset-bottom)); }
+  .hud-date { font-size: 12px; }
+  .hud-date .ico { font-size: 14px; }
+  .hud-time b { font-size: 26px; }
+  .hud-time small { font-size: 13px; }
+  .hud-phone { top: max(6px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); width: 38px; height: 38px; padding: 4px; }
+  .hud-bag { top: max(7px, calc(env(safe-area-inset-top) + 1px)); right: max(52px, calc(env(safe-area-inset-right) + 44px)); width: 35px; height: 35px; padding: 4px; }
+  .hud-zoom { top: calc(max(6px, env(safe-area-inset-top)) + 44px); right: max(9px, calc(env(safe-area-inset-right) + 1px)); gap: 4px; }
+  .hud-zoom .icon-btn { width: 34px; height: 34px; }
+  .hud-action { right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 15px; }
+  .hud-meter { bottom: max(6px, env(safe-area-inset-bottom)); padding: 3px 12px 7px; }
+  .hud-meter .lab { margin-bottom: 2px; font-size: 13px; }
+  .hud-meter .track { height: 12px; }
+  .hud-toasts { top: max(6px, env(safe-area-inset-top)); gap: 4px; }
+  .toast { padding: 2px 12px 3px; font-size: 13px; }
+  .toast .t-ico { width: 22px; height: 22px; margin: -4px -2px -4px -4px; }
+  .hud-timer { top: max(6px, env(safe-area-inset-top)); padding: 2px 14px 3px; font-size: 16px; }
+  #ui:has(.hud-timer:not([hidden])) .hud-toasts { top: calc(max(6px, env(safe-area-inset-top)) + 34px); }
+  .hud-banner { top: 40%; padding: 6px 22px 8px; }
+  .hud-banner b { font-size: 28px; }
+  .hud-banner span { margin-top: 2px; font-size: 14px; }
+  .task-card { padding: 6px 18px 8px 10px; }
+  .task-ico svg { width: 30px; height: 30px; }
+  .task-txt i { font-size: 13px; }
+  .task-txt b { margin-top: 2px; font-size: 20px; }
+  .task-txt span { font-size: 13px; }
+  .quest-done { top: 20%; padding: 20px 18px 8px; }
+  .quest-done .qd-ribbon { top: -14px; padding: 3px 18px 5px; font-size: 18px; }
+  .quest-done .qd-sub { font-size: 16px; }
+  .notice-wrap, .raffle-wrap { padding: 6px; }
+  .notice-card { padding: 8px 18px 10px; }
+  .notice-card .stamp { margin: 4px auto 2px; padding: 2px 14px 4px; border-width: 4px; font-size: 28px; }
+  .notice-card .ns { margin-top: 4px; font-size: 15px; }
+  .notice-card .btn { margin-top: 6px; }
+  .notice-card .lic-card { width: 190px; margin: 4px auto 0; }
+  .village-title { top: 34%; }
+  .vt-name { font-size: 28px; }
+  .vt-kicker { font-size: 16px; }
+  .sleep-text b { font-size: 36px; }
+  .sleep-text p { font-size: 18px; }
+  .world-label.bubble { padding: 2px 11px 4px; font-size: 14px; }
+  .world-label.prompt { padding: 2px 10px 3px; font-size: 14px; }
+  .world-label.sign { font-size: 12px; }
+  .world-label.sign .sg-ico { width: 18px; height: 18px; }
+  /* 대화 상자 */
+  .guide { bottom: max(6px, env(safe-area-inset-bottom)); padding: 10px 22px 14px; }
+  .guide-name { left: 22px; top: -12px; padding: 0 12px 2px; font-size: 14px; }
+  .guide-text { font-size: 16px; line-height: 1.28; }
+  .guide-next { bottom: 1px; width: 20px; height: 14px; margin-left: -10px; }
+  .g-chip { font-size: 13px; }
+  .g-chip svg { width: 16px; height: 16px; }
+  .guide-choices { max-height: calc(100vh - 90px); padding: 5px; }
+  .guide-choice { padding: 2px 12px 3px 24px; font-size: 15px; }
+  /* 창: 위아래 여백을 줄여 줄이 한 줄이라도 더 보이게 */
+  .backdrop:not(.phone-backdrop) { padding: 5px; }
+  .panel { max-height: calc(100% - 10px); }
+  .panel-body { padding: 8px 14px 10px; }
+  .panel h2 { font-size: 19px; }
+  .panel .sub { margin: 3px 2px 1px; font-size: 14px; }
+  .panel .row { margin-top: 4px; padding: 4px 10px 6px; }
+  .panel .row .t { font-size: 16px; }
+  .panel .row .d { font-size: 13px; }
+  .panel .actions { margin-top: 6px; }
+  .btn { min-height: 34px; padding: 3px 14px 5px; font-size: 15px; }
+  .job-row { padding: 4px 0; }
+  .job-name { font-size: 16px; }
+  /* 마을폰: 높이를 다 쓰고 틀 · 막대를 얇게 */
+  .panel.phone { height: calc(100% - 12px); padding: 6px 6px 0; border-radius: 30px; }
+  .phone-screen { border-radius: 24px; }
+  .phone-status { padding: 4px 18px 0; font-size: 13px; }
+  .phone-time { font-size: 15px; }
+  .phone-cam { width: 44px; height: 14px; }
+  .phone-home { width: 28px; height: 28px; margin: 3px 0; }
+  .phone-home::after { width: 10px; height: 10px; border-width: 2px; border-radius: 4px; }
+  .phone-bar { gap: 8px; padding: 2px 14px 4px; }
+  .phone-back { width: 30px; height: 30px; font-size: 22px; }
+  .phone .phone-bar h2 { font-size: 18px; }
+  .phone .phone-title { margin: 2px 6px 0; font-size: 18px; }
+  .phone .sub { font-size: 14px; }
+  .phone .row .t { font-size: 16px; }
+  .phone .row .d { font-size: 13px; }
+  .apps { gap: 4px; margin: 4px 0; }
+  .app { gap: 2px; padding: 2px; }
+  .app-ico { width: 42px; height: 42px; }
+  .app-ico svg { width: 28px; height: 28px; }
+  .app.off .app-ico::after { width: 32px; }
+  .app-label { font-size: 13px; }
+  /* 타이틀 · 캐릭터 만들기 */
+  .title-screen { padding-top: max(6px, env(safe-area-inset-top)); }
+  .title-card { padding: 6px 18px 10px; }
+  .title-kicker { font-size: 13px; }
+  .title-name { font-size: 30px; }
+  .title-sub { margin: 0 0 6px; font-size: 13px; }
+  .title-actions .btn { min-height: 34px; font-size: 16px; }
+  .creator { gap: 8px; padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .creator-scroll { padding: 6px 12px 10px; }
+  .creator-form h1 { font-size: 19px; }
+  .creator-form h2 { margin: 6px 0 3px; font-size: 15px; }
+  .tabs { margin-top: 5px; }
+  .tab { min-height: 32px; padding: 1px 12px 3px; font-size: 15px; }
+  .choice { min-height: 32px; padding: 1px 10px 3px; font-size: 14px; }
+  .swatch { width: 32px; height: 32px; }
+  .name-input { min-height: 34px; font-size: 17px; }
+  .preview-hint { font-size: 13px; }
+  /* 집 안 */
+  .home-title { top: max(6px, env(safe-area-inset-top)); gap: 4px; }
+  .home-title b { padding: 1px 14px 3px; font-size: 16px; }
+  .home-bar { bottom: max(6px, env(safe-area-inset-bottom)); gap: 6px; }
+  .home-tray { bottom: max(5px, env(safe-area-inset-bottom)); padding: 5px 10px 6px; gap: 3px 8px; }
+  .home-hint { font-size: 13px; }
+  .tile { width: 62px; padding: 4px 3px; font-size: 12px; }
+  .tile .thumb { width: 38px; height: 38px; }
+}
 </style>
 
 <div id="game">
   <canvas id="scene" aria-label="치이카와 마을. 내 캐릭터를 움직여 풀을 뽑고 일감을 해요."></canvas>
   <div id="ui"></div>
 </div>
+<script type="module" src="./src/ui/webapp.js"></script>
 <script type="module" src="./src/main.js"></script>
 
 </body></html>
