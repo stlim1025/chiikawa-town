@@ -143,6 +143,12 @@ function boot() {
   const berries = createBerries(scene, village); // 잡초보다 먼저 심어서 잡초가 덤불을 피해 자란다
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
+  // 가려진 몬스터 실루엣은 스텐실 버퍼로 '제 몸이 보이는 곳'을 빼고 칠한다. 기기 · 브라우저가 스텐실을 안 주면
+  // 실루엣이 몬스터 몸 위를 분홍으로 덮어 모습이 안 보이므로, 그런 화면에서는 실루엣을 끈다
+  {
+    const gl = gfx.renderer.getContext();
+    monsters.setGhosts(!!(gl.getContextAttributes() || {}).stencil && gl.getParameter(gl.STENCIL_BITS) > 0);
+  }
   const ground = createGround(scene, (e) => (e.weapon ? weaponSvg(e.id) : itemSvg(e.id))); // 주머니에서 버린 물건(그 물건 그림 그대로 바닥에)
   const groundKind = (e) => (e.weapon ? 'weapon' : (itemInfo(e.id) || { kind: 'quest' }).kind);
   const npcs = createNpcs(scene, village, weeds, berries);

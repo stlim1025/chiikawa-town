@@ -380,8 +380,9 @@ const markMat = new THREE.MeshBasicMaterial({
   colorWrite: false, transparent: true, depthWrite: false, depthFunc: THREE.LessEqualDepth, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2,
   stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp
 });
+// polygonOffset: 실루엣을 카메라 쪽으로 살짝 당겨, 기기마다 몸과 깊이가 아주 조금 달라도 제 몸(보이는 곳) 위에는 칠해지지 않게
 const ghostMat = new THREE.MeshBasicMaterial({
-  color: 0xff5470, transparent: true, opacity: 0.55, depthWrite: false, depthFunc: THREE.GreaterDepth,
+  color: 0xff5470, transparent: true, opacity: 0.55, depthWrite: false, depthFunc: THREE.GreaterDepth, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
   stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.ReplaceStencilOp
 });
 /** 실루엣용 덧그림(표시 4 → 실루엣 5 순서). */
@@ -470,6 +471,7 @@ export function createMonsters(scene, village, random = Math.random) {
   const list = [];
   const poofs = [], shots = [], waves = [];
   let nextId = 1, refill = 0, nightK = 0, C = null, playerSafe = false, P = { x: 0, z: 0 };
+  let ghostsOn = true; // 스텐실을 못 쓰는 기기에서는 실루엣이 몸 위를 분홍으로 덮으므로 끈다(setGhosts)
 
   function spotFor(area, size, avoid) {
     const A = AREAS[area], [x0, x1, z0, z1] = A.box;
@@ -1028,6 +1030,8 @@ export function createMonsters(scene, village, random = Math.random) {
 
   return {
     list,
+    /** 가려진 몬스터 실루엣을 켜고 끈다(스텐실이 없는 화면에서는 끈다: 실루엣이 몬스터 몸을 분홍으로 덮어 버린다). */
+    setGhosts(on) { ghostsOn = !!on; if (!ghostsOn) list.forEach((m) => { m.mesh.ghost.visible = false; }); },
     /** 시험 허수아비 · 이야기 속 왕버섯처럼 정해진 자리에 놓는다. extra.exam 이면 마을 안에도 둔다. */
     spawnAt(species, x, z, extra = {}) { return add(species, x, z, { ...extra, wobble: 0 }); },
     /** 조건에 맞는 몬스터를 없앤다(연기 없이). */
@@ -1133,7 +1137,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i], M = m.M, root = m.mesh.root;
         const dp = Math.hypot(m.x - p.x, m.z - p.z);
-        m.mesh.ghost.visible = dp < 18; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
+        m.mesh.ghost.visible = ghostsOn && dp < 18; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
         if (m.dead) {
           m.deadT += dt;
           const k = m.deadT / 0.35;
