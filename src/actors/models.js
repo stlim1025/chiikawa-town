@@ -921,6 +921,7 @@ const ZERO = [0, 0, 0];
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
+ *   · 파자마 파티즈 무대: 'idol' 아이돌 춤(8박 안무) · 'idolSing' 노래하며 춤 · 'glow' 응원봉 흔들기 — 셋 다 opts.beat(곡 박 번호)에 맞춘다
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
  *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다), eat (한 번 먹기 진행 0..1 — 없으면 계속 먹는다) }
  */
@@ -1084,6 +1085,23 @@ function basePose(mode, t, opts) {
     a.armL = [0.12, 0, -0.32 + Math.sin(t * 21) * 0.06]; a.armR = [0.12, 0, 0.32 - Math.sin(t * 21) * 0.06];
     a.head = [-0.12 - sh * 0.05, 0, Math.sin(t * 2.6) * 0.06];
     bob = sh * 0.025;
+  } else if (mode === 'idol' || mode === 'idolSing') {
+    // 아이돌 춤(파자마 파티즈): 8박 안무를 박자(opts.beat — 곡 박 번호)에 맞춰. 오른손 위로 콕 · 왼손 위로 콕 · 두 팔 흔들기 · 머리 위 두 손 하트.
+    // 박마다 통 튀었다 잦아든다. 'idolSing' 은 오른손을 입가에(노래하는 마이크 손)
+    const b = opts.beat != null ? opts.beat : t * 2, k = ((b % 8) + 8) % 8, step = Math.floor(k / 2), kick = Math.pow(1 - (b - Math.floor(b)), 2), w = Math.sin(b * Math.PI);
+    if (step === 0) { a.armR = [0, 0, 2.6]; a.armL = [0, 0, -0.5]; a.head = [-0.08, 0, -0.18]; waddle = 0.12; }
+    else if (step === 1) { a.armL = [0, 0, -2.6]; a.armR = [0, 0, 0.5]; a.head = [-0.08, 0, 0.18]; waddle = -0.12; }
+    else if (step === 2) { a.armL = [0, 0, -2.1 - w * 0.4]; a.armR = [0, 0, 2.1 - w * 0.4]; a.head = [-0.1, 0, w * 0.15]; waddle = w * 0.14; }
+    else { a.armL = [-0.5, 0, -2.75]; a.armR = [-0.5, 0, 2.75]; a.head = [-0.12, 0, w * 0.08]; }
+    if (mode === 'idolSing') a.armR = [-1.45, 0, -0.62];
+    a.legL = [step % 2 ? 0 : -0.3 * kick, 0, 0]; a.legR = [step % 2 ? -0.3 * kick : 0, 0, 0];
+    bob = kick * 0.1;
+  } else if (mode === 'glow') {
+    // 응원봉 흔들기(관객): 오른팔을 높이 들고 박(opts.beat)마다 좌우로, 고개도 박마다 끄덕
+    const b = opts.beat != null ? opts.beat : t * 2, w = Math.sin(b * Math.PI), kick = Math.pow(1 - (b - Math.floor(b)), 2);
+    a.armR = [-0.15, 0, 2.35 + w * 0.45]; a.armL = [-0.6, 0, -0.25];
+    a.head = [0.06 + kick * 0.12, 0, w * 0.06];
+    bob = kick * 0.05;
   } else if (mode === 'dj') {
     // DJ: 오른손은 탁자 위 도토리를 나뭇잎으로 끽끽 문지르고, 왼손은 박자(118)에 맞춰 위로 흔들고, 고개는 끄덕끄덕
     const b = Math.abs(Math.sin(t * 6.18));

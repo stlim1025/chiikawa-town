@@ -103,6 +103,8 @@ import { createMinigame } from './ui/minigame.js';
 import { createShisaStory } from './stories/shisa.js';
 import { createHachiPit } from './stories/hachipit.js';
 import { createPajamaStory } from './stories/pajama.js';
+import { createIdolStage } from './world/idolstage.js';
+import { createIdolStory } from './stories/pajamaidol.js';
 import { createCliff } from './world/cliff.js';
 import { createPit } from './world/pit.js';
 import { eatStyle } from './core/eating.js';
@@ -278,6 +280,17 @@ function boot() {
         refreshLook();
         const h = village.spots.home;
         player.setPosition(h.x + 4, h.z + 3);
+        cam.snap(player.position);
+      },
+      /** 파자마 파티즈: show 면 무대만 바로(보상 없음), 아니면 잠옷 밤나들이를 끝낸 것으로 하고 부탁을 받은 채 밤 8시 광장 앞(걸어 들어가면 시작 · 보상까지). */
+      pajamaParty(show) {
+        if (idolStory.active) return;
+        if (show) { idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.pajamaParty;
+        if (!isDone(state, 'pajamaNight')) qs.pajamaNight = { step: QUESTS.pajamaNight.steps.length, base: 0, done: Math.max(1, state.clock.day - 3) };
+        commit({ ...startQuest({ ...state, quests: qs }, 'pajamaParty'), clock: { day: Math.max(8, state.clock.day), t: (20 - 6) / 24 } });
+        player.setPosition(0, 7.5);
         cam.snap(player.position);
       },
       /** 우사기 클럽 춤만 바로(보상 없음). */
@@ -532,6 +545,7 @@ function boot() {
       hachiPit.reset();
       pajama.reset();
       islandTrip.reset();
+      idolStory.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1018,6 +1032,7 @@ function boot() {
       return;
     }
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
+    if (mode === 'idol') { if (down && idolStory && !guide.open) idolStory.press(); return; } // 파자마 파티즈 무대: 박자(박자 화면도 스스로 스페이스 · 탭을 받는다)
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
@@ -1071,8 +1086,9 @@ function boot() {
   let islandTrip = null; // 사이드스토리 '수상한 섬 합숙'(stories/island.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
+  let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (islandTrip && islandTrip.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -1366,6 +1382,7 @@ function boot() {
       const done = () => finishQuestStep(id, null, lines);
       if (step.scene === 'shisaExam') shisaStory.exam(done);
       else if (step.scene === 'pajamaNight') pajama.play(done);
+      else if (step.scene === 'pajamaParty') idolStory.play(done);
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
@@ -2114,6 +2131,14 @@ function boot() {
     // 마지막 밤: 밤 10시로 맞추고 진짜로 잔다(다음 날 아침). 섬에 있는 동안 마을 시계는 멈춰 있다
     sleepOver: (after) => { const late = (22 - 6) / 24; if (state.clock.t < late) commit({ ...state, clock: { ...state.clock, t: late } }); doSleep('home', after); },
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); delete awayInfo[kind]; setDoing(kind, null, null); }
+  });
+  // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js): 밤 광장 무대(world/idolstage.js) · 아이돌 넷 · 원곡(core/idolsong.js) · 응원 리듬 놀이
+  // 무대(캐릭터 열넷)는 처음 공연을 볼 때 만든다: 게임을 켤 때 휴대폰을 무겁게 하지 않게
+  let idolStage = null;
+  idolStory = createIdolStory({
+    hud, guide, sound, input, rhythm, get stage() { return idolStage || (idolStage = createIdolStage()); }, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook()
   });
   let visit = null; // { kind, lodge }
   const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
@@ -3776,7 +3801,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -3852,6 +3877,8 @@ function boot() {
       staged: () => [...staged],
       burrows: () => burrows.spots,
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
+      idol: () => ({ phase: idolStory.phase, round: idolStory.round, rhythm: rhythm.active, guide: guide.open, fans: idolStage ? idolStage.fans : 0, mode }),
+      idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
       /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
       islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
@@ -3938,6 +3965,16 @@ function boot() {
       hud.placeLabels([], club.camera);
       return;
     }
+    // 파자마 파티즈 무대(사이드스토리): 마을 대신 무대 장면. 공연 동안 마을 시계 · 친구들은 멈춰 있다(밤 12시를 넘겨도 공연은 끝까지)
+    if (mode === 'idol' && state) {
+      idolStage.resize(aspect);
+      idolStory.tick(dt, t);
+      setCelLight(idolStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(idolStage.scene, idolStage.camera);
+      hud.placeLabels(idolStory.labels(), idolStage.camera);
+      return;
+    }
     // 수상한 섬(사이드스토리): 섬 장면을 그린다. 섬에 있는 동안 마을 시계 · 친구들은 멈춰 있다(마지막 밤에 진짜로 잔다)
     if (mode === 'island' && state) {
       isle.resize(aspect);
@@ -4004,6 +4041,7 @@ function boot() {
       shisaStory.update(dt);
       hachiPit.update(dt);
       pajama.update(dt);
+      idolStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) {

@@ -227,6 +227,19 @@ export const QUESTS = {
     }],
     reward: { bond: 3, friends: { chiikawa: 3, hachiware: 3, usagi: 3, rakko: 2, momonga: 1 }, items: { katsucurry: 2, shellsoup: 2 }, story: 'islandDone' }
   },
+  // 파자마 파티즈(원작 아이돌 그룹: 포셰트 갑옷 씨에게 산 색색 파자마를 입은 넷이 노래하고 춤춘다 — 첫 공연엔 손님이 없었지만 노래가 귀에 남아
+  // 갑옷 씨들 · 치이카와 · 하치와레까지 따라 부르고 춤추게 된다). 잠옷 밤나들이 다음, 밤 광장 무대에서 공연 · 응원(stories/pajamaidol.js, 노래는 core/idolsong.js 의 원곡)
+  pajamaParty: {
+    title: '파자마 파티즈', giver: 'pochette', side: true, after: 'pajamaNight', minDay: 8, hours: [9, 18], needHearts: 0, ask: '요즘 잘 팔리는 거 있어요?',
+    offer: ['어서 오세요~! 들어 보세요, {name} 님!', '지난번 그 폭신폭신 잠옷이요, 초록 · 분홍 · 하양 · 보라… 넷이서 색깔별로 사 갔는데요',
+      '글쎄 그 잠옷을 입고 아이돌을 한대요! 이름하여 『파자마 파티즈』!', '오늘 밤 광장에서 첫 공연이래요. 근데… 손님이 하나도 안 오면 어쩌죠…?',
+      { who: 'hachiware', text: '아이돌!? 우리가 보러 가자~! 첫 손님 해 주자!' }, { who: 'chiikawa', text: '…!! (두근두근)' }],
+    steps: [{
+      type: 'visit', place: 'plaza', hours: [19, 24], scene: 'pajamaParty', speaker: 'pochette', goal: '밤에 광장 무대로 · 파자마 파티즈 첫 공연 (밤 7시 ~ 12시)',
+      say: ['공연 봤어요!? 제가 만든 잠옷이 무대 위에서 반짝반짝…!', '파·자·마·파·티~♪ …어라, 저도 모르게 흥얼거리네요. 귀에서 안 떠나요~!']
+    }],
+    reward: { bond: 2, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, story: 'pajamaParty' }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',

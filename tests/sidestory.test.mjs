@@ -277,3 +277,22 @@ test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, �
   assert.ok(BEATS[ids.indexOf('farewell')].lines.at(-1).do === 'sleep', '모닥불 뒤에 잠');
   for (const ch of [CHORUS, BATTLE]) { assert.ok(ch[0] >= 4, '처음 4박은 준비'); for (let i = 1; i < ch.length; i++) assert.ok(ch[i] > ch[i - 1]); }
 });
+
+test('파자마 파티즈: 잠옷 밤나들이를 끝낸 뒤 여덟째 날부터 낮에 포셰트 갑옷 씨 → 밤 7시 넘어 광장 무대 → 공연', () => {
+  let s = fresh(8, 11);
+  assert.ok(!Q.canOffer(s, 'pajamaParty'), '잠옷 밤나들이를 끝낸 뒤에');
+  s = Q.completeStep(Q.startQuest(fresh(5, 11), 'pajamaNight'), 'pajamaNight', 5).state;
+  s = { ...s, clock: at(8, 11) };
+  assert.ok(Q.canOffer(s, 'pajamaParty'));
+  assert.equal(Q.markOf(s, 'pochette'), 'story');
+  assert.ok(!Q.canOffer({ ...s, clock: at(7, 11) }, 'pajamaParty'), '여덟째 날부터');
+  assert.ok(!Q.canOffer({ ...s, clock: at(8, 21) }, 'pajamaParty'), '가게가 여는 낮에만');
+  const step = Q.QUESTS.pajamaParty.steps[0];
+  assert.equal(step.scene, 'pajamaParty');
+  assert.equal(step.place, 'plaza');
+  assert.ok(Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 20) && !Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 15), '밤에 광장');
+  const r = Q.completeStep(Q.startQuest(s, 'pajamaParty'), 'pajamaParty', 8);
+  assert.ok(r.finished);
+  for (const k of ['chiikawa', 'hachiware', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
+  assert.equal(r.state.story.pajamaParty, 8, '본 날을 적어 둔다');
+});

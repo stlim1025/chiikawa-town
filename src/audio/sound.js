@@ -1,6 +1,8 @@
 // 효과음과 배경음악. 음원 파일 없이 Web Audio 로 그 자리에서 합성한다(외부 파일을 불러올 수 없는 환경이라).
 // 브라우저는 사용자가 한 번 누르기 전까지 소리를 막으므로, 첫 누름에서 unlock() 을 부른다.
 
+import { IDOL_BPM, CHORDS, songAt } from '../core/idolsong.js';
+
 import { playVoice, hush } from './voices.js';
 const PREFS_KEY = 'chiikawa-town-sound';
 const MUSIC_VOL = 0.28, SFX_VOL = 0.9;
@@ -18,7 +20,8 @@ const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
 /** 친구마다 말소리 높이(Hz). */
 const VOICE = { chiikawa: 820, hachiware: 700, usagi: 980, momonga: 900, kurimanju: 420, rakko: 520, shisa: 760, kani: 640, pochette: 600, labor: 330, ramen: 380, captain: 300,
-  hitoha: 860, futaba: 900, islander: 880, jiro: 280, siren: 560 }; // 수상한 섬 사람들
+  hitoha: 860, futaba: 900, islander: 880, jiro: 280, siren: 560, // 수상한 섬 사람들
+  idolG: 940, idolP: 1040, idolW: 880, idolV: 780 }; // 파자마 파티즈(초록 · 분홍 · 하양 · 보라)
 
 /**
  * 소리 장치를 만든다. storage 는 localStorage 처럼 getItem/setItem 이 있는 객체(막혀 있어도 동작한다).
@@ -261,6 +264,35 @@ export function createSound(storage) {
     },
     /** 마을 배경음악을 잠깐 쉰다(on) · 다시 튼다(off): 우사기 클럽처럼 따로 비트가 울리는 동안. */
     duck(on) { ducked = !!on; },
+    /**
+     * 파자마 파티즈의 노래 한 칸(core/idolsong.js): 8분음표 e(곡 시작부터, 준비 박 포함)의 멜로디 · 화음 · 베이스 · 북.
+     * 무대 장면이 박자 화면 시계(rhythm.time)에 맞춰 칸이 바뀔 때마다 부른다. 준비 박에는 똑 · 똑 · 똑 · 띵.
+     * fever: 다 같이 춤출 때 한 옥타브 위 반짝이를 더한다. 노래는 배경음악 · 북은 효과음 켜기를 따른다.
+     */
+    idolStep(round, e, fever = false) {
+      if (!ensure() || ctx.state !== 'running') return;
+      const at = songAt(round, e);
+      if (!at) return;
+      const j = at.count ? e % 8 : at.j, eighth = 60 / IDOL_BPM / 2;
+      if (prefs.sfx) {
+        if (at.count) { if (j % 2 === 0) tone({ freq: j === 6 ? 1568 : 1047, type: 'sine', dur: 0.08, vol: 0.1 }); return; }
+        if (j % 4 === 0) SFX.kick();
+        else if (j % 4 === 2) noise({ dur: 0.09, vol: 0.16, freq: 1700, q: 0.9 }); // 짝(손뼉)
+        if (j % 2) SFX.hat();
+      }
+      if (at.count || !prefs.music) return;
+      const b = at.data, ch = CHORDS[b.chord], n = b.mel[j];
+      if (n) {
+        let len = 1;
+        while (j + len < 8 && !b.mel[j + len]) len++; // 뒤 쉼표만큼 길게 끈다
+        const dur = Math.min(4, len) * eighth * 0.92;
+        tone({ freq: midi(n), type: 'triangle', dur, vol: 0.13, attack: 0.012, bus: musicBus });
+        tone({ freq: midi(n), type: 'square', dur: dur * 0.7, vol: 0.035, attack: 0.012, bus: musicBus }); // 반짝이는 8비트 아이돌 소리
+        if (fever) tone({ freq: midi(n + 12), type: 'sine', dur: dur * 0.6, vol: 0.04, bus: musicBus });
+      }
+      if (j === 0 || j === 4) tone({ freq: midi(ch.bass), type: 'triangle', dur: eighth * 3.6, vol: 0.16, bus: musicBus });
+      if (j % 2 === 1) ch.tones.forEach((f) => tone({ freq: midi(f), type: 'triangle', dur: eighth * 0.8, vol: 0.028, bus: musicBus })); // 엇박 화음(통통 튀게)
+    },
     /** 효과음(sfx) 또는 배경음악(music)을 켜고 끈다. 바뀐 값을 돌려준다. */
     toggle(kind) {
       prefs[kind] = !prefs[kind];
