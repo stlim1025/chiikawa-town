@@ -1275,7 +1275,9 @@ function boot() {
   // ---------- 토벌(4단계): 무기 휘두르기 · 몬스터에게 맞기 · 기절 · 토벌 실기 ----------
   const SWING_TIME = 0.34, HIT_DELAY = 0.14;
   let swingCool = 0, iframe = 0, fainting = false, swingHit = null; // swingHit: { t: 맞히기까지 남은 초, id: 무기 }
-  let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비, pass, fail }
+  let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비 · 몬스터, hits: 맞은 수, pass, fail, foes: { at: 나올 자리, in: 나오기까지 초 } | null }
+  const EXAM_FOE_DELAY = 3; // 실기 몬스터가 나오기까지(초)
+  let examCleanup = false; // 실기 몬스터를 치울 차례(endHunterExam(true))
   let growlCool = 0, warnCool = 0;
   /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 사스마타). */
   const weaponNow = () => (state ? heldWeapon(state) || (hunterExam ? 'fork' : null) : null);
@@ -1354,6 +1356,7 @@ function boot() {
     sound.play('hurt');
     hud.hurt();
     hud.floatText({ x: p.x, y: 1.6, z: p.z, text: `기운 −${dmg}`, kind: 'hurt' });
+    if (hunterExam && examHit(next)) { if (next <= 0) startFaint(); return; }
     if (next <= 0) startFaint();
     else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요!', 2400); }
   }
@@ -1386,28 +1389,47 @@ function boot() {
       }, 700);
     }, 1500);
   }
-  /** 토벌 자격증 실기: 검정소 앞마당에 허수아비가 서고, 정해진 시간 안에 모두 쓰러뜨린다. */
+  /**
+   * 토벌 자격증 실기: 검정소 앞마당 앞줄에 허수아비, 뒤쪽에 쫓아와 공격하는 몬스터(LICENSES.hunter.foes)가 선다.
+   * 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
+   */
   function startHunterPractical(pass, fail) {
     const L = LICENSES.hunter, ex = village.spots.exam;
     endOverlay();
-    const spots = [[-2.4, 1.6], [0, 3.0], [2.4, 1.6]].slice(0, L.dummies).map(([dx, dz]) => village.nearestFree(ex.x + dx, ex.z + dz, 0.4));
-    spots.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
-    hunterExam = { t: L.practical, left: spots.length, pass, fail };
+    const at = ([dx, dz]) => village.nearestFree(ex.x + dx, ex.z + dz, 0.5);
+    const dummies = [[-2.4, 1.6], [2.4, 1.6], [0, 3.0]].slice(0, L.dummies).map(at);
+    const foes = [[-3.4, 5.4], [0, 6.4], [3.4, 5.4]].slice(0, L.foes.length).map(at);
+    dummies.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
+    // 몬스터는 시작 안내를 읽을 틈을 두고 조금 뒤에 나온다(그동안 허수아비로 몸풀기)
+    hunterExam = { t: L.practical, left: dummies.length + foes.length, hits: 0, pass, fail, foes: { at: foes, in: EXAM_FOE_DELAY } };
     player.face(ex.x, ex.z + 2);
     sound.play('job');
-    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${spots.length}개 쓰러뜨리기`, sub: '',
-      chips: [{ icon: ICO.clock, text: `${L.practical}초 안에` }, heldWeapon(state) ? null : { icon: weaponSvg('fork'), text: '사스마타 빌려줌' }].filter(Boolean) });
+    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${dummies.length}개 · 몬스터 ${foes.length}마리`, sub: '',
+      chips: [{ icon: ICO.clock, text: `${L.practical}초 안에` }, { text: `${L.hits}번 맞으면 불합격` },
+        heldWeapon(state) ? null : { icon: weaponSvg('fork'), text: '사스마타 빌려줌' }].filter(Boolean) });
   }
-  function endHunterExam() {
+  /** 실기 중에 맞았다: L.hits 번째이거나 기절하면 불합격. → 시험이 끝났는지 */
+  function examHit(stamina) {
+    const L = LICENSES.hunter;
+    hunterExam.hits += 1;
+    const left = L.hits - hunterExam.hits;
+    if (left > 0 && stamina > 0) { hud.toast(left === 1 ? '한 번 더 맞으면 불합격!' : `${left}번 더 맞으면 불합격!`, 1600); return false; }
+    const fail = hunterExam.fail;
+    endHunterExam(true); // 몬스터에게 맞은 순간은 몬스터 갱신 도중이라 목록은 나중에 치운다
+    fail(stamina > 0 ? `${L.hits}번 맞아서 떨어졌어요` : '기절해서 떨어졌어요');
+    return true;
+  }
+  /** 실기를 끝낸다. later: 몬스터 갱신 도중(맞아서 끝났을 때)이면 몬스터 목록을 건드리지 않고 이번 프레임 updateCombat 에서 치운다. */
+  function endHunterExam(later = false) {
     if (!hunterExam) return;
     hunterExam = null;
-    monsters.clear((m) => m.exam);
+    if (later) examCleanup = true; else monsters.clear((m) => m.exam);
     hud.setTimer(null);
   }
   function examDummyDown() {
     if (!hunterExam) return;
     hunterExam.left -= 1;
-    if (hunterExam.left > 0) { hud.toast(`허수아비 ${hunterExam.left}개 남았어요!`, 1400); return; }
+    if (hunterExam.left > 0) { hud.toast(`${hunterExam.left}개 남았어요!`, 1400); return; }
     const pass = hunterExam.pass;
     endHunterExam();
     setTimeout(pass, 500);
@@ -1436,6 +1458,7 @@ function boot() {
       trail.material.opacity = 0.75 * (1 - Math.abs(k - 0.45) / 0.3);
       trail.material.color.set(wid === 'star' ? 0xfff2a8 : 0xffffff);
     }
+    if (examCleanup) { examCleanup = false; monsters.clear((m) => m.exam); }
     swingCool = Math.max(0, swingCool - dt);
     iframe = Math.max(0, iframe - dt);
     growlCool = Math.max(0, growlCool - dt);
@@ -1445,11 +1468,20 @@ function boot() {
     player.setEngraved(engravedOf(state));
     if (hunterExam) {
       hunterExam.t -= dt;
-      hud.setTimer(['토벌 실기', { icon: monsterSvg('dummy'), text: `${hunterExam.left}개` }, { icon: ICO.clock, text: `${Math.max(0, Math.ceil(hunterExam.t))}초` }]);
+      const F = hunterExam.foes;
+      if (F && (F.in -= dt) <= 0) {
+        F.at.forEach((sp, i) => monsters.spawnAt(LICENSES.hunter.foes[i], sp.x, sp.z, { exam: true }));
+        hunterExam.foes = null;
+        sound.play('growl');
+        hud.toast('몬스터가 나왔어요!', 1600);
+      }
+      const lives = LICENSES.hunter.hits - hunterExam.hits;
+      hud.setTimer(['토벌 실기', { icon: monsterSvg('dummy'), text: `${hunterExam.left}개` }, { text: '♥'.repeat(lives) + '♡'.repeat(hunterExam.hits) },
+        { icon: ICO.clock, text: `${Math.max(0, Math.ceil(hunterExam.t))}초` }]);
       if (hunterExam.t <= 0) {
         const fail = hunterExam.fail;
         endHunterExam();
-        fail('시간 안에 허수아비를 다 쓰러뜨리지 못했어요');
+        fail('시간 안에 다 쓰러뜨리지 못했어요');
       }
     }
   }
@@ -1578,14 +1610,49 @@ function boot() {
   let theft = null; // 모몽가가 살금살금 다가오는 중 { n, t }
   Object.keys(VILLAGERS).forEach((k) => { restUntil[k] = 2 + Math.random() * 14; }); // 시작하자마자 한꺼번에 움직이지 않게 조금씩 어긋나게
   /**
-   * 여럿이 함께 쓰는 곳의 자리(친구가 갈 때 빈자리를 고른다): 게시판 앞 넷 · 스티커 작업대 둘레 다섯 · 라멘 가게 앞 넷.
+   * 여럿이 함께 쓰는 곳의 자리(친구가 갈 때 빈자리를 고른다): 게시판 앞 넷 · 스티커 작업대 둘레 다섯. 라멘 가게는 아래 ramenSeatSteps.
    * 문 앞(내가 말 거는 자리)과 그곳 직원 자리는 비워 둔다. spots 는 문 앞 자리, 작업대 · 게시판 가운데는 그보다 1.7 · 1.65 뒤.
    */
   const SLOTS = {
     board: () => { const b = village.spots.board; return [[-0.7, 0.25], [0.15, 0.9], [-1.5, 0.6], [-0.6, 1.1]].map(([dx, dz]) => ({ x: b.x + dx, z: b.z + dz })); },
-    bench: () => { const f = village.spots.factory, cz = f.z - 1.7; return [[-0.45, 0.8], [0.35, 0.8], [-0.4, -0.8], [0.4, -0.8], [-1.15, 0]].map(([dx, dz]) => ({ x: f.x + dx, z: cz + dz })); },
-    ramen: () => { const r = village.spots.ramen; return [[0.55, 0.95], [-0.45, 1.05], [1.45, 1.35], [-1.5, 1.3]].map(([dx, dz]) => ({ x: r.x + dx, z: r.z + dz })); }
+    bench: () => { const f = village.spots.factory, cz = f.z - 1.7; return [[-0.45, 0.8], [0.35, 0.8], [-0.4, -0.8], [0.4, -0.8], [-1.15, 0]].map(([dx, dz]) => ({ x: f.x + dx, z: cz + dz })); }
   };
+  // ---------- 라멘 가게 자리: 한 자리에 한 명씩 앉고, 다 찼으면 뒤에 줄을 섰다가 빈자리가 나면 앉는다 ----------
+  const RAMEN_SEATS = [[0.55, 0.95], [-0.45, 1.05], [1.45, 1.35], [-1.5, 1.3]], RAMEN_QUEUE = [[-0.5, 2.7], [0.7, 2.8], [-1.7, 3.0], [1.9, 3.1], [0.1, 3.8]];
+  const RAMEN_WAIT = 45; // 줄 서서 기다리는 최대 시간(초)
+  const ramenAt = (list) => { const r = village.spots.ramen; return list.map(([dx, dz]) => ({ x: r.x + dx, z: r.z + dz })); };
+  const ramenFace = () => ({ x: village.spots.ramen.x, z: village.spots.ramen.z - 1.5 });
+  /** 그 자리에 다른 누가 앉아 있거나 앉으러 가는 중인지(라멘 일정이 남아 있을 때만: 다른 일로 바뀌면 자리는 저절로 빈다). */
+  const seatTaken = (i, me) => npcs.list.some((m) => m !== me && m.ramenSeat === i && !m.away && m.plan && m.plan.some((s) => s.ramen));
+  /** 가장 가까운 빈자리를 맡는다 → 자리 { x, z } | null */
+  function takeSeat(n) {
+    const seats = ramenAt(RAMEN_SEATS), free = seats.map((_, i) => i).filter((i) => !seatTaken(i, n));
+    if (!free.length) return null;
+    const i = free.sort((a, b) => Math.hypot(seats[a].x - n.x, seats[a].z - n.z) - Math.hypot(seats[b].x - n.x, seats[b].z - n.z))[0];
+    n.ramenSeat = i;
+    return seats[i];
+  }
+  /**
+   * 라멘 가게까지 가서 빈자리에 앉는 일정 단계. 자리가 다 찼으면 뒤에 줄을 서서(하는 일 '라멘 줄 서는 중') 빈자리가 나기를 기다린다.
+   * 이어지는 먹기 단계에도 ramen: true 를 붙여야 먹는 동안 자리를 지킨다. 너무 오래 기다리면 그만두고 잠깐 쉰다.
+   */
+  function ramenSeatSteps(n) {
+    const sitDown = () => { const p = ramenAt(RAMEN_SEATS)[n.ramenSeat]; n.plan.unshift({ do: 'walk', x: p.x, z: p.z, near: 0.45, ramen: true }); };
+    return [{
+      do: 'call', ramen: true,
+      fn: () => {
+        n.ramenSeat = null;
+        if (takeSeat(n)) { sitDown(); return; }
+        const doing = mindOf(n.kind).doing;
+        setDoing(n.kind, 'bowl', '라멘 줄 서는 중');
+        n.plan.unshift(
+          { do: 'walk', slots: ramenAt(RAMEN_QUEUE), near: 0.5, ramen: true },
+          { do: 'until', ramen: true, face: ramenFace(), max: RAMEN_WAIT, test: () => !!takeSeat(n), onGiveUp: () => { n.ramenSeat = null; restHere(n.kind, 6 + Math.random() * 6); } },
+          { do: 'call', ramen: true, fn: () => { mindOf(n.kind).doing = doing; sitDown(); } }
+        );
+      }
+    }];
+  }
   // ---------- 친구 집 · 동굴에 놀러 가기(3단계) ----------
   const rooms = createRooms();
   let visit = null; // { kind, lodge }
@@ -2107,7 +2174,7 @@ function boot() {
   function npcEat(n) {
     const r = village.spots.ramen;
     setDoing(n.kind, 'bowl', '라멘 먹기');
-    npcs.plan(n, [{ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat') }, {
+    npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat'), ramen: true }, {
       do: 'call',
       fn: () => {
         commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
@@ -2260,12 +2327,12 @@ function boot() {
       if (n === a) s.push({ do: 'walk', x: b.x + (a.x > b.x ? 1 : -1), z: b.z, near: 1.4 }, { do: 'act', anim: 'talk', face: { x: b.x, z: b.z }, time: 2.6, say: fillLine(MEAL_INVITE[a.kind] || '{w} 라멘 먹자', { w: nameOf(b.kind) }), quick: true });
       else s.push({ do: 'sync', group: invite, face: { x: a.x, z: a.z }, max: 30 }, { do: 'act', anim: 'cheer', time: 1.4, say: pickLine(SMALLTALK.reply[n.kind] || ['응!']), quick: true });
       if (n === a) s.push({ do: 'sync', group: invite, max: 30 });
-      s.push({ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'sync', group, face });
-      if (n === a) s.push({ do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) });
-      s.push({ do: 'act', anim: 'drink', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true });
+      s.push(...ramenSeatSteps(n), { do: 'sync', group, face, max: RAMEN_WAIT + 15, ramen: true }); // 짝이 줄 서 있으면 앉아서 기다려 준다
+      if (n === a) s.push({ do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) });
+      s.push({ do: 'act', anim: 'drink', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true, ramen: true });
       for (const [who, text] of conv.lines) {
         const t = npcs.lineTime(text) + 0.25;
-        s.push(who === n.kind ? { do: 'act', anim: 'talk', face, time: t, say: text, quick: true } : { do: 'act', anim: 'drink', face, time: t, quick: true });
+        s.push(who === n.kind ? { do: 'act', anim: 'talk', face, time: t, say: text, quick: true, ramen: true } : { do: 'act', anim: 'drink', face, time: t, quick: true, ramen: true });
       }
       s.push({ do: 'call', fn: () => end(n) });
       return s;
@@ -2517,8 +2584,8 @@ function boot() {
   function staffLunch(n) {
     const r = village.spots.ramen, face = { x: r.x, z: r.z - 1.5 };
     setDoing(n.kind, 'bowl', '점심 라멘');
-    npcs.plan(n, [{ do: 'walk', slots: SLOTS.ramen(), near: 0.45 }, { do: 'call', fn: () => staffSay('ramen', 'welcome', 7, r) },
-      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true }, ...backToPost(n)]);
+    npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) },
+      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true, ramen: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true, ramen: true }, ...backToPost(n)]);
   }
   /** 대장 갑옷 씨 순찰: 광장과 문 몇 곳을 돌며 둘러본다. */
   function patrol(n) {
@@ -2574,7 +2641,7 @@ function boot() {
       opts = [
         [3, () => atPost(n, 'sweep', 'cook', 'pot', '국물 우리기', 3, { x: r.x, z: r.z - 2 })],
         [shisa && !npcs.busy(shisa) && shisa !== talking ? 1.6 : 0, () => together(n, shisa, pickLine(STAFF_SCRIPTS.coach), { at: { x: r.x + 0.2, z: r.z + 1.0 }, icon: 'pot', text: (o) => (o === 'shisa' ? '시사 가르치기' : '면 삶기 배우기') })],
-        [1, () => goAndDo(n, SLOTS.ramen()[Math.floor(Math.random() * 4)], 'sweep', 'wipe', 'broom', '테이블 닦기', 4)],
+        [1, () => goAndDo(n, ramenAt(RAMEN_SEATS)[Math.floor(Math.random() * RAMEN_SEATS.length)], 'sweep', 'wipe', 'broom', '테이블 닦기', 4)],
         [hour >= 14.5 && hour < 16.5 ? 3 : 0.2, () => goAndDo(n, Math.random() < 0.5 ? { x: POND.x + 1, z: POND.z - POND.r - 1 } : S.plaza, 'idle', 'rest', 'step', '바람 쐬기', 6)]
       ];
     } else if (kind === 'pochette') {

@@ -642,9 +642,11 @@ export function createMonsters(scene, village, random = Math.random) {
   }
 
   // ---------- 공격 ----------
+  /** 마을 안은 안전하다. 검정소 앞마당의 토벌 실기 몬스터(m.exam)만은 마을 안에서도 나를 노린다. */
+  const safeFrom = (m) => playerSafe && !m.exam;
   /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). */
   function hurt(m, dmg, x, z) {
-    if (!C || !C.active || playerSafe) return;
+    if (!C || !C.active || safeFrom(m)) return;
     m.hitPlayer = true;
     C.onHit?.(m, { dmg, x, z });
   }
@@ -794,7 +796,7 @@ export function createMonsters(scene, village, random = Math.random) {
   /** 예고: 몸이 붉게 깜빡이고, 칠 곳에 빨간 표시가 차오른다. 겨누는 공격은 도중에 겨눈 곳을 굳힌다. */
   function windStep(m, dt) {
     const A = m.atk, kind = A.kind;
-    if (!C.active || playerSafe) { cancel(m); return; }
+    if (!C.active || safeFrom(m)) { cancel(m); return; }
     const k = 1 - m.wind / m.windMax;
     if (!m.locked) {
       m.aim.x = P.x; m.aim.z = P.z;
@@ -1029,7 +1031,16 @@ export function createMonsters(scene, village, random = Math.random) {
     /** 시험 허수아비 · 이야기 속 왕버섯처럼 정해진 자리에 놓는다. extra.exam 이면 마을 안에도 둔다. */
     spawnAt(species, x, z, extra = {}) { return add(species, x, z, { ...extra, wobble: 0 }); },
     /** 조건에 맞는 몬스터를 없앤다(연기 없이). */
-    clear(fn) { for (let i = list.length - 1; i >= 0; i--) if (fn(list[i])) removeAt(i); },
+    clear(fn) {
+      for (let i = list.length - 1; i >= 0; i--) if (fn(list[i])) removeAt(i);
+      // 치운 몬스터가 쏜 탄도 같이 없앤다(실기가 끝난 뒤 날아오던 포자에 마을 안에서 맞지 않게)
+      for (let i = shots.length - 1; i >= 0; i--) {
+        const s = shots[i];
+        if (list.includes(s.owner)) continue;
+        scene.remove(s.mesh); scene.remove(s.sh);
+        shots.splice(i, 1);
+      }
+    },
     /**
      * 마을 친구가 몬스터를 친다(토벌 일감): 밀어내지 않고 잠깐 멈칫, 체력만 깎는다. 몬스터는 친구를 쫓지 않는다(나만 노린다).
      * → 쓰러뜨렸는지
@@ -1167,7 +1178,7 @@ export function createMonsters(scene, village, random = Math.random) {
         }
         if (M.speed > 0) {
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
-          const canSee = ctx.active && !playerSafe && !m.dormant && dp < (m.engaged ? M.aggro * 1.7 : M.aggro);
+          const canSee = ctx.active && !safeFrom(m) && !m.dormant && dp < (m.engaged ? M.aggro * 1.7 : M.aggro);
           if ((m.state === 'wander' || m.state === 'chase') && fromHome > LEASH) { m.state = 'return'; hideTele(m); }
           if (m.state === 'wander') {
             if (canSee) {
@@ -1240,7 +1251,7 @@ export function createMonsters(scene, village, random = Math.random) {
         s.x += s.vx * dt; s.z += s.vz * dt;
         s.mesh.position.set(s.x, 0.45 + Math.sin(s.t * 10) * 0.05, s.z);
         s.sh.position.set(s.x, 0.03, s.z);
-        let gone = s.t > s.life || Math.hypot(s.x, s.z) < FENCE - 0.3;
+        let gone = s.t > s.life || (!s.owner.exam && Math.hypot(s.x, s.z) < FENCE - 0.3);
         if (!gone && Math.hypot(s.x - p.x, s.z - p.z) < s.r + ME) { hurt(s.owner, s.dmg, s.x, s.z); gone = true; }
         if (gone) {
           poof(s.x, 0.45, s.z, 0.02, 6);

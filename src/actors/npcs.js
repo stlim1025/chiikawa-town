@@ -258,6 +258,7 @@ export function createNpcs(scene, village, weeds, berries) {
    * · wait { time } · call { fn } · hunt { find(x, z, skip), hit(m), left, onKill(m) } (마을 밖 몬스터 토벌). 다 하면 다음 단계로.
    * · walk 에 run: true 면 뛰어간다. act 에 quick: true 면 끝나자마자 다음 단계(대화처럼 박자를 맞출 때).
    * · sync { group: { need, here: Set } } 같은 group 의 친구가 다 모일 때까지 기다린다(오래 안 오면 모두 그만둔다).
+   * · until { test(n), max, face, onGiveUp(n) } test 가 참이 될 때까지 제자리에서 기다린다(라멘 가게 줄). max 초가 지나면 그만두고 onGiveUp.
    * · approach { near, max } 내 캐릭터에게 다가간다(움직여도 따라간다).
    */
   function runPlan(n) {
@@ -341,6 +342,12 @@ export function createNpcs(scene, village, weeds, berries) {
       step.waited = (step.waited || 0) + 0.3;
       n.timer = 0.3;
       if (step.waited > (step.max || 16)) { g.cancel = true; n.plan = null; n.timer = 1; } // 짝이 안 온다: 모두 그만
+    } else if (step.do === 'until') {
+      if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
+      if (step.test(n)) { next(0.05); return; }
+      step.waited = (step.waited || 0) + 0.5;
+      n.timer = 0.5;
+      if (step.waited > (step.max || 30)) { n.plan = null; n.timer = 1; step.onGiveUp?.(n); }
     } else if (step.do === 'approach') {
       const d = Math.hypot(lastPlayer.x - n.x, lastPlayer.z - n.z);
       if (d < (step.near || 1.6)) { n.yaw = Math.atan2(lastPlayer.x - n.x, lastPlayer.z - n.z); next(0.05); return; }

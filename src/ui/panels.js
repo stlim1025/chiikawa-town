@@ -385,7 +385,7 @@ export function createPanels(ui, handlers) {
       const LINES = {
         liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
         arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명'], ['book', '레시피 북']],
-        hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개`], ['book', '토벌 안내서']]
+        hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개 · 몬스터 ${L.hunter.foes.length}마리 · ${L.hunter.hits}번 맞으면 탈락`], ['book', '토벌 안내서']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
@@ -459,10 +459,10 @@ export function createPanels(ui, handlers) {
       const rule = (art, title, sub) => h('div', { class: 'rule-card' }, svgSpan('rule-ico', RULE_ART[art]), h('div', {}, h('b', {}, title), h('span', {}, sub)));
       return [head('토벌 안내서'),
         h('div', { class: 'rule-grid' },
-          rule('faint', '기운 0이면 기절', ''),
+          rule('faint', '기운 0이면 기절', '마을 입구에서 깨고 돈을 조금 잃어요'),
           rule('safe', '마을 안은 안전', ''),
           rule('dodge', '빨간 표시는 피하기', ''),
-          rule('shop', '무기는 도구점', '')),
+          rule('shop', '무기는 도구점', '전리품은 노동 접수에서 팔아요')),
         h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];

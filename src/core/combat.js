@@ -123,27 +123,54 @@ export function inSwing(px, pz, yaw, range, mx, mz, size, arc = Math.PI / 3) {
 }
 
 /**
- * 토벌 자격증 필기: 몬스터 안내문(검정소)에서 문제를 만든다. 4지선다 → [{ q, choices, answer }].
+ * 토벌 자격증 필기: 검정소 토벌 안내서(몬스터 카드 · 규칙 카드)를 꼼꼼히 봐야 풀리는 4지선다 → [{ type, mon?, q, choices, answer }].
+ * 카드에 적힌 것만 묻는다: 사는 곳 · 공격 방식 · 단단함(방패 칸) · 맞으면 줄어드는 기운 · 전리품과 그 값. 거꾸로도 묻는다(전리품 → 몬스터).
+ * 오답은 같은 구역 몬스터의 것부터 골라 헷갈리게 하고, 규칙 문제의 오답도 그럴듯하게 둔다. 같은 문제는 한 번만.
  */
 export function huntQuiz(n, random = Math.random) {
   const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const q = (text, right, wrong) => { const choices = shuffle([right, ...wrong.slice(0, 3)]); return { q: text, choices, answer: choices.indexOf(right) }; };
+  const pick = (list) => list[Math.floor(random() * list.length) % list.length];
+  const q = (type, text, right, wrong, mon = null) => { const choices = shuffle([right, ...wrong.slice(0, 3)]); return { type, mon, q: text, choices, answer: choices.indexOf(right) }; };
   const REGION = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '밤에 마을 밖 어디든' };
   const field = MONSTER_ORDER.filter((k) => !MONSTERS[k].boss);
-  const name = (k) => MONSTERS[k].name;
-  const pool = [
-    ...field.map((k) => () => q(`${josa(name(k), '은/는')} ${MONSTERS[k].night ? '언제 어디에' : '어디에'} 나타날까?`, REGION[MONSTERS[k].region], shuffle(Object.values(REGION).filter((r) => r !== REGION[MONSTERS[k].region])))),
-    ...field.map((k) => () => q(`${josa(name(k), '을/를')} 잡으면 얻는 전리품은?`, DROPS[MONSTERS[k].drop].name, shuffle(field.filter((o) => o !== k).map((o) => DROPS[MONSTERS[o].drop].name)))),
-    () => q('가장 단단한(여러 번 때려야 하는) 몬스터는?', name('turtle'), shuffle(['fluff', 'beetle', 'slime', 'moth'].map(name))),
-    ...field.map((k) => () => q(`${josa(name(k), '은/는')} 어떻게 공격할까?`, MONSTERS[k].atk, shuffle(field.filter((o) => MONSTERS[o].atk !== MONSTERS[k].atk).map((o) => MONSTERS[o].atk)))),
-    () => q('바닥에 빨간 표시가 뜨면?', '곧 그 자리로 공격이 오니 피한다', ['보물이 묻힌 자리라 기다린다', '몬스터가 잠든다는 뜻이다', '아무 일도 없다']),
-    () => q('몬스터에게 맞으면 무엇이 줄어들까?', '기운', ['돈', '친밀도', '제초 급수']),
-    () => q('기운이 0이 되면 어떻게 될까?', '기절해서 마을 입구로 옮겨지고 돈을 조금 잃는다', ['그 자리에서 바로 다시 일어난다', '가방의 물건을 모두 잃는다', '집으로 옮겨지고 아무것도 잃지 않는다']),
-    () => q('몬스터가 들어오지 못하는 곳은?', '마을 울타리 안', ['남쪽 강가', '동쪽 들판', '바위산 동굴 앞']),
-    () => q('전리품은 어디에서 팔까?', '노동 접수', ['라멘 로우', '카니 헌책방', '부동산']),
-    () => q('무기는 어디에서 살까?', '도구점', ['가구점', '포셰트 가게', '검정소'])
+  const M = (k) => MONSTERS[k], name = (k) => M(k).name, drop = (k) => DROPS[M(k).drop];
+  const pips = (k) => Math.min(5, Math.ceil(M(k).hp / 3)); // 안내서의 단단함(방패 다섯 칸)과 같은 셈
+  const won = (v) => `${v.toLocaleString('ko-KR')}원`;
+  const quoted = (w, pair) => `'${w}'${josa(w, pair).slice(w.length)}`; // '풀잎 날개'는 · '반짝 뿔'은
+  /** 헷갈리는 오답 후보: 같은 구역 몬스터 먼저, 그다음 다른 구역. */
+  const lookalikes = (k) => [...shuffle(field.filter((o) => o !== k && M(o).region === M(k).region)), ...shuffle(field.filter((o) => M(o).region !== M(k).region))];
+  /** 후보들을 보기 글로 바꾸되 정답 · 서로 겹치는 글은 뺀다. */
+  const texts = (list, f, right) => { const seen = new Set([right]); return list.map(f).filter((t) => !seen.has(t) && seen.add(t)); };
+  const groups = Object.keys(REGION).filter((r) => field.filter((k) => M(k).region === r).length >= 3);
+  const KINDS = {
+    region: () => { const k = pick(field), r = REGION[M(k).region]; return q('region', `${josa(name(k), '은/는')} ${M(k).night ? '언제 어디에' : '어디에'} 나타날까?`, r, shuffle(Object.values(REGION).filter((x) => x !== r)), k); },
+    drop: () => { const k = pick(field); return q('drop', `${josa(name(k), '을/를')} 잡으면 얻는 전리품은?`, drop(k).name, texts(lookalikes(k), (o) => drop(o).name, drop(k).name), k); },
+    dropOf: () => { const k = pick(field); return q('dropOf', `${quoted(drop(k).name, '을/를')} 떨어뜨리는 몬스터는?`, name(k), texts(lookalikes(k), name, name(k)), k); },
+    atk: () => { const k = pick(field); return q('atk', `${josa(name(k), '은/는')} 어떻게 공격할까?`, M(k).atk, texts(lookalikes(k), (o) => M(o).atk, M(k).atk), k); },
+    atkOf: () => { const k = pick(field); return q('atkOf', `공격 방식이 '${M(k).atk}'인 몬스터는?`, name(k), texts(lookalikes(k), name, name(k)), k); },
+    dmg: () => { const k = pick(field), t = `기운 −${M(k).dmg}`; return q('dmg', `${name(k)}에게 한 번 맞으면 기운이 얼마나 줄까?`, t, texts(lookalikes(k), (o) => `기운 −${M(o).dmg}`, t), k); },
+    price: () => { const k = pick(field), t = won(drop(k).price); return q('price', `${quoted(drop(k).name, '은/는')} 노동 접수에서 얼마에 팔릴까?`, t, texts(lookalikes(k), (o) => won(drop(o).price), t), k); },
+    tough: () => {
+      const k = pick(field.filter((o) => pips(o) >= 2));
+      return q('tough', '다음 중 가장 단단한(방패가 많은) 몬스터는?', name(k), shuffle(field.filter((o) => pips(o) < pips(k))).map(name), k);
+    },
+    odd: () => {
+      const r = pick(groups), k = pick(field.filter((o) => M(o).region !== r && !M(o).night)); // 밤 나방은 어디든 나오니 정답이 될 수 없다
+      return q('odd', `${REGION[r]}에 살지 않는 몬스터는?`, name(k), shuffle(field.filter((o) => M(o).region === r)).map(name), k);
+    }
+  };
+  const RULES = [
+    () => q('rule', '바닥에 빨간 표시가 뜨면 어떻게 할까?', '곧 그 자리로 공격이 오니 피한다', ['몬스터가 화났다는 뜻이니 더 세게 친다', '그 안에 서 있으면 공격을 막을 수 있다', '몬스터가 곧 도망친다는 뜻이니 쫓아간다']),
+    () => q('rule', '기운이 0이 되면 어떻게 될까?', '기절해서 마을 입구로 옮겨지고 돈을 조금 잃는다',
+      ['기절해서 집으로 옮겨지고 아무것도 잃지 않는다', '기절해서 마을 입구로 옮겨지고 전리품을 모두 잃는다', '그 자리에서 기운이 조금 찬 채로 바로 일어난다']),
+    () => q('rule', '몬스터가 들어오지 못하는 곳은?', '마을 울타리 안', ['강가의 나무다리 위', '숲속 커다란 나무 밑', '바위산 동굴 앞']),
+    () => q('rule', '전리품은 어디에서 팔까?', '노동 접수', ['도구점', '검정소', '포셰트 가게']),
+    () => q('rule', '무기는 어디에서 살까?', '도구점', ['노동 접수', '검정소', '가구점'])
   ];
-  return shuffle(pool).slice(0, n).map((f) => f());
+  // 안내서 세부 문제는 종류마다 두 번씩 뽑아 두고 규칙 문제와 섞는다 → 같은 글은 빼고 n 개
+  const pool = shuffle([...Object.values(KINDS), ...Object.values(KINDS), ...RULES]).map((f) => f());
+  const seen = new Set();
+  return pool.filter((x) => !seen.has(x.q) && seen.add(x.q)).slice(0, n);
 }
 
 export function isValidWeapon(w) {
