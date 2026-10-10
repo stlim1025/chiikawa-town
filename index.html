@@ -1583,6 +1583,9 @@ html.standalone, html.standalone body { height: 100vh; }
 /* 가로로 든 휴대폰: 마을폰을 옆으로 넓게 눕혀 앱이 한 줄에 다 들어가게(세로로 좁으면 앱이 아래로 밀려 스크롤해야 했다) */
 @media (orientation: landscape) and (max-height: 500px) {
   .panel.phone { width: min(620px, 100% - 24px); }
+  /* 아래 대사창: 화면 폭을 거의 다 쓰는 얇은 띠(한 줄)였다 → 동물의 숲처럼 가운데 좁게, 두세 줄로(낱말 단위로 줄바꿈) */
+  .guide { width: min(480px, 58vw); }
+  .guide-text { word-break: keep-all; }
   .apps { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
 }
 
