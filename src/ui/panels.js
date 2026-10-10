@@ -751,12 +751,18 @@ export function createPanels(ui, handlers) {
       const hover = h('div', { class: 'pocket-name hover', 'aria-hidden': 'true' });
       hover.hidden = true;
       const wrap = h('div', { class: 'pocket' }, grid, hover);
+      // 칸 자리(주머니 안 좌표): 화면 좌표(getBoundingClientRect)는 창이 톡 커지는 중이면 줄어든 값이라 말풍선이 어긋난다 → 배치 좌표로 잰다
+      const slotAt = (el) => {
+        let x = 0, y = 0;
+        for (let e = el; e && e !== wrap; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+        return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight };
+      };
       function showHover(btn, x) {
         if (same(x, current.sel)) { hover.hidden = true; return; } // 고른 칸은 이미 이름이 떠 있다
-        const W = wrap.getBoundingClientRect(), r = btn.getBoundingClientRect();
+        const r = slotAt(btn);
         hover.textContent = nameOf(x);
-        hover.style.left = `${r.left - W.left + r.width / 2}px`;
-        hover.style.top = `${r.top - W.top - 6}px`;
+        hover.style.left = `${r.left + r.width / 2}px`;
+        hover.style.top = `${r.top - 6}px`;
         hover.hidden = false;
       }
       // 고른 칸: 위에 이름 말풍선, 옆에 할 일 메뉴
@@ -772,15 +778,17 @@ export function createPanels(ui, handlers) {
         else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
         else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
         acts.push(act('그만두기', () => {}));
-        wrap.append(h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), h('div', { class: 'pocket-menu', role: 'menu' }, acts));
+        // 이름 말풍선 · 메뉴는 직접 잡아 둔다(같은 모양의 마우스 말풍선 hover 가 먼저 들어 있어서 querySelector 로 찾으면 그쪽이 잡힌다)
+        const bubble = h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), menu = h('div', { class: 'pocket-menu', role: 'menu' }, acts);
+        wrap.append(bubble, menu);
         // 그린 뒤에 말풍선 · 메뉴를 고른 칸 옆에 붙인다(칸 자리를 재야 해서)
         current.afterRender = () => {
-          const slot = wrap.querySelector('.pocket-slot.on'), menu = wrap.querySelector('.pocket-menu'), bubble = wrap.querySelector('.pocket-name');
+          const slot = wrap.querySelector('.pocket-slot.on');
           if (!slot || !menu) return;
-          const W = wrap.getBoundingClientRect(), r = slot.getBoundingClientRect();
-          const left = r.left - W.left, top = r.top - W.top;
+          const W = { width: wrap.clientWidth, height: wrap.clientHeight }, r = slotAt(slot);
+          const { left, top } = r;
           bubble.style.left = `${left + r.width / 2}px`;
-          bubble.style.top = `${top - 6}px`;
+          bubble.style.top = `${top - 12}px`; // 고른 칸은 4px 떠오르고 조금 커져 있다
           // 칸 오른쪽 → 왼쪽 → (좁은 화면) 칸 아래, 아래가 모자라면 이름 말풍선 위
           const mw = menu.offsetWidth, mh = menu.offsetHeight;
           let mx = left + r.width + 8, my = Math.max(4, Math.min(W.height - mh - 4, top + r.height / 2 - mh / 2));
