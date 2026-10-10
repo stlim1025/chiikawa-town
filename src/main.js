@@ -917,6 +917,7 @@ function boot() {
   // ---------- 친구와 이야기 · 놀기 ----------
   let talking = null; // 대화 중인 친구
   let tag = null; // 술래잡기 { n, t: 남은 초 }
+  let examPill = false; // 제초 승급 시험 진행을 위 가운데 알약에 띄우는 중
   let dance = null; // 같이 춤추기 { n, t }
   let escort = false; // 하치와레가 집까지 앞장서는 중
   let overlay = false; // 시험 · 알바 창이 열려 있다
@@ -3406,6 +3407,12 @@ function boot() {
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
       hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
+      // 제초 승급 시험: 토벌 실기처럼 위 가운데 노란 알약에 진행(깔끔하게 연속 ●○)을 크게. 실기 · 술래잡기가 알약을 쓰는 동안은 비켜 준다
+      if (state.exam && !hunterExam && !tag) {
+        const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
+        hud.setTimer(['승급 시험', { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}` }]);
+        examPill = true;
+      } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
       // 하는 중인 퀘스트를 모두(화면에 띄우기로 고른 것이 맨 위)
       const qt = pickTrack(state), qs = activeQuests(state);
       hud.setQuests((qt ? [qt, ...qs.filter((id) => id !== qt)] : qs).map((id) => {
