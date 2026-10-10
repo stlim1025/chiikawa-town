@@ -568,7 +568,11 @@ export function createHud(ui, input) {
         } else if (it.kind === 'doing') {
           // 친구가 하는 일: 머리 위 작은 동그라미 아이콘
           if (e.dataset.v !== it.icon) { e.dataset.v = it.icon; e.innerHTML = it.svg; }
+        } else if (it.html != null) {
+          // 그림이 든 표시(간판 명찰 · 이야기 표시): 바뀔 때만 다시 그린다
+          if (e.dataset.v !== it.html) { e.dataset.v = it.html; e.innerHTML = it.html; }
         } else if (e.textContent !== it.text) e.textContent = it.text;
+        if ('far' in it) e.classList.toggle('far', !!it.far);
         e.style.left = ((v.x + 1) / 2) * w + 'px';
         e.style.top = ((1 - v.y) / 2) * h + 'px';
         seen.add(it.id);

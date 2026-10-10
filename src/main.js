@@ -90,6 +90,7 @@ import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
 import { createStarfall } from './world/starfall.js';
 import { createStreaks } from './ui/starstreaks.js';
+import { signHtml } from './ui/signart.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
@@ -3503,7 +3504,8 @@ function boot() {
   // 창을 닫거나 다른 앱으로 갈 때도 저장한다
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
   window.addEventListener('pagehide', save);
-  const signLabels = village.labels.map((l, i) => ({ id: 'sign-' + i, ...l, kind: 'sign' }));
+  const signLabels = village.labels.map((l, i) => ({ id: 'sign-' + i, ...l, key: l.text, html: signHtml(l.text), kind: 'sign' }));
+  const SIGN_SEE = 34, SIGN_CLEAR = 16; // 간판은 이만큼 안에서만, 가까운 것(SIGN_CLEAR 안)만 또렷하게 · 먼 것은 작고 흐리게
   const homeSign = signLabels.find((l) => l.text === '내 집'); // 사기 전에는 '빌린 집'
 
   // ---------- 루프 ----------
@@ -3780,14 +3782,23 @@ function boot() {
     starfall.update(dt, cam.camera);
     gfx.followSun(focus.x, focus.z);
     if (!skipRender) gfx.render(cam.camera);
-    if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
-    const bubbles = npcs.labels(), mark = mode === 'play' ? tutorialMarker() : null;
+    if (homeSign && state) {
+      const tx = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
+      if (homeSign.text !== tx) { homeSign.text = tx; homeSign.html = signHtml(tx, homeSign.key); }
+    }
+    // 타이틀 · 처음 마을에 들어오는 장면에서는 간판 · 말풍선을 띄우지 않는다(마을에 들어온 뒤부터 톡톡 나타난다)
+    if (mode !== 'play') { cue.visible = false; hud.placeLabels([], cam.camera); return; }
+    const bubbles = npcs.labels(), mark = tutorialMarker();
     if (mark) bubbles.push(mark);
-    if (mode === 'play') bubbles.push(...monsters.labels(focus), ...questMarks(focus), ...doingLabels(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?, 친구가 하는 일
-    const prompt = mode === 'play' ? showTargetCue(bubbles) : (cue.visible = false, null);
+    bubbles.push(...monsters.labels(focus), ...questMarks(focus), ...doingLabels(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?, 친구가 하는 일
+    const prompt = showTargetCue(bubbles);
     if (prompt) bubbles.push(prompt);
-    // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게)
-    const near = signLabels.filter((l) => Math.abs(l.x - focus.x) < 45 && Math.abs(l.z - focus.z) < 45);
+    // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게), 먼 간판은 작고 흐리게
+    const near = [];
+    for (const l of signLabels) {
+      const d = Math.hypot(l.x - focus.x, l.z - focus.z);
+      if (d < SIGN_SEE) { l.far = d > SIGN_CLEAR; near.push(l); }
+    }
     hud.placeLabels(bubbles.length ? near.concat(bubbles) : near, cam.camera);
   }
   requestAnimationFrame(frame);

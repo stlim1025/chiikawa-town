@@ -465,13 +465,15 @@ export function buildVillage(scene) {
 
   // ---------- 마을 건물: layout 의 자리(LOTS)마다 남쪽(카메라 쪽)을 보고 짓는다 ----------
   const homes = {};
+  const SIGN_TOP = 2.5; // 집 이름표 높이 상한(처마 언저리)
   for (const lot of LOTS) {
     if (lot.kind === 'house') {
       const d = building(lot, DESIGNS[lot.id]);
-      labels.push({ x: lot.x, y: d.H + 0.55, z: lot.z, text: lot.label });
+      // 이름표는 지붕 꼭대기가 아니라 앞면 처마 높이(문패처럼): 가까이 가도 화면 위로 잘리지 않는다
+      labels.push({ x: lot.x, y: Math.min(d.H + 0.55, SIGN_TOP), z: lot.z + 1.716 * lot.s * 0.6, text: lot.label });
     } else if (lot.kind === 'dome') {
       const d = dome(lot.x, lot.z, lot.s, lot.yaw || 0);
-      labels.push({ x: lot.x, y: d.R + 0.9, z: lot.z, text: lot.label });
+      labels.push({ x: lot.x, y: Math.min(d.R + 0.9, SIGN_TOP), z: lot.z + 1.4 * lot.s * 0.5, text: lot.label });
     } else if (lot.kind === 'stall') stall(lot);
     else if (lot.kind === 'board') board(lot);
     else if (lot.kind === 'bench') bench(lot);
