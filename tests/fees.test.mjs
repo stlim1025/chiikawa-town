@@ -50,3 +50,14 @@ test('자는 동안 친구들이 보내는 시간: 저녁(밤 9시까지) · 밤
   assert.equal(s.evening, null); assert.equal(s.night, true);
   assert.deepEqual(s.morning, { day: 4, from: 6.5, to: 10 });
 });
+
+test('자고 일어나면 기운이 꽉 차지 않고 60쯤까지만 찬다(이미 더 있으면 그대로)', async () => {
+  const { sleepStamina, SLEEP_STAMINA } = await import('../src/core/state.js');
+  assert.equal(SLEEP_STAMINA, 60);
+  assert.equal(sleepStamina(fresh({ stamina: 10 }), 'home').stamina, 60);
+  assert.equal(sleepStamina(fresh({ stamina: 10 }), 'lodge').stamina, 60);
+  assert.equal(sleepStamina(fresh({ stamina: 85 }), 'home').stamina, 85, '자서 줄지는 않는다');
+  assert.equal(sleepStamina(fresh({ stamina: 10 }), 'rough').stamina, 40, '노숙은 조금만');
+  assert.equal(sleepStamina(fresh({ stamina: 50 }), 'rough').stamina, 60, '노숙해도 침대보다 더 차지는 않는다');
+  assert.equal(sleepStamina(fresh({ stamina: 70 }), 'rough').stamina, 70);
+});
