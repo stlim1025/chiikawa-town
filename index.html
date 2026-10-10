@@ -259,7 +259,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @media (prefers-reduced-motion: reduce) { .hud-banner, .hud-job.done, .toast, .hud-action { animation: none; } }
 
 /* 월드 라벨: 간판은 나무 팻말, 대사는 크림색 말풍선 */
-.world-label { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; font-family: var(--hand); font-weight: 700; }
+.world-label { position: absolute; width: max-content; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; font-family: var(--hand); font-weight: 700; }
+/* 머리 위 표시의 자리 껍데기: hud.js placeAt 이 통째로 GPU 로 옮긴다(안의 글자 · 아이콘은 한 장으로 같이 움직인다) */
+.wl-pos { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
 /* 간판 명찰(동물의 숲처럼): 크림색 둥근 판 · 갈색 글씨 · 건물마다 다른 색 동그라미 아이콘 · 아래로 살짝 꼬리. 먼 간판은 작고 흐리게 */
 .world-label.sign { display: flex; align-items: center; gap: 6px; padding: 3px 13px 4px 4px; margin-top: -8px; font-size: 15px; line-height: 1.15; color: #5d4128; background: #fffaf0; border-radius: 999px; box-shadow: 0 0 0 2px #f1e3c6, 0 3px 0 2px #e2cba2, 0 6px 10px rgba(90, 60, 25, 0.16); transition: opacity 0.35s ease; animation: sign-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards; }
 .world-label.sign::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -6px; border: 6px solid transparent; border-top: 7px solid #fffaf0; border-bottom: 0; filter: drop-shadow(0 2px 0 #e2cba2); }
@@ -1346,7 +1348,10 @@ button.pocket-slot:hover { transform: translateY(-2px); }
 .notice-wrap, .raffle-wrap { align-items: flex-start; overflow-y: auto; }
 .notice-card, .raffle-stage { margin: auto; }
 /* 창 닫기: 오른쪽 위 X(스크롤 밖이라 늘 보인다). 첫 줄(이름표 · 지갑)은 X 와 겹치지 않게 비켜 두고, 닫기만 있던 아래 줄은 감춘다 */
-.panel-x { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding-bottom: 3px; border-radius: 50%; background: var(--paper-2); box-shadow: 0 3px 0 var(--shadow); font-size: 26px; line-height: 1; }
+.panel-x { position: absolute; top: 8px; right: 8px; z-index: 3; width: 38px; height: 38px; padding: 0; border-radius: 50%; background: var(--paper-2); box-shadow: 0 3px 0 var(--shadow); }
+/* X 는 글자 대신 선 두 개로 그린다: 글꼴마다 × 의 자리가 달라 휴대폰에서 동그라미 가운데에서 벗어났다 */
+.panel-x::before, .panel-x::after { content: ""; position: absolute; left: calc(50% - 9px); top: calc(50% - 1.5px); width: 18px; height: 3px; border-radius: 2px; background: var(--ink); transform: rotate(45deg); }
+.panel-x::after { transform: rotate(-45deg); }
 .panel-x:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
 .panel-x ~ .panel-body > :first-child { padding-right: 44px; }
 .panel .actions:empty { display: none; }

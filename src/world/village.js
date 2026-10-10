@@ -587,6 +587,7 @@ export function buildVillage(scene) {
   const haloMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd98c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0xffc56b, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const poolGeo = new THREE.CircleGeometry(1.9, 28).rotateX(-Math.PI / 2);
+  const lampGlows = []; // 후광 · 빛 웅덩이: 낮엔 감춘다(투명도 0 이어도 보이게 두면 매 장면 40번쯤 헛그렸다)
   function lamp(x, z) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
@@ -602,6 +603,7 @@ export function buildVillage(scene) {
     pool.position.y = 0.05;
     pool.renderOrder = 1;
     g.add(pool);
+    lampGlows.push(halo, pool);
     world.add(g);
     obstacles.push({ x, z, r: 0.22 });
   }
@@ -707,9 +709,17 @@ export function buildVillage(scene) {
   const move = (ox, oz, nx, nz, radius = 0.35) => slideMove(isFree, obstacles.pushOut, ox, oz, nx, nz, radius);
 
   // ---------- 가볍게: 움직이지 않는 소품은 덩어리로 합치고(render/batch.js) 위치를 굳힌다. 구름 · 나비 · 추첨 통은 움직여서 뺀다 ----------
-  // 집 · 가게 · 문은 반투명해지려고 재질을 따로 둬서 아래 배칭에서 빠진다 → 한 채 안에서 같은 재질 부품끼리 합친다(집마다 그리기 수십 번 → 몇 번)
+  // 집 · 가게 · 문은 반투명해지려고 재질을 따로 둬서 아래 배칭에서 빠진다 → 한 채 안의 부품을 합친다. 색만 다른 재질은 색을 꼭짓점에 칠해
+  // 한 채에 재질 하나로(집마다 그리기 열 번 남짓 → 두세 번). 밤에 불 켜지는 창 · 그림 간판 · 양면 재질처럼 따로인 것은 재질째로
   const unitOf = (m) => { let u = m; while (u.parent && u.parent !== world) u = u.parent; return u; };
-  for (const o of [...houses, ...gates]) if (o.meshes.length) o.meshes = mergeUnit(unitOf(o.meshes[0]), o.meshes);
+  for (const o of [...houses, ...gates]) {
+    if (!o.meshes.length) continue;
+    const own = new Set(o.mats), vc = toonMaterial('#ffffff', { unique: true, vertexColors: true });
+    vc.transparent = true; // 다른 집 재질처럼: 아래 정적 배칭이 이 집을 마을 덩어리에 섞지 않게(섞이면 가릴 때 반투명해지지 않았다). 끝에 불투명으로 돌린다
+    const plain = (m) => own.has(m) && !windows.includes(m) && m.isMeshToonMaterial && !m.map && !m.vertexColors && m.side === THREE.FrontSide && m.emissive.getHex() === 0;
+    o.meshes = mergeUnit(unitOf(o.meshes[0]), o.meshes, (m) => (plain(m.material) ? { key: 'vc', material: vc, tint: m.material.color } : { key: m.material.uuid, material: m.material, tint: null }));
+    o.mats = [vc, ...o.mats]; // 가릴 때 함께 반투명해지게(합치지 못하고 남은 부품은 원래 재질 그대로)
+  }
   batchStatic(world, { skip: [...clouds, ...butterflies.map((b) => b.g), raffleDrum] });
   for (const m of [...trees, ...houses, ...gates].flatMap((o) => o.mats)) seeThrough(m, false);
 
@@ -721,7 +731,7 @@ export function buildVillage(scene) {
     warmShaders(renderer, camera) {
       const mats = [...trees, ...houses, ...gates].flatMap((o) => o.mats);
       mats.forEach((m) => seeThrough(m, true));
-      try { renderer.compile(scene, camera); } finally { mats.forEach((m) => seeThrough(m, false)); }
+      try { renderer.compile(scene, camera); } finally { mats.forEach((m) => seeThrough(m, false)); } // 숨긴 것(낮의 가로등 빛)까지 다 훑는다
     },
     /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
@@ -780,6 +790,7 @@ export function buildVillage(scene) {
       lampGlass.emissive.setRGB(1, 0.86, 0.55).multiplyScalar(k);
       haloMat.opacity = 0.85 * k;
       poolMat.opacity = 0.5 * k;
+      lampGlows.forEach((o) => { o.visible = k > 0.01; });
       windows.forEach((m) => { if (m) m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(0.85 * k); });
       outdoors.glow.forEach((m) => m.emissive.setRGB(0.45, 0.85, 1).multiplyScalar(k));
     },

@@ -214,7 +214,7 @@ export function createPanels(ui, handlers) {
       // 테두리는 .panel 에, 스크롤은 .panel-body 에 둔다(스크롤해도 테두리가 따라 움직이지 않게)
       body = h('div', { class: 'panel-body' });
       panel = h('div', { class: `panel panel-${kind}`, role: 'dialog', 'aria-modal': 'true' },
-        h('button', { class: 'panel-x', type: 'button', 'aria-label': '닫기', onClick: () => close() }, '×'), body); // 스크롤 밖 오른쪽 위에 늘 보이는 닫기
+        h('button', { class: 'panel-x', type: 'button', 'aria-label': '닫기', onClick: () => close() }), body); // 스크롤 밖 오른쪽 위에 늘 보이는 닫기
     }
     backdrop.append(panel);
     ui.append(backdrop);

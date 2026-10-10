@@ -13,6 +13,13 @@ export function createScene(canvas) {
   const scene = new THREE.Scene();
   // 장면 자체는 움직이지 않는다: 켜 두면 매 장면 '위치 다시 계산' 신호가 꼭대기부터 모든 물체로 번져 굳혀 둔 정적 물체까지 다시 계산했다
   scene.matrixAutoUpdate = false;
+  // 숨긴 꼭대기 물체(뽑힌 풀 · 따 간 열매 같은 것 수백 개)는 매 장면 위치 계산 순회에서 뺀다. 장면이 움직이지 않으니
+  // 다시 보일 때 제 위치 계산만으로 맞는다. 통째로 다시(force)일 때는 원래대로 다 돈다
+  const updateAll = scene.updateMatrixWorld;
+  scene.updateMatrixWorld = function (force) {
+    if (force || this.matrixWorldNeedsUpdate) return updateAll.call(this, force);
+    for (const c of this.children) if (c.visible && c.matrixWorldAutoUpdate) c.updateMatrixWorld(false);
+  };
   scene.background = new THREE.Color(0xd9eef7);
   scene.fog = new THREE.Fog(0xe2f5fb, 46, 125);
 
@@ -79,9 +86,36 @@ export function createScene(canvas) {
     scene.background.copy(horizon);
   }
 
+  // 그림자 맵: 카메라가 멈춰 있으면 두 장면에 한 번만 다시 그린다(서 있을 때 그림자 그리기 절반 — 친구가 걸어도 한 장면 늦는 건 2cm 남짓).
+  // 카메라가 움직이거나, 그림자 범위 안 캐릭터 · 몬스터(장면 꼭대기 물체)가 지난 그림자 뒤로 3cm 넘게 움직였으면 매번
+  // (카메라를 세워 둔 연출 · 달려오는 몬스터도 그림자가 몸에서 3cm 넘게 늦지 않게)
+  const SHADOW_SLACK = 0.03, SHADOW_REACH = 22;
+  const lastCam = new THREE.Matrix4(), lastPos = new WeakMap();
+  let shadowTick = 0;
+  function shadowDue(camera) {
+    camera.updateMatrixWorld();
+    const a = camera.matrixWorld.elements, b = lastCam.elements;
+    let due = (++shadowTick & 1) === 0;
+    for (let i = 0; i < 16 && !due; i++) due = Math.abs(a[i] - b[i]) > 1e-4;
+    const cx = sun.target.position.x, cz = sun.target.position.z;
+    for (let i = 0, kids = scene.children; i < kids.length && !due; i++) {
+      const c = kids[i], p = c.position, q = lastPos.get(c);
+      if (!c.visible || !c.matrixAutoUpdate || Math.abs(p.x - cx) > SHADOW_REACH || Math.abs(p.z - cz) > SHADOW_REACH) continue;
+      due = !q || Math.abs(q.x - p.x) + Math.abs(q.y - p.y) + Math.abs(q.z - p.z) > SHADOW_SLACK;
+    }
+    if (!due) return false;
+    lastCam.copy(camera.matrixWorld);
+    for (const c of scene.children) if (c.visible && c.matrixAutoUpdate) { const q = lastPos.get(c); if (q) q.copy(c.position); else lastPos.set(c, c.position.clone()); }
+    return true;
+  }
+
   return {
     renderer, scene, sun, hemi, coarse, resize, followSun, setSky, adapt,
     get pixelRatio() { return ratio; },
-    render: (camera) => { sky.position.copy(camera.position); renderer.render(scene, camera); }
+    render: (camera) => {
+      sky.position.copy(camera.position);
+      renderer.shadowMap.autoUpdate = shadowDue(camera);
+      try { renderer.render(scene, camera); } finally { renderer.shadowMap.autoUpdate = true; } // 다른 장면(클럽 · 미리보기)은 늘 그대로
+    }
   };
 }

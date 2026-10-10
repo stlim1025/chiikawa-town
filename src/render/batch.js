@@ -136,6 +136,12 @@ export function mergeUnit(unit, meshes, recolor = (m) => ({ key: m.material.uuid
   return [...kept, ...merged];
 }
 
+/** 순회에서 뺀 굳은 가지에 무언가를 넣을 때: 그 가지부터 위로 다시 순회하게 하고 넣는다. */
+function wakeAdd(...objects) {
+  for (let a = this; a && a.matrixWorldAutoUpdate === false; a = a.parent) { a.matrixWorldAutoUpdate = true; delete a.add; }
+  return this.add(...objects);
+}
+
 /**
  * root(마을) 아래 정적 소품을 합치고, 남은 정적 물체는 위치를 굳힌다(matrixAutoUpdate 끄기). skip: 움직이는 물체(그 아래는 손대지 않는다).
  * cell: 묶음(zone) 밖 물체를 모을 칸 크기(m). 돌려주는 값: 합치기 전 · 뒤 메시 수.
@@ -204,6 +210,15 @@ export function batchStatic(root, { skip = [], cell = 20 } = {}) {
     for (const c of o.children) freeze(c);
   };
   freeze(root);
+  // 통째로 굳은 가지는 매 장면 위치 계산 순회에서도 뺀다(three 는 굳은 물체도 자식까지 하나하나 들렀다 — 마을 물체 천칠백 개).
+  // 나중에 그 가지에 무언가를 넣으면(add · attach) 꼭대기까지 다시 돌게 깨운다
+  const settle = (o) => {
+    let live = o.matrixAutoUpdate;
+    for (const c of o.children) if (settle(c)) live = true;
+    if (!live && o !== root) { o.matrixWorldAutoUpdate = false; o.add = wakeAdd; }
+    return live;
+  };
+  settle(root);
   let after = 0;
   root.traverse((o) => { if (o.isMesh) after++; });
   return { before, after };

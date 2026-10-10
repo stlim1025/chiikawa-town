@@ -121,20 +121,17 @@ export function createHud(ui, input) {
   const labelLayer = el('div');
   labelLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
   /**
-   * 머리 위 표시를 (x, y) 에 놓는다(표시는 CSS 로 가운데 · 아래 기준: translate(-50%, -100%)). 놓인 왼쪽 위가 늘 정수 픽셀이 되게
-   * 폭 · 높이의 소수 부분까지 보정한다: 이름표 크기가 소수(87.3px …)라 가운데 기준으로 놓으면 글자 · 아이콘이 소수 픽셀에 걸려,
-   * 걸을 때마다 고해상도 휴대폰에서 아이콘이 글자와 따로 부들부들 떨렸다. 크기는 내용 · 모양이 바뀔 때(와 3초마다 — 글꼴이 늦게 와도) 잰다.
+   * 머리 위 표시는 자리만 맡는 껍데기(.wl-pos) 안에 넣고 껍데기를 GPU 로 옮긴다(translate3d, 소수 픽셀 그대로).
+   * left/top 으로 옮기면 매 장면 레이아웃을 다시 했고, 소수 픽셀이면 글자 · 아이콘이 따로 픽셀에 맞춰져 아이콘이 떨렸고,
+   * 정수 픽셀로 맞추면 이름표 전체가 1px 씩 뚝뚝 끊겨 따라가 떨려 보였다. 껍데기째 옮기면 안은 한 장 그림이라 통째로 부드럽게 움직인다.
    */
+  const mount = (e) => { const p = el('div', 'wl-pos'); p.append(e); e._pos = p; labelLayer.appendChild(p); return e; };
+  const unmount = (e) => (e._pos || e).remove();
   const placeAt = (e, x, y) => {
-    const key = (e.dataset.v || e.textContent) + '|' + e.className;
-    if (e._key !== key || ++e._age > 90) {
-      const r = e.getBoundingClientRect(), t = getComputedStyle(e).transform;
-      const k = t && t !== 'none' ? Math.hypot(new DOMMatrixReadOnly(t).a, new DOMMatrixReadOnly(t).b) || 1 : 1; // 톡 나타나는 중(줄어 있음)이면 원래 크기로
-      e._w = r.width / k; e._h = r.height / k; e._key = key; e._age = 0;
-    }
-    const lx = Math.round(x - e._w / 2) + e._w / 2, ly = Math.round(y - e._h) + e._h;
-    if (e._lx !== lx) { e._lx = lx; e.style.left = lx + 'px'; }
-    if (e._ly !== ly) { e._ly = ly; e.style.top = ly + 'px'; }
+    x = Math.round(x * 100) / 100; y = Math.round(y * 100) / 100; // 서 있을 때 생기는 아주 작은 흔들림은 무시(스타일을 다시 쓰지 않게)
+    if (e._x === x && e._y === y) return;
+    e._x = x; e._y = y;
+    e._pos.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   };
   // 맞았을 때 붉은 테두리 · 기절할 때 어둡게 덮는 막
   const hurtFx = el('div', 'hurt-fx');
@@ -232,7 +229,8 @@ export function createHud(ui, input) {
       // 랏코와 수련한 날: 공격 +1 꼬리표
       const trained = !!(state.friends && state.friends.rakko && state.friends.rakko.home === state.clock.day);
       if (shown.buff !== trained) { shown.buff = trained; buffEl.hidden = !trained; }
-      setText('money', moneyEl, state.money.toLocaleString('ko-KR') + '원');
+      // 숫자 꾸미기(toLocaleString) · 날짜 글은 만들기가 비싸서 값이 바뀔 때만 만든다(전에는 매 장면)
+      if (shown.moneyN !== state.money) { shown.moneyN = state.money; setText('money', moneyEl, state.money.toLocaleString('ko-KR') + '원'); }
       if (shown.stamina !== state.stamina) {
         shown.stamina = state.stamina;
         staminaEl.textContent = String(state.stamina);
@@ -258,7 +256,8 @@ export function createHud(ui, input) {
       }
       // 시각은 동물의 숲처럼 12시간제 큰 숫자 + 오전/오후
       const minutes = Math.round(hourOf(state.clock) * 60) % 1440, h24 = Math.floor(minutes / 60);
-      setText('date', dateEl, dateLabel(state.startDate || todayISO(), state.clock.day));
+      const start = state.startDate || todayISO();
+      if (shown.day !== start + '|' + state.clock.day) { shown.day = start + '|' + state.clock.day; setText('date', dateEl, dateLabel(start, state.clock.day)); }
       setText('hm', hmEl, `${h24 % 12 || 12}:${String(minutes % 60).padStart(2, '0')}`);
       setText('ap', apEl, h24 < 12 ? '오전' : '오후');
       const phase = phaseOf(state.clock);
@@ -442,7 +441,7 @@ export function createHud(ui, input) {
         html += `<i class="hf" style="--a:${a}deg;--d:${d}px;--t:${(i * 0.06).toFixed(2)}s">${HEART_SVG}</i>`;
       }
       e.innerHTML = html + `<b class="hf-plus">${HEART_SVG}+${gained}</b>`;
-      labelLayer.appendChild(e);
+      mount(e);
       fx.push({ x, y, z, el: e, until: performance.now() + (up ? 1700 : 1300) });
       if (!up) return;
       const card = el('div', 'heart-card');
@@ -462,7 +461,7 @@ export function createHud(ui, input) {
     floatText({ x, y, z, text, kind = 'dmg' }) {
       const e = el('div', 'float-fx ' + kind);
       e.textContent = text;
-      labelLayer.appendChild(e);
+      mount(e);
       fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : kind === 'note' ? 1400 : 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
@@ -562,7 +561,7 @@ export function createHud(ui, input) {
         v.set(it.x, it.y, it.z).project(camera);
         if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) continue;
         let e = labelEls.get(it.id);
-        if (!e) { e = el('div', 'world-label ' + it.kind); labelLayer.appendChild(e); labelEls.set(it.id, e); }
+        if (!e) { e = mount(el('div', 'world-label ' + it.kind)); labelEls.set(it.id, e); }
         if (it.kind === 'prompt') {
           // 행동 안내: (PC 면) 키 모양 + 할 일
           const want = (it.key || '') + '|' + it.text;
@@ -593,12 +592,12 @@ export function createHud(ui, input) {
         placeAt(e, ((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h);
         seen.add(it.id);
       }
-      labelEls.forEach((e, id) => { if (!seen.has(id)) { e.remove(); labelEls.delete(id); } });
+      labelEls.forEach((e, id) => { if (!seen.has(id)) { unmount(e); labelEls.delete(id); } });
       // 잠깐짜리 연출: 붙은 자리를 따라다니다가 시간이 되면 지운다
       const t = performance.now();
       for (let i = fx.length - 1; i >= 0; i--) {
         const f = fx[i];
-        if (t > f.until) { f.el.remove(); fx.splice(i, 1); continue; }
+        if (t > f.until) { unmount(f.el); fx.splice(i, 1); continue; }
         v.set(f.x, f.y, f.z).project(camera);
         placeAt(f.el, ((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h);
       }
