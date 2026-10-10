@@ -91,6 +91,7 @@ export function createIsland() {
   buildGrotto(env, e);
   buildHut(env, e);
   buildMemory(e);
+  buildFarIsle(e);
   batchStatic(env, { skip: [sign], cell: 30 }); // 팻말은 쓰러진다 · 회상 소품은 숨겨 둔 채라 그대로
   const fires = { beach: makeFire(g, ISLE.fire.x, ISLE.fire.z, 1, T.flame), grotto: makeFire(g, ISLE.grotto.x - 2.4, ISLE.grotto.z - 1.4, 0.8, T.flame), hut: makeFire(g, ISLE.hut.x + 1.2, ISLE.hut.z + 0.95, 0.5, T.flame) };
   fires.grotto.group.position.y = 0.4; // 바위 턱 위
@@ -502,6 +503,14 @@ function buildHut(g, m) {
   b.position.set(H.x, 2.95, H.z + 1.75);
   b.rotation.x = -0.15;
   g.add(b);
+}
+/** 마지막 장면에서 한잎 · 두잎의 배가 향하는 먼 작은 섬(모래 · 풀 · 야자수 둘). */
+function buildFarIsle(m) {
+  const x = ISLE.far.x - 30, z = ISLE.far.z - 3;
+  m(GEO.cylinder, '#f3dfa6', { position: [x, -0.3, z], scale: [4.2, 0.3, 3.4], outline: 0.04 });
+  m(GEO.cylinder, '#9fd36f', { position: [x - 0.4, -0.28, z - 0.3], scale: [2.6, 0.32, 2.1], outline: 0.03 });
+  palm(m, x - 0.8, z - 0.6, 3.4, 0.5);
+  palm(m, x + 1.2, z + 0.2, 2.8, -0.4);
 }
 function buildMemory(m) {
   const M = ISLE.memory, mark = (o) => { o.userData.memory = true; o.visible = false; return o; };

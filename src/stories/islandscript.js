@@ -434,14 +434,16 @@ export const BEATS = [
   },
   {
     id: 'far', at: ISLE.far, sky: 'day', title: '',
-    boats: { far: { x: 0, z: 0, face: -PI / 2, drift: 0.5 } },
+    boats: { far: { x: 0, z: 0, face: -PI / 2, drift: 0.35 } },
     cast: { hitoha: [0.55, 0, -PI / 2, 'pull', 0, 'far'], futaba: [-0.55, 0, -PI / 2, 'idle', 0, 'far'] },
     // 배 뒤를 세이렌이 머리만 내밀고 쫓고, 그 뒤로 인어 둘이 따라간다(배 기준 자리 — 배와 함께 움직인다)
     siren: { state: 'idle', x: 8, z: 0.2, face: -PI / 2, ride: 'far', sink: 3.6 },
     mer: [{ x: 13.4, z: 1.3, face: -PI / 2, state: 'swim', ride: 'far' }, { x: 14.8, z: -0.9, face: -PI / 2, state: 'swim', ride: 'far' }],
-    cam: [[8, 12, 21], [7.5, 0, 0]],
+    // 처음엔 배 뒤에서 먼 섬을 향해 가는 배만 → 카메라가 뒤로 빠지며 쫓아오는 세이렌과 인어가 드러난다
+    cam: [[2.6, 2.4, 4.6], [-12, 0.6, -1.5]],
     lines: [
       '(…멀리, 작은 배 한 척이 다른 섬을 향해 조용히 노를 젓고 있다)',
+      { do: 'cam', pos: [8, 12, 21], look: [7.5, 0, 0], blend: 3.6 }, { do: 'wait', sec: 3.4 },
       '(그 뒤를… 커다란 두 눈이 물 위로, 가만히 그 배를 바라보며 따라간다)',
       '(그리고 세이렌 뒤로… 인어 둘이 물결 사이로 고개를 내밀며 따라가고 있었다)'
     ]
