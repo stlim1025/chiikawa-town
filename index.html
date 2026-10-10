@@ -982,6 +982,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* 집 안: 걸어 다닐 수 있으니 터치에서는 조이스틱과 행동 버튼을 보인다(다른 HUD 는 숨긴 채) */
 [data-input="touch"] .cinematic.in-home .hud-action:not([hidden]) { display: block !important; }
 .cinematic.in-home .hud-meter:not([hidden]) { display: block !important; } /* 친구 집 수련 게이지 */
+.cinematic.in-home .hud-phone { display: block !important; } /* 집 · 친구 집 안에서도 마을폰 */
 [data-input="touch"] .cinematic.in-home .stick:not([hidden]) { display: block !important; }
 .in-home .home-bar { bottom: max(14px, env(safe-area-inset-bottom)); }
 [data-input="touch"] .in-home .home-bar { left: auto; right: 130px; transform: none; width: auto; max-width: calc(100% - 300px); justify-content: flex-end; }

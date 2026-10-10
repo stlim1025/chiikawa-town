@@ -603,7 +603,8 @@ function boot() {
   window.addEventListener('keydown', (e) => {
     if ((e.code === 'KeyI' || e.code === 'KeyB') && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) openBag();
   });
-  hud.onSettings(() => { if (state && mode === 'play' && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); });
+  // 마을폰: 마을에서도, 집 · 친구 집 안에서도(꾸미는 중만 빼고) 연다
+  hud.onSettings(() => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); });
   input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
   // 등불 버튼: 가진 불만 끔 → 랜턴 → 손전등
   hud.onLight(() => { if (state && mode === 'play') { commit(nextLight(state)); } });
