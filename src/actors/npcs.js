@@ -1,4 +1,5 @@
 import { buildNpc, animateChibi, propFor } from './models.js';
+import { EAT_ANIMS } from './eatmotion.js';
 import { VILLAGE_R, groundY } from '../core/layout.js';
 
 /** 말 걸면 하는 대사. */
@@ -41,6 +42,9 @@ const WORK = {
 const WEED_PULL_SECONDS = 2.4;
 const STEER = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]; // 가려는 쪽이 막히면 이만큼(라디안) 옆으로 틀어 본다
 const MIN_WEEDS_FOR_FRIENDS = 8; // 내 몫을 남기려고 풀이 이보다 적으면 친구들은 뽑지 않는다
+const POST_ROAM = 2.5; // 자리가 정해진 친구가 쉬다가 자리 둘레를 거니는 거리(따로 정하지 않았으면)
+const EATING = new Set([...EAT_ANIMS, 'drink']); // 먹고 마시는 몸짓: 등을 보이지 않게 화면 쪽으로 돌아서 한다
+const VIEW_Z = 7; // 카메라는 늘 내 캐릭터 뒤(+z)에서 본다(render/camera.js)
 
 /** 마을 친구 12명. 자리가 정해진 친구는 그 주변에서만 움직인다. 각자 할 일(WORK)을 하다가 돌아다닌다. */
 export function createNpcs(scene, village, weeds, berries) {
@@ -51,7 +55,8 @@ export function createNpcs(scene, village, weeds, berries) {
     ['momonga', -3.6, 4.2, false], ['kurimanju', kuri.x + 0.8, kuri.z + 0.6, false], ['rakko', s.dojo.x - 1.2, s.dojo.z + 0.4, false],
     // 대장 갑옷 씨는 검정소 시험관, 카니는 헌책방 앞
     ['captain', s.exam.x - 0.9, s.exam.z + 0.5, true], ['kani', s.books.x + 1.0, s.books.z + 0.3, true],
-    ['shisa', s.ramen.x + 1.3, s.ramen.z + 0.6, true], ['ramen', s.ramen.x - 1.0, s.ramen.z + 0.4, true],
+    // 라멘 가게: 손님 자리(의자 · 줄 · 오가는 길)는 비워 둔다 — 라멘 아저씨는 카운터 바로 앞, 시사는 가게 오른쪽 옆에서만
+    ['shisa', s.ramen.x + 2.4, s.ramen.z - 0.6, true, 0.9], ['ramen', s.ramen.x, s.ramen.z - 0.8, true, 0.6],
     ['pochette', s.pochette.x + 0.6, s.pochette.z + 0.4, true], ['labor', s.board.x, s.board.z - 2.15, true]
   ];
 
@@ -64,12 +69,12 @@ export function createNpcs(scene, village, weeds, berries) {
     return { x, z };
   };
 
-  const list = POSTS.map(([kind, x, z, fixed]) => {
+  const list = POSTS.map(([kind, x, z, fixed, roam = POST_ROAM]) => {
     const p = nearFree(x, z);
     const chibi = buildNpc(kind);
     scene.add(chibi.root);
     return {
-      kind, chibi, fixed, home: { ...p }, x: p.x, z: p.z, yaw: Math.random() * 6, phase: Math.random() * 6,
+      kind, chibi, fixed, roam, home: { ...p }, x: p.x, z: p.z, yaw: Math.random() * 6, phase: Math.random() * 6,
       state: 'idle', timer: 0.5 + Math.random() * 2, tx: p.x, tz: p.z, talk: 0, bubble: null,
       speed: chibi.height > 1.8 ? 0.8 : fixed ? 0.95 : 1.15 // 마을 친구들은 할 일이 많아 조금 더 빨리 걷는다
     };
@@ -192,6 +197,13 @@ export function createNpcs(scene, village, weeds, berries) {
     } else if (!n.flee) { route(n); sidestep(n); }
   }
 
+  /** 몸을 yaw 쪽으로 천천히 돌린다. */
+  function turnToward(n, yaw, dt, rate = 5) {
+    let d = yaw - n.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    n.yaw += Math.max(-dt * rate, Math.min(dt * rate, d));
+  }
   /** 지금 몸짓에 맞는 소품만 보인다(바뀔 때만 손댄다). 등에 멘 칼('sheathed')은 칼을 뽑아 들 때만 숨는다. */
   function showProp(n, want) {
     if (n.prop === want) return;
@@ -400,7 +412,7 @@ export function createNpcs(scene, village, weeds, berries) {
     }
     for (let i = 0; i < 25; i++) {
       const a = Math.random() * Math.PI * 2;
-      const r = n.fixed ? Math.random() * 2.5 : 1.5 + Math.random() * 5;
+      const r = n.fixed ? Math.random() * n.roam : 1.5 + Math.random() * 5;
       const bx = n.fixed ? n.home.x : n.x, bz = n.fixed ? n.home.z : n.z;
       const x = bx + Math.sin(a) * r, z = bz + Math.cos(a) * r;
       const taken = list.some((m) => m !== n && Math.hypot(m.x - x, m.z - z) < spacing(n, m) + 0.3);
@@ -581,6 +593,7 @@ export function createNpcs(scene, village, weeds, berries) {
             }
           } else {
             mode = task.anim;
+            if (EATING.has(mode)) turnToward(n, Math.atan2(lastPlayer.x - n.x, lastPlayer.z + VIEW_Z - n.z), dt); // 먹을 때는 등을 보이지 않게
             if (n.workT >= task.time) endTask(n);
           }
         } else {

@@ -1802,6 +1802,11 @@ function boot() {
   const ramenAt = (list) => { const r = village.spots.ramen; return list.map(([dx, dz]) => ({ x: r.x + dx, z: r.z + dz })); };
   const ramenFace = () => ({ x: village.spots.ramen.x, z: village.spots.ramen.z - 1.5 });
   /** 그 자리에 다른 누가 앉아 있거나 앉으러 가는 중인지(라멘 일정이 남아 있을 때만: 다른 일로 바뀌면 자리는 저절로 빈다). */
+  /** 손님이 앉지도 오지도 않는 빈 의자 하나(없으면 null): 라멘 아저씨가 테이블을 닦으러 갈 곳. */
+  const emptySeat = (me) => {
+    const free = ramenAt(RAMEN_SEATS).filter((p, i) => !seatTaken(i, me) && !npcs.list.some((m) => m !== me && !m.away && Math.hypot(m.x - p.x, m.z - p.z) < 0.8));
+    return free.length ? free[Math.floor(Math.random() * free.length)] : null;
+  };
   const seatTaken = (i, me) => npcs.list.some((m) => m !== me && m.ramenSeat === i && !m.away && m.plan && m.plan.some((s) => s.ramen));
   /** 가장 가까운 빈자리를 맡는다 → 자리 { x, z } | null */
   function takeSeat(n) {
@@ -2990,8 +2995,8 @@ function boot() {
       const r = S.ramen, shisa = npcs.byKind('shisa');
       opts = [
         [3, () => atPost(n, 'sweep', 'cook', 'pot', '국물 우리기', 3, { x: r.x, z: r.z - 2 })],
-        [shisa && !npcs.busy(shisa) && shisa !== talking ? 1.6 : 0, () => together(n, shisa, pickLine(STAFF_SCRIPTS.coach), { at: { x: r.x + 0.2, z: r.z + 1.0 }, icon: 'pot', text: (o) => (o === 'shisa' ? '시사 가르치기' : '면 삶기 배우기') })],
-        [1, () => goAndDo(n, ramenAt(RAMEN_SEATS)[Math.floor(Math.random() * RAMEN_SEATS.length)], 'sweep', 'wipe', 'broom', '테이블 닦기', 4)],
+        [shisa && !npcs.busy(shisa) && shisa !== talking ? 1.6 : 0, () => together(n, shisa, pickLine(STAFF_SCRIPTS.coach), { at: { x: r.x + 1.9, z: r.z - 0.3 }, icon: 'pot', text: (o) => (o === 'shisa' ? '시사 가르치기' : '면 삶기 배우기') })],
+        [emptySeat(n) ? 1 : 0, () => goAndDo(n, emptySeat(n), 'sweep', 'wipe', 'broom', '테이블 닦기', 4)],
         [hour >= 14.5 && hour < 16.5 ? 3 : 0.2, () => goAndDo(n, Math.random() < 0.5 ? { x: POND.x + 1, z: POND.z - POND.r - 1 } : S.plaza, 'idle', 'rest', 'step', '바람 쐬기', 6)]
       ];
     } else if (kind === 'pochette') {
