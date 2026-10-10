@@ -199,13 +199,17 @@ export function createIsland() {
       camTo = to; camT = 0; camDur = blend;
     },
     shake(sec = 0.6) { shakeT = sec; },
-    /** 세이렌: { state: hide|rise|idle|sing|friendly|angry|swipe|calm|hurt|leave, x, z, face, mouth(0..1 — 입 벌림을 직접) } */
+    /**
+     * 세이렌: { state: hide|rise|idle|sing|friendly|angry|swipe|calm|hurt|leave, x, z, face, mouth(0..1 — 입 벌림을 직접),
+     *   ride(배 이름 — 있으면 x · z 는 그 배 기준이라 배를 따라온다), sink(물에 잠긴 깊이 — 머리만 내밀 때) }
+     */
     siren(spec) {
       const was = sv.state;
+      if ('x' in spec) { sv.ride = spec.ride || null; sv.sink = spec.sink || 0; } // 자리를 새로 정할 때만(몸짓만 바꿀 땐 그대로)
       Object.assign(sv, { mouth: null }, spec, { t: 0 });
       if (spec.state === 'rise') { sv.y = -7; fx.splash(sv.x, sv.z, 2.2); }
       if (spec.state === 'hide') sv.y = -9;
-      if (spec.state !== 'rise' && was === 'hide' && spec.state !== 'hide') sv.y = 0;
+      if (spec.state !== 'rise' && was === 'hide' && spec.state !== 'hide') sv.y = -(sv.sink || 0);
     },
     sirenMouth(v) { sv.mouth = v; },
     get sirenState() { return sv.state; },
@@ -295,11 +299,12 @@ export function createIsland() {
   function updateSiren(dt, t) {
     const P = siren.parts, s = sv;
     s.t += dt;
-    const target = s.state === 'hide' ? -9 : s.state === 'leave' ? -8 : 0;
+    const target = s.state === 'hide' ? -9 : s.state === 'leave' ? -8 : -(s.sink || 0);
     s.y += (target - s.y) * Math.min(1, dt * (s.state === 'rise' ? 1.8 : s.state === 'leave' ? 0.7 : 3));
     if (s.state === 'leave') { s.x -= Math.sin(s.face) * dt * 1.5; s.z -= Math.cos(s.face) * dt * 1.5; }
     siren.root.visible = s.y > -8.6;
-    siren.root.position.set(s.x, s.y, s.z);
+    const rb = s.ride && boats[s.ride].spec; // 배를 쫓아오는 세이렌(마지막 장면)
+    siren.root.position.set(s.x + (rb ? rb.x : 0), s.y, s.z + (rb ? rb.z : 0));
     siren.root.rotation.y = s.face;
     const st = s.state, sway = Math.sin(t * 0.9) * 0.05;
     // 지느러미 손: armZ 0 = 옆으로 쭉, + 면 위로. 눈썹: + 면 찌푸림(안쪽 끝이 내려간다)
