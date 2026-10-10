@@ -96,6 +96,17 @@ test('exam uses current-grade weeds and per-grade streak', () => {
   assert.equal(Lc.examStep(Lc.examStep(Lc.examStep(old, 'clean'), 'clean'), 'clean').passed, true);
   assert.equal(Lc.examStep(Lc.startExam(5), 'snapped').passed, false);
 });
+test('examKinds: 시험에 세는 풀 종류(마을에서 표시할 풀)는 examCounts 와 똑같다', async () => {
+  const { WEED_ORDER } = await import(G + 'weeding.js');
+  for (const exam of [Lc.startExam(5), Lc.startExam(3), Lc.startExam(2), { streak: 1 }]) {
+    const kinds = Lc.examKinds(exam);
+    assert.ok(kinds.length > 0, JSON.stringify(exam));
+    assert.deepEqual(kinds, WEED_ORDER.filter((k) => Lc.examCounts(exam, k)));
+  }
+  const three = Lc.examKinds(Lc.startExam(3));
+  assert.ok(three.includes('thorny') && three.includes('reed') && !three.includes('weed'));
+  assert.deepEqual(Lc.examKinds(null), [], '시험 중이 아니면 표시할 풀 없음');
+});
 test('old board on same day gets new job slots', () => {
   const state = { board: { day: 3, left: { weed8: 1, sticker10: 0, berry6: 2, thorny3: 0 } } };
   const b = V.boardOf(state, 3);

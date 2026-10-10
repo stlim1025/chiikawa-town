@@ -33,6 +33,7 @@ const AREAS = {
 const REGROW_SECONDS = 20;
 /** 이보다 먼 풀은 그리지 않는다(안개 너머). */
 const DRAW_DIST = 50;
+const HINT_DIST = 22; // 뽑을 풀 표시는 이만큼 가까운 풀에만(멀리까지 다 띄우면 어지럽다)
 
 // ---------- 모양: 부품을 쌓아 만든 뒤 한 덩어리 도형으로 합친다(풀 하나 = 그리기 두 번: 몸 + 외곽선) ----------
 /** 원뿔 잎이 바깥으로 기울어 둥글게 퍼진 다발. */
@@ -210,6 +211,17 @@ export function createWeeds(scene, village, random = Math.random) {
   list.forEach((w) => { w.grow = 1; w.mesh.scale.setScalar(1); });
 
   const usable = (w) => !w.hidden;
+  // 승급 시험에서 뽑을 풀: 그 풀 위에 통통 뛰며 도는 노란 화살표(setHint 로 종류를 정한다)
+  let hintKinds = new Set(), hintKey = '', hintT = 0;
+  const tops = {}; // 종류 → 다 자란 풀의 꼭대기 높이
+  const topOf = (kind) => (tops[kind] ??= new THREE.Box3().setFromObject(weedMesh(kind)).max.y);
+  const hintMesh = () => {
+    const g = new THREE.Group();
+    g.add(toonMesh(GEO.cone, '#fcd95b', { rotation: [Math.PI, 0, 0], scale: [0.14, 0.26, 0.14], outline: 0.016, shadow: false }));
+    scene.add(g);
+    return g;
+  };
+  const dropHint = (w) => { if (w.hint) { scene.remove(w.hint); w.hint = null; } };
   const applyVisibility = (focus) => {
     for (const w of list) w.mesh.visible = !w.hidden && (!focus || Math.hypot(w.x - focus.x, w.z - focus.z) < DRAW_DIST);
   };
@@ -228,6 +240,14 @@ export function createWeeds(scene, village, random = Math.random) {
     },
     /** 지금 보이고 뽑을 수 있는 풀인지. */
     usable,
+    /** 뽑을 풀 표시: kinds(풀 종류 목록) 위에 화살표를 띄운다. null · [] 이면 모두 지운다. */
+    setHint(kinds) {
+      const key = (kinds || []).join(',');
+      if (key === hintKey) return;
+      hintKey = key;
+      hintKinds = new Set(kinds || []);
+      for (const w of list) if (!hintKinds.has(w.kind)) dropHint(w);
+    },
     /** 뽑는 동안 풀이 흔들리고 늘어난다. */
     tug(weed, power) {
       if (!weed) return;
@@ -245,6 +265,7 @@ export function createWeeds(scene, village, random = Math.random) {
       const i = list.indexOf(weed);
       if (i < 0) return;
       list.splice(i, 1);
+      dropHint(weed);
       const m = weed.mesh;
       m.visible = true;
       m.scale.setScalar(1);
@@ -288,6 +309,17 @@ export function createWeeds(scene, village, random = Math.random) {
       list.forEach((w) => {
         if (w.grow < 1) { w.grow = Math.min(1, w.grow + dt * 1.5); w.mesh.scale.setScalar(w.grow); }
       });
+      if (hintKinds.size) {
+        hintT += dt;
+        for (const w of list) {
+          const want = hintKinds.has(w.kind) && w.mesh.visible && !w.hidden && (!focus || Math.hypot(w.x - focus.x, w.z - focus.z) < HINT_DIST);
+          if (!want) { if (w.hint) w.hint.visible = false; continue; }
+          if (!w.hint) w.hint = hintMesh();
+          w.hint.visible = true;
+          w.hint.position.set(w.x, w.mesh.position.y + topOf(w.kind) * w.grow + 0.42 + Math.sin(hintT * 4 + w.id) * 0.06, w.z);
+          w.hint.rotation.y = hintT * 1.5;
+        }
+      }
       regrow += dt;
       if (regrow >= REGROW_SECONDS) {
         regrow = 0;

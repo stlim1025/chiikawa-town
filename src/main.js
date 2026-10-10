@@ -33,7 +33,7 @@ import { createState, addMoney, useStamina, restoreStamina, sleepStamina, MAX_ST
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
-import { gainXp, canTakeExam, startExam, examStep, examCounts, promote, PAY_MULT, EXAM_FEE, payExamFee } from './core/license.js';
+import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, payExamFee } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { createSound } from './audio/sound.js';
@@ -3569,9 +3569,12 @@ function boot() {
       hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
       // 제초 승급 시험: 토벌 실기처럼 위 가운데 노란 알약에 진행(깔끔하게 연속 ●○)을 크게. 실기 · 술래잡기가 알약을 쓰는 동안은 비켜 준다
+      // 시험에 세는 풀은 마을에서 그 풀 위에 노란 화살표, 알약에도 그 풀 그림 · 이름
+      const examWeeds = state.exam && !state.exam.done ? examKinds(state.exam) : [];
+      weeds.setHint(examWeeds);
       if (state.exam && !hunterExam && !tag) {
         const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
-        hud.setTimer(['승급 시험', { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}` }]);
+        hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}` }]);
         examPill = true;
       } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
       // 하는 중인 퀘스트를 모두(화면에 띄우기로 고른 것이 맨 위)

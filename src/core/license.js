@@ -1,4 +1,4 @@
-import { WEED_KINDS } from './weeding.js';
+import { WEED_KINDS, WEED_ORDER } from './weeding.js';
 import { trySpend } from './state.js';
 
 /** 승급 시험 값(지금 급수 → 다음 급). 떨어지면 다시 내야 하니 깔끔하게 뽑을 자신이 있을 때. */
@@ -41,6 +41,11 @@ export function startExam(grade = 5) {
 /** 시험에 세는 풀인지: 지금 급수의 풀(예전 저장의 시험은 잡초 · 토끼풀). */
 export function examCounts(exam, kind) {
   return WEED_KINDS[kind] && WEED_KINDS[kind].grade === (exam.grade || 5);
+}
+
+/** 시험에 세는 풀 종류들(마을에서 그 풀 위에 표시한다). 시험 중이 아니면 []. */
+export function examKinds(exam) {
+  return exam ? WEED_ORDER.filter((k) => examCounts(exam, k)) : [];
 }
 
 /** 시험 중 뽑기 한 번의 결과를 반영한다. */
