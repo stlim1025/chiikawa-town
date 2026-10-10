@@ -52,7 +52,7 @@ export function createNpcs(scene, village, weeds, berries) {
     // 대장 갑옷 씨는 검정소 시험관, 카니는 헌책방 앞
     ['captain', s.exam.x - 0.9, s.exam.z + 0.5, true], ['kani', s.books.x + 1.0, s.books.z + 0.3, true],
     ['shisa', s.ramen.x + 1.3, s.ramen.z + 0.6, true], ['ramen', s.ramen.x - 1.0, s.ramen.z + 0.4, true],
-    ['pochette', s.pochette.x + 0.6, s.pochette.z + 0.4, true], ['labor', s.board.x + 0.9, s.board.z + 0.3, true]
+    ['pochette', s.pochette.x + 0.6, s.pochette.z + 0.4, true], ['labor', s.board.x, s.board.z - 2.15, true]
   ];
 
   const nearFree = (x, z) => {
@@ -614,6 +614,14 @@ export function createNpcs(scene, village, weeds, berries) {
         if (pd < min && pd > 0.001) {
           const nx = player.x + (px / pd) * min, nz = player.z + (pz / pd) * min;
           if (village.isFree(nx, nz, 0.3)) { n.x = nx; n.z = nz; }
+        }
+        // 노동 갑옷 씨: 접수대 안 제자리에 한가하게 서 있으면 계산대에 팔짱 끼고 기대어 손님 쪽(남쪽)을 본다
+        if (n.kind === 'labor' && mode === 'idle' && n.state === 'idle' && !n.task && n.talk <= 0 && !n.emote && Math.hypot(n.x - n.home.x, n.z - n.home.z) < 0.5) {
+          mode = 'lean';
+          let dy = -n.yaw;
+          while (dy > Math.PI) dy -= Math.PI * 2;
+          while (dy < -Math.PI) dy += Math.PI * 2;
+          if (pd0 >= 2.8) n.yaw += dy * Math.min(1, dt * 3);
         }
         n.chibi.root.position.set(n.x, groundY(n.x, n.z), n.z);
         n.chibi.root.rotation.y = n.yaw;

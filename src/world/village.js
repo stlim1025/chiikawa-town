@@ -247,20 +247,82 @@ export function buildVillage(scene) {
   }
 
   /** 노동 접수 게시판. */
+  /**
+   * 노동 접수대(원작처럼): 노란 계산대 앞판에 일감 종이 셋, 나무 기둥 넷 위에 '노동' 이라 쓴 흰 간판, 계산대 위 호출 종.
+   * 노동 갑옷 씨가 계산대 안에서 팔짱 끼고 기대 손님을 기다린다(뒤가 트여 있어 드나든다).
+   * 왼쪽 옆에는 나무 일감 패가 줄줄이 걸린 흰 벽(일감 걸이)이 선다.
+   */
   function board(lot) {
-    const { x, z } = lot, g = new THREE.Group(), wood = '#a77d5a';
+    const { x, z } = lot, g = new THREE.Group(), post = '#8a5a3c', front = '#f6c66b';
     g.position.set(x, 0, z);
-    g.rotation.y = 0;
-    [-0.7, 0.7].forEach((px) => place(g, toonMesh(GEO.box, wood, { position: [px, 0.8, 0], scale: [0.1, 1.6, 0.1], shell: true })));
-    place(g, toonMesh(GEO.box, '#f5ead2', { position: [0, 1.25, 0], scale: [1.6, 0.9, 0.08], shell: true }));
-    place(g, toonMesh(ROOF, wood, { position: [0, 1.7, 0], scale: [1.9, 0.3, 0.4], shell: true }));
-    [[-0.45, 1.4, '#ffd6e2'], [0.05, 1.3, '#ffffff'], [0.45, 1.42, '#fff1a8'], [-0.15, 1.05, '#d9ccff']].forEach(([nx, ny, c]) => {
-      place(g, toonMesh(GEO.box, c, { position: [nx, ny, 0.05], scale: [0.32, 0.26, 0.02], outline: false, shadow: false }));
+    // 계산대: 노란 앞판 · 옆판 · 밝은 나무 상판
+    place(g, toonMesh(GEO.box, front, { position: [0, 0.47, 0.3], scale: [1.9, 0.94, 0.08], shell: true }));
+    [-0.95, 0.95].forEach((px) => place(g, toonMesh(GEO.box, front, { position: [px, 0.47, 0.1], scale: [0.08, 0.94, 0.48], shell: true })));
+    place(g, toonMesh(GEO.box, '#ead3a6', { position: [0, 0.97, 0.12], scale: [2.0, 0.07, 0.5], shell: true }));
+    // 앞판에 붙인 일감 종이 셋(줄 셋씩)
+    [-0.55, 0.05, 0.6].forEach((px, i) => {
+      place(g, toonMesh(GEO.box, '#fffdf6', { position: [px, 0.5, 0.35], rotation: [0, 0, (i - 1) * 0.04], scale: [0.32, 0.42, 0.015], outline: 0.012, shadow: false }));
+      [0.62, 0.52, 0.42].forEach((py) => place(g, toonMesh(GEO.box, '#6b4a3a', { position: [px, py, 0.36], scale: [0.2, 0.014, 0.01], outline: false, shadow: false })));
+    });
+    // 호출 종
+    place(g, toonMesh(GEO.cone, '#d9c58f', { position: [-0.62, 1.0, 0.2], scale: [0.08, 0.1, 0.08], outline: 0.014, shadow: false }));
+    place(g, toonMesh(GEO.sphere, '#a8935f', { position: [-0.62, 1.12, 0.2], scale: [0.025, 0.025, 0.025], outline: false, shadow: false }));
+    // 기둥 넷 · 위 옆 들보 · '노동' 간판
+    [[-0.95, 0.34], [0.95, 0.34], [-0.95, -0.42], [0.95, -0.42]].forEach(([px, pz]) => place(g, toonMesh(GEO.box, post, { position: [px, 1.18, pz], scale: [0.08, 2.36, 0.08], shell: true })));
+    [-0.95, 0.95].forEach((px) => place(g, toonMesh(GEO.box, post, { position: [px, 2.22, -0.04], scale: [0.08, 0.08, 0.84], shell: true, shadow: false })));
+    place(g, toonMesh(GEO.box, '#fbfaf5', { position: [0, 2.5, 0.34], scale: [2.1, 0.62, 0.08], shell: true }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.96, 0.54), new THREE.MeshBasicMaterial({ map: signTexture('노동') }));
+    sign.position.set(0, 2.5, 0.385);
+    g.add(sign);
+    signs.push(sign.material);
+    world.add(g);
+    // 계산대 앞 · 뒤 기둥만 막는다(노동 갑옷 씨가 뒤로 드나들며 안에 선다)
+    [-0.6, 0, 0.6].forEach((px) => obstacles.push({ x: x + px, z: z + 0.25, r: 0.36, soft: true }));
+    [-0.95, 0.95].forEach((px) => obstacles.push({ x: x + px, z: z - 0.42, r: 0.12 }));
+    solid(g, g.children.filter((m) => m !== sign), true);
+    labels.push({ x, y: 3.05, z, text: lot.label });
+    tagWall(x - 1.85, z - 0.15);
+  }
+  /** 일감 걸이: 흰 벽에 가로 막대 셋, 막대마다 나무 일감 패가 넷씩 걸려 있다. */
+  function tagWall(x, z) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    place(g, toonMesh(GEO.box, '#f7f2e6', { position: [0, 1.0, 0], scale: [1.25, 2.0, 0.12], shell: true }));
+    place(g, toonMesh(GEO.box, '#c9b48e', { position: [0, 2.04, 0.02], scale: [1.35, 0.08, 0.2], shell: true, shadow: false }));
+    [1.62, 1.12, 0.62].forEach((py) => {
+      place(g, toonMesh(GEO.box, '#6b4a3a', { position: [0, py, 0.08], scale: [1.08, 0.022, 0.02], outline: false, shadow: false }));
+      [-0.39, -0.13, 0.13, 0.39].forEach((px) => {
+        place(g, toonMesh(GEO.box, '#e9cf9a', { position: [px, py - 0.17, 0.08], scale: [0.15, 0.24, 0.02], outline: 0.01, shadow: false }));
+        place(g, toonMesh(GEO.sphere, '#6b4a3a', { position: [px, py - 0.08, 0.095], scale: [0.016, 0.016, 0.006], outline: false, shadow: false }));
+      });
     });
     world.add(g);
-    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    obstacles.push({ x, z, r: 0.66, soft: true });
     solid(g, g.children, true);
-    labels.push({ x, y: 2.4, z, text: lot.label });
+  }
+  /** 간판 글씨(캔버스 그림): 흰 바탕에 굵은 갈색 손글씨, 나뭇결 같은 짧은 선 몇 개. 글꼴이 늦게 오면 다시 그린다. */
+  function signTexture(text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 140;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const draw = () => {
+      const c = canvas.getContext('2d');
+      c.fillStyle = '#fbfaf5';
+      c.fillRect(0, 0, 512, 140);
+      c.strokeStyle = 'rgba(90, 68, 49, 0.45)';
+      c.lineWidth = 3;
+      [[40, 22], [62, 30], [455, 18], [470, 28], [70, 108], [440, 104], [452, 112]].forEach(([lx, ly]) => { c.beginPath(); c.moveTo(lx, ly); c.lineTo(lx, ly + 14); c.stroke(); });
+      c.fillStyle = '#6e3a2e';
+      c.font = 'bold 104px Gaegu, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(text.split('').join(' '), 256, 76);
+      tex.needsUpdate = true;
+    };
+    draw();
+    document.fonts?.load('bold 104px Gaegu').then(draw, () => {});
+    return tex;
   }
 
   /** 스티커 작업대: 게시판 옆 긴 탁자 위에 컨베이어와 과일, 옆에 과일 상자. */
@@ -286,6 +348,7 @@ export function buildVillage(scene) {
    * 뒤에 빨강 · 하양 차양. 추첨할 때 통이 빙글빙글 돈다(raffleDrum).
    */
   let raffleDrum = null;
+  const signs = []; // 글씨 그림 간판 재질(밤에는 어둡게: tintSigns)
   function raffle(lot) {
     const { x, z } = lot, g = new THREE.Group(), wood = '#c98a4a', red = '#e0524f';
     g.position.set(x, 0, z);
@@ -637,6 +700,8 @@ export function buildVillage(scene) {
   const move = (ox, oz, nx, nz, radius = 0.35) => slideMove(isFree, obstacles.pushOut, ox, oz, nx, nz, radius);
 
   return {
+    /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
+    tintSigns(color) { for (const m of signs) m.color.copy(color); },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */
     get raffleDrum() { return raffleDrum; },
     group: world,

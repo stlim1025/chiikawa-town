@@ -766,7 +766,7 @@ const ZERO = [0, 0, 0];
 /**
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
- *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기
+ *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이) }
  */
 export function animateChibi(chibi, mode, t, opts = {}) {
@@ -785,6 +785,12 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.head = [0.28 + strain, 0, strain];
     a.legL = [0.25, 0, 0]; a.legR = [0.25, 0, 0];
     lean = 0.32 - power * 0.38;
+  } else if (mode === 'lean') {
+    // 계산대에 팔짱 끼고 기대기(노동 갑옷 씨): 두 팔을 앞으로 모아 포개고 몸을 살짝 숙인다
+    a.armL = [-1.35, 0, 0.78]; a.armR = [-1.35, 0, -0.78];
+    a.head = [0.12 + Math.sin(t * 1.3 + phase) * 0.03, 0, 0];
+    lean = 0.2;
+    bob = Math.sin(t * 1.6 + phase) * 0.008;
   } else if (mode === 'cheer') {
     const w = Math.sin(t * 12 + phase);
     a.armL = [0, 0, -2.3 - w * 0.2]; a.armR = [0, 0, 2.3 + w * 0.2];

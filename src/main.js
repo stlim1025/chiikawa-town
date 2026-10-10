@@ -2861,7 +2861,7 @@ function boot() {
     if (kind === 'labor') {
       const b = S.board, left = Object.values(boardOf(state, state.clock.day).left).reduce((a, c) => a + c, 0);
       opts = [
-        [hour < 10 ? 3 : 0.4, () => goAndDo(n, { x: b.x - 0.4, z: b.z }, 'read', 'post', 'pen', '일감 붙이기', 4.5, { x: b.x, z: b.z - 1.65 })],
+        [hour < 10 ? 3 : 0.4, () => goAndDo(n, { x: b.x - 1.85, z: b.z - 0.75 }, 'read', 'post', 'pen', '일감 붙이기', 4.5, { x: b.x - 1.85, z: b.z - 1.8 })], // 옆 일감 걸이에 패를 건다
         [2, () => atPost(n, 'talk', left > 0 ? 'call' : 'callNone', 'dots', '손님 부르기', 2, south(n.home))],
         [hour >= 9 && hour < 18 ? 1.8 : 0, () => cheerWorker(n, 'cheer', 'eye', '격려') || atPost(n, 'talk', 'call', 'dots', '손님 부르기', 1, south(n.home))],
         [hour >= 11.5 && hour < 13.5 ? 6 : 0, () => staffLunch(n)],
@@ -3118,6 +3118,7 @@ function boot() {
     nightNow = night;
     const lit = state && lightOf(state) !== 'off' ? 0.3 * night : 0;
     setCelLight(celTint.copy(CEL_NIGHT).lerp(CEL_DAY, Math.min(1, day * dim + lit)));
+    village.tintSigns(celTint);
     village.setNight(Math.min(1, Math.max(0, (0.6 - day) / 0.4))); // 해가 지면 가로등과 창문에 불이 들어온다
   }
 
