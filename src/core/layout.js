@@ -133,3 +133,54 @@ export function doorSpot(lot) {
   return { x: lot.x, z: lot.z + FRONT[lot.kind](lot) };
 }
 export const lotById = (id) => LOTS.find((l) => l.id === id);
+
+/** 라멘 로우 앞 손님 자리(가게 앞 지점에서 잰 [dx, dz]): 의자 넷 · 줄 다섯. */
+export const RAMEN_SEATS = [[0.55, 0.95], [-0.45, 1.05], [1.45, 1.35], [-1.5, 1.3]];
+export const RAMEN_QUEUE = [[-0.5, 2.7], [0.7, 2.8], [-1.7, 3.0], [1.9, 3.1], [0.1, 3.8]];
+
+// ---------- 가로등 ----------
+export const LAMP_SPACING = 7, LAMP_GAP = 6, LAMP_FRONT_CLEAR = 2.4, LAMP_CROWD_CLEAR = 1.2;
+// 문 앞에서 남쪽(카메라 쪽)으로 뻗은 다가가는 길: 여기 서면 문으로 가는 길을 막고 화면에서 문을 가린다
+export const LAMP_LANE = { half: 2.2, len: 4.5 };
+/** (x, z) 가 문 앞 f 에서 카메라 쪽으로 뻗은 길(다가가는 자리) 안인지. */
+export const inDoorLane = (f, x, z) => Math.abs(x - f.x) < LAMP_LANE.half && z > f.z - 0.5 && z < f.z + LAMP_LANE.len;
+const LAMP_ROADS = ['main-ew', 'main-ns', 'shops', 'homes']; // 마을 안 길(큰길부터, 그다음 골목)
+/**
+ * 마을 안 가로등 자리 [{ x, z }]: 길을 처음부터 끝까지 이어 재며 LAMP_SPACING 마다 번갈아 한쪽에 세운다
+ * (예전엔 길이 꺾이는 데마다 처음부터 다시 세서 광장 둘레에 몰리고, 가게 앞을 가렸다).
+ * 가로등끼리 LAMP_GAP 이상, 가게 · 집 문 앞에서 LAMP_FRONT_CLEAR 이상 떨어지고 길 · 광장 · 물가 · 마을 밖은 피한다.
+ * 그 자리가 안 되면 길 건너편, 그다음 앞뒤로 조금씩 비켜 본다. isFree(x, z): 건물 같은 장애물이 없는지(마을이 알려 준다).
+ */
+export function lampSpots({ isFree = () => true } = {}) {
+  const fronts = LOTS.map(doorSpot), out = [];
+  const ramen = doorSpot(lotById('ramen')), crowd = [...RAMEN_SEATS, ...RAMEN_QUEUE].map(([dx, dz]) => ({ x: ramen.x + dx, z: ramen.z + dz })); // 라멘 손님 의자 · 줄도 비운다
+  const ok = (x, z) => Math.hypot(x, z) <= VILLAGE_R - 2 && roadDist(x, z) > 0.2 && shoreDist(x, z) > 1.2 && isFree(x, z)
+    && fronts.every((f) => Math.hypot(f.x - x, f.z - z) >= LAMP_FRONT_CLEAR && !inDoorLane(f, x, z)) && crowd.every((c) => Math.hypot(c.x - x, c.z - z) >= LAMP_CROWD_CLEAR)
+    && out.every((p) => Math.hypot(p.x - x, p.z - z) >= LAMP_GAP);
+  for (const id of LAMP_ROADS) {
+    const road = ROADS.find((r) => r.id === id), off = road.w / 2 + 0.8;
+    const segs = [];
+    let total = 0;
+    for (let k = 1; k < road.pts.length; k++) {
+      const [ax, az] = road.pts[k - 1], [bx, bz] = road.pts[k], len = Math.hypot(bx - ax, bz - az);
+      segs.push({ ax, az, bx, bz, len, from: total });
+      total += len;
+    }
+    // 길을 따라 s 만큼 간 점과 그 자리에서 길 옆 방향
+    const at = (s) => {
+      const g = segs.find((q) => s <= q.from + q.len) || segs[segs.length - 1], u = (s - g.from) / g.len;
+      return { x: g.ax + (g.bx - g.ax) * u, z: g.az + (g.bz - g.az) * u, nx: -(g.bz - g.az) / g.len, nz: (g.bx - g.ax) / g.len };
+    };
+    for (let s = LAMP_SPACING / 2, k = 0; s < total; s += LAMP_SPACING, k++) {
+      const side = k % 2 ? 1 : -1;
+      place: for (const ds of [0, 1.5, -1.5, 3, -3]) {
+        const c = at(Math.max(0, Math.min(total, s + ds)));
+        for (const sd of [side, -side]) {
+          const x = c.x + c.nx * off * sd, z = c.z + c.nz * off * sd;
+          if (ok(x, z)) { out.push({ x, z }); break place; }
+        }
+      }
+    }
+  }
+  return out;
+}

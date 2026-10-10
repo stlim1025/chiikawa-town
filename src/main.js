@@ -80,7 +80,7 @@ import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, RAMEN_SEATS, RAMEN_QUEUE } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
@@ -1809,7 +1809,6 @@ function boot() {
     bench: () => { const f = village.spots.factory, cz = f.z - 1.7; return [[-0.45, 0.8], [0.35, 0.8], [-0.4, -0.8], [0.4, -0.8], [-1.15, 0]].map(([dx, dz]) => ({ x: f.x + dx, z: cz + dz })); }
   };
   // ---------- 라멘 가게 자리: 한 자리에 한 명씩 앉고, 다 찼으면 뒤에 줄을 섰다가 빈자리가 나면 앉는다 ----------
-  const RAMEN_SEATS = [[0.55, 0.95], [-0.45, 1.05], [1.45, 1.35], [-1.5, 1.3]], RAMEN_QUEUE = [[-0.5, 2.7], [0.7, 2.8], [-1.7, 3.0], [1.9, 3.1], [0.1, 3.8]];
   const RAMEN_WAIT = 45; // 줄 서서 기다리는 최대 시간(초)
   const ramenAt = (list) => { const r = village.spots.ramen; return list.map(([dx, dz]) => ({ x: r.x + dx, z: r.z + dz })); };
   const ramenFace = () => ({ x: village.spots.ramen.x, z: village.spots.ramen.z - 1.5 });

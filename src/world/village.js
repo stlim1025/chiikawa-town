@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
 import { astar, smoothPath } from '../core/pathfind.js';
 import { createObstacleIndex, slideMove } from '../core/obstacles.js';
-import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, roadDist, shoreDist, doorSpot, lotRadius } from '../core/layout.js';
+import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, roadDist, shoreDist, doorSpot, lotRadius, lampSpots } from '../core/layout.js';
 import { createZones } from './zones.js';
 import { buildOutdoors } from './outdoors.js';
 import { DESIGNS } from './buildings.js';
@@ -593,21 +593,8 @@ export function buildVillage(scene) {
     world.add(g);
     obstacles.push({ x, z, r: 0.22 });
   }
-  // 마을 안 길마다 7칸 간격으로 번갈아 한쪽에(한쪽이 막혔으면 반대편에)
-  for (const road of ROADS) {
-    for (let k = 1; k < road.pts.length; k++) {
-      const [ax, az] = road.pts[k - 1], [bx, bz] = road.pts[k];
-      const len = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / len, nz = (bx - ax) / len;
-      for (let d = 3; d < len; d += 7) {
-        const x = ax + ((bx - ax) * d) / len, z = az + ((bz - az) * d) / len;
-        if (Math.hypot(x, z) > VILLAGE_R - 2) continue;
-        const off = (Math.round(d / 7) % 2 ? 1 : -1) * (road.w / 2 + 0.8);
-        const ok = [[x + nx * off, z + nz * off], [x - nx * off, z - nz * off]]
-          .find(([px, pz]) => isFree(px, pz, 0.6, true) && roadDist(px, pz) > 0.2 && shoreDist(px, pz) > 1.2);
-        if (ok) lamp(ok[0], ok[1]);
-      }
-    }
-  }
+  // 마을 안 길가 가로등: 자리는 core/layout.js 의 lampSpots(길 따라 고른 간격 · 가로등끼리 띄우기 · 가게 앞과 라멘 손님 자리 비우기)
+  for (const p of lampSpots({ isFree: (x, z) => isFree(x, z, 0.6, true) })) lamp(p.x, p.z);
 
   // 마을 나무: 길 · 건물 · 물을 피해 약 46그루(다섯에 하나는 꽃나무, 셋에 하나는 덤불)
   for (let k = 0, made = 0; k < 500 && made < 46; k++) {
