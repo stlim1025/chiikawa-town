@@ -990,6 +990,8 @@ export function createPanels(ui, handlers) {
 
   return {
     isOpen: () => !!current,
+    /** 지금 떠 있는 창 이름('bag' · 'settings' …, 없으면 null). */
+    openKind: () => current?.kind ?? null,
     /** 마을폰을 보고 있는지(폰을 볼 때는 시간이 계속 흐른다). */
     isPhone: () => !!current?.phone,
     /** 매 프레임: 폰 상태 줄 시각을 흐르는 시간에 맞춘다. */

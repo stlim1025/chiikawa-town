@@ -75,14 +75,17 @@ export function createHud(ui, input) {
   const bagBtn = el('button', 'hud-bag', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 14q0-8 7-8t7 8" fill="none" stroke="#8a5a30" stroke-width="3" stroke-linecap="round"/><rect x="7" y="13" width="26" height="22" rx="7" fill="#e9b26b" stroke="#8a5a30" stroke-width="2.6"/><path d="M7 21h26" stroke="#8a5a30" stroke-width="2.4"/><rect x="16" y="18" width="8" height="7" rx="2" fill="#fcd95b" stroke="#8a5a30" stroke-width="2"/></svg>');
   bagBtn.type = 'button';
   bagBtn.setAttribute('aria-label', '주머니');
+  bagBtn.title = '주머니 (I)';
   const gear = el('button', 'hud-phone', PHONE);
   gear.type = 'button';
   gear.setAttribute('aria-label', '마을폰(설정)');
+  gear.title = '마을폰 (E)';
   // 마을폰 아래 등불 버튼(확대 · 축소는 휠 · 두 손가락으로)
   const zoom = el('div', 'hud-zoom');
   const lightBtn = el('button', 'icon-btn hud-light', LIGHT_ICON.off);
   lightBtn.type = 'button';
   lightBtn.hidden = true;
+  lightBtn.title = '등불 (F)';
   zoom.append(lightBtn);
   const action = el('button', 'hud-action');
   action.type = 'button';

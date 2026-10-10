@@ -95,11 +95,11 @@ export function createInput(ui, canvas) {
     // 입력이 꺼져 있으면(창, 캐릭터 만들기) 키를 가로채지 않아 버튼을 스페이스로 누를 수 있게 둔다
     if (!enabled || typing(e)) return;
     if (KEYS[e.code]) { pressed.add(e.code); e.preventDefault(); }
-    if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); if (enabled) emitAction(true); }
+    if (e.code === 'Space') { e.preventDefault(); if (enabled) emitAction(true); }
   }
   function onKeyUp(e) {
     if (KEYS[e.code]) pressed.delete(e.code);
-    if (e.code === 'Space' || e.code === 'KeyE') emitAction(false);
+    if (e.code === 'Space') emitAction(false);
   }
   function onBlur() { pressed.clear(); touch = null; fingers.clear(); pinchDist = 0; stick.hidden = true; emitAction(false); }
 

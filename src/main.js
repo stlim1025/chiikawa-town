@@ -648,14 +648,25 @@ function boot() {
   // 가방: 오른쪽 위 버튼 또는 I · B 키
   const openBag = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
   hud.onBag(openBag);
-  window.addEventListener('keydown', (e) => {
-    if ((e.code === 'KeyI' || e.code === 'KeyB') && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) openBag();
-  });
-  // 마을폰: 마을에서도, 집 · 친구 집 안에서도(꾸미는 중만 빼고) 연다
-  hud.onSettings(() => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); });
+  // 마을폰: 마을에서도, 집 · 친구 집 안에서도(꾸미는 중만 빼고) 연다. 오른쪽 위 버튼 또는 E 키
+  const openPhone = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); };
+  hud.onSettings(openPhone);
   input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
-  // 등불 버튼: 가진 불만 끔 → 랜턴 → 손전등
-  hud.onLight(() => { if (state && mode === 'play') { commit(nextLight(state)); } });
+  // 등불: 가진 불만 끔 → 랜턴 → 손전등. 버튼 또는 F 키(아직 불이 없으면 어디서 사는지 알려 준다)
+  const toggleLight = (fromKey) => {
+    if (!state || mode !== 'play') return;
+    const next = nextLight(state);
+    if (lightOf(next) === lightOf(state)) { if (fromKey) hud.toast('등불이 아직 없어요', 2200, { chips: [{ text: '도구점에서 팔아요' }] }); return; }
+    commit(next);
+  };
+  hud.onLight(() => toggleLight(false));
+  // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || (e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) return;
+    if (e.code === 'KeyI' || e.code === 'KeyB') { if (panels.openKind() === 'bag') panels.close(); else openBag(); }
+    else if (e.code === 'KeyE') { if (panels.isPhone()) panels.close(); else openPhone(); }
+    else if (e.code === 'KeyF') toggleLight(true);
+  });
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoomBy(Math.exp(e.deltaY * 0.001)); }, { passive: false });
   // PC: 마우스 왼쪽 클릭으로 무기를 휘두른다(누른 쪽 · 그 근처 몬스터를 노린다)
   const clickRay = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), clickHit = new THREE.Vector3();
