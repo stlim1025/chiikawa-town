@@ -17,7 +17,7 @@ import { REGION_NAMES, regionAt } from '../core/layout.js';
 import { createMapView } from './mapapp.js';
 import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core/weeding.js';
 import { weedSvg } from './weedart.js';
-import { pochetteSvg, itemSvg, accessorySvg } from './itemart.js';
+import { pochetteSvg, itemSvg, accessorySvg, TICKET_SVG } from './itemart.js';
 import { bagOf, itemInfo } from '../core/inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
@@ -26,6 +26,7 @@ import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActiv
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
+import { PRIZES, RAFFLE_PRICE, DAILY_TICKETS, raffleOf } from '../core/raffle.js';
 import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
 
 // 마을폰 앱 아이콘
@@ -825,6 +826,23 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'actions' }, closeBtn())];
     },
     // 도구점: 랜턴 · 손전등(4단계에 무기)
+    // 경품 추첨(원작의 가라가라): 구슬 색마다 상품 · 추첨권(가게에서 물건을 사면 한 장) · 돌리기
+    raffle(s) {
+      const r = raffleOf(s), left = DAILY_TICKETS - (r.day === s.clock.day ? r.got : 0);
+      return [head('경품 추첨', s.money),
+        h('p', { class: 'sub' }, '손잡이를 돌려 나온 구슬 색으로 상품을 받아요!'),
+        h('div', { class: 'prize-list' }, PRIZES.map((P) => h('div', { class: 'prize-row' },
+          h('i', { class: 'prize-ball', style: `background:${P.ball}` }),
+          h('b', { class: 'prize-rank' }, P.rank),
+          svgSpan('prize-art', itemSvg(P.item)),
+          h('span', { class: 'prize-name' }, itemInfo(P.item).name)))),
+        h('div', { class: 'row pochette' }, svgSpan('pochette-art', TICKET_SVG),
+          h('div', {}, h('div', { class: 't' }, `추첨권 ${r.tickets}장`), h('div', { class: 'd' }, left > 0 ? `가게에서 물건을 사면 한 장(오늘 ${left}장 더)` : '오늘 받을 추첨권은 다 받았어요'))),
+        h('div', { class: 'actions' },
+          r.tickets > 0 ? h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.raffleDraw() }, '추첨권으로 돌리기')
+            : h('button', { class: 'btn primary', type: 'button', disabled: s.money < RAFFLE_PRICE, onClick: () => handlers.raffleDraw() }, s.money < RAFFLE_PRICE ? `${won(RAFFLE_PRICE)} 부족` : `돌리기 ${won(RAFFLE_PRICE)}`),
+          closeBtn())];
+    },
     tools(s) {
       const out = [head('도구점', s.money), h('h3', { class: 'shop-sec' }, '불')];
       const LIGHT_ART = {
@@ -964,6 +982,7 @@ export function createPanels(ui, handlers) {
     openWardrobe: () => show('wardrobe'),
     openBooks: () => show('books'),
     openTools: () => show('tools'),
+    openRaffle: () => show('raffle'),
     openMap: () => show('map'),
     openWeeds: () => show('weeds'),
     openMonsters: () => show('monsters'),

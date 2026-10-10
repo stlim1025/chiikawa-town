@@ -12,6 +12,7 @@ import { isValidBag } from './inventory.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS } from './quests.js';
+import { isValidRaffle } from './raffle.js';
 import { isValidGround } from './ground.js';
 import { isValidHunters } from './hunters.js';
 
@@ -53,6 +54,7 @@ export function isValidState(s) {
   if (s.hunted !== undefined && !isValidHunted(s.hunted)) return false; // 잡은 몬스터 수
   if (s.quests !== undefined && !isValidQuests(s.quests)) return false; // 퀘스트(5단계)
   if (s.acts !== undefined && !isValidActs(s.acts)) return false; // 같이 한 일상 일(일상 부탁)
+  if (s.raffle !== undefined && !isValidRaffle(s.raffle)) return false; // 경품 추첨권
   if (s.questTrack !== undefined && s.questTrack !== null && !QUESTS[s.questTrack]) return false;
   if (s.story !== undefined && !isValidStory(s.story)) return false;
   if (s.truce !== undefined && !num(s.truce)) return false;

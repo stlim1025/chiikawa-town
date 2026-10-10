@@ -43,6 +43,7 @@ function roofGeometry() {
   return g;
 }
 const ROOF = roofGeometry();
+const OCTA = new THREE.CylinderGeometry(1, 1, 1, 8); // 경품 추첨 가라가라의 팔각 통
 
 /** 둥근 문(아래는 평평, 위는 반원): 폭 1 · 높이 1.75 · 두께 1(가운데 기준), 원점은 문 아래 가운데. */
 function archDoorGeometry() {
@@ -280,6 +281,44 @@ export function buildVillage(scene) {
     labels.push({ x, y: 1.6, z, text: lot.label });
   }
 
+  /**
+   * 경품 추첨: 빨간 줄무늬 천을 덮은 탁자 위에 팔각 나무 통(가라가라)과 손잡이, 앞에 구슬 받는 하얀 쟁반과 금 종,
+   * 뒤에 빨강 · 하양 차양. 추첨할 때 통이 빙글빙글 돈다(raffleDrum).
+   */
+  let raffleDrum = null;
+  function raffle(lot) {
+    const { x, z } = lot, g = new THREE.Group(), wood = '#c98a4a', red = '#e0524f';
+    g.position.set(x, 0, z);
+    // 탁자: 흰 천에 빨간 세로 줄
+    place(g, toonMesh(GEO.box, '#fffaf0', { position: [0, 0.38, 0], scale: [1.5, 0.76, 0.72], shell: true }));
+    [-0.6, -0.3, 0, 0.3, 0.6].forEach((px) => place(g, toonMesh(GEO.box, red, { position: [px, 0.38, 0.37], scale: [0.13, 0.74, 0.02], outline: false, shadow: false })));
+    // 가라가라: 받침 다리 둘 + 팔각 통(옆으로 눕힌 축) + 손잡이
+    [-0.32, 0.32].forEach((px) => place(g, toonMesh(GEO.box, '#a8743c', { position: [px, 0.98, -0.05], scale: [0.06, 0.46, 0.3], shell: true, shadow: false })));
+    const drum = new THREE.Group();
+    drum.position.set(0, 1.12, -0.05);
+    place(drum, toonMesh(OCTA, wood, { rotation: [0, 0, Math.PI / 2], scale: [0.27, 0.5, 0.27], outline: 0.022 }));
+    [-0.255, 0.255].forEach((px) => place(drum, toonMesh(OCTA, '#e8b878', { position: [px, 0, 0], rotation: [0, 0, Math.PI / 2], scale: [0.2, 0.02, 0.2], outline: false, shadow: false })));
+    place(drum, toonMesh(GEO.box, '#7a5233', { position: [0.36, 0, 0], scale: [0.04, 0.04, 0.04], outline: false, shadow: false }));
+    // 손잡이(통과 같이 돈다): 축에서 뻗은 팔 + 빨간 손잡이
+    place(drum, toonMesh(GEO.box, '#7a5233', { position: [0.4, 0, 0.13], scale: [0.04, 0.04, 0.28], outline: 0.012, shadow: false }));
+    place(drum, toonMesh(GEO.cylinder, '#e0524f', { position: [0.4, 0, 0.26], rotation: [0, 0, -Math.PI / 2], scale: [0.035, 0.12, 0.035], outline: 0.012, shadow: false }));
+    g.add(drum);
+    raffleDrum = drum;
+    // 구슬 쟁반(색 구슬 몇 개) · 금 종
+    place(g, toonMesh(GEO.box, '#ffffff', { position: [-0.05, 0.8, 0.22], scale: [0.5, 0.05, 0.22], outline: 0.014, shadow: false }));
+    [['#f6c453', -0.2], ['#e0524f', -0.05], ['#fbfaf5', 0.1]].forEach(([c, px]) => place(g, toonMesh(GEO.sphere, c, { position: [px, 0.86, 0.22], scale: [0.045, 0.045, 0.045], outline: 0.01, shadow: false })));
+    place(g, toonMesh(GEO.cone, '#f6c453', { position: [-0.55, 0.77, 0.12], scale: [0.09, 0.14, 0.09], outline: 0.014, shadow: false }));
+    place(g, toonMesh(GEO.sphere, '#a8743c', { position: [-0.55, 0.93, 0.12], scale: [0.025, 0.025, 0.025], outline: false, shadow: false }));
+    // 뒤 기둥 · 빨강 하양 차양
+    [-0.72, 0.72].forEach((px) => place(g, toonMesh(GEO.box, '#a8743c', { position: [px, 1.05, -0.35], scale: [0.07, 2.1, 0.07], shell: true })));
+    place(g, toonMesh(ROOF, red, { position: [0, 2.1, -0.15], scale: [1.75, 0.34, 0.8], shell: true }));
+    [-0.6, -0.2, 0.2, 0.6].forEach((px) => place(g, toonMesh(GEO.box, '#fffaf0', { position: [px, 1.92, 0.27], scale: [0.2, 0.22, 0.03], outline: 0.012, shadow: false })));
+    world.add(g);
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children, true);
+    labels.push({ x, y: 2.6, z, text: lot.label });
+  }
+
   /** 랏코 수련장: 나무 기둥 셋과 짚 인형. */
   function dojo(lot) {
     const g = new THREE.Group();
@@ -368,6 +407,7 @@ export function buildVillage(scene) {
     else if (lot.kind === 'bench') bench(lot);
     else if (lot.kind === 'dojo') dojo(lot);
     else if (lot.kind === 'pub') pub(lot);
+    else if (lot.kind === 'raffle') raffle(lot);
     if (lot.home) homes[lot.home] = doorSpot(lot);
     else spots[lot.id] = doorSpot(lot);
   }
@@ -597,6 +637,8 @@ export function buildVillage(scene) {
   const move = (ox, oz, nx, nz, radius = 0.35) => slideMove(isFree, obstacles.pushOut, ox, oz, nx, nz, radius);
 
   return {
+    /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */
+    get raffleDrum() { return raffleDrum; },
     group: world,
     obstacles,
     move,

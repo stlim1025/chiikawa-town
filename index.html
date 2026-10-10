@@ -195,6 +195,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @keyframes photo-pop { from { opacity: 0; transform: scale(1.6) rotate(8deg); } }
 @media (max-height: 420px) { .notice-card .lic-card { width: 250px; margin: 8px auto 0; } }
 @media (prefers-reduced-motion: reduce) { .notice-card .lic-card, .notice-card .lc-photo { animation: none; } }
+/* 경품 추첨: 상품 구슬 표 · 가라가라 연출(팔각 통이 두 바퀴 → 구슬이 쟁반으로 툭) · 당첨 카드의 큰 구슬 */
+.prize-list { display: grid; gap: 6px; margin: 6px 0 10px; }
+.prize-row { display: grid; grid-template-columns: 26px 64px 40px minmax(0, 1fr); align-items: center; gap: 8px; padding: 5px 12px; border-radius: 16px 18px 16px 14px; background: var(--paper-2); }
+.prize-ball { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--ink); box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.12), inset 2px 2px 0 rgba(255, 255, 255, 0.6); }
+.prize-rank { font-weight: inherit; font-size: 19px; }
+.prize-art svg { display: block; width: 38px; height: 38px; }
+.prize-name { font-size: 19px; }
+.raffle-wrap { position: absolute; inset: 0; z-index: 28; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(58, 42, 30, 0.34); animation: notice-in 0.2s ease-out; cursor: pointer; }
+.raffle-wrap.out { opacity: 0; transition: opacity 0.2s; }
+.raffle-stage { width: min(300px, 100%); box-sizing: border-box; padding: 16px 20px 12px; text-align: center; border-radius: var(--r); background: var(--dots), var(--paper); box-shadow: var(--lift); animation: pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.raffle-stage svg { display: block; width: 100%; height: auto; }
+.raffle-stage .rs-drum { transform-box: view-box; transform-origin: 100px 80px; animation: rs-spin 1.5s cubic-bezier(0.35, 0.1, 0.3, 1) both; }
+.raffle-stage .rs-ball { opacity: 0; animation: rs-drop 0.65s cubic-bezier(0.3, 1.5, 0.5, 1) 1.5s both; }
+.raffle-stage .rs-say { margin: 4px 0 0; font-size: 22px; }
+@keyframes rs-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(720deg); } }
+@keyframes rs-drop { 0% { opacity: 0; transform: translate(0, 0); } 6% { opacity: 1; transform: translate(0, 0); } 55% { transform: translate(30px, 24px); } 75% { transform: translate(33px, 15px); } 100% { opacity: 1; transform: translate(36px, 24px); } }
+.raffle-prize { position: relative; display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px auto 0; }
+.raffle-prize .rp-ball { width: 54px; height: 54px; border-radius: 50%; border: 3.5px solid var(--ink); box-shadow: inset -6px -6px 0 rgba(0, 0, 0, 0.12), inset 4px 4px 0 rgba(255, 255, 255, 0.6); animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.raffle-prize .rp-item svg { display: block; width: 84px; height: 84px; animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) 0.15s both; }
+@media (prefers-reduced-motion: reduce) { .raffle-stage, .raffle-stage .rs-drum, .raffle-stage .rs-ball, .raffle-prize .rp-ball, .raffle-prize .rp-item svg { animation: none; } .raffle-stage .rs-ball { opacity: 1; transform: translate(36px, 24px); } }
 /* 마을폰 자격증 앱: 카드를 차례로 쌓고, 카드 아래 한 줄(보수 · 랭킹) */
 .lic-list { display: grid; gap: 16px; margin: 6px 0 4px; }
 .lic-item .chip-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: 8px 4px 0; color: var(--ink); }

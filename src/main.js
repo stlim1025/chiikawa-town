@@ -57,6 +57,8 @@ import { itemSvg, accessorySvg } from './ui/itemart.js';
 import { weaponSvg, monsterSvg } from './ui/monsterart.js';
 import { openQuiz, openHighball } from './ui/exams.js';
 import { licenseCardEl } from './ui/licensecard.js';
+import { openRaffleSpin } from './ui/rafflespin.js';
+import { raffleOf, earnTicket, drawRaffle } from './core/raffle.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, villagerTakesJob, payVillager, villagerSpend, villagerPay,
   canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY,
@@ -74,6 +76,7 @@ import {
 import { DOING_ICONS } from './ui/doingicons.js';
 import { charSvg } from './ui/art.js';
 import { furnitureThumbs } from './world/thumbs.js';
+import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
@@ -224,7 +227,19 @@ function boot() {
       sound.play('eat');
       const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
       hud.toast(SAY[itemId] || '냠냠!', 2000);
+      gotTicket();
       if (itemId === 'ramen') didAct('ramen'); // 일상 부탁: 같이 라멘 먹기
+    },
+    // 경품 추첨: 추첨권(없으면 돈)으로 가라가라를 돌린다 → 연출 → 당첨 카드
+    raffleDraw() {
+      const r = drawRaffle(state);
+      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '가방이 꽉 찼어요'); return; }
+      commit(r.state);
+      panels.close();
+      beginOverlay();
+      drumSpin = 1.6;
+      if (r.paid === 'money') sound.play('coin');
+      openRaffleSpin(ui, { ball: r.prize.ball, sound, onDone: () => { endOverlay(); showPrize(r.prize); } });
     },
     // 맥주집: 쿠리만쥬가 와 있는지 · 오늘 건배했는지, 건배하기
     pubInfo: () => ({ here: !!kuriAtPub(), cheered: friendOf(state, 'kurimanju').drink === state.clock.day }),
@@ -241,6 +256,7 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 2600);
+      gotTicket();
     },
     // 부동산
     dayLabel: (day) => dateLabel(state.startDate, day),
@@ -268,6 +284,7 @@ function boot() {
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(POCHETTES[id].name, '을/를')} 장착했어요!`, 2800);
+      gotTicket();
     },
     wearPochette(id) {
       commit(wearPochette(state, id));
@@ -286,6 +303,7 @@ function boot() {
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(ACCESSORY_ITEMS[id].name, '을/를')} 장착했어요!`, 3400);
+      gotTicket();
     },
     wearAccessory(id) {
       commit(wearAccessory(state, id));
@@ -309,6 +327,7 @@ function boot() {
       commit(r.state);
       sound.play('coin');
       hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
+      gotTicket();
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
     // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
@@ -319,6 +338,7 @@ function boot() {
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 2800, { icon: weaponSvg(id) });
+      gotTicket();
     },
     /** 토벌 랭커 특전: 지금 든 무기에 내 얼굴을 새긴다. */
     engrave() {
@@ -888,6 +908,7 @@ function boot() {
     else if (target.type === 'pub') panels.openPub();
     else if (target.type === 'books') panels.openBooks();
     else if (target.type === 'tools') panels.openTools();
+    else if (target.type === 'raffle') panels.openRaffle();
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -1260,6 +1281,27 @@ function boot() {
   /** 시험 · 알바 창이 열려 있는 동안 마을 조작을 막는다. */
   function beginOverlay() { cancelPull(); input.setEnabled(false); hud.setAction(null); overlay = true; }
   function endOverlay() { overlay = false; if (mode === 'play') input.setEnabled(true); }
+  // ---------- 경품 추첨 ----------
+  let drumSpin = 0; // 마을의 가라가라 통이 도는 남은 시간
+  /** 가게에서 물건을 샀다: 경품 추첨권 한 장(하루 몇 장까지). 처음 받으면 어디서 쓰는지 알려 준다. */
+  function gotTicket() {
+    const r = earnTicket(state, state.clock.day);
+    if (!r.earned) return;
+    commit(r.state);
+    setTimeout(() => hud.toast('추첨권 +1', 1800, { icon: TICKET_SVG, chips: [{ text: `${raffleOf(state).tickets}장` }] }), 700);
+    if (!seen('raffle-ticket')) { markSeen('raffle-ticket'); setTimeout(() => hud.toast('추첨권은 광장 옆 경품 추첨에서', 3200, { icon: TICKET_SVG }), 2600); }
+  }
+  /** 당첨 카드: 나온 구슬과 상품 그림, 1 · 2등은 도장이 빨갛게 쾅. */
+  function showPrize(P) {
+    const I = itemInfo(P.item), big = P.id === 'gold' || P.id === 'red';
+    const card = document.createElement('div');
+    card.className = 'raffle-prize';
+    card.innerHTML = `<span class="rp-ball" style="background:${P.ball}"></span><span class="rp-item">${itemSvg(P.item)}</span>`;
+    hud.notice({ kicker: `${P.ballName} 구슬!`, card, stamp: P.id === 'white' ? '참가상' : `${P.rank} 당첨!`, tone: big ? 'good' : 'info', sub: `${josa(I.name, '을/를')} 받았어요`, ok: '받았다!' });
+    sound.play(P.id === 'gold' ? 'heartUp' : big ? 'done' : 'heart');
+    if (big) player.cheerTime = P.id === 'gold' ? 2.4 : 1.4;
+    hud.bagBump();
+  }
   /** 자격증 카드에 적는 날짜: 진짜 자격증처럼 2026.10.08 */
   const cardDate = (s, day) => { const { y, m, d } = dateOf(s.startDate || todayISO(), day); return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`; };
   /**
@@ -2973,7 +3015,7 @@ function boot() {
   }
 
   // ---------- 상호작용 대상 ----------
-  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업']];
+  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업'], ['raffle', '경품 추첨']];
   // 가장 가까운 대상을 고른다. 건물은 거리를 0.6 깎아 조금 우선한다.
   function findTarget() {
     const p = player.position;
@@ -3264,6 +3306,7 @@ function boot() {
   function tick(dt) {
     t += dt;
     const aspect = gfx.resize();
+    if (drumSpin > 0 && village.raffleDrum) { drumSpin -= dt; village.raffleDrum.rotation.x -= dt * 10 * Math.min(1, drumSpin * 1.5); } // 경품 추첨 가라가라
     // 집 안: 마을 대신 집 안 장면을 그린다(시간은 흐르고, 마을 친구들도 계속 지낸다)
     if (mode === 'visit' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
