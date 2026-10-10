@@ -7,7 +7,7 @@ import { ISLE } from '../core/layout.js';
  *    바라봄: 라디안(0 = +z) · 'cam'(카메라) · 다른 사람 이름 · [x, z](상대 자리). 탄 배('duck' | 'row' | 'far')가 있으면 dx · dz 는 배 기준.
  *  - lines: 글(내레이션) · [말하는 사람, 글] · 연출 { do: ... } 를 차례로. 말하는 사람: c h u r m k q s(치이카와 · 하치와레 · 우사기 · 랏코 · 모몽가 · 카니 · 쿠리만쥬 · 시사)
  *    j(시마지로) · t(한잎) · f(두잎) · i(섬사람) · z(세이렌) · me(나)
- *  - 연출: pose · cast · hide · siren · sirenMouth · mer · tendrils · bind · unbind · boat · cam · fire · sign · lid · snd · shake · splash · wait · notes · bubbles · lei · scale · ask · game · branch · sleep
+ *  - 연출: pose · cast · hide · siren · sirenMouth · mer(ride 면 배를 따라간다) · tendrils · bind · unbind · boat · cam · fire · sign · lid · snd · shake · splash · wait · notes · bubbles · lei · scale · ask · game · branch · sleep
  */
 const PI = Math.PI;
 const PALS = ['me', 'chiikawa', 'hachiware', 'usagi', 'rakko', 'momonga', 'kani'];
@@ -434,13 +434,14 @@ export const BEATS = [
   },
   {
     id: 'far', at: ISLE.far, sky: 'day', title: '',
-    boats: { far: { x: 0, z: 0, face: -PI / 2, drift: 0.5 } }, props: { farShadow: [3.2, 2.6] },
+    boats: { far: { x: 0, z: 0, face: -PI / 2, drift: 0.5 } },
     cast: { hitoha: [0.55, 0, -PI / 2, 'pull', 0, 'far'], futaba: [-0.55, 0, -PI / 2, 'idle', 0, 'far'] },
-    mer: [{ x: 4, z: 2.4, face: -PI / 2, state: 'swim' }, { x: 5.2, z: 3.4, face: -PI / 2, state: 'swim' }],
+    // 인어 둘이 배 뒤를 쫓아간다(배 기준 자리 — 배와 함께 움직인다)
+    mer: [{ x: 3.4, z: 0.9, face: -PI / 2, state: 'swim', ride: 'far' }, { x: 4.6, z: -0.7, face: -PI / 2, state: 'swim', ride: 'far' }],
     cam: [[12, 9, 14], [0, 0, 0]],
     lines: [
       '(…멀리, 작은 배 한 척이 다른 섬을 향해 조용히 노를 젓고 있다)',
-      '(그 곁, 물결 아래로… 커다란 그림자가 스윽 스쳐 갔다)'
+      '(그 뒤를… 인어 둘이 물결 사이로 고개를 내밀며, 조용히 따라가고 있었다)'
     ]
   }
 ];

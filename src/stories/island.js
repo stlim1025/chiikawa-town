@@ -36,7 +36,7 @@ export function createIslandTrip(ctx) {
   const speaker = (key) => (key === 'me' ? ctx.me() : KEY[key] ? ctx.who(KEY[key]) : GUESTS[key] || ctx.narrator);
   const line = (L) => (typeof L === 'string' ? { who: ctx.narrator, text: L } : { who: speaker(L[0]), text: L[1] });
   const rel = (x, z) => ({ x: S.o.x + x, z: S.o.z + z });
-  const relSpec = (sp) => (sp && sp.x !== undefined ? { ...sp, ...rel(sp.x, sp.z) } : sp);
+  const relSpec = (sp) => (sp && sp.x !== undefined && !sp.ride ? { ...sp, ...rel(sp.x, sp.z) } : sp); // 배를 탄(ride) 것은 배 기준 그대로
 
   /** 대사 · 연출 목록을 차례로. 대사는 이어서 한 상자로, 연출은 하나씩(기다리는 연출은 끝나면 다음으로). */
   function run(items, done) {
@@ -196,7 +196,6 @@ export function createIslandTrip(ctx) {
     const pr = b.props || {};
     if (pr.pot) isle.pot(true);
     if (pr.memory) isle.memoryProps(true);
-    if (pr.farShadow) { const p = rel(pr.farShadow[0], pr.farShadow[1]); isle.farShadow(true, p.x, p.z); }
     if (S.leis) LEIS.forEach((k) => isle.lei(k, true));
   }
   function playBeat(i) {

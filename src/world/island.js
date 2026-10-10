@@ -111,10 +111,6 @@ export function createIsland() {
   tufts.visible = false;
   g.add(tufts);
   const m4 = new THREE.Matrix4(), v3 = new THREE.Vector3();
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#0a1a2a', transparent: true, opacity: 0.45, depthWrite: false }));
-  shadow.scale.set(3.2, 1, 6);
-  shadow.visible = false;
-  g.add(shadow);
 
   // 세이렌 · 인어 · 덩굴
   const siren = buildSiren();
@@ -165,7 +161,7 @@ export function createIsland() {
       Object.values(fires).forEach((f) => { f.group.visible = false; });
       api.boat('duck', { x: ISLE.jetty.x + 3.3, z: ISLE.jetty.z + 2.5, face: 0 }); // 선착장 옆에 나란히
       api.boat('row', null); api.boat('far', null);
-      api.sign(false); api.lid(false); api.memoryProps(false); api.pot(false); api.farShadow(false);
+      api.sign(false); api.lid(false); api.memoryProps(false); api.pot(false);
       fx.clear();
     },
     setSky(kind) {
@@ -215,7 +211,7 @@ export function createIsland() {
     get sirenState() { return sv.state; },
     /** 세이렌 입(카레 과녁) 위치. */
     mouthPos() { const p = new THREE.Vector3(); siren.parts.mouth.getWorldPosition(p); return p; },
-    /** 인어들: [{ x, z, face, state: swim|sing|bitten }] */
+    /** 인어들: [{ x, z, face, state: swim|sing|bitten, ride(배 이름 — 있으면 x · z 는 그 배 기준이라 배를 따라간다) }] */
     mermaids(list) { merSpec = list || []; mermaids.forEach((mm, i) => { mm.root.visible = !!merSpec[i]; if (!merSpec[i]) fx.notes(false, null, 'mer' + i); }); },
     /** 덩굴 줄기: { x, z, r } 둘레에서 솟는다 | null */
     tendrils(spec) { tenSpec = spec ? { r: 4, ...spec, grow: 0 } : null; vines.root.visible = !!spec; },
@@ -225,7 +221,6 @@ export function createIsland() {
     sign(fallen) { sign.rotation.x = fallen ? -Math.PI / 2 + 0.12 : 0; },
     lid(on) { lid.visible = on; },
     memoryProps(on) { env.traverse((o) => { if (o.userData.memory) o.visible = on; }); },
-    farShadow(on, x = 0, z = 0) { shadow.visible = on; shadow.position.set(x, -0.02, z); },
     pot(on) { pot.visible = on; fx.steam(on, { x: ISLE.fire.x, y: 1.0, z: ISLE.fire.z, w: 0.25, size: 0.45 }, 'pot'); },
     notes(on, src) { fx.notes(on, src, 'script'); },
     steam(on, src) { fx.steam(on, src, 'script'); },
@@ -331,12 +326,13 @@ export function createIsland() {
     merSpec.forEach((ms, i) => {
       const mm = mermaids[i];
       if (!ms) return;
-      mm.root.position.set(ms.x, Math.sin(t * 2 + i) * 0.08 - 0.1, ms.z);
+      const rb = ms.ride && boats[ms.ride].spec, mx = ms.x + (rb ? rb.x : 0), mz = ms.z + (rb ? rb.z : 0); // 배를 쫓아가는 인어(마지막 장면)
+      mm.root.position.set(mx, Math.sin(t * 2 + i) * 0.08 - 0.1, mz);
       mm.root.rotation.y = ms.face || 0;
       mm.fin.rotation.x = Math.sin(t * 5 + i) * 0.35;
       mm.mouth.scale.y = ms.state === 'sing' ? 0.035 + 0.025 * (0.5 + 0.5 * Math.sin(t * 6 + i)) : 0.04;
       mm.root.position.x += ms.state === 'bitten' ? Math.sin(t * 40) * 0.05 : 0;
-      fx.notes(ms.state === 'sing', { x: ms.x, y: 1.3, z: ms.z, w: 0.3, size: 0.4 }, 'mer' + i);
+      fx.notes(ms.state === 'sing', { x: mx, y: 1.3, z: mz, w: 0.3, size: 0.4 }, 'mer' + i);
     });
   }
   function faceAngle(w) {
