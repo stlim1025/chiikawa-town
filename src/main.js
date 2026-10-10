@@ -3745,7 +3745,9 @@ function boot() {
   const titlePos = new THREE.Vector3(), titleLook = new THREE.Vector3(0, 0, 1);
   function frame(now) {
     requestAnimationFrame(frame);
-    if (!perf.due(now)) return; // 절전: 초당 30번만 돌고 그린다(휴대폰 발열)
+    // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
+    // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
