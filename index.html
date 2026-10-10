@@ -1348,6 +1348,10 @@ button.pocket-slot:hover { transform: translateY(-2px); }
 .creator { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .home-bar { width: min(760px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
 .home-tray { width: min(820px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+/* 홈 화면 앱(아이폰): 시각 띠 밑까지 그리면 100% 높이가 띠 높이(약 60px)만큼 모자라 화면 아래가 비었다 → 그때는 화면 전체 높이(100vh)로.
+   .standalone 은 src/ui/webapp.js 가 붙인다(display-mode 를 모르는 경우 대비) */
+@media (display-mode: standalone), (display-mode: fullscreen) { html, body { height: 100vh; } }
+html.standalone, html.standalone body { height: 100vh; }
 
 /* 휴대폰(세로 폭 480px 이하 · 가로 높이 500px 이하): 글씨 · 칸 · 버튼을 한 단계 작게, 줄 간격을 촘촘하게(한 화면에 더 많이 → 스크롤 덜) */
 @media (max-width: 480px), (max-height: 500px) {

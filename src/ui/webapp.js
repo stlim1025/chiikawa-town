@@ -16,4 +16,7 @@ if (!framed) {
   add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' });
   add('meta', { name: 'apple-mobile-web-app-title', content: '치이카와 마을' });
   add('meta', { name: 'theme-color', content: '#d9eef7' });
+  // 홈 화면에서 연 앱이면 표시해 둔다(index.html 이 화면 높이를 100vh 로 잡는다)
+  const standalone = navigator.standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  if (standalone) document.documentElement.classList.add('standalone');
 }
