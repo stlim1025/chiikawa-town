@@ -295,21 +295,44 @@ export function createHud(ui, input) {
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
     /** 같이 토벌 중인 친구들. list: [{ name, svg: 얼굴 그림 }] (비면 숨긴다) */
+    /**
+     * 같이 다니는 친구 꼬리표. list: [{ name, svg, hp?, max?, down? }] — 같이 토벌 중인 친구는 얼굴 옆에 체력 막대와 숫자(쓰러지면 흐린 얼굴 · '기절').
+     * 친구가 바뀔 때만 새로 그리고 톡 튀며, 체력만 바뀌면 막대만 고친다.
+     */
     setParty(list, label = '같이 토벌') {
       partyTag.hidden = !list.length;
-      partyTag.replaceChildren();
-      if (!list.length) return;
-      const lab = el('span', 'pt-lab');
-      lab.textContent = label;
-      partyTag.appendChild(lab);
-      for (const f of list) {
-        const face = el('i', 'pt-face');
-        face.innerHTML = f.svg;
-        face.title = f.name;
-        face.setAttribute('aria-label', f.name);
-        partyTag.appendChild(face);
+      const key = label + '|' + list.map((f) => f.name + (f.hp !== undefined ? '+' : '')).join(',');
+      if (partyTag.dataset.k !== key) {
+        partyTag.dataset.k = key;
+        partyTag.replaceChildren();
+        if (!list.length) return;
+        const lab = el('span', 'pt-lab');
+        lab.textContent = label;
+        partyTag.appendChild(lab);
+        for (const f of list) {
+          const box = el('span', 'pt-ally');
+          const face = el('i', 'pt-face');
+          face.innerHTML = f.svg;
+          face.title = f.name;
+          face.setAttribute('aria-label', f.name);
+          box.appendChild(face);
+          if (f.hp !== undefined) { const bar = el('span', 'pt-hp'); bar.appendChild(el('i')); box.append(bar, el('b', 'pt-num')); }
+          partyTag.appendChild(box);
+        }
+        partyTag.classList.remove('got'); void partyTag.offsetWidth; partyTag.classList.add('got');
       }
-      partyTag.classList.remove('got'); void partyTag.offsetWidth; partyTag.classList.add('got');
+      list.forEach((f, i) => {
+        const box = partyTag.querySelectorAll('.pt-ally')[i], bar = box && box.querySelector('.pt-hp');
+        if (!bar) return;
+        const k = Math.max(0, Math.min(1, f.hp / (f.max || 1)));
+        bar.firstChild.style.width = `${Math.round(k * 100)}%`;
+        bar.classList.toggle('low', k <= 0.4 && k > 0.2);
+        bar.classList.toggle('crit', k <= 0.2);
+        box.classList.toggle('down', !!f.down);
+        bar.title = f.down ? `${f.name} 기절` : `${f.name} 체력 ${Math.max(0, Math.round(f.hp))} / ${f.max}`;
+        bar.setAttribute('aria-label', bar.title);
+        box.querySelector('.pt-num').textContent = String(f.down ? 0 : Math.max(0, Math.round(f.hp)));
+      });
     },
     setAction(label) {
       action.hidden = !label;

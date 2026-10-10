@@ -2333,11 +2333,13 @@ function boot() {
     const n = npcs.byKind(kind);
     if (!n || n.down || !n.party) return;
     allyHp[kind] = (allyHp[kind] ?? ALLY_HP) - hit.dmg;
+    syncParty(); // 왼쪽 위 꼬리표의 체력 막대
     hud.floatText({ x: n.x, y: n.chibi.height + 0.3, z: n.z, text: `-${hit.dmg}`, kind: 'dmg' });
     sound.play('hurt');
     if (allyHp[kind] > 0) { if (Math.random() < 0.5) npcs.say(n, HURT_SAY[kind] || '아얏!'); npcs.emote(n, 'hurt', 0.35); return; }
     allyHp[kind] = 0;
     npcs.down(n, true);
+    syncParty();
     npcs.say(n, DOWN_SAY[kind] || '으으…');
     setDoing(kind, 'moon', '기절해 있어요');
     hud.toast(`${josa(nameOf(kind), '이/가')} 쓰러졌어요!`, 2800, { icon: faceIcon(kind), chips: [{ text: '다가가서 깨우기' }] });
@@ -2347,6 +2349,7 @@ function boot() {
     if (!n || !n.down) return;
     npcs.down(n, false);
     allyHp[n.kind] = WAKE_HP;
+    syncParty();
     npcs.say(n, WAKE_SAY[n.kind] || '고마워!');
     npcs.emote(n, joyAnim(n.kind), 1.2);
     setDoing(n.kind, 'sword', '나랑 같이 토벌');
@@ -2405,7 +2408,12 @@ function boot() {
   /** 왼쪽 위 '같이 토벌' · '같이 다니는 중' 꼬리표(데려간 친구 얼굴). */
   const syncParty = () => {
     const party = npcs.partyKinds(), list = [...party, ...[...buddies].filter((k) => !party.includes(k))];
-    hud.setParty(list.map((k) => ({ name: nameOf(k), svg: faceIcon(k) })), party.length ? '같이 토벌' : '같이 다니는 중');
+    hud.setParty(list.map((k) => {
+      const f = { name: nameOf(k), svg: faceIcon(k) };
+      if (!party.includes(k)) return f;
+      const n = npcs.byKind(k);
+      return { ...f, hp: allyHp[k] ?? ALLY_HP, max: ALLY_HP, down: !!(n && n.down) }; // 같이 토벌하는 친구는 체력 막대도
+    }), party.length ? '같이 토벌' : '같이 다니는 중');
   };
 
   // ---------- 일상 부탁: 친구와 같이 다니며 라멘 먹기 · 풀 뽑기 · 열매 따기 · 산책 ----------
