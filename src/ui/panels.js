@@ -705,7 +705,6 @@ export function createPanels(ui, handlers) {
         t.label, h('span', { class: 'n' }, t.n))))));
       if (pochetteTab === 'accessory') {
         // 꾸미기 소품: 사면 바로 달고, 집 옷장에서 바꿔 단다
-        out.push(h('p', { class: 'sub' }, '사면 바로 달아요. 집 옷장에서 바꿔 달 수 있어요.'));
         Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
           const own = wd.owned.includes(id);
           out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),

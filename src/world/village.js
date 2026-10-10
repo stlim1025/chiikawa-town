@@ -204,17 +204,24 @@ export function buildVillage(scene) {
     const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
     const R = 1.4 * s;
     part(GEO.sphere, '#fbfaf5', { scale: [R, R * 0.9, R], receive: true, outline: 0.05 }); // 아래 반은 땅에 묻혀 반구가 된다
-    // 현관 혹(앞 오른쪽): 키 큰 반달 모양. 문은 혹 앞면(카메라 쪽)에 둥근 나무문으로 붙인다
+    // 현관 혹(앞 오른쪽 대각선): 키 큰 반달 모양
     const bx = R * 0.62, bz = R * 0.62, rz = 0.42 * s, ry = 0.95 * s;
     part(GEO.sphere, '#fbfaf5', { position: [bx, 0, bz], scale: [rz, ry, rz], outline: 0.04 });
-    // 문은 혹 겉면을 따라 살짝 뒤로 기울인다(위로 갈수록 혹이 좁아져서): 아래 · 위 끝이 겉면 바로 앞에 오게
+    // 문(원작처럼 흰 문): 카메라 쪽으로 꺾지 않고 혹이 바깥을 보는 쪽(대각선)에 자연스럽게 달고,
+    // 위로 갈수록 좁아지는 혹 겉면을 따라 살짝 뒤로 기울인다. 문 · 손잡이 · 가로선은 문 묶음(door) 안 좌표로 붙인다
     const dw = 0.33 * s, dh = dw * 1.75, dt = 0.06, surf = (y) => rz * Math.sqrt(1 - (y / ry) ** 2);
-    const tilt = Math.atan((surf(0) - surf(dh)) / dh), dz = bz + surf(0) + dt / 2 + 0.012;
-    part(ARCH_DOOR, '#a8795a', { position: [bx, 0, dz], rotation: [-tilt, 0, 0], scale: [dw, dw, dt], shell: true, outline: 0.022, shadow: false });
-    // 문 위 가로 나뭇결 · 손잡이 · 문 앞 디딤돌
-    part(GEO.box, '#946546', { position: [bx, dh * 0.42, dz + dt / 2 - Math.sin(tilt) * dh * 0.42 + 0.004], rotation: [-tilt, 0, 0], scale: [dw * 0.78, 0.018, 0.01], outline: false, shadow: false });
-    part(GEO.dot, '#fcd95b', { position: [bx + dw * 0.28, dh * 0.4, dz + dt / 2 - Math.sin(tilt) * dh * 0.4 + 0.02], scale: [0.035 * s, 0.035 * s, 0.035 * s], outline: 0.012, shadow: false });
-    part(GEO.cylinder, '#e7e1d6', { position: [bx, 0, dz + 0.3 * s], scale: [0.3 * s, 0.05, 0.2 * s], outline: 0.02, shadow: false, receive: true });
+    const tilt = Math.atan((surf(0) - surf(dh)) / dh), face = Math.atan2(bx, bz), ox = Math.sin(face), oz = Math.cos(face);
+    const door = new THREE.Group();
+    door.position.set(bx + ox * surf(0), 0, bz + oz * surf(0));
+    door.rotation.set(-tilt, face, 0, 'YXZ');
+    g.add(door);
+    const doorPart = (geo, c, opts) => { const m = place(door, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
+    doorPart(ARCH_DOOR, '#ffffff', { position: [0, 0, dt / 2 + 0.012], scale: [dw, dw, dt], shell: true, outline: 0.022, shadow: false });
+    doorPart(GEO.box, '#e3dacb', { position: [0, dh * 0.42, dt + 0.016], scale: [dw * 0.78, 0.016, 0.01], outline: false, shadow: false });
+    doorPart(GEO.dot, '#d9b45a', { position: [dw * 0.28, dh * 0.4, dt + 0.03], scale: [0.035 * s, 0.035 * s, 0.035 * s], outline: 0.012, shadow: false });
+    // 문 앞 디딤돌(문이 보는 쪽으로)
+    const step = surf(0) + 0.3 * s;
+    part(GEO.cylinder, '#e7e1d6', { position: [bx + ox * step, 0, bz + oz * step], rotation: [0, face, 0], scale: [0.3 * s, 0.05, 0.2 * s], outline: 0.02, shadow: false, receive: true });
     // 십자 창(앞 왼쪽 위): 흰 틀 + 진한 십자
     const el = 0.62, az = -0.42; // 높이각, 옆으로 돌린 각
     const wx = Math.sin(az) * Math.cos(el) * R * 1.01, wy = Math.sin(el) * R * 0.9, wz = Math.cos(az) * Math.cos(el) * R * 1.01;
