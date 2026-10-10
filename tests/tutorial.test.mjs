@@ -22,11 +22,10 @@ test('첫날 안내는 하치와레 말투로 짧고 깔끔하다', () => {
   for (const [step, lines] of Object.entries(TUTORIAL_LINES)) hachiwareSays(lines, step);
 });
 
-test('첫날 안내: 꼭 알아야 할 것은 꼬리표로 남긴다', () => {
-  assert.ok(chipsOf('houseTour').includes('300원'));
-  assert.ok(chipsOf('board').includes('PC 는 Space'));
-  assert.ok(chipsOf('pull').includes('딩 소리'));
-  assert.ok(chipsOf('tips').includes('동쪽 검정소'));
+test('첫날 안내 · 궁금한 거 답변에는 꼬리표(보수 UP · 300원 같은 알약) 없이 말만 한다', () => {
+  const all = [...Object.values(TUTORIAL_LINES).flat(), ...HELP_TOPICS.flatMap((t) => t.lines)];
+  assert.deepEqual(chipTexts(all), []);
+  for (const line of all) assert.equal(typeof line, 'string', JSON.stringify(line));
 });
 
 test('궁금한 거 답변도 하치와레 말투로 짧고 깔끔하다', () => {
@@ -35,11 +34,3 @@ test('궁금한 거 답변도 하치와레 말투로 짧고 깔끔하다', () =>
   assert.deepEqual(HELP_TOPICS.filter((t) => t.home).map((t) => t.q), ['우리 집이 어디였지?']);
 });
 
-test('궁금한 거 답변: 값 · 장소 같은 꼬리표는 그대로 남긴다', () => {
-  const chips = new Set(HELP_TOPICS.flatMap((t) => chipTexts(t.lines)));
-  for (const c of ['! 부탁', '? 다 했어', '퀘스트 앱', '도구점', '검정소 랭킹', '끝까지 들으면 하트', '지도에도 얼굴', '하트 3개', '둘 다 자격증', '둘까지',
-    '풀 뽑기', '스티커', '열매', '딩 소리', '라멘 로우', '내 집', '동쪽 검정소', '보수 UP', '300원', '50,000원', '신청 500원', '당첨 15,000원',
-    '부동산에서 다시 세 들기', '하트 5개', '포셰트 가게', '민트색 가게', '가위바위보', '술래잡기', '춤', '술', '슈퍼 알바이터', '토벌', '맥주집', '라멘 로우 알바']) {
-    assert.ok(chips.has(c), `꼬리표 빠짐: ${c}`);
-  }
-});
