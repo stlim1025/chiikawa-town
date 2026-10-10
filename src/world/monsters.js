@@ -473,6 +473,7 @@ export function createMonsters(scene, village, random = Math.random) {
   const list = [];
   const poofs = [], shots = [], waves = [];
   let nextId = 1, refill = 0, nightK = 0, C = null, playerSafe = false, P = { x: 0, z: 0 };
+  let allies = [], curFoe = null; // 같이 토벌하는 친구들 { kind, x, z } · 지금 다루는 몬스터가 노리는 친구(없으면 나)
   let ghostsOn = true; // 스텐실을 못 쓰는 기기에서는 실루엣이 몸 위를 분홍으로 덮으므로 끈다(setGhosts)
 
   function spotFor(area, size, avoid) {
@@ -650,7 +651,9 @@ export function createMonsters(scene, village, random = Math.random) {
   const safeFrom = (m) => playerSafe && !m.exam;
   /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). */
   function hurt(m, dmg, x, z) {
-    if (!C || !C.active || safeFrom(m)) return;
+    if (!C || !C.active) return;
+    if (curFoe) { C.onAllyHit?.(curFoe.kind, { dmg, x, z }, m); return; }
+    if (safeFrom(m)) return;
     m.hitPlayer = true;
     C.onHit?.(m, { dmg, x, z });
   }
@@ -1061,9 +1064,10 @@ export function createMonsters(scene, village, random = Math.random) {
      * 마을 친구가 몬스터를 친다(토벌 일감): 밀어내지 않고 잠깐 멈칫, 체력만 깎는다. 몬스터는 친구를 쫓지 않는다(나만 노린다).
      * → 쓰러뜨렸는지
      */
-    npcHit(m, dmg, fromX, fromZ) {
+    npcHit(m, dmg, fromX, fromZ, by = null) {
       if (m.dead || m.under || m.dormant || m.airY > 0.7) return false;
       m.hp -= dmg;
+      if (by && !m.M.boss && m.state !== 'wind' && m.state !== 'act' && random() < 0.55) m.foe = by; // 때린 친구에게 덤빈다
       m.flash = 0.13;
       m.engaged = true;
       if (!m.M.boss) m.stun = Math.max(m.stun, 0.35); // 왕버섯은 친구가 때려도 멈칫하지 않는다(같이 때려서 묶어 둘 수 없게)
@@ -1143,6 +1147,7 @@ export function createMonsters(scene, village, random = Math.random) {
       C = ctx;
       P = p;
       nightK = ctx.night;
+      allies = ctx.allies || [];
       glowMat.emissive.setRGB(1, 0.85, 0.4).multiplyScalar(0.3 + 0.9 * nightK);
       TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
       playerSafe = inVillage(p.x, p.z, 0.6);
@@ -1193,13 +1198,21 @@ export function createMonsters(scene, village, random = Math.random) {
           const damp = Math.exp(-dt * 9);
           m.kx *= damp; m.kz *= damp;
         }
+        // 같이 토벌하는 친구에게 어그로가 끌렸으면 그 친구를 노린다(쓰러졌거나 떠났으면 다시 나를). 그동안 P · 거리를 그 친구 것으로
+        const ally = m.foe ? allies.find((o) => o.kind === m.foe) : null;
+        if (m.foe && !ally) m.foe = null;
+        const pd = ally ? Math.hypot(m.x - ally.x, m.z - ally.z) : dp;
+        if (ally) { P = ally; curFoe = ally; }
         if (M.speed > 0) {
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
-          const canSee = ctx.active && !safeFrom(m) && !m.dormant && dp < (m.engaged ? M.aggro * 1.7 : M.aggro);
+          const canSee = ctx.active && !safeFrom(m) && !m.dormant && pd < (m.engaged ? M.aggro * 1.7 : M.aggro);
           if ((m.state === 'wander' || m.state === 'chase') && fromHome > LEASH) { m.state = 'return'; hideTele(m); }
           if (m.state === 'wander') {
             if (canSee) {
               m.state = 'chase'; m.alert = 0.9; m.engaged = true;
+              // 둘레에 같이 토벌하는 친구가 있으면 가끔은 그 친구에게 먼저 덤빈다
+              const near = !m.foe && allies.filter((o) => Math.hypot(o.x - m.x, o.z - m.z) < M.aggro * 1.4);
+              if (near && near.length && random() < 0.35) m.foe = near[Math.floor(random() * near.length)].kind;
               ctx.onAggro?.(m);
             } else if (ctx.active) {
               m.timer -= dt;
@@ -1218,9 +1231,9 @@ export function createMonsters(scene, village, random = Math.random) {
                 } else m.goal = null;
               }
             }
-          } else if (m.state === 'chase') moving = chase(m, dt, dp, canSee);
+          } else if (m.state === 'chase') moving = chase(m, dt, pd, canSee);
           else if (m.state === 'wind') windStep(m, dt);
-          else if (m.state === 'act') moving = actStep(m, dt, dp);
+          else if (m.state === 'act') moving = actStep(m, dt, pd);
           else if (m.state === 'recover') {
             m.rec -= dt;
             if (m.rec <= 0) m.state = 'chase';
@@ -1235,6 +1248,7 @@ export function createMonsters(scene, village, random = Math.random) {
             }
           }
         }
+        P = p; curFoe = null; // 다음 몬스터 · 나와 겹치기 계산은 다시 내 자리로
         const solid = !m.under && m.airY < 0.3;
         // 나와 겹치지 않게(들이받은 뒤에도 내 몸 안으로 파고들지 않는다)
         if (M.speed > 0 && solid) {

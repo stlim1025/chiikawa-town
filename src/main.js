@@ -927,6 +927,7 @@ function boot() {
     else if (target.type === 'books') panels.openBooks();
     else if (target.type === 'tools') panels.openTools();
     else if (target.type === 'raffle') panels.openRaffle();
+    else if (target.type === 'wake') wakeAlly(target.npc);
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -2319,14 +2320,49 @@ function boot() {
     }
     sayAs(n, [{ text: lineOf(kind, 'partyJoin'), chips: [{ icon: ICO.star, text: '토벌 점수는 나눠 가져요' }] }], () => { endTalk(); startParty(n); });
   }
+  // 같이 토벌하는 친구의 체력: 몬스터가 친구를 노려 맞히면 줄고, 다 떨어지면 그 자리에 기절한다. 다가가서 깨우면 조금만 찬 채로 일어난다
+  const ALLY_HP = 40, WAKE_HP = 12;
+  const allyHp = {};
+  const DOWN_SAY = { chiikawa: '히잉…', hachiware: '으앗… 미안…', usagi: '우라…', kurimanju: '하아…', rakko: '…큭.', momonga: '흥… 아파…' };
+  const WAKE_SAY = { chiikawa: '…고마워… 다시 힘낼게…!', hachiware: '고마워! 다시 해 보자~', usagi: '우라!!', kurimanju: '하아~ 살았다~', rakko: '…빚졌군.', momonga: '흥, 안 고마워! …고마워.' };
+  const HURT_SAY = { chiikawa: '히잉!', hachiware: '아얏!', usagi: '우랏!', kurimanju: '아이고~', rakko: '…큭', momonga: '아야!' };
+  /** 몬스터가 노릴 수 있는 친구들(쓰러진 친구는 빼고). */
+  const partyAllies = () => npcs.partyKinds().map((k) => npcs.byKind(k)).filter((n) => n && !n.down && !n.away).map((n) => ({ kind: n.kind, x: n.x, z: n.z }));
+  /** 몬스터가 같이 토벌하는 친구를 맞혔다. */
+  function onAllyHit(kind, hit) {
+    const n = npcs.byKind(kind);
+    if (!n || n.down || !n.party) return;
+    allyHp[kind] = (allyHp[kind] ?? ALLY_HP) - hit.dmg;
+    hud.floatText({ x: n.x, y: n.chibi.height + 0.3, z: n.z, text: `-${hit.dmg}`, kind: 'dmg' });
+    sound.play('hurt');
+    if (allyHp[kind] > 0) { if (Math.random() < 0.5) npcs.say(n, HURT_SAY[kind] || '아얏!'); npcs.emote(n, 'hurt', 0.35); return; }
+    allyHp[kind] = 0;
+    npcs.down(n, true);
+    npcs.say(n, DOWN_SAY[kind] || '으으…');
+    setDoing(kind, 'moon', '기절해 있어요');
+    hud.toast(`${josa(nameOf(kind), '이/가')} 쓰러졌어요!`, 2800, { icon: faceIcon(kind), chips: [{ text: '다가가서 깨우기' }] });
+  }
+  /** 쓰러진 친구를 깨운다: 그 자리에서 조금만 찬 체력으로 일어나 다시 같이 싸운다. */
+  function wakeAlly(n) {
+    if (!n || !n.down) return;
+    npcs.down(n, false);
+    allyHp[n.kind] = WAKE_HP;
+    npcs.say(n, WAKE_SAY[n.kind] || '고마워!');
+    npcs.emote(n, joyAnim(n.kind), 1.2);
+    setDoing(n.kind, 'sword', '나랑 같이 토벌');
+    sound.play('heart');
+    player.cheerTime = 0.8;
+    hud.toast(`${josa(nameOf(n.kind), '을/를')} 깨웠어요!`, 2200, { icon: faceIcon(n.kind), chips: [{ text: `체력 ${WAKE_HP} / ${ALLY_HP}` }] });
+  }
   /** 친구가 따라나선다: 내 둘레 8칸 안 몬스터를 친구 힘(power)만큼 친다. */
   function startParty(n) {
     const kind = n.kind, power = npcPower(state, kind);
+    allyHp[kind] = ALLY_HP;
     npcs.party(kind, {
       range: 8, every: 1.05,
       find: () => monsters.nearest(player.position.x, player.position.z, 8, (m) => !m.exam && m.species !== 'dummy'),
       hit: (m) => {
-        const before = m.hp, killed = monsters.npcHit(m, power, n.x, n.z);
+        const before = m.hp, killed = monsters.npcHit(m, power, n.x, n.z, kind); // 맞은 몬스터는 이 친구에게 덤비기도 한다
         if (m.hp < before) hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${power}`, kind: 'dmg' });
         return killed;
       },
@@ -2358,6 +2394,8 @@ function boot() {
     for (const kind of list) {
       const n = npcs.byKind(kind);
       if (!n || !n.party) continue;
+      if (n.down) npcs.down(n, false); // 헤어질 때 쓰러져 있던 친구는 털고 일어난다
+      delete allyHp[kind];
       npcs.party(kind, null);
       if (key) npcs.say(n, lineOf(kind, key));
       restHere(kind, 10 + Math.random() * 20);
@@ -3095,6 +3133,11 @@ function boot() {
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
     const npc = npcs.nearest(p.x, p.z, 1.6);
     // 퀘스트 표시(! · ?)가 뜬 친구는 가게 문 앞에 서 있어도 말 걸기가 먼저
+    // 같이 토벌하다 쓰러진 친구: 가까이 가면 '깨우기'가 먼저
+    for (const kind of npcs.partyKinds()) {
+      const dn = npcs.byKind(kind);
+      if (dn && dn.down && Math.hypot(dn.x - p.x, dn.z - p.z) < 1.6) options.push({ d: -2, t: { type: 'wake', npc: dn, label: `${nameOf(kind)} 깨우기` } });
+    }
     if (npc) options.push({ d: Math.hypot(npc.x - p.x, npc.z - p.z) - (markOf(state, npc.kind) ? 1.2 : 0), t: { type: 'npc', npc, label: '말 걸기' } });
     for (const [key, label] of PLACES) {
       const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
@@ -3299,6 +3342,8 @@ function boot() {
       npcWork: (kind, typeId) => npcWork(npcs.byKind(kind), typeId),
       announce: (events) => announce(events),
       licenseCard: (id) => showLicenseCard(id, '자격증 카드 확인'), // 합격 카드를 바로 띄워 보기
+      party: (kind) => startParty(npcs.byKind(kind)), // 같이 토벌을 바로 시작(대화 없이)
+      ally: (kind) => ({ hp: allyHp[kind], down: !!(npcs.byKind(kind) || {}).down }),
       monsterHp: (id, hp) => { const m = monsters.list.find((o) => o.id === id); if (m) m.hp = hp; },
       npcEat: (kind) => npcEat(npcs.byKind(kind)),
       npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),
@@ -3427,7 +3472,7 @@ function boot() {
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 중에는 멈칫)
     const hunting = mode === 'play' && !!state && !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !sticker;
     monsters.update(dt, t, {
-      player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro,
+      player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro, allies: hunting ? partyAllies() : [], onAllyHit,
       // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
       onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
       onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },

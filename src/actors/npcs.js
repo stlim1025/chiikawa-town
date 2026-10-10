@@ -496,6 +496,16 @@ export function createNpcs(scene, village, weeds, berries) {
       n.state = 'idle';
       n.timer = 1;
     },
+    /** 같이 토벌하다 쓰러진다(on) · 깨워서 일어난다(off). 쓰러진 동안은 제자리에 누워 있다. */
+    down(n, on) {
+      if (!n) return;
+      n.down = !!on;
+      if (n.task) endTask(n);
+      clearRoute(n);
+      n.emote = null;
+      n.state = 'idle';
+      n.timer = on ? 99 : 0.5;
+    },
     /** 같이 토벌 중인 친구 kind 목록. */
     partyKinds() { return list.filter((n) => n.party).map((n) => n.kind); },
     update(dt, t, player) {
@@ -508,7 +518,8 @@ export function createNpcs(scene, village, weeds, berries) {
         let mode = 'idle', power = 0;
         const pd0 = Math.hypot(player.x - n.x, player.z - n.z);
         // 술래잡기: 내 캐릭터 반대쪽으로 달아난다(멀리 떨어지면 숨을 고르며 약 올린다)
-        if (n.flee && !n.emote) {
+        if (n.down) { n.state = 'idle'; n.timer = 99; } // 기절: 제자리에 누워 있는다(깨워 줄 때까지)
+        else if (n.flee && !n.emote) {
           n.state = 'walk';
           const away = Math.atan2(n.x - player.x, n.z - player.z) + Math.sin(t * 1.7 + n.phase) * 0.6;
           n.tx = n.x + Math.sin(away) * 2;
@@ -603,7 +614,7 @@ export function createNpcs(scene, village, weeds, berries) {
           }
         }
         // 한가하게 서 있는 친구는 내가 가까이 지나가면 고개를 돌려 바라본다
-        if (n.state === 'idle' && !n.task && !n.emote && n.talk <= 0 && !n.flee && pd0 < 2.8 && !(n.plan && n.plan[0] && n.plan[0].do === 'sync')) {
+        if (!n.down && n.state === 'idle' && !n.task && !n.emote && n.talk <= 0 && !n.flee && pd0 < 2.8 && !(n.plan && n.plan[0] && n.plan[0].do === 'sync')) {
           let dd = Math.atan2(player.x - n.x, player.z - n.z) - n.yaw;
           while (dd > Math.PI) dd -= Math.PI * 2;
           while (dd < -Math.PI) dd += Math.PI * 2;
@@ -615,6 +626,7 @@ export function createNpcs(scene, village, weeds, berries) {
           const nx = player.x + (px / pd) * min, nz = player.z + (pz / pd) * min;
           if (village.isFree(nx, nz, 0.3)) { n.x = nx; n.z = nz; }
         }
+        if (n.down) mode = 'faint';
         // 노동 갑옷 씨: 접수대 안 제자리에 한가하게 서 있으면 계산대에 팔짱 끼고 기대어 손님 쪽(남쪽)을 본다
         if (n.kind === 'labor' && mode === 'idle' && n.state === 'idle' && !n.task && n.talk <= 0 && !n.emote && Math.hypot(n.x - n.home.x, n.z - n.home.z) < 0.5) {
           mode = 'lean';

@@ -785,6 +785,13 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.head = [0.28 + strain, 0, strain];
     a.legL = [0.25, 0, 0]; a.legR = [0.25, 0, 0];
     lean = 0.32 - power * 0.38;
+  } else if (mode === 'faint') {
+    // 기절(같이 토벌하다 쓰러짐): 뒤로 벌러덩 누워 팔다리를 축 늘어뜨린다
+    a.armL = [-0.3, 0, -1.25]; a.armR = [-0.3, 0, 1.25];
+    a.legL = [-0.35, 0, -0.25]; a.legR = [-0.35, 0, 0.25];
+    a.head = [-0.15, 0, Math.sin(t * 2 + phase) * 0.06];
+    lean = -1.35;
+    bob = 0.16;
   } else if (mode === 'lean') {
     // 계산대에 팔짱 끼고 기대기(노동 갑옷 씨): 두 팔을 앞으로 모아 포개고 몸을 살짝 숙인다
     a.armL = [-1.35, 0, 0.78]; a.armR = [-1.35, 0, -0.78];
