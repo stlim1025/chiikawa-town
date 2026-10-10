@@ -361,7 +361,9 @@ const BUILD = {
 };
 
 const MODELS = new Map();
-const bodyMat = toonMaterial('#ffffff', { vertexColors: true });
+// unique: 같은 설정의 재질을 나눠 쓰는 캐시에서 빼 둔다(마을 땅도 '#ffffff' 정점색 재질이라, 같이 쓰면 그림자 받는 땅과 몬스터 몸이
+// 한 재질을 번갈아 쓰며 셰이더가 바뀌어 기기에 따라 몸이 안 그려지는 일이 있었다)
+const bodyMat = toonMaterial('#ffffff', { vertexColors: true, unique: true });
 const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true });
 /** 맞았을 때 번쩍(모두 하얗게) · 공격 직전 예고(붉게). */
 const flashMat = toonMaterial('#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.9, unique: true });
@@ -1032,6 +1034,16 @@ export function createMonsters(scene, village, random = Math.random) {
     list,
     /** 가려진 몬스터 실루엣을 켜고 끈다(스텐실이 없는 화면에서는 끈다: 실루엣이 몬스터 몸을 분홍으로 덮어 버린다). */
     setGhosts(on) { ghostsOn = !!on; if (!ghostsOn) list.forEach((m) => { m.mesh.ghost.visible = false; }); },
+    /** 진단(테스트 앱): (x, z) 에서 가장 가까운 몬스터의 그리기 상태 한 줄. */
+    debugNearest(x, z) {
+      const m = list.filter((o) => !o.dead).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
+      if (!m) return '몬스터 없음';
+      const { root, inner, body, ghost } = m.mesh, f = (v) => (Math.round(v * 100) / 100).toString();
+      return [m.species, `d=${f(Math.hypot(m.x - x, m.z - z))}`, `st=${m.state}`, `under=${m.under}`, `born=${f(m.born)}`,
+        `scale=${f(root.scale.x)}`, `rootY=${f(root.position.y)}`, `innerY=${f(inner.position.y)}`, `air=${f(m.airY || 0)}`,
+        `vis=${root.visible ? 1 : 0}${inner.visible ? 1 : 0}${body.visible ? 1 : 0}`, `ghost=${ghost.visible ? 1 : 0}/${ghostsOn ? 1 : 0}`,
+        `mat=${body.material === bodyMat ? 'body' : body.material === warnMat ? 'warn' : body.material === flashMat ? 'flash' : 'other'}`].join(' ');
+    },
     /** 시험 허수아비 · 이야기 속 왕버섯처럼 정해진 자리에 놓는다. extra.exam 이면 마을 안에도 둔다. */
     spawnAt(species, x, z, extra = {}) { return add(species, x, z, { ...extra, wobble: 0 }); },
     /** 조건에 맞는 몬스터를 없앤다(연기 없이). */

@@ -182,6 +182,18 @@ function boot() {
     getSound: () => sound.prefs,
     toast: (text) => hud.toast(text),
     // 테스트 도구(마을폰 숨은 앱)
+    /** 테스트 앱의 그래픽 진단: 그래픽 카드 · 버퍼 · 화면 크기와 가장 가까운 몬스터의 그리기 상태(복사해서 알려 줄 수 있게). */
+    diag() {
+      const gl = gfx.renderer.getContext(), attrs = gl.getContextAttributes() || {}, ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const cv = gfx.renderer.domElement, p = player ? player.position : { x: 0, z: 0 };
+      return [
+        `gpu: ${ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)}`,
+        `webgl2=${typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext} stencil=${gl.getParameter(gl.STENCIL_BITS)} depth=${gl.getParameter(gl.DEPTH_BITS)} aa=${!!attrs.antialias} samples=${gl.getParameter(gl.SAMPLES)}`,
+        `dpr=${window.devicePixelRatio} buf=${cv.width}x${cv.height} css=${cv.clientWidth}x${cv.clientHeight}`,
+        `me=${p.x.toFixed(1)},${p.z.toFixed(1)} night=${nightNow.toFixed(2)} light=${lightOf(state)}`,
+        `mon: ${monsters.debugNearest(p.x, p.z)}`
+      ].join('\n');
+    },
     dev: {
       money(n) { commit(addMoney(state, n)); sound.play('coin'); hud.toast(`테스트: ${won(n)}을 넣었어요`); },
       stamina() { commit({ ...state, stamina: MAX_STAMINA }); },

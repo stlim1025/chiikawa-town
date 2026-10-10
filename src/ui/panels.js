@@ -903,6 +903,14 @@ export function createPanels(ui, handlers) {
         row('제초 검정', `지금 ${s.license.grade}급`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
         ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),
+        // 그래픽 진단: 몬스터가 이상하게 보일 때 그 자리에서 복사해 알려 주면 원인을 찾을 수 있다
+        row('그래픽 진단', '몬스터 근처에서 복사', h('button', { class: 'btn', type: 'button', onClick: (e) => {
+          const text = handlers.diag(), btn = e.currentTarget;
+          const done = (ok) => { btn.textContent = ok ? '복사했어요' : '복사 실패'; };
+          (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text).then(() => done(true), () => done(false)) : done(false));
+          current.panel.querySelector('.diag-text')?.remove();
+          btn.closest('.row').after(h('pre', { class: 'diag-text' }, text));
+        } }, '복사')),
         h('p', { class: 'note' }, '마을폰 제목을 다시 다섯 번 누르면 이 앱이 숨어요.')];
     },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
