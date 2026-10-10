@@ -128,3 +128,28 @@ test('장면 단계에서 멈춘 퀘스트(장면 도중 새로고침)는 없던
   assert.ok(Q.isDone(d, 'usagiHome'), '다른 기록은 그대로');
   assert.deepEqual(Q.staleScenes(Q.startQuest(fresh(), 'pillow')), [], '장면이 아닌 단계는 그대로');
 });
+
+test('시사의 슈퍼 알바이터: 면 삶기 특훈 뒤 아침에 이야기 표시 → 저녁 공부 → 다음 날 검정소 → 특제 라멘', async () => {
+  let s = withHearts(fresh(6, 10), 'shisa', 1);
+  assert.ok(!Q.canOffer(s, 'shisaArbeiter'), '면 삶기 특훈 먼저');
+  s = { ...s, quests: { noodles: { step: 1, base: 0, done: 4 } } };
+  assert.ok(Q.canOffer(s, 'shisaArbeiter'));
+  assert.equal(Q.markOf(s, 'shisa'), 'story');
+  s = Q.startQuest(s, 'shisaArbeiter');
+  assert.ok(!Q.stepReady(s, 'shisaArbeiter'), '공부는 저녁에');
+  assert.equal(Q.markOf(s, 'shisa'), null, '낮에는 ? 도 안 뜬다');
+  const eve = { ...s, clock: at(6, 18) };
+  assert.ok(Q.stepReady(eve, 'shisaArbeiter'));
+  assert.equal(Q.markOf(eve, 'shisa'), '?');
+  const r1 = Q.completeStep(eve, 'shisaArbeiter', 6);
+  const exam = r1.next;
+  assert.equal(exam.scene, 'shisaExam');
+  assert.ok(Q.arrived(exam, { x: 0, z: 0 }, 0.5, 0.5, 10) && !Q.arrived(exam, { x: 0, z: 0 }, 0.5, 0.5, 19), '시험은 낮에');
+  const Sh = await import(G + 'shop.js');
+  assert.ok(!Sh.buy({ ...r1.state, money: 500, stamina: 10 }, 'ramen', 'shisaramen').ok, '합격 전에는 특제 라멘이 없다');
+  const r2 = Q.completeStep({ ...r1.state, clock: at(7, 10) }, 'shisaArbeiter', 7);
+  assert.ok(r2.finished);
+  assert.equal(r2.state.story.shisaPass, 7, '합격한 날');
+  assert.ok(Sh.buy({ ...r2.state, money: 500, stamina: 10 }, 'ramen', 'shisaramen').ok, '합격 뒤에는 특제 라멘');
+  assert.ok(F.friendOf(r2.state, 'ramen').pts > 0, '사부님과도 친해진다');
+});

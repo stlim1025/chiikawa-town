@@ -211,6 +211,8 @@ const ART = {
   }
 };
 
+/** 그 캐릭터 그림이 있는지(마을 친구 여섯만 있다). */
+export const hasCharArt = (kind) => typeof ART[kind] === 'function';
 /** 캐릭터 그림 조각(<g> 안에 넣는 SVG 문자열). 좌표계는 64x64, 발끝이 y≈61. */
 export function charSvg(kind) {
   return `<g transform="translate(0 -3) scale(0.32)">${ART[kind]()}</g>`; // 발끝(200 좌표 y≈200)이 y≈61 에 오게

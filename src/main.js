@@ -18,7 +18,7 @@ import { createScene } from './render/scene.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
-import { buildChibi } from './actors/models.js';
+import { buildChibi, setCrying } from './actors/models.js';
 import { setCelLight } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
 import { createNpcs } from './actors/npcs.js';
@@ -73,7 +73,7 @@ import {
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
 } from './core/villagetalk.js';
 import { DOING_ICONS } from './ui/doingicons.js';
-import { charSvg } from './ui/art.js';
+import { charSvg, hasCharArt } from './ui/art.js';
 import { furnitureThumbs } from './world/thumbs.js';
 import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
@@ -94,6 +94,7 @@ import { createClub } from './world/club.js';
 import { createBurrows } from './world/burrows.js';
 import { createRhythm } from './ui/rhythm.js';
 import { createUsagiClub } from './stories/usagiclub.js';
+import { createShisaStory } from './stories/shisa.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
@@ -168,7 +169,7 @@ function boot() {
   document.addEventListener('pointerdown', () => sound.unlock(), true);
   document.addEventListener('keydown', () => sound.unlock(), true);
   ui.addEventListener('click', (e) => { if (e.target.closest('button')) sound.play('click'); }, true);
-  const guide = createGuide(ui, { onLine: (who) => sound.play('talk', who.kind), dock: hud.dock });
+  const guide = createGuide(ui, { onLine: (who) => sound.play('talk', who.kind), dock: hud.dock, onCue: (cue) => storyCue(cue) });
 
   let state = null;
   let player = null;
@@ -220,6 +221,25 @@ function boot() {
       },
       /** 피자호빵 소식 바로(라멘 로우 새 메뉴 · 우사기에게 이야기 표시). */
       pizzaNews() { commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } }); hud.toast('테스트: 라멘 로우에 피자호빵이 나왔어요', 2600); },
+      /** 시사의 슈퍼 알바이터: 저녁 공부(퀴즈)부터 · 시험 날(검정소 앞, 시사가 따라온다)부터. */
+      shisaStudy() {
+        const qs = { ...(state.quests || {}), noodles: { step: 1, base: 0, done: Math.max(1, state.clock.day - 1) } };
+        delete qs.shisaArbeiter;
+        const s = startQuest({ ...state, quests: qs }, 'shisaArbeiter');
+        commit({ ...s, clock: { day: state.clock.day, t: (18 - 6) / 24 } });
+        const r = village.spots.ramen;
+        player.setPosition(r.x, r.z + 2);
+        cam.snap(player.position);
+      },
+      shisaExam() {
+        const qs = { ...(state.quests || {}), noodles: { step: 1, base: 0, done: Math.max(1, state.clock.day - 1) }, shisaArbeiter: { step: 1, base: 0 } };
+        commit({ ...state, quests: qs, questTrack: 'shisaArbeiter', clock: { day: state.clock.day, t: (10 - 6) / 24 } });
+        const e = village.spots.exam;
+        player.setPosition(e.x, e.z + 6);
+        cam.snap(player.position);
+        const n = npcs.byKind('shisa');
+        if (n) startBuddy(n);
+      },
       /** 우사기 클럽 춤만 바로(보상 없음). */
       club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); }
     },
@@ -268,10 +288,10 @@ function boot() {
       if (r.item) { sound.play('coin'); hud.toast(`${itemInfo(r.item).name} 포장 완료! 가방에 넣었어요`, 2400, { icon: itemSvg(r.item) }); gotTicket(paid); return; } // 포장 상품(피자호빵)
       sound.play('eat');
       eatMotion(itemId);
-      const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
+      const SAY = { ramen: '후루룩!', shisaramen: '시사 특제 라멘… 국물이 끝내준다!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
       hud.toast(SAY[itemId] || '냠냠!', 2000);
       gotTicket(paid);
-      if (itemId === 'ramen') didAct('ramen'); // 일상 부탁: 같이 라멘 먹기
+      if (itemId === 'ramen' || itemId === 'shisaramen') didAct('ramen'); // 일상 부탁: 같이 라멘 먹기
     },
     // 경품 추첨: 추첨권(없으면 돈)으로 가라가라를 돌린다 → 연출 → 당첨 카드
     raffleDraw() {
@@ -456,6 +476,7 @@ function boot() {
       if (bossM) { monsters.clear((m) => m === bossM || m.summoned); bossM = null; }
       questScene = false;
       usagiClub.reset();
+      shisaStory.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1175,21 +1196,16 @@ function boot() {
   /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
   function reportQuest(n, id) {
     const step = stepOf(state, id);
-    if (step.fx && STEP_FX[step.fx]) STEP_FX[step.fx](n); // 단계마다 짧은 연출(피자호빵을 먹고 우는 우사기 …)
-    finishQuestStep(id, n, step.say);
+    const finish = () => finishQuestStep(id, n, step.say);
+    // 단계마다 짧은 연출(피자호빵을 먹고 우는 우사기 …). true 를 돌려주면 그 연출(시사의 공부 퀴즈)이 끝난 뒤 스스로 마무리한다
+    if (step.fx && STEP_FX[step.fx] && STEP_FX[step.fx](n, finish) === true) return;
+    finish();
   }
   /** 퀘스트 단계 연출: 건네받은 친구가 먹고 · 울고, 둘레 친구들이 모여든다. */
   const STEP_FX = {
+    shisaQuiz(n, finish) { shisaStory.quiz(finish); return true; },
     pizzaCry(n) {
-      npcs.emote(n, 'nibble', 3.4);
-      setTimeout(() => { if (guide.open) npcs.emote(n, 'shy', 7); }, 3400);
-      setTimeout(() => {
-        let k = 0;
-        const tears = setInterval(() => {
-          if (++k > 12 || mode !== 'play') { clearInterval(tears); return; }
-          hud.floatText({ x: n.x + (k % 2 ? -0.2 : 0.2), y: n.chibi.height * 0.72, z: n.z, text: '💧', kind: 'note' });
-        }, 380);
-      }, 2200);
+      cryFx = { n, t: 0, crying: false }; // 대사 줄 신호(storyCue)로: 한 입 → 클로즈업 → 굳기 → 울기 → 활짝
       ['hachiware', 'chiikawa'].forEach((kind, i) => {
         const m = npcs.byKind(kind);
         if (!m || m.away || npcs.busy(m) || staged.has(kind) || Math.hypot(m.x - n.x, m.z - n.z) > 22) return;
@@ -1217,6 +1233,55 @@ function boot() {
       celebrateQuest(id, r.reward, n);
     });
   }
+  // ---------- 우는 얼굴 클로즈업(피자호빵): 카메라가 얼굴로 다가가고, 친구는 카메라 쪽을 보며 진짜로 운다 ----------
+  let cryFx = null, closeup = null; // cryFx: { n, t, crying } · closeup: { n, t, a(카메라가 오는 방향), fromPos, fromLook, out, outT }
+  /** 대사 줄의 연출 신호. */
+  function storyCue(cue) {
+    const F = cryFx;
+    if (!F) return;
+    const n = F.n;
+    if (cue === 'pizzaBite') { npcs.emote(n, 'nibble', 2.4); startCloseup(n); }
+    else if (cue === 'pizzaFreeze') npcs.emote(n, 'idle', 30);
+    else if (cue === 'pizzaCry') { F.crying = true; npcs.emote(n, 'sob', 30); }
+    else if (cue === 'pizzaSmile') { F.crying = false; setCrying(n.chibi, false); npcs.emote(n, 'hop', 2.5); endCloseup(); }
+  }
+  /** 얼굴로 다가간다: 내 캐릭터에 가리지 않게 비스듬한 쪽에서. 그 친구는 카메라 쪽을 본다. */
+  function startCloseup(n) {
+    const p = player.position, from = cam.poseFor(p.x, p.z);
+    const a = Math.atan2(p.x - n.x, p.z - n.z) + (p.x >= n.x ? -1.05 : 1.05);
+    closeup = { n, t: 0, a, fromPos: from.pos, fromLook: from.look, out: false, outT: 0 };
+    n.faceYaw = a;
+  }
+  function endCloseup() { if (closeup && !closeup.out) { closeup.out = true; closeup.outT = 0; } }
+  function closeupCamera(dt) {
+    const C = closeup, n = C.n;
+    C.t += dt;
+    const ease = (u) => u * u * (3 - 2 * u);
+    const face = new THREE.Vector3(n.x, n.chibi.height * 0.47, n.z);
+    const near = face.clone().add(new THREE.Vector3(Math.sin(C.a) * 2.15, 0.1, Math.cos(C.a) * 2.15));
+    const aim = face.clone().add(new THREE.Vector3(0, -0.28, 0)); // 얼굴이 화면 위쪽에(아래 대화 상자에 안 가리게)
+    const home = cam.poseFor(player.position.x, player.position.z);
+    let pos, look;
+    if (!C.out) { const k = ease(Math.min(1, C.t / 0.9)); pos = C.fromPos.clone().lerp(near, k); look = C.fromLook.clone().lerp(aim, k); }
+    else {
+      C.outT += dt;
+      const k = ease(Math.min(1, C.outT / 0.9));
+      pos = near.clone().lerp(home.pos, k); look = aim.clone().lerp(home.look, k);
+      if (C.outT >= 0.9) { n.faceYaw = null; closeup = null; cam.snap(player.position); return; }
+    }
+    cam.set(pos, look);
+  }
+  /** 매 프레임: 눈물 · 대화가 끝났는데 남은 연출 정리. */
+  function updateCryFx(dt) {
+    if (!cryFx) return;
+    cryFx.t += dt;
+    if (cryFx.crying) setCrying(cryFx.n.chibi, true, cryFx.t);
+    if (!guide.open && cryFx.t > 0.5) { // 대화가 끝났다(중간에 닫혀도)
+      setCrying(cryFx.n.chibi, false);
+      endCloseup();
+      if (!closeup) cryFx = null;
+    }
+  }
   /** 해설 · 장면(visit · boss)이 끝나면 다시 움직인다. */
   function unlockAfterScene() { questScene = false; if (mode === 'play') input.setEnabled(true); }
   let questScene = false;
@@ -1230,8 +1295,10 @@ function boot() {
     hud.setAction(null);
     const lines = [...step.say];
     lines.speaker = step.speaker;
-    if (step.scene) { // 사이드스토리 장면(stories/usagiclub.js): 다 보고 나면 마무리 대사 · 보상
-      usagiClub.play({ id, again: step.scene === 'clubNight', done: () => finishQuestStep(id, null, lines) });
+    if (step.scene) { // 사이드스토리 장면(stories/): 다 보고 나면 마무리 대사 · 보상
+      const done = () => finishQuestStep(id, null, lines);
+      if (step.scene === 'shisaExam') shisaStory.exam(done);
+      else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
     if (step.speaker === 'hachiware') {
@@ -1305,7 +1372,7 @@ function boot() {
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
@@ -1940,6 +2007,11 @@ function boot() {
     awayInfo[kind] = { why: 'sleep', until: 0, ...(hourOf(state.clock) >= 18 ? { day: state.clock.day } : {}) }; // 저녁이면 다음 날 아침에
     setDoing(kind, 'moon', '자는 중');
   };
+  // 사이드스토리 '시사의 슈퍼 알바이터'(stories/shisa.js): 저녁 공부 퀴즈 · 시험 날
+  const shisaStory = createShisaStory({
+    guide, npcs, hud, sound, input, village, staged, who: (kind) => whoOf({ kind }), me: () => meWho(), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    skipHours: (h) => commit({ ...state, clock: { ...state.clock, t: Math.min(0.999, state.clock.t + h / 24) } }), getPlayer: () => player
+  });
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
@@ -2284,7 +2356,7 @@ function boot() {
     // 갑옷 씨들 · 시사 · 카니: 지나가면 인사하고, 쉴 때가 지나면 일과대로 다음 일
     for (const kind of STAFF) {
       const n = npcs.byKind(kind);
-      if (!n || n.away || npcs.busy(n) || n === talking) continue;
+      if (!n || n.away || staged.has(kind) || npcs.busy(n) || n === talking) continue; // 연출 중(시사 시험 날)이면 그대로
       staffGreet(n, kind);
       if (lifeClock >= restUntil[kind]) staffDecide(n, kind, hour);
     }
@@ -2341,7 +2413,9 @@ function boot() {
     npcs.plan(n, steps);
   }
   // ---------- 친구들의 토벌: 자격증 시험(검정소) → 토벌 일감(마을 밖에서 진짜 몬스터를) → 랭킹 ----------
-  const faceIcon = (kind) => `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`;
+  // 그림이 없는 친구(시사 같은 직원)는 이름표 색 동그라미에 첫 글자
+  const faceIcon = (kind) => (hasCharArt(kind) ? `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`
+    : `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="${(FRIENDS[kind] || {}).tag || '#eee'}" stroke="#5a4431" stroke-width="3"/><text x="32" y="42" text-anchor="middle" font-size="28" font-weight="700" fill="${(FRIENDS[kind] || {}).ink || '#5a4431'}">${((FRIENDS[kind] || {}).name || '?').slice(0, 1)}</text></svg>`);
   const nameOf = (kind) => (HUNTER_PROFILES[kind] ? HUNTER_PROFILES[kind].name : FRIENDS[kind] ? FRIENDS[kind].name : kind);
   /** 친구가 검정소에 가서 토벌 자격증 시험을 본다(응시료는 친구 지갑에서). 붙으면 마을에 소식이 퍼진다. */
   function npcExam(n) {
@@ -3809,6 +3883,8 @@ function boot() {
       updateCombat(dt);
       updateQuests(dt);
       usagiClub.update(dt);
+      shisaStory.update(dt);
+      updateCryFx(dt);
       if (pulling) {
         const before = pulling.pull.power;
         pulling.pull = chargePull(pulling.pull, dt);
@@ -3881,7 +3957,7 @@ function boot() {
     npcs.update(dt, t, focus);
     if (mode !== 'play') streaks.setActive(false);
     applySky(starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 }); // 별똥별맨 미리 보기 동안은 하늘만 밤
-    if (mode === 'play') { if (starShow) starCamera(dt); else cam.follow(focus, dt); }
+    if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else cam.follow(focus, dt); }
     else if (mode === 'title') {
       // 타이틀: 마을 위를 천천히 돈다
       const a = t * 0.07;
@@ -3896,7 +3972,7 @@ function boot() {
       if (homeSign.text !== tx) { homeSign.text = tx; homeSign.html = signHtml(tx, homeSign.key); }
     }
     // 타이틀 · 처음 마을에 들어오는 장면에서는 간판 · 말풍선을 띄우지 않는다(마을에 들어온 뒤부터 톡톡 나타난다)
-    if (mode !== 'play') { cue.visible = false; hud.placeLabels([], cam.camera); return; }
+    if (mode !== 'play' || closeup) { cue.visible = false; hud.placeLabels([], cam.camera); return; } // 얼굴 클로즈업 동안은 간판 · 말풍선도 숨긴다
     const bubbles = npcs.labels(), mark = tutorialMarker();
     if (mark) bubbles.push(mark);
     bubbles.push(...monsters.labels(focus), ...questMarks(focus), ...doingLabels(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?, 친구가 하는 일

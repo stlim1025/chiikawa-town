@@ -50,7 +50,8 @@ export const PLACES = {
   lair: { name: '바위산 깊은 곳', r: 9 },
   pub: { name: '맥주집', r: 3 },
   bridge: { name: '강가 다리', r: 3.4 },
-  plaza: { name: '광장', r: 4.5 }
+  plaza: { name: '광장', r: 4.5 },
+  exam: { name: '검정소', r: 3 }
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -160,10 +161,28 @@ export const QUESTS = {
     offer: ['(라멘 로우 쪽을 가리키며 킁킁…)', '우라…? (침을 꿀꺽)', '(새로 나온 피자호빵이 몹시 궁금한 것 같다…!)'],
     steps: [{
       type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사서 우사기에게 (라멘 로우 · 60원)',
-      say: ['(우사기가 피자호빵을 반으로 갈랐다… 치즈가 쭈욱~)', '(한 입 베어 물더니…)', '……', '(그대로 굳어 버렸다…?)', '…우…우라…(눈물이 주르륵)',
-        { who: 'hachiware', text: '우사기가… 울어?! 그렇게 맛있어?!' }, { who: 'chiikawa', text: '…(꿀꺽)' }, '(너무 맛있어서 우는 것 같다…!)', '야하~!! (반쪽을 내밀며 같이 먹자고 한다)']
+      // cue: 그 줄에서 연출(한 입 → 얼굴 클로즈업 · 굳기 · 진짜로 울기 · 활짝 웃으며 카메라가 빠진다)
+      say: ['(우사기가 피자호빵을 반으로 갈랐다… 치즈가 쭈욱~)', { text: '(한 입 베어 물더니…)', cue: 'pizzaBite' }, '……', { text: '(그대로 굳어 버렸다…?)', cue: 'pizzaFreeze' },
+        { text: '…우…우라…(눈물이 주르륵)', cue: 'pizzaCry' }, { who: 'hachiware', text: '우사기가… 울어?! 그렇게 맛있어?!' }, { who: 'chiikawa', text: '…(꿀꺽)' },
+        '(너무 맛있어서 우는 것 같다…!)', { text: '야하~!! (반쪽을 내밀며 같이 먹자고 한다)', cue: 'pizzaSmile' }]
     }],
     reward: { bond: 3, friends: { chiikawa: 1, hachiware: 1 }, items: { pizzabun: 1 } }
+  },
+  shisaArbeiter: {
+    title: '시사의 슈퍼 알바이터', giver: 'shisa', side: true, after: 'noodles', hours: [8, 18], needHearts: 1, ask: '요즘 무슨 고민 있어?',
+    offer: [
+      '{name} 님…! 저, 사부님 곁에서 같이 라멘을 만들고 싶어요!',
+      '그러려면 슈퍼 알바이터 자격이 있어야 한대요… 엄청 어렵다는 그 시험이요!',
+      '필기는 레시피랑 조리 규칙, 실기는 레시피 책 없이 손님께 실수 없이…!',
+      '저 혼자서는 자신이 없어서요… 공부 좀 도와주실 수 있어요?'
+    ],
+    steps: [
+      { type: 'talk', hours: [17, 22], fx: 'shisaQuiz', goal: '저녁에 라멘 로우 앞에서 시사 공부 도와주기 (오후 5시 ~ 10시)',
+        say: ['헤헤… {name} 님 덕분에 조금 자신이 생겼어요!', '시험은 내일이에요! 내일 낮에 같이 검정소까지 가 주실 거죠…?'] },
+      { type: 'visit', place: 'exam', hours: [9, 17], with: true, scene: 'shisaExam', speaker: 'shisa', goal: '시험 날! 시사와 같이 검정소에 가기 (오전 9시 ~ 오후 5시)',
+        say: ['{name} 님, 정말 고마워요!', '오늘부터 사부님 곁에서 열심히 할게요! 시사 특제 라멘, 꼭 먹으러 와 주세요~!'] }
+    ],
+    reward: { bond: 4, friends: { ramen: 2 }, money: 300, story: 'shisaPass' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
@@ -273,7 +292,7 @@ export function progressOf(state, id) {
 export function stepReady(state, id) {
   const step = stepOf(state, id);
   if (!step) return false;
-  if (step.type === 'talk') return true;
+  if (step.type === 'talk') return !step.hours || !state.clock || inHours(hourOf(state.clock), step.hours); // 시각이 정해진 이야기(저녁 공부)는 그때에만
   if (step.type === 'license') return hasLicense(state, step.id);
   if (step.type === 'visit' || step.type === 'boss' || step.type === 'scene') return false;
   const p = progressOf(state, id);
@@ -408,6 +427,7 @@ export function giveReward(state, id, day) {
     s = b.state; if (b.gift) gifts.push(b.gift);
     add({ kind: 'bond', id: k, n, text: `${FRIENDS[k].name} +${n}`, long: `${FRIENDS[k].name} 친밀도 +${n}` });
   }
+  if (R.story) s = { ...s, story: { ...(s.story || {}), [R.story]: day } }; // 이야기의 끝을 기억한다(시사 합격 → 특제 라멘)
   if (R.truce) { s = { ...s, truce: day + R.truce - 1 }; add({ kind: 'truce', n: R.truce, text: `모몽가 휴전 ${R.truce}일`, long: `모몽가가 ${R.truce}일 동안 소매치기 안 하기` }); }
   return { state: s, got, parts, gifts, up };
 }

@@ -10,7 +10,8 @@ export const SHOPS = {
       { id: 'ramen', name: '라멘', price: 80, stamina: 60 },
       { id: 'onigiri', name: '주먹밥', price: 30, stamina: 25 },
       { id: 'highball', name: '하이볼', price: 90, stamina: 45, needs: 'liquor' }, // 술 자격이 있어야 판다
-      { id: 'pizzabun', name: '피자호빵', price: 60, item: 'pizzabun', after: 'pizzaNews' } // 새 메뉴(소식이 나온 뒤부터): 포장해서 가방에
+      { id: 'pizzabun', name: '피자호빵', price: 60, item: 'pizzabun', after: 'pizzaNews' }, // 새 메뉴(소식이 나온 뒤부터): 포장해서 가방에
+      { id: 'shisaramen', name: '시사 특제 라멘', price: 120, stamina: 80, after: 'shisaPass' } // 시사가 슈퍼 알바이터에 붙은 뒤부터
     ]
   },
   // 맥주집(마을 동쪽 노점): 저녁이면 쿠리만쥬가 와서 한 잔 한다. 같이 건배하면 친해진다

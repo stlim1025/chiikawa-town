@@ -3,7 +3,7 @@ import { celMaterial, addOutline, addShellOutline, GEO } from '../render/toon.js
 import { EAT_ANIMS, FOOD_SHAPES, eatPose, eatWeight } from './eatmotion.js';
 import { POCHETTES } from '../core/pochette.js';
 
-const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', MOUTH = '#5a2b33';
+const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', MOUTH = '#5a2b33', TEAR = '#8fd3ff';
 const NAVY = '#6f94bb', USAGI = '#f6e8b6', EAR_PINK = '#f4b6c2'; // 하치와레 무늬는 원작처럼 연한 파랑
 const MOMO_BLUE = '#bfe0f5', KURI_TOP = '#b8743d', KURI_BOT = '#f4dcab', RAKKO = '#fbe7c2', RAKKO_PAW = '#4a3a34', STAR_SCAR = '#bfae8c', INK = '#3a2a28';
 const SHISA = '#f7cf5e', SHISA_MANE = '#e8833a', KANI = '#fbd1d8', KANI_DARK = '#f297a6', CLAW = '#ef6f7f';
@@ -120,10 +120,17 @@ function onHead(hc, hr, x, y, push = 0) {
 function face(parts, hc, hr, o) {
   [-1, 1].forEach((sd) => {
     const e = onHead(hc, hr, sd * o.eyeX, o.eyeY);
-    parts.push({ m: 'dot', c: EYE, p: e.p, r: e.r, s: o.eye, n: 'head', o: false });
+    parts.push({ m: 'dot', c: EYE, p: e.p, r: e.r, s: o.eye, n: 'head', o: false, role: 'eye' });
     const sh = o.shine || 1;
     const h = onHead(hc, hr, sd * o.eyeX + 0.012, o.eyeY + o.eye[1] * 0.35, 0.012);
-    parts.push({ m: 'dot', c: SHINE, p: h.p, r: h.r, s: [o.eye[0] * 0.36 * sh, o.eye[1] * 0.3 * sh, 0.008], n: 'head', o: false });
+    parts.push({ m: 'dot', c: SHINE, p: h.p, r: h.r, s: [o.eye[0] * 0.36 * sh, o.eye[1] * 0.3 * sh, 0.008], n: 'head', o: false, role: 'shine' });
+    // 우는 얼굴(setCrying)일 때만: 감은 눈 밑에 고인 눈물, 볼을 타고 흐르는 줄기, 턱 밑으로 떨어지는 방울
+    const pool = onHead(hc, hr, sd * o.eyeX, o.eyeY - o.eye[1] * 0.75, 0.012);
+    parts.push({ m: 'dot', c: TEAR, p: pool.p, r: pool.r, s: [o.eye[0] * 1.5, 0.018, 0.012], n: 'head', o: false, role: 'tear' });
+    const flow = onHead(hc, hr, sd * (o.eyeX + 0.008), o.eyeY - o.eye[1] - 0.06, 0.01);
+    parts.push({ m: 'dot', c: TEAR, p: flow.p, r: flow.r, s: [0.022, 0.075, 0.012], n: 'head', o: false, role: 'tear' });
+    const drop = onHead(hc, hr, sd * (o.eyeX + 0.014), o.eyeY - o.eye[1] - 0.15, 0.03);
+    parts.push({ m: 'sphere', c: TEAR, p: drop.p, s: [0.024, 0.032, 0.024], n: 'head', o: false, role: 'drop' });
     const b = onHead(hc, hr, sd * o.cheekX, o.cheekY, -0.004);
     parts.push({ m: 'dot', c: o.cheek || CHEEK, p: b.p, r: b.r, s: [0.075, 0.034, 0.012], n: 'head', o: false });
     if (o.brows) [0.1, 0.125].forEach((dy) => {
@@ -732,7 +739,7 @@ function buildFromDef(def) {
   const root = new THREE.Group();
   const inner = new THREE.Group();
   root.add(inner);
-  const pivots = {}, props = {}; // props: 꼬리표(tag)를 단 소품(맥주잔 · 책처럼 그 몸짓을 할 때만 보이는 것)
+  const pivots = {}, props = {}, roles = {}; // props: 꼬리표(tag)를 단 소품(맥주잔 · 책처럼 그 몸짓을 할 때만 보이는 것), roles: 표정 부품
   const getPivot = (name, parName) => {
     if (pivots[name]) return pivots[name];
     const g = new THREE.Group();
@@ -768,8 +775,13 @@ function buildFromDef(def) {
     }
     holder.add(mesh);
     if (pt.tag) { mesh.visible = false; (props[pt.tag] = props[pt.tag] || []).push(mesh); }
+    if (pt.role) { // 얼굴 표정용(눈 · 눈빛 · 눈물): 원래 자리 · 크기를 기억해 둔다
+      mesh.userData.base = { y: mesh.position.y, sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z };
+      if (pt.role === 'tear' || pt.role === 'drop') mesh.visible = false;
+      (roles[pt.role] = roles[pt.role] || []).push(mesh);
+    }
   });
-  return { root, inner, pivots, props, height: def.height, radius: def.radius, label: def.label };
+  return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label };
 }
 
 /** 내 캐릭터 모델. 빠진 항목은 기본값을 쓴다. */
@@ -783,6 +795,24 @@ export function buildNpc(kind) {
   (chibi.props.sheathed || []).forEach((m) => { m.visible = true; });
   chibi.kind = kind;
   return chibi;
+}
+
+/**
+ * 우는 얼굴(피자호빵이 너무 맛있어서 우는 우사기): 눈을 질끈 감고(눈이 가는 선으로, 눈빛은 숨김) 눈물이 고이고 · 흐르고 · 방울이 떨어진다.
+ * 매 프레임 t(초)를 넘기면 방울이 볼을 타고 내려가며 떨어진다. on = false 면 원래 얼굴로.
+ */
+export function setCrying(chibi, on, t = 0) {
+  const R = chibi.roles || {};
+  (R.eye || []).forEach((m) => { m.scale.y = m.userData.base.sy * (on ? 0.2 : 1); m.scale.x = m.userData.base.sx * (on ? 1.25 : 1); });
+  (R.shine || []).forEach((m) => { m.visible = !on; });
+  (R.tear || []).forEach((m, i) => { m.visible = on; if (on) m.scale.y = m.userData.base.sy * (1 + 0.12 * Math.sin(t * 9 + i)); });
+  (R.drop || []).forEach((m, i) => {
+    m.visible = on;
+    if (!on) { m.position.y = m.userData.base.y; return; }
+    const k = (t * 1.3 + i * 0.45) % 1, b = m.userData.base;
+    m.position.y = b.y - k * 0.2;
+    m.scale.set(b.sx * (1 - k * 0.5), b.sy * (1 + k * 0.3), b.sz * (1 - k * 0.5));
+  });
 }
 
 /** 손에 든 소품을 꼬리표 tag 하나만 보이게(null 이면 모두 숨김). 집 안 내 캐릭터가 잠깐 음식을 들 때. */
@@ -954,6 +984,12 @@ function basePose(mode, t, opts) {
     a.head = [-0.55, Math.sin(t * 0.5 + phase) * 0.3, 0];
     a.armL = [0.45, 0, -0.18]; a.armR = [0.45, 0, 0.18];
     lean = -0.06;
+  } else if (mode === 'sob') {
+    // 엉엉: 고개를 살짝 들고(얼굴이 보이게) 어깨를 들썩이며 운다, 두 팔은 옆에서 부들부들
+    const sh = Math.abs(Math.sin(t * 13 + phase));
+    a.armL = [0.12, 0, -0.32 + Math.sin(t * 21) * 0.06]; a.armR = [0.12, 0, 0.32 - Math.sin(t * 21) * 0.06];
+    a.head = [-0.12 - sh * 0.05, 0, Math.sin(t * 2.6) * 0.06];
+    bob = sh * 0.025;
   } else if (mode === 'dj') {
     // DJ: 오른손은 탁자 위 도토리를 나뭇잎으로 끽끽 문지르고, 왼손은 박자(118)에 맞춰 위로 흔들고, 고개는 끄덕끄덕
     const b = Math.abs(Math.sin(t * 6.18));

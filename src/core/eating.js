@@ -11,6 +11,7 @@ const style = (mode, prop) => Object.freeze({ mode, prop, dur: DUR[mode] });
 
 export const EAT_STYLE = Object.freeze({
   ramen: style('slurp', 'f-ramen'),
+  shisaramen: style('slurp', 'f-ramen'),
   hotpot: style('slurp', 'f-hotpot'),
   beer: style('gulp', 'f-beer'),
   highball: style('gulp', 'f-highball'),
