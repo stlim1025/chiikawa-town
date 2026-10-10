@@ -181,8 +181,9 @@ function boot() {
   let drawNow = true;
   // 소리: 브라우저는 첫 누름 전까지 소리를 막으므로 누를 때마다 깨운다. 버튼을 누르면 딸깍.
   const sound = createSound(safeStorage());
-  document.addEventListener('pointerdown', () => sound.unlock(), true);
-  document.addEventListener('keydown', () => sound.unlock(), true);
+  // 소리 깨우기: 터치는 손을 뗄 때(pointerup · touchend · click)라야 브라우저가 '사용자가 눌렀다'로 쳐준다(누르는 순간은 스크롤일 수도 있어서).
+  // 예전엔 pointerdown · keydown 에서만 깨워 아이폰(터치)에서는 소리가 영영 나지 않았다
+  for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) document.addEventListener(type, () => sound.unlock(), true);
   ui.addEventListener('click', (e) => { if (e.target.closest('button')) sound.play('click'); }, true);
   const guide = createGuide(ui, { onLine: (who) => sound.play('talk', who.kind), dock: hud.dock, onCue: (cue) => storyCue(cue) });
 

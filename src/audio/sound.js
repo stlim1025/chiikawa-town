@@ -34,6 +34,8 @@ export function createSound(storage) {
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
+    // 아이폰: 무음(벨소리) 스위치를 켜 둬도 게임 소리가 나게(음악 앱처럼 'playback'). 끄고 싶으면 마을폰 설정에서 끈다
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* 없는 브라우저 */ }
     ctx = new AC();
     master = ctx.createGain();
     master.gain.value = 0.8;
@@ -50,7 +52,7 @@ export function createSound(storage) {
     // 화면을 떠나 있으면 소리도 쉰다
     document.addEventListener('visibilitychange', () => {
       if (!ctx) return;
-      if (document.hidden) ctx.suspend(); else ctx.resume();
+      if (document.hidden) ctx.suspend().catch(() => {}); else ctx.resume().catch(() => {}); // 못 깨우면 다음 누름에서(unlock)
     });
     return ctx;
   }
@@ -208,7 +210,10 @@ export function createSound(storage) {
     /** 첫 누름에서 부른다: 소리 장치를 만들고 깨운다. */
     unlock() {
       const c = ensure();
-      if (c && c.state === 'suspended' && !document.hidden) c.resume();
+      if (!c || c.state === 'running' || c.state === 'closed' || document.hidden) return;
+      // 아이폰은 전화 · 앱 전환 뒤 'interrupted' 가 되기도 한다 → running 이 아니면 깨운다. 옛 아이폰은 누름 안에서 소리를 하나 내야 풀려서 빈 소리 한 번
+      c.resume().catch(() => {});
+      try { const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, c.sampleRate); s.connect(c.destination); s.start(0); } catch { /* 이미 닫힘 */ }
     },
     /** 효과음. name: click · zone · clean · snap · none · coin · eat · talk · stamp · pass · fail · sleep · job · done · morning */
     play(name, arg) {
