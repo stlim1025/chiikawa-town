@@ -87,6 +87,9 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { createMonsters } from './world/monsters.js';
+import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
+import { createStarfall } from './world/starfall.js';
+import { createStreaks } from './ui/starstreaks.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
@@ -948,6 +951,7 @@ function boot() {
     else if (target.type === 'tools') panels.openTools();
     else if (target.type === 'raffle') panels.openRaffle();
     else if (target.type === 'wake') wakeAlly(target.npc);
+    else if (target.type === 'wish') startWish();
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -961,7 +965,8 @@ function boot() {
   let dance = null; // 같이 춤추기 { n, t }
   let escort = false; // 하치와레가 집까지 앞장서는 중
   let overlay = false; // 시험 · 알바 창이 열려 있다
-  const funBusy = () => !!(talking || tag || dance || overlay);
+  let starShow = null; // 별똥별 소원 연출 중(아래 별똥별 밤 참고)
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow);
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name) : { ...line, text: fillName(line.text) });
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   /** 대화 상자 이름표: 이름 · 색 · 친밀도 하트. */
@@ -3212,6 +3217,7 @@ function boot() {
       if (dd < 1.8) options.push({ d: dd - 0.5, t: { type: 'friendHome', kind, label: kind === 'hachiware' ? '동굴 들여다보기' : '문 두드리기' } });
     }
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
+    if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
   }
@@ -3222,6 +3228,98 @@ function boot() {
   cue.renderOrder = 2;
   cue.visible = false;
   scene.add(cue);
+
+  // ---------- 별똥별이 쏟아지는 밤(core/starfall.js · world/starfall.js): 소원을 빌다가 진짜 별똥별이 떨어져 별똥별맨이 ----------
+  const starfall = createStarfall(scene), streaks = createStreaks(ui);
+  let starNotice = 0, shakeT = 0;
+  const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
+  const meWho = () => ({ kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
+  const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
+  const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓
+  /** 소원 빌기: 고개를 들어 밤하늘 → 소원 고르기 → 진짜 별똥별이 앞에 쿵 → 별똥별맨이 빤히 보다가 날아간다. */
+  function startWish() {
+    if (starShow || !canWish(state)) return;
+    const p = player.position, land = village.nearestFree(p.x, p.z - 3.4, 0.9), from = cam.poseFor(p.x, p.z);
+    player.face(land.x, land.z);
+    player.busy = true;
+    streaks.setActive(false);
+    starfall.setSky(true);
+    starShow = { phase: 'look', t: 0, land, p: { x: p.x, z: p.z }, fromPos: from.pos, fromLook: from.look, kinds: [] };
+  }
+  function askWish() {
+    guide.ask('(별똥별이 쏟아진다…!) 무슨 소원을 빌까?', [...WISHES.map((w) => w.label), '역시 안 빌래'], (i) => {
+      const S = starShow, w = WISHES[i];
+      if (!S) return;
+      if (!w) { S.phase = 'back'; S.t = 0; return; }
+      Object.assign(S, { wish: w.id, phase: 'fall', t: 0 });
+      sound.play('swing');
+      starfall.drop(new THREE.Vector3(S.p.x - 7, 15, S.p.z - 22), S.land.x, S.land.z, starLanded);
+    }, meWho());
+  }
+  /** 쿵! 화면이 흔들리고, 근처 친구들이 달려와 놀란다. 별똥별맨이 다 솟아나면 빤히 쳐다본다. */
+  function starLanded() {
+    const S = starShow;
+    if (!S) return;
+    Object.assign(S, { phase: 'landed', t: 0 });
+    shakeT = 0.7;
+    sound.play('thud');
+    setTimeout(() => sound.play('poof'), 120);
+    starfall.setSky(false);
+    for (const n of npcs.list) {
+      if (n.away || !FRIENDS[n.kind] || Math.hypot(n.x - S.land.x, n.z - S.land.z) > 16) continue;
+      S.kinds.push(n.kind);
+      const a = Math.atan2(n.x - S.land.x, n.z - S.land.z);
+      // 하던 일을 멈추고 그 자리에서 바로 놀란 뒤(말 걸기처럼 끼어든다), 구덩이 옆으로 달려와 본다
+      npcs.plan(n, [{ do: 'walk', x: S.land.x + Math.sin(a) * 2.2, z: S.land.z + Math.cos(a) * 2.2, near: 0.6 },
+        { do: 'act', anim: STAR_REACT[n.kind] || 'hop', face: { x: S.land.x, z: S.land.z }, time: 6, quick: true }]);
+      npcs.talk(n, lineOf(n.kind, 'starShock'));
+    }
+    setTimeout(() => {
+      if (starShow !== S) return;
+      guide.say(['……', '(엄청 사실적인 얼굴로 빤히 쳐다본다)', '……!'], () => { sound.play('swing'); starfall.leave(starGone); }, STARMAN);
+    }, 1700);
+  }
+  /** 별똥별맨이 날아갔다: 소원이 시시하게 조금 이루어지고 별 조각이 남는다. */
+  function starGone() {
+    const S = starShow;
+    if (!S) return;
+    const r = makeWish(state, S.wish, S.kinds);
+    if (r.ok) commit(r.state);
+    sound.play('done');
+    const chip = { rich: { icon: ICO.coin, text: `+${WISH_MONEY}원` }, full: { text: `기운 +${WISH_STAMINA}` }, luck: { icon: TICKET_SVG, text: '추첨권 +1' },
+      friends: r.gained.length ? { icon: ICO.heart, text: r.gained.map(nameOf).join(' · ') } : null }[S.wish];
+    S.kinds.forEach((kind, i) => { const n = npcs.byKind(kind); if (n) setTimeout(() => npcs.say(n, lineOf(kind, 'starBye')), 500 + i * 450); });
+    guide.say([WISH_GAG[S.wish], { text: '(별똥별맨이 반짝이는 조각을 남기고 갔다)', chips: [{ icon: itemSvg('starshard'), text: '별 조각' }, ...(chip ? [chip] : [])] }], () => endWish(true), meWho());
+  }
+  function endWish(done = false) {
+    const S = starShow;
+    if (!S) return;
+    starShow = null;
+    starfall.setSky(false);
+    player.busy = false;
+    cam.snap(done ? { x: S.p.x, z: (S.p.z + S.land.z) / 2 } : S.p); // 따라가기 카메라가 지금 자리에서 부드럽게 이어 간다
+  }
+  /** 연출 카메라: 올려다보기 → (소원) → 떨어지는 별을 따라 내려와 나와 구덩이가 함께 보이게. */
+  function starCamera(dt) {
+    const S = starShow;
+    S.t += dt;
+    const ease = (u) => u * u * (3 - 2 * u), mid = cam.poseFor(S.p.x, (S.p.z + S.land.z) / 2);
+    const skyPos = new THREE.Vector3(S.p.x, 1.1, S.p.z + 2.8), skyLook = new THREE.Vector3(S.p.x, 8, S.p.z - 12);
+    let pos = mid.pos, look = mid.look;
+    if (S.phase === 'look') {
+      const e = ease(Math.min(1, S.t / 1.3));
+      pos = S.fromPos.clone().lerp(skyPos, e); look = S.fromLook.clone().lerp(skyLook, e);
+      if (S.t >= 1.3) { S.phase = 'wish'; askWish(); }
+    } else if (S.phase === 'wish') { pos = skyPos; look = skyLook; }
+    else if (S.phase === 'fall') { const e = ease(Math.min(1, S.t / 1.4)); pos = skyPos.clone().lerp(mid.pos, e); look = skyLook.clone().lerp(mid.look, e); }
+    else if (S.phase === 'back') {
+      const e = ease(Math.min(1, S.t / 0.9));
+      pos = skyPos.clone().lerp(S.fromPos, e); look = skyLook.clone().lerp(S.fromLook, e);
+      if (S.t >= 0.9) { endWish(false); return; }
+    }
+    if (shakeT > 0) { shakeT -= dt; const a = 0.24 * (shakeT / 0.7); pos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, 0)); }
+    cam.set(pos, look);
+  }
   /** 대상의 자리 { x, z, r: 고리 크기, y: 안내 높이, id }. */
   function targetSpot(tg) {
     if (!tg) return null;
@@ -3231,6 +3329,7 @@ function boot() {
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
+    if (tg.type === 'wish') return { x: player.position.x, z: player.position.z, r: 0.7, y: 1.9, id: 'wish' }; // 내 발밑 · 머리 위에
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }
@@ -3580,6 +3679,13 @@ function boot() {
         hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}` }]);
         examPill = true;
       } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
+      // 별똥별이 쏟아지는 밤: 처음 한 번 알리고, 화면 위쪽에 별똥별이 가끔 지나간다(소원을 빌면 하늘을 올려다본다)
+      const starNight = isStarfallNight(state.clock.day) && isStarHour(hourOf(state.clock)) && !tutorialActive(state.tutorial);
+      streaks.setActive(starNight && !starShow && !sleeping && !panels.isOpen());
+      if (starNight && canWish(state) && starNotice !== state.clock.day && !guide.open) {
+        starNotice = state.clock.day;
+        hud.toast('별똥별이 쏟아지는 밤이에요', 3600, { chips: [{ text: '소원을 빌어 봐요' }] });
+      }
       // 하는 중인 퀘스트를 모두(화면에 띄우기로 고른 것이 맨 위)
       const qt = pickTrack(state), qs = activeQuests(state);
       hud.setQuests((qt ? [qt, ...qs.filter((id) => id !== qt)] : qs).map((id) => {
@@ -3616,14 +3722,16 @@ function boot() {
       if (saveTimer > 10) { saveTimer = 0; save(); }
     }
     npcs.update(dt, t, focus);
+    if (mode !== 'play') streaks.setActive(false);
     applySky(state ? state.clock : { day: 1, t: 0.15 });
-    if (mode === 'play') cam.follow(focus, dt);
+    if (mode === 'play') { if (starShow) starCamera(dt); else cam.follow(focus, dt); }
     else if (mode === 'title') {
       // 타이틀: 마을 위를 천천히 돈다
       const a = t * 0.07;
       titlePos.set(Math.sin(a) * 34, 16, Math.cos(a) * 34 + 2);
       cam.set(titlePos, titleLook);
     }
+    starfall.update(dt, cam.camera);
     gfx.followSun(focus.x, focus.z);
     if (!skipRender) gfx.render(cam.camera);
     if (homeSign && state) homeSign.text = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';

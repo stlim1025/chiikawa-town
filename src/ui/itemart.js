@@ -40,6 +40,10 @@ export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"
 
 /** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */
 const EXTRA = {
+  // 별 조각: 별똥별맨이 남기고 간 노란 별, 반짝
+  starshard: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="15" ry="4" fill="#e6d8b8"/>
+    <path d="M32 9l6.5 13.5 15 2-11 10.5 3 15-13.5-7.5-13.5 7.5 3-15-11-10.5 15-2z" fill="#ffe23a" ${S}/>
+    <path d="M50 10v7M46.5 13.5h7" stroke="#f6c94a" stroke-width="2.4" stroke-linecap="round"/><circle cx="27" cy="29" r="2.4" fill="#fff8d0"/></svg>`,
   // 우사기 주먹밥: 커다란 세모 주먹밥 + 김 띠
   riceball: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
     <path d="M32 9q6 0 14 15t8 20q0 8-10 9H20q-10-1-10-9t8-20 14-15z" fill="#fffdf6" ${S}/>

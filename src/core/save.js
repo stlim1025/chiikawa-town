@@ -15,6 +15,7 @@ import { isValidQuests, isValidStory, isValidActs, QUESTS } from './quests.js';
 import { isValidRaffle } from './raffle.js';
 import { isValidGround } from './ground.js';
 import { isValidHunters } from './hunters.js';
+import { isValidStarfall } from './starfall.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -60,6 +61,7 @@ export function isValidState(s) {
   if (s.truce !== undefined && !num(s.truce)) return false;
   if (s.ground !== undefined && !isValidGround(s.ground)) return false; // 바닥에 떨어뜨린 물건
   if (s.hunters !== undefined && !isValidHunters(s.hunters)) return false; // 토벌꾼 기록 · 랭킹
+  if (s.starfall !== undefined && !isValidStarfall(s.starfall)) return false; // 별똥별에 소원을 빈 날
   return true;
 }
 

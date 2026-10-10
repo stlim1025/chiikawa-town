@@ -56,7 +56,10 @@ export const NPC_LINES = {
     tagEscaped: ['…헉헉… 안 잡혔다…!', '…도망쳤다…♪'],
     danceGo: '…춤…! 하나 둘 셋…!',
     danceEnd: ['…신난다…♪', '…헤헤… 재밌다…!'],
-    gift: '…이거 선물…! 받아 줘…!'
+    gift: '…이거 선물…! 받아 줘…!',
+    // 별똥별맨(진짜 별똥별이 떨어졌다)
+    starShock: ['…!! (덜덜덜)', '…우와아앙…!'],
+    starBye: '…가 버렸다…'
   },
   hachiware: {
     jobTake: ['{title}! 맡겨 줘~', '{title}! 내가 할게~'],
@@ -101,7 +104,9 @@ export const NPC_LINES = {
     tagEscaped: ['못 잡았지롱~ ♪', '다음엔 잡을 수 있을 거야~!'],
     danceGo: '같이 춤추자~ 하나 둘 셋!',
     danceEnd: ['신난다~! 노래도 부르고 싶다~', '{name} 춤 잘 춘다~!'],
-    gift: '{name}~ 이거 선물이야! ♪'
+    gift: '{name}~ 이거 선물이야! ♪',
+    starShock: ['에엣?! 진짜 떨어졌어?!', '별똥별… 얼굴이 있어…!'],
+    starBye: '소원… 들어준 걸까~?'
   },
   usagi: {
     jobTake: '야하!',
@@ -146,7 +151,9 @@ export const NPC_LINES = {
     tagEscaped: ['야하~! (메롱)', '우라라라~!'],
     danceGo: '야하! 야하! (둠칫둠칫)',
     danceEnd: ['우라~! 우라~!', '야하~!! (신났다)'],
-    gift: '우라! (쓱 내민다)'
+    gift: '우라! (쓱 내민다)',
+    starShock: ['하아?!', '…후랏?! (뒷걸음)'],
+    starBye: '야하~!'
   },
   kurimanju: {
     jobTake: '{title}… 슬슬 해 볼까~',
@@ -191,7 +198,9 @@ export const NPC_LINES = {
     tagEscaped: ['하아~ 아직 안 죽었다고', '하아~ 의외지?'],
     danceGo: '하아~ 한 잔 들어간 춤이다~',
     danceEnd: ['하아~ 땀 났다 맥주 땡기네', '하아~ 오랜만에 신났다'],
-    gift: '하아~ 이거 받아 둬 선물이야'
+    gift: '하아~ 이거 받아 둬 선물이야',
+    starShock: ['하아~ 술이 덜 깼나…', '하아~ 별에 얼굴이…'],
+    starBye: '하아~ 별일이네…'
   },
   rakko: {
     jobTake: '…이것도 수련이다',
@@ -236,12 +245,16 @@ export const NPC_LINES = {
     tagEscaped: ['…아직이다', '…발을 더 단련해라'],
     danceGo: '…춤도 검의 호흡이다',
     danceEnd: ['…나쁘지 않군', '…훗 땀이 나는군'],
-    gift: '…받아라 수련의 답례다'
+    gift: '…받아라 수련의 답례다',
+    starShock: ['…수상한 놈이다', '…베어야 하나'],
+    starBye: '…사라졌군'
   },
   momonga: {
     eat: '맛있어! 더 줘!',
     napWake: '흥 잘 잤어',
-    gift: '흥! 남아서 주는 거야!'
+    gift: '흥! 남아서 주는 거야!',
+    starShock: ['뭐야 저거! 무서워!', '흥! 난 하나도 안 무섭거든!'],
+    starBye: '흥 별 거 아니네'
   },
   shisa: { gift: '사부님 몰래 주는 선물이에요~!' },
   kani: { gift: '딱딱! 이거… 선물이야…' }
@@ -259,7 +272,8 @@ const PLAIN = {
   partyTiredLeave: '먼저 쉴게', partyNightLeave: '이제 들어갈게', partyFaint: '괜찮아?!',
   playAsk: '좋아! 뭐 하고 놀까?', rpsGo: '가위바위보! 뭐 낼래?', rpsShow: '나는 {hand}!', rpsDraw: '비겼다! 한 번 더', rpsLose: '으앗 졌다! {name} 잘한다~',
   rpsWin: '내가 이겼다~! 헤헤', rpsAgain: '한 판 더 할래?', tagGo: '내가 도망갈게! 잡아 봐~', tagCaught: '으앗 잡혔다~!', tagEscaped: '못 잡았지롱~!',
-  danceGo: '같이 춤추자! 하나 둘 셋!', danceEnd: '헤헤 신난다~!', gift: '{name} 이거 선물이야!'
+  danceGo: '같이 춤추자! 하나 둘 셋!', danceEnd: '헤헤 신난다~!', gift: '{name} 이거 선물이야!',
+  starShock: '에엣?! 별똥별이…!', starBye: '가 버렸다…'
 };
 
 /** 그 친구의 그 대사 한 줄(목록이면 하나 골라서 {title} · {mon} · {pay} 를 채운다). */

@@ -75,6 +75,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-energy .sv { min-width: 1.8em; text-align: right; color: var(--ink-soft); }
 .hud-job { display: flex; align-items: center; gap: 8px; padding: 5px 10px 7px 10px; border-radius: 20px 22px 20px 18px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
 .hud-job b { font-weight: inherit; }
+/* 별똥별 밤: 화면 위쪽을 휙 지나가는 별똥별(밝은 머리가 왼쪽 아래로) */
+.star-streaks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.star-streaks[hidden] { display: none; }
+.star-streaks i { position: absolute; width: 150px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, rgba(255, 252, 230, 0.95), rgba(255, 240, 190, 0)); box-shadow: 0 0 10px rgba(255, 238, 160, 0.75); opacity: 0; animation: star-streak 1s ease-in forwards; }
+@keyframes star-streak { 0% { opacity: 0; transform: rotate(-22deg) translateX(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: rotate(-22deg) translateX(-280px); } }
 .hud-party { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 12px; border-radius: 999px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); font-size: 16px; }
 .hud-party .pt-lab { margin-right: 4px; color: var(--ink-soft); white-space: nowrap; }
 .hud-party .pt-face { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #f3d9a8; overflow: hidden; }
