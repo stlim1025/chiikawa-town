@@ -77,7 +77,7 @@ import { furnitureThumbs } from './world/thumbs.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, GATES, POND, regionAt } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
@@ -86,7 +86,7 @@ import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, rec
 import { createMonsters } from './world/monsters.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
-import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond } from './core/quests.js';
+import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady } from './core/quests.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -224,6 +224,7 @@ function boot() {
       sound.play('eat');
       const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
       hud.toast(SAY[itemId] || '냠냠!', 2000);
+      if (itemId === 'ramen') didAct('ramen'); // 일상 부탁: 같이 라멘 먹기
     },
     // 맥주집: 쿠리만쥬가 와 있는지 · 오늘 건배했는지, 건배하기
     pubInfo: () => ({ here: !!kuriAtPub(), cheered: friendOf(state, 'kurimanju').drink === state.clock.day }),
@@ -663,6 +664,7 @@ function boot() {
       if (!a.added) { hud.toast('가방이 꽉 찼어요'); return; }
       berries.pick(bush);
       commit(a.state);
+      didAct('berry');
       sound.play('clean');
       player.face(bush.x, bush.z);
       hud.bagBump();
@@ -672,6 +674,7 @@ function boot() {
     const before = state.job;
     berries.pick(bush);
     commit({ ...useStamina(state, WORK_STAMINA).state, job: recordPull(state.job, 'berry', 'clean') });
+    didAct('berry');
     sound.play('clean');
     player.face(bush.x, bush.z);
     player.cheerTime = 0.6;
@@ -783,6 +786,7 @@ function boot() {
       markSeen('exam-' + state.license.grade);
       hud.toast('승급 시험을 볼 수 있어요!', 3600);
     }
+    didAct('weed'); // 일상 부탁: 같이 풀 뽑기
     save();
   }
 
@@ -961,7 +965,9 @@ function boot() {
     const qs = questsFor(state, n.kind);
     qs.report.forEach((id) => { const st = stepOf(state, id); opts.push(['qreport:' + id, st.type === 'bring' ? '부탁한 거 가져왔어!' : st.type === 'talk' ? (QUESTS[id].story ? `「${QUESTS[id].title}」 이야기` : '이야기 들으러 왔어') : '다 했어!']); });
     qs.offer.forEach((id) => opts.push(['qoffer:' + id, QUESTS[id].ask || '무슨 고민 있어?']));
-    qs.waiting.forEach((id) => opts.push(['qhint:' + id, '부탁 다시 듣기']));
+    qs.waiting.forEach((id) => opts.push(isBuddyStep(stepOf(state, id)) && !n.follow ? ['qwith:' + id, '같이 가자!'] : ['qhint:' + id, '부탁 다시 듣기']));
+    activeQuests(state).forEach((id) => { const st = stepOf(state, id); if (st.type === 'visit' && st.with && reportTo(id, st) === n.kind && !n.follow) opts.push(['qwith:' + id, '같이 가자!']); });
+    if (buddies.has(n.kind)) opts.push(['qstop', '오늘은 여기까지 하자']);
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
     // 토벌하는 친구: 같이 토벌 가자(하트 PARTY_HEARTS 개부터) · 같이 다니는 중이면 헤어지기
@@ -993,6 +999,8 @@ function boot() {
       const k = opts[i][0];
       if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
       else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
+      else if (k.startsWith('qwith:')) sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].go : '좋아!'], () => { endTalk(); startBuddy(n); });
+      else if (k === 'qstop') sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].stop : '그래, 다음에 또!'], () => { endTalk(); endBuddy(n.kind); });
       else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`「${QUESTS[id].title}」`, goalLine(id), n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'chat') {
@@ -1049,12 +1057,13 @@ function boot() {
   /** 부탁을 듣고 받을지 고른다. */
   function offerQuest(n, id) {
     const Q = QUESTS[id];
-    sayAs(n, Q.offer, () => askAs(n, Q.story ? '맡아 주겠나?' : '…부탁해도 될까?', ['좋아, 해 볼게!', '지금은 좀…'], (i) => {
+    sayAs(n, Q.offer, () => askAs(n, Q.story ? '맡아 주겠나?' : Q.daily ? '같이 할래?' : '…부탁해도 될까?', [Q.daily ? '좋아, 같이 하자!' : '좋아, 해 볼게!', '지금은 좀…'], (i) => {
       if (i !== 0) { sayAs(n, ['그래… 마음이 바뀌면 또 말해 줘.'], endTalk); return; }
       commit(startQuest(state, id));
       sound.play('job');
       endTalk();
-      hud.announce({ kicker: Q.story ? '이야기 시작!' : '새 부탁!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
+      if (isBuddyStep(Q.steps[0])) startBuddy(n); // 일상 부탁: 같이 하자며 따라나선다
+      hud.announce({ kicker: Q.story ? '이야기 시작!' : Q.daily ? '일상 부탁!' : '새 부탁!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
     }));
   }
   /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
@@ -1156,7 +1165,8 @@ function boot() {
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : null;
+  const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
   /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
@@ -1168,12 +1178,14 @@ function boot() {
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
     for (const id of activeQuests(state)) {
       const step = stepOf(state, id);
-      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour)) {
+      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step)))) {
         if (step.place === 'lair') commit({ ...state, story: { ...(state.story || {}), bossSeen: true } });
+        if (step.with) endBuddy(reportTo(id, step));
         questSceneStep(id);
         return;
       }
     }
+    if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
     // 왕버섯: 이야기가 바위산 깊은 곳에 이르면 그 자리에 있다. 싸울 차례(boss)가 되기 전에는 잠들어 있다
     const story = state.quests && state.quests.story, sStep = stepOf(state, 'story');
     const bossTime = story && !story.done && story.step >= QUESTS.story.steps.findIndex((s) => s.type === 'visit') && !(state.story && state.story.bossDown);
@@ -2025,6 +2037,11 @@ function boot() {
         continue;
       }
       tireNpc(kind, 0.3); // 돌아다니기만 해도 조금씩
+      if (buddies.has(kind)) { // 일상 부탁으로 같이 다니는 중: 밤이 되거나 지치면 인사하고 집으로(부탁은 그대로, 다음에 또 같이)
+        const sleepy = isSleepHour(hour);
+        if (sleepy || villagerOf(state, kind, day).energy < TIRED) { endBuddy(kind, BUDDY_SAY[kind] ? BUDDY_SAY[kind].stop : null); npcGoHome(n, sleepy ? 'sleep' : 'nap', true); }
+        continue;
+      }
       if (n.party) { // 같이 토벌 중: 밤이 되거나 지치면 인사하고 집으로
         if (isSleepHour(hour)) { partyEnd([kind], 'partyNightLeave'); npcGoHome(n, 'sleep', true); }
         else if (villagerOf(state, kind, day).energy < TIRED) { partyEnd([kind], 'partyTiredLeave'); npcGoHome(n, 'nap', true); }
@@ -2244,6 +2261,7 @@ function boot() {
   }
   /** 같이 토벌을 끝낸다(kinds 가 null 이면 모두). key 가 있으면 그 친구 말투로 인사한다. */
   function partyEnd(kinds, key) {
+    if (!kinds) [...buddies].forEach((k) => endBuddy(k, null)); // 일상 부탁으로 같이 다니던 친구도
     const list = kinds || npcs.partyKinds();
     for (const kind of list) {
       const n = npcs.byKind(kind);
@@ -2254,8 +2272,68 @@ function boot() {
     }
     if (list.length) syncParty();
   }
-  /** 왼쪽 위 '같이 토벌' 꼬리표(데려간 친구 얼굴). */
-  const syncParty = () => hud.setParty(npcs.partyKinds().map((k) => ({ name: nameOf(k), svg: faceIcon(k) })));
+  /** 왼쪽 위 '같이 토벌' · '같이 다니는 중' 꼬리표(데려간 친구 얼굴). */
+  const syncParty = () => {
+    const party = npcs.partyKinds(), list = [...party, ...[...buddies].filter((k) => !party.includes(k))];
+    hud.setParty(list.map((k) => ({ name: nameOf(k), svg: faceIcon(k) })), party.length ? '같이 토벌' : '같이 다니는 중');
+  };
+
+  // ---------- 일상 부탁: 친구와 같이 다니며 라멘 먹기 · 풀 뽑기 · 열매 따기 · 산책 ----------
+  /** 친구와 같이 해야 하는 단계인지(같이 하기 · 같이 가기). */
+  const isBuddyStep = (st) => !!st && (st.type === 'together' || (st.type === 'visit' && st.with));
+  const buddies = new Set(); // 일상 부탁으로 나를 따라다니는 친구들
+  const buddyDone = []; // 같이 하기를 다 해서, 창이 닫히면 그 자리에서 끝낼 부탁
+  const ACT_ANIM = { ramen: 'drink', weed: 'pull', berry: 'pull' };
+  // 같이 다닐 때 친구마다 하는 말: go 따라나설 때 · stop 헤어질 때 · 일마다 한마디
+  const BUDDY_SAY = {
+    chiikawa: { go: '…응! 같이 가…!', stop: '…응… 다음에 또 같이 하자…', ramen: '…후루룩…♪', weed: '…영차…!', berry: '…빨갛다…♪' },
+    hachiware: { go: '좋아, 가자~!', stop: '그래! 다음에 또 같이 하자~', ramen: '후루룩~ 맛있다!', weed: '영차~ 하나 뽑았다!', berry: '반짝반짝 열매다~' },
+    usagi: { go: '우라~!!', stop: '우라…', ramen: '후루룩!!', weed: '우라!', berry: '야하~!' },
+    kurimanju: { go: '하아~ 그럼 가 볼까~', stop: '하아~ 다음에 또 하자~', ramen: '하아~ 국물 좋다~', weed: '하아~ 허리야…', berry: '안주로 딱이네~' },
+    momonga: { go: '흥, 빨리 와!', stop: '흥! 다음엔 끝까지 같이 가.', ramen: '흥, 나쁘지 않네.', weed: '왜 내가 이걸… 흥!', berry: '이건 내 거!' },
+    rakko: { go: '…가지.', stop: '…다음에 또.', ramen: '…훗.', weed: '…이것도 수련이다.', berry: '…달군.' }
+  };
+  /** 친구가 나를 따라나선다(하던 일정은 그만두고). */
+  function startBuddy(n) {
+    if (!n || n.away || buddies.has(n.kind)) return;
+    buddies.add(n.kind);
+    npcs.plan(n, []);
+    npcs.setFollow(n.kind, true);
+    setDoing(n.kind, 'heart', '나랑 같이 다니는 중');
+    syncParty();
+  }
+  /** 같이 다니기를 그만둔다(say 가 있으면 한마디). */
+  function endBuddy(kind, say = null) {
+    if (!buddies.delete(kind)) return;
+    const n = npcs.byKind(kind);
+    if (n) { npcs.setFollow(kind, false); if (say) npcs.say(n, say); restHere(kind, 10 + Math.random() * 20); }
+    syncParty();
+  }
+  /** 그 친구가 내 옆(8칸 안)에 같이 있는지. */
+  const buddyNear = (kind) => { const n = npcs.byKind(kind); return !!n && !n.away && (buddies.has(kind) || n.party) && Math.hypot(n.x - player.position.x, n.z - player.position.z) < 8; };
+  /**
+   * 내가 일상 일(라멘 먹기 · 풀 뽑기 · 열매 따기)을 했다: 옆에서 같이 다니던 친구와 같이 한 것으로 세고, 친구도 같이 한다(몸짓 · 한마디).
+   * 같이 하기를 다 했으면 창이 닫힌 뒤 그 자리에서 부탁을 끝낸다.
+   */
+  function didAct(act) {
+    const near = [...new Set([...buddies, ...npcs.partyKinds()])].filter(buddyNear);
+    commit(logAct(state, act, near), false);
+    for (const kind of near) {
+      const n = npcs.byKind(kind);
+      npcs.emote(n, ACT_ANIM[act] || 'clap', act === 'ramen' ? 3.2 : 1.2);
+      if (BUDDY_SAY[kind] && BUDDY_SAY[kind][act] && Math.random() < 0.6) npcs.say(n, BUDDY_SAY[kind][act]);
+      const id = activeQuests(state).find((q) => { const st = stepOf(state, q); return st && st.type === 'together' && st.act === act && reportTo(q, st) === kind; });
+      if (id && stepReady(state, id) && !buddyDone.includes(id)) buddyDone.push(id);
+    }
+  }
+  /** 같이 하기를 다 했다: 따라다니기를 끝내고 그 친구가 고맙다고 말하며 부탁 끝(보상). */
+  function finishBuddy(id) {
+    const st = stepOf(state, id), kind = reportTo(id, st), n = npcs.byKind(kind);
+    if (!n || n.away) return;
+    endBuddy(kind);
+    beginTalk(n);
+    finishQuestStep(id, n, st.say);
+  }
 
   /** 친구가 라멘 로우에서 라멘을 사 먹는다(지갑에서 나간다). */
   function npcEat(n) {

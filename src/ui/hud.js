@@ -295,12 +295,12 @@ export function createHud(ui, input) {
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
     /** 같이 토벌 중인 친구들. list: [{ name, svg: 얼굴 그림 }] (비면 숨긴다) */
-    setParty(list) {
+    setParty(list, label = '같이 토벌') {
       partyTag.hidden = !list.length;
       partyTag.replaceChildren();
       if (!list.length) return;
       const lab = el('span', 'pt-lab');
-      lab.textContent = '같이 토벌';
+      lab.textContent = label;
       partyTag.appendChild(lab);
       for (const f of list) {
         const face = el('i', 'pt-face');

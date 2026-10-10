@@ -15,7 +15,10 @@ import { WEED_KINDS } from './weeding.js';
  *   pull    { kind, n }                그 풀을 n 개 뽑고 to 에게 알린다
  *   license { id }                     그 자격증을 따고 to 에게 알린다
  *   talk    { }                        to 에게 말을 건다
- *   visit   { place, night?, evening? } 그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시, evening 이면 저녁 17 ~ 21시에만)
+ *   visit   { place, night?, evening?, with? } 그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시, evening 이면 저녁 17 ~ 21시에만,
+ *                                       with 면 부탁한 친구와 같이 가야 한다)
+ *   together { act, n }                부탁한 친구와 같이(친구가 따라다니는 동안) 일상 일(ACTS)을 n 번 하면 저절로 끝난다
+ * daily: 일상 부탁(같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일). again: 끝내고 그만큼 날이 지나면 또 부탁한다.
  *   boss    { }                        이야기 속 왕버섯을 쓰러뜨리면 저절로 끝난다
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
  * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
@@ -34,8 +37,21 @@ registerItems(QUEST_ITEMS);
 export const PLACES = {
   cave: { name: '하치와레 동굴', r: 3.2 },
   lair: { name: '바위산 깊은 곳', r: 9 },
-  pub: { name: '맥주집', r: 3 }
+  pub: { name: '맥주집', r: 3 },
+  bridge: { name: '강가 다리', r: 3.4 }
 };
+
+/** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
+export const ACTS = { ramen: '라멘 먹기', weed: '풀 뽑기', berry: '열매 따기' };
+
+/** 내가 한 일상 일을 센다. withKinds: 그때 옆에서 같이 다니던 친구들(그 친구와 같이 한 것으로도 센다). */
+export function logAct(state, act, withKinds = []) {
+  const acts = { ...(state.acts || {}) };
+  acts[act] = (acts[act] || 0) + 1;
+  for (const k of withKinds) acts[`${act}@${k}`] = (acts[`${act}@${k}`] || 0) + 1;
+  return { ...state, acts };
+}
+const actsWith = (state, act, kind) => (state.acts || {})[`${act}@${kind}`] || 0;
 
 export const QUESTS = {
   // ---------- 마을 이야기(대장 갑옷 씨): 바위산의 수상한 기척 → 왕버섯 ----------
@@ -109,6 +125,49 @@ export const QUESTS = {
     offer: ['{name} 님! 저 면 삶기 특훈 중인데요…', '사부님이 그러셨어요. 좋은 라멘은 좋은 재료부터라고!', '강가 물가 갈대를 5개만 뽑아다 주실 수 있어요? 국물 거를 때 쓰려고요!'],
     steps: [{ type: 'pull', kind: 'reed', n: 5, goal: '물가 갈대 5개 뽑고 시사에게 알리기 (3급부터)', say: ['와아! 고마워요, {name} 님!', '이걸로 국물을 거르면 훨씬 맑아질 거예요!', '감사의 뜻으로… 사부님 몰래 드리는 거예요! 쉿!'] }],
     reward: { money: 700, bond: 3 }
+  },
+  // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
+  ramenDate: {
+    title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, needHearts: 0, ask: '무슨 일 있어?',
+    offer: ['…저기… {name}…', '라멘 로우 라멘… 먹고 싶은데…', '혼자 가면… 좀 떨려서…', '…같이… 먹으러 가 줄래…?'],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '치이카와랑 라멘 로우에서 라멘 먹기', say: ['…후루룩…! 맛있어…!', '같이 먹으니까… 훨씬 맛있다…', '…또 같이 오자…♪'] }],
+    reward: { bond: 2 }
+  },
+  weedChii: {
+    title: '치이카와랑 풀 뽑기', giver: 'chiikawa', daily: true, again: 3, needHearts: 0, ask: '풀 뽑으러 가?',
+    offer: ['…{name}…', '오늘 풀 뽑기… 하려고 하는데…', '혼자 하면… 조금 무서워서…', '히잉… 같이 해 줄래…?'],
+    steps: [{ type: 'together', act: 'weed', n: 4, goal: '치이카와랑 같이 풀 4개 뽑기', say: ['…다 뽑았다…!', '같이 하니까… 금방이었어…', '…이거… 아까 찾은 거… 너 줄게…'] }],
+    reward: { bond: 2, items: { clover: 1 } }
+  },
+  weedPal: {
+    title: '하치와레랑 풀 뽑기', giver: 'hachiware', daily: true, again: 2, needHearts: 0, ask: '오늘 뭐 해?',
+    offer: ['있잖아, {name}! 오늘 풀 뽑기 같이 할래?', '둘이 하면 금방 끝나고, 수다도 떨 수 있잖아~', '어떻게든 될 거야!'],
+    steps: [{ type: 'together', act: 'weed', n: 5, goal: '하치와레랑 같이 풀 5개 뽑기', say: ['우와~ 벌써 다 했다!', '같이 하니까 하나도 안 힘들었어!', '이거 아까 주운 동전이야. 반씩 나누자!'] }],
+    reward: { money: 120, bond: 2 }
+  },
+  berryPal: {
+    title: '우사기랑 열매 따기', giver: 'usagi', daily: true, again: 2, needHearts: 0, ask: '우라?',
+    offer: ['우라!', '(빨간 열매 덤불 쪽을 가리키며 펄쩍펄쩍 뛴다)', '(바구니를 내밀며 같이 가자고 손짓한다)'],
+    steps: [{ type: 'together', act: 'berry', n: 4, goal: '우사기랑 빨간 열매 4개 따기 (마을 가장자리 열매 덤불)', say: ['야하~!', '(열매를 하나 입에 쏙 넣고는 행복한 얼굴을 한다)', '(바구니에서 열매를 한 줌 나눠 준다)'] }],
+    reward: { bond: 2, items: { berry: 2 } }
+  },
+  hangover: {
+    title: '쿠리만쥬의 해장 라멘', giver: 'kurimanju', daily: true, again: 3, needHearts: 0, ask: '오늘 기분은 어때?',
+    offer: ['하아~ 어젯밤에 조금 많이 마셨나 봐…', '이럴 땐 뜨끈한 라멘 국물이 최고지~', '같이 한 그릇 할래? 혼자 먹으면 심심하잖아~'],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '쿠리만쥬랑 라멘 로우에서 라멘 먹기', say: ['후루룩… 하아~ 살 것 같다~', '역시 라멘은 같이 먹어야 맛있어~', '다음엔 내가 한 잔 살게~'] }],
+    reward: { bond: 2 }
+  },
+  walkRiver: {
+    title: '모몽가랑 강가 산책', giver: 'momonga', daily: true, again: 3, needHearts: 1, ask: '심심해?',
+    offer: ['야, {name}.', '…강가 다리에서 물 구경하고 싶은데, 혼자 가긴 좀 그렇잖아.', '너도 같이 와. 싫다고 하면 지갑 털 거야. 흥!'],
+    steps: [{ type: 'visit', place: 'bridge', with: true, goal: '모몽가랑 남쪽 강가 다리까지 같이 걷기', speaker: 'momonga', say: ['(다리 아래로 강물이 졸졸 흐른다…)', '…뭐야, 생각보다 좋잖아.', '…가끔 또 데려와. 흥!'] }],
+    reward: { bond: 2 }
+  },
+  restDay: {
+    title: '랏코의 쉬는 날', giver: 'rakko', daily: true, again: 4, needHearts: 1, ask: '오늘도 수련이야?',
+    offer: ['…{name}.', '수련만 한다고 강해지는 건 아니다. 가끔은 쉬는 것도 수련이지.', '…라멘이나 먹으러 가지. 같이.'],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '랏코랑 라멘 로우에서 라멘 먹기', say: ['…훗. 국물이 좋군.', '…이런 날도 나쁘지 않다.', '…또 가자.'] }],
+    reward: { bond: 2 }
   }
 };
 export const QUEST_ORDER = Object.keys(QUESTS);
@@ -124,10 +183,11 @@ export const stepOf = (state, id) => { const q = questState(state, id); return q
 /** 그 단계를 누구에게 알리는지. */
 export const reportTo = (id, step) => step.to || QUESTS[id].giver;
 
-/** 그 단계를 받았을 때 세어 두는 값(사냥 · 풀은 그 뒤로 센다). */
-function snapshot(state, step) {
+/** 그 단계를 받았을 때 세어 두는 값(사냥 · 풀 · 같이 하기는 그 뒤로 센다). */
+function snapshot(state, step, id) {
   if (step.type === 'hunt') return (state.hunted || {})[step.species] || 0;
   if (step.type === 'pull') return (state.weedLog || {})[step.kind] || 0;
+  if (step.type === 'together') return actsWith(state, step.act, reportTo(id, step));
   return 0;
 }
 /** 지금 단계의 진행 { have, need } (센 것이 없으면 null). */
@@ -136,6 +196,7 @@ export function progressOf(state, id) {
   if (!step) return null;
   if (step.type === 'hunt') return { have: Math.min(step.n, ((state.hunted || {})[step.species] || 0) - q.base), need: step.n };
   if (step.type === 'pull') return { have: Math.min(step.n, ((state.weedLog || {})[step.kind] || 0) - q.base), need: step.n };
+  if (step.type === 'together') return { have: Math.min(step.n, Math.max(0, actsWith(state, step.act, reportTo(id, step)) - q.base)), need: step.n };
   if (step.type === 'bring') {
     const b = bagOf(state).items;
     const need = Object.values(step.items).reduce((a, n) => a + n, 0);
@@ -154,11 +215,11 @@ export function stepReady(state, id) {
   const p = progressOf(state, id);
   return !!p && p.have >= p.need;
 }
-/** 부탁을 들을 수 있는지: 안 했고, 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
+/** 부탁을 들을 수 있는지: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
 export function canOffer(state, id) {
-  const Q = QUESTS[id];
-  if (questState(state, id)) return false;
-  if (Q.tutorial && state.tutorial && state.tutorial !== 'done') return false;
+  const Q = QUESTS[id], q = questState(state, id);
+  if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
+  if ((Q.tutorial || Q.daily) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
   return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
 }
@@ -182,7 +243,7 @@ export function markOf(state, kind) {
 /** 부탁을 받는다(처음 단계를 시작한다). 화면에 띄울 퀘스트로 고른다. */
 export function startQuest(state, id) {
   const step = QUESTS[id].steps[0];
-  return { ...state, quests: { ...questsOf(state), [id]: { step: 0, base: snapshot(state, step) } }, questTrack: id };
+  return { ...state, quests: { ...questsOf(state), [id]: { step: 0, base: snapshot(state, step, id) } }, questTrack: id };
 }
 
 /** 친밀도를 바로 올린다(퀘스트 보상). 하트 3개가 되면 그 친구 선물 가구도. → { state, up, hearts, gift } */
@@ -247,7 +308,7 @@ export function completeStep(state, id, day) {
     return { state: reward.state, finished: true, next: null, reward };
   }
   const next = Q.steps[nextI];
-  s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: snapshot(s, next) } } };
+  s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: snapshot(s, next, id) } } };
   return { state: s, finished: false, next, reward: null };
 }
 
@@ -309,6 +370,10 @@ export function isValidQuests(qs) {
   if (!qs || typeof qs !== 'object' || Array.isArray(qs)) return false;
   return Object.entries(qs).every(([id, q]) => QUESTS[id] && q && num(q.step) && q.step >= 0 && q.step <= QUESTS[id].steps.length && num(q.base) && (q.done === undefined || num(q.done)));
 }
+/** 같이 한 일상 일 기록(state.acts) 모양 검사. */
+export function isValidActs(a) {
+  return !!a && typeof a === 'object' && !Array.isArray(a) && Object.values(a).every((v) => num(v) && v >= 0);
+}
 export function isValidStory(st) {
   return !!st && typeof st === 'object' && !Array.isArray(st);
 }
@@ -323,6 +388,8 @@ export function checkQuestData() {
       if (st.type === 'hunt' && !MONSTERS[st.species]) errs.push(id + ': species');
       if (st.type === 'pull' && !WEED_KINDS[st.kind]) errs.push(id + ': weed');
       if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
+      if (st.type === 'together' && (!ACTS[st.act] || !(st.n > 0))) errs.push(id + ': act');
+      if (Q.daily && !(Q.again >= 1)) errs.push(id + ': again');
       if (!st.goal || !st.say) errs.push(id + ': goal/say');
     }
     const R = Q.reward || {};
