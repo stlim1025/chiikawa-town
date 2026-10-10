@@ -1190,18 +1190,26 @@ function boot() {
     const giver = n || npcs.byKind(Q.giver);
     // 머리 위 하트만 퐁퐁(하트 줄 카드는 가운데 보상 카드와 겹쳐서 띄우지 않는다 · 보상 카드에 하트 꼬리표가 있다)
     if (giver && !giver.away && mode === 'play') hud.hearts({ x: giver.x, y: giver.chibi.height + 0.5, z: giver.z, gained: (Q.reward && Q.reward.bond) || 1, up: false, hearts: hearts(friendOf(state, Q.giver)), name: F.name, tag: F.tag });
-    sound.play('done');
-    player.cheerTime = 2;
+    sound.play('quest');
+    player.cheerTime = 2.4;
+    // 부탁한 친구도 펄쩍 기뻐하고, 머리 위로 반짝 · 음표가 퐁퐁
+    if (giver && !giver.away && mode === 'play') {
+      npcs.emote(giver, joyAnim(Q.giver), 2.8);
+      let k = 0;
+      const sparkle = setInterval(() => {
+        if (++k > 6 || mode !== 'play') { clearInterval(sparkle); return; }
+        hud.floatText({ x: giver.x + (Math.random() - 0.5) * 0.9, y: giver.chibi.height + 0.5, z: giver.z, text: ['★', '♪', '♥'][k % 3], kind: 'note' });
+      }, 260);
+    }
     // 보상은 아이콘 꼬리표로 짧게(돈 · 하트 · 물건 그림)
     const ICON = { money: 'coin', bond: 'heart', village: 'heart' };
     const chips = reward.parts.map((pt) => ({
       icon: ICON[pt.kind] || (pt.kind === 'item' ? itemSvg(pt.id) : pt.kind === 'accessory' ? accessorySvg(pt.id) : pt.kind === 'weapon' ? weaponSvg(pt.id) : null),
       text: pt.text
     }));
-    if (Q.story) {
-      hud.banner('이야기 완료!', Q.title, 5200, chips);
-      npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, joyAnim(m.kind), 3); });
-    } else hud.banner('부탁 완료!', Q.title, 4200, chips);
+    // 부탁 완료 카드(리본 · 꽃가루). 이야기 끝이면 마을 친구들이 다 같이 기뻐한다
+    hud.questDone({ title: Q.story ? '이야기 완료!' : '부탁 완료!', sub: Q.title, chips, ms: Q.story ? 5600 : 4800 });
+    if (Q.story) npcs.list.forEach((m) => { if (!m.away) npcs.emote(m, joyAnim(m.kind), 3); });
     if (reward.gifts.length) setTimeout(() => hud.toast('선물을 받았어요!', 3000, { chips: reward.gifts.map((g) => ({ text: FURNITURE[g].name })) }), 4400);
     refreshLook();
   }
@@ -1211,10 +1219,32 @@ function boot() {
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
   /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
+  /**
+   * 부탁에 필요한 걸 다 모았을 때(물건 · 토벌 · 풀): 그 순간 한 번 '다 모았어요!' 카드가 떠서 퀘스트 쪽지로 날아가 반짝이고, 띠링 소리 · 만세.
+   * 불러온 저장에 이미 다 모인 부탁은 알리지 않는다(처음 한 번은 지금 상태를 기억만). 같은 부탁도 단계가 바뀌면 다시 센다.
+   */
+  const readySeen = new Set();
+  let readyInit = false;
+  const READY_TYPES = { bring: ['다 모았어요!', '가져가요'], hunt: ['다 잡았어요!', '알려요'], pull: ['다 뽑았어요!', '알려요'] };
+  function checkReady() {
+    const now = activeQuests(state).filter((id) => { const st = stepOf(state, id); return st && READY_TYPES[st.type] && stepReady(state, id); })
+      .map((id) => `${id}:${state.quests[id].step}`);
+    if (!readyInit) { readyInit = true; now.forEach((k) => readySeen.add(k)); return; }
+    for (const key of [...readySeen]) if (!now.includes(key)) readySeen.delete(key); // 버리거나 써서 모자라지면 다음에 다시 알린다
+    for (const key of now) {
+      if (readySeen.has(key)) continue;
+      readySeen.add(key);
+      const id = key.split(':')[0], st = stepOf(state, id), [kicker, verb] = READY_TYPES[st.type], to = FRIENDS[reportTo(id, st)];
+      sound.play('ready');
+      player.cheerTime = 1.2;
+      hud.announce({ kicker, title: QUESTS[id].title, sub: `${to ? to.name : ''}에게 ${verb}`, to: 'quest', id });
+    }
+  }
   function updateQuests(dt) {
     questT -= dt;
     if (questT > 0 || !state) return;
     questT = 0.3;
+    checkReady();
     const p = player.position, hour = hourOf(state.clock);
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
     for (const id of activeQuests(state)) {
@@ -3152,6 +3182,7 @@ function boot() {
   /** 새 캐릭터는 마을 입구에서 걸어 들어오고(입장 연출), 이어하기는 저장된 자리에서 바로 시작한다. */
   function beginSession(next, fresh) {
     lastRegion = null; // 다시 시작해도 구역 알림이 잘못 뜨지 않게
+    readySeen.clear(); readyInit = false; // 불러온 저장에 이미 다 모인 부탁은 '다 모았어요!' 를 다시 띄우지 않게
     // 예전 저장에는 시작 날짜가 없다: 지금 날이 오늘이 되도록 거꾸로 맞춘다
     if (!next.startDate) next = { ...next, startDate: todayISO(new Date(Date.now() - (next.clock.day - 1) * 86400000)) };
     // 예전 저장의 위치가 새 배치에서 건물 · 물 위면 광장으로

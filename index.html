@@ -195,6 +195,21 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @keyframes photo-pop { from { opacity: 0; transform: scale(1.6) rotate(8deg); } }
 @media (max-height: 420px) { .notice-card .lic-card { width: 250px; margin: 8px auto 0; } }
 @media (prefers-reduced-motion: reduce) { .notice-card .lic-card, .notice-card .lc-photo { animation: none; } }
+/* 부탁 완료 카드: 리본 머리띠 · 부탁 이름 · 보상 꼬리표, 둘레로 꽃가루가 팡(동물의 숲처럼). 누르지 않아도 저절로 사라진다 */
+.quest-done { position: absolute; left: 50%; top: 24%; z-index: 6; transform: translateX(-50%); min-width: min(320px, calc(100% - 40px)); box-sizing: border-box; padding: 34px 26px 16px; text-align: center; color: var(--ink);
+  background: var(--dots), var(--paper); border-radius: var(--r); box-shadow: 0 0 0 6px var(--yellow), 0 10px 0 6px var(--yellow-deep), 0 18px 30px rgba(84, 62, 38, 0.25); pointer-events: none; animation: qd-in 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both; transition: opacity 0.4s; }
+.quest-done.out { opacity: 0; }
+.quest-done .qd-ribbon { position: absolute; left: 50%; top: -22px; transform: translateX(-50%) rotate(-3deg); padding: 6px 30px 9px; border-radius: 999px; background: #ff8fab; box-shadow: 0 4px 0 #e06a89; color: #fff; font-style: normal; font-size: 30px; line-height: 1; white-space: nowrap; text-shadow: 0 2px 0 #e06a89; animation: qd-ribbon 0.5s cubic-bezier(0.3, 1.8, 0.5, 1) 0.15s both; }
+.quest-done .qd-sub { display: block; font-weight: inherit; font-size: 24px; line-height: 1.25; word-break: keep-all; }
+.quest-done .qd-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; margin-top: 10px; }
+.qd-confetti { position: absolute; left: 50%; top: 40%; width: 0; height: 0; }
+.qd-bit { position: absolute; left: -5px; top: -4px; width: 10px; height: 8px; border-radius: 2px; opacity: 0; animation: qd-bit var(--d) cubic-bezier(0.2, 0.8, 0.4, 1) 0.12s forwards; }
+.qd-bit.round { width: 9px; height: 9px; border-radius: 50%; }
+.qd-bit.long { width: 5px; height: 14px; }
+@keyframes qd-in { 0% { opacity: 0; transform: translateX(-50%) scale(0.5) translateY(20px); } 100% { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes qd-ribbon { from { opacity: 0; transform: translateX(-50%) rotate(-3deg) scale(1.8); } }
+@keyframes qd-bit { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(0.6); } 35% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot) * 0.4)) scale(1); } 100% { opacity: 0; transform: translate(calc(var(--dx) * 1.15), calc(var(--dy) + 170px)) rotate(var(--rot)) scale(0.9); } }
+@media (prefers-reduced-motion: reduce) { .quest-done, .quest-done .qd-ribbon { animation: none; } .qd-confetti { display: none; } }
 /* 테스트 앱 그래픽 진단: 복사한 글을 그대로 보여 준다(복사가 안 되면 화면을 찍어 보내면 된다) */
 .diag-text { margin: 4px 0 10px; padding: 8px 10px; border-radius: 12px; background: var(--paper-2); font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.45; white-space: pre-wrap; word-break: break-all; user-select: text; }
 /* 경품 추첨: 상품 구슬 표 · 가라가라 연출(팔각 통이 두 바퀴 → 구슬이 쟁반으로 툭) · 당첨 카드의 큰 구슬 */

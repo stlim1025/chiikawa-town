@@ -426,6 +426,42 @@ export function createHud(ui, input) {
     /**
      * chips: 보상 꼬리표 [{ icon: 'coin' | 'heart' | SVG 문자열 | null, text }] — 긴 글 대신 아이콘 + 짧은 글로 한 줄에.
      */
+    /**
+     * 부탁 완료(동물의 숲처럼 축하): 가운데 위에 리본 달린 큰 카드가 톡 튀어나오고, 둘레로 꽃가루가 팡 터진다. 잠깐 뒤 저절로 사라진다(누르지 않아도 된다).
+     * { title: '부탁 완료!' · '이야기 완료!', sub: 부탁 이름, chips: [{ icon, text }] 보상 }
+     */
+    questDone({ title, sub, chips = [], ms = 4800 }) {
+      const card = el('div', 'quest-done');
+      card.setAttribute('role', 'status');
+      card.innerHTML = '<i class="qd-ribbon"></i><b class="qd-sub"></b><div class="qd-chips"></div>';
+      card.querySelector('.qd-ribbon').textContent = title;
+      card.querySelector('.qd-sub').textContent = sub || '';
+      const row = card.querySelector('.qd-chips');
+      for (const c of chips) {
+        const ch = el('i', 'banner-chip');
+        ch.innerHTML = (c.icon === 'coin' ? COIN : c.icon === 'heart' ? HEART_SVG : c.icon === 'energy' ? HEART : c.icon || '') + '<em></em>';
+        ch.querySelector('em').textContent = c.text;
+        row.appendChild(ch);
+      }
+      if (!chips.length) row.remove();
+      // 꽃가루: 카드 가운데서 사방으로 튀었다가 떨어진다(색 · 모양 · 크기 제각각)
+      const COLORS = ['#ffb7cf', '#fcd95b', '#8fd16a', '#8fd3ff', '#c9a8ff', '#ff9a8a', '#ffffff'];
+      const burst = el('div', 'qd-confetti');
+      for (let i = 0; i < 34; i++) {
+        const p = el('i', 'qd-bit' + (i % 3 === 0 ? ' round' : i % 3 === 1 ? ' long' : ''));
+        const a = (i / 34) * Math.PI * 2 + Math.random() * 0.3, r = 90 + Math.random() * 120;
+        p.style.setProperty('--dx', `${Math.round(Math.cos(a) * r * 1.4)}px`);
+        p.style.setProperty('--dy', `${Math.round(Math.sin(a) * r - 40)}px`);
+        p.style.setProperty('--rot', `${Math.round((Math.random() - 0.5) * 900)}deg`);
+        p.style.setProperty('--d', `${(0.9 + Math.random() * 0.7).toFixed(2)}s`);
+        p.style.background = COLORS[i % COLORS.length];
+        burst.appendChild(p);
+      }
+      card.appendChild(burst);
+      ui.appendChild(card);
+      setTimeout(() => card.classList.add('out'), ms - 400);
+      setTimeout(() => card.remove(), ms);
+    },
     banner(title, sub, ms = 2600, chips = null) {
       const b = el('div', 'hud-banner' + (chips && chips.length ? ' has-chips' : ''));
       b.setAttribute('role', 'status');

@@ -122,6 +122,14 @@ export function createSound(storage) {
     job: () => [784, 988].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.09, dur: 0.16, vol: 0.12 })),
     // 노동 완료: 빰빠밤!
     done: () => [659, 784, 1047, 1319, 1047, 1319, 1568].forEach((f, i) => tone({ freq: f, type: i < 4 ? 'square' : 'triangle', start: i * 0.09, dur: i === 6 ? 0.6 : 0.12, vol: i < 4 ? 0.07 : 0.12 })),
+    // 부탁에 필요한 걸 다 모았다: 띠링~ 반짝
+    ready: () => [1175, 1568, 2093].forEach((f, i) => tone({ freq: f, type: i === 2 ? 'triangle' : 'sine', start: i * 0.08, dur: i === 2 ? 0.45 : 0.16, vol: 0.11 })),
+    // 부탁 완료: 따라라 따~안! 하고 화음이 울린 뒤 반짝반짝
+    quest: () => {
+      [523, 659, 784, 1047].forEach((f, i) => tone({ freq: f, type: 'square', start: i * 0.08, dur: 0.1, vol: 0.07 }));
+      [1047, 1319, 1568].forEach((f) => tone({ freq: f, type: 'triangle', start: 0.34, dur: 0.9, vol: 0.09 }));
+      [2093, 2637, 3136, 2637, 3136].forEach((f, i) => tone({ freq: f, type: 'sine', start: 0.5 + i * 0.1, dur: 0.18, vol: 0.05 }));
+    },
     // 친밀도: 퐁퐁(오름), 하트가 늘면 반짝이는 아르페지오
     heart: () => [988, 1319].forEach((f, i) => tone({ freq: f, type: 'sine', start: i * 0.09, dur: 0.22, vol: 0.12 })),
     heartUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone({ freq: f, type: i % 2 ? 'triangle' : 'sine', start: i * 0.08, dur: i === 4 ? 0.6 : 0.2, vol: 0.11 })),
