@@ -796,7 +796,7 @@ const ZERO = [0, 0, 0];
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
- *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광
+ *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
  *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다), eat (한 번 먹기 진행 0..1 — 없으면 계속 먹는다) }
  */
@@ -954,6 +954,14 @@ function basePose(mode, t, opts) {
     a.head = [-0.55, Math.sin(t * 0.5 + phase) * 0.3, 0];
     a.armL = [0.45, 0, -0.18]; a.armR = [0.45, 0, 0.18];
     lean = -0.06;
+  } else if (mode === 'dj') {
+    // DJ: 오른손은 탁자 위 도토리를 나뭇잎으로 끽끽 문지르고, 왼손은 박자(118)에 맞춰 위로 흔들고, 고개는 끄덕끄덕
+    const b = Math.abs(Math.sin(t * 6.18));
+    a.armR = [-1.15 + Math.sin(t * 12.4) * 0.22, 0, -0.35 + Math.sin(t * 12.4) * 0.3];
+    a.armL = [0, 0, -2.2 + b * 0.5];
+    a.head = [0.12 + b * 0.22, 0, Math.sin(t * 3.09) * 0.1];
+    bob = b * 0.06;
+    waddle = Math.sin(t * 3.09) * 0.08;
   } else if (mode === 'pray') {
     // 소원 빌기: 두 손을 가슴 앞에 꼭 모으고 고개를 숙인다(조금씩 끄덕)
     a.armL = [-1.25, 0, 0.62]; a.armR = [-1.25, 0, -0.62];

@@ -26,7 +26,7 @@ export function createSound(storage) {
   try { Object.assign(prefs, JSON.parse(storage.getItem(PREFS_KEY) || '{}')); } catch { /* 저장소가 막혀도 기본값으로 */ }
 
   let ctx = null, master = null, sfxBus = null, musicBus = null, noiseBuf = null;
-  let musicOn = false, nextTime = 0, step = 0;
+  let musicOn = false, nextTime = 0, step = 0, ducked = false;
   let charge = null; // { osc, gain }
 
   function ensure() {
@@ -163,6 +163,12 @@ export function createSound(storage) {
     warn: () => tone({ freq: 520, slideTo: 880, type: 'triangle', dur: 0.14, vol: 0.06 }),
     thud: () => { tone({ freq: 110, slideTo: 55, type: 'sine', dur: 0.22, vol: 0.2 }); noise({ dur: 0.12, vol: 0.12, freq: 300, sweepTo: 120, q: 0.8 }); },
     faint: () => [659, 587, 523, 440, 330].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.16, dur: 0.3, vol: 0.12 })),
+    // 우사기 클럽: 쿵(킥) · 칙(하이햇) · 끽(도토리에 나뭇잎 문지르기) · 와아(손님들 환호) · 둥(터널 너머로 들리는 비트, arg = 크기 0..1)
+    kick: () => { tone({ freq: 150, slideTo: 45, type: 'sine', dur: 0.18, vol: 0.32 }); noise({ dur: 0.03, vol: 0.05, freq: 2400, q: 0.7 }); },
+    hat: () => noise({ dur: 0.045, vol: 0.06, freq: 8200, q: 0.9, type: 'highpass' }),
+    scratch: () => { noise({ dur: 0.12, vol: 0.14, freq: 1300, sweepTo: 3200, q: 2.4 }); tone({ freq: 880, slideTo: 1480, type: 'triangle', dur: 0.08, vol: 0.06 }); },
+    cheer: () => { noise({ dur: 0.9, vol: 0.12, freq: 1700, sweepTo: 1100, q: 0.6 }); [660, 880, 990].forEach((f, i) => tone({ freq: f, type: 'triangle', start: 0.05 + i * 0.09, dur: 0.18, vol: 0.05 })); },
+    thump: (v = 0.5) => tone({ freq: 95, slideTo: 42, type: 'sine', dur: 0.22, vol: 0.05 + 0.25 * v }),
     // 아침: 해가 뜨며 올라가는 소리
     morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 }))
   };
@@ -170,6 +176,7 @@ export function createSound(storage) {
   // ---------- 배경음악 ----------
   function scheduleMusic() {
     if (!ctx || ctx.state !== 'running') return;
+    if (ducked) { nextTime = ctx.currentTime + 0.05; return; } // 클럽 · 연출 동안 마을 음악은 쉰다
     const eighth = 60 / TEMPO / 2;
     if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05; // 쉬었다 돌아오면 밀린 음을 몰아 치지 않게
     while (nextTime < ctx.currentTime + 0.25) {
@@ -231,6 +238,8 @@ export function createSound(storage) {
       step = 0;
       setInterval(scheduleMusic, 80);
     },
+    /** 마을 배경음악을 잠깐 쉰다(on) · 다시 튼다(off): 우사기 클럽처럼 따로 비트가 울리는 동안. */
+    duck(on) { ducked = !!on; },
     /** 효과음(sfx) 또는 배경음악(music)을 켜고 끈다. 바뀐 값을 돌려준다. */
     toggle(kind) {
       prefs[kind] = !prefs[kind];

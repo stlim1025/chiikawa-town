@@ -28,7 +28,7 @@ export function createGuide(ui, { onLine, dock } = {}) {
 
   const text = box.querySelector('.guide-text'), chipsEl = box.querySelector('.guide-chips'), next = box.querySelector('.guide-next'), choicesEl = box.querySelector('.guide-choices');
   const nameEl = box.querySelector('.guide-name'), nmEl = nameEl.querySelector('.nm'), heartsEl = nameEl.querySelector('.hearts'), noteEl = nameEl.querySelector('.note');
-  let lines = [], i = 0, done = null, who = HACHI, choosing = false, seq = 0;
+  let lines = [], i = 0, done = null, who = HACHI, baseWho = HACHI, choosing = false, seq = 0;
   let sel = 0, pickFn = null; // 선택지: 지금 고른 줄, 골랐을 때 부를 함수
 
   function setWho(w) {
@@ -66,6 +66,8 @@ export function createGuide(ui, { onLine, dock } = {}) {
   }
   function show() {
     const L = lines[i];
+    const w = typeof L !== 'string' && L.who ? L.who : baseWho;
+    if (w !== who) setWho(w);
     text.textContent = typeof L === 'string' ? L : L.text;
     setChips(typeof L === 'string' ? [] : L.chips);
     next.setAttribute('aria-label', i === lines.length - 1 ? '알겠어!' : '다음');
@@ -126,6 +128,7 @@ export function createGuide(ui, { onLine, dock } = {}) {
     get open() { return !box.hidden; },
     say(list, onDone, w) {
       setWho(w);
+      baseWho = who;
       open();
       choosing = false;
       choicesEl.hidden = true;

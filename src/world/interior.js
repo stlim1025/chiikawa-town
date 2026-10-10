@@ -60,6 +60,16 @@ export function furnitureModel(id) {
       m(GEO.box, '#f7a84a', { position: [0, 0.24, 0.23], scale: [0.26, 0.2, 0.02], outline: false });
       m(GEO.cylinder, '#6b6470', { position: [0.12, 0.56, -0.08], scale: [0.07, 0.6, 0.07], outline: 0.015 });
       break;
+    case 'djbooth':
+      // 우사기 클럽의 DJ 자리: 작은 탁자 위 커다란 도토리와 나뭇잎, 옆에 동그란 스피커
+      m(GEO.box, '#5b4a7a', { position: [0, 0.3, 0], scale: [0.86, 0.6, 0.46], shell: true });
+      m(GEO.box, '#ff7ad9', { position: [0, 0.4, 0.235], scale: [0.7, 0.05, 0.01], outline: false });
+      m(GEO.sphere, '#b9773f', { position: [-0.12, 0.7, 0], scale: [0.16, 0.13, 0.16], outline: 0.02 });
+      m(GEO.sphere, '#7a5131', { position: [-0.12, 0.79, 0], scale: [0.17, 0.06, 0.17], outline: 0.015 });
+      m(GEO.sphere, '#6cc77e', { position: [0.18, 0.62, 0.02], scale: [0.16, 0.025, 0.09], rotation: [0, 0.5, 0], outline: 0.015 });
+      m(GEO.box, '#3a3236', { position: [0.55, 0.32, 0], scale: [0.26, 0.64, 0.3], shell: true });
+      [0.2, 0.46].forEach((y) => m(GEO.cylinder, '#8f8174', { position: [0.55, y, 0.16], scale: [0.08, 0.02, 0.08], rotation: [Math.PI / 2, 0, 0], outline: 0.01 }));
+      break;
     case 'doll': {
       const doll = buildNpc('chiikawa');
       doll.root.scale.setScalar(0.42);

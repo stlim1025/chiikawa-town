@@ -473,7 +473,7 @@ export function createPanels(ui, handlers) {
         const Q = QUESTS[id], st = questState(s, id), p = kind === 'active' ? progressOf(s, id) : null;
         return h('div', { class: `row q-card ${kind}${Q.story ? ' story' : ''}${id === track ? ' tracked' : ''}` }, face(Q.giver),
           h('div', {},
-            h('div', { class: 't' }, Q.title, Q.story ? h('span', { class: 'weed-count' }, '이야기') : null),
+            h('div', { class: 't' }, Q.title, Q.story || Q.side ? h('span', { class: 'weed-count' + (Q.side ? ' side' : '') }, Q.side ? '사이드스토리' : '이야기') : null),
             kind === 'active' ? h('div', { class: 'd' }, shortGoal(s, id).goal) : null,
             // 단계 · 진행 · 어디서(괄호 속 안내)는 꼬리표로
             kind === 'active' ? h('div', { class: 'mon-chips' },
@@ -607,7 +607,7 @@ export function createPanels(ui, handlers) {
     },
     // 동물의 숲 카탈로그처럼: 왼쪽 목록에서 고르면 오른쪽에 크게 보인다
     furniture(s) {
-      const home = homeOf(s), thumbs = handlers.thumbs(), list = Object.values(FURNITURE);
+      const home = homeOf(s), thumbs = handlers.thumbs(), list = Object.values(FURNITURE).filter((f) => !f.gift); // 선물로만 받는 가구는 안 판다
       if (!current.sel) current.sel = list[0].id;
       const view = h('div', { class: 'cat-view', 'aria-live': 'polite' });
       const drawView = () => {
@@ -903,6 +903,8 @@ export function createPanels(ui, handlers) {
         row('제초 검정', `지금 ${s.license.grade}급`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
         row('별똥별맨', '바로 보기(미리 보기라 소원은 안 이뤄져요)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.starfall(); } }, '보기')),
+        row('우사기의 집', '바로 시작(밤 9시 광장 · 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
+        row('우사기 클럽', '춤만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.club(); } }, '가기')),
         ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),
         // 그래픽 진단: 몬스터가 이상하게 보일 때 그 자리에서 복사해 알려 주면 원인을 찾을 수 있다
         row('그래픽 진단', '몬스터 근처에서 복사', h('button', { class: 'btn', type: 'button', onClick: (e) => {

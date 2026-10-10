@@ -24,6 +24,12 @@ import { VILLAGERS, villagerOf } from './villagers.js';
  *   wish: { hours: [시작, 끝), need?: 'hungry' 배고플 때 | 'broke' 돈이 모자랄 때 | 'tired' 지쳤을 때, chance: 그날 그 마음이 들 확률 }
  *   — 일상 부탁은 늘 떠 있지 않고, 그 친구가 정말 그럴 형편 · 시간일 때만, 마을 전체에 많아야 MAX_WISHES 개만 뜬다.
  *   boss    { }                        이야기 속 왕버섯을 쓰러뜨리면 저절로 끝난다
+ *   scene   { scene }                  main 이 그 장면(사이드스토리 연출)을 끝까지 보여 주면 끝난다(받자마자 시작)
+ *   visit 에 hours: [시작, 끝) 이 있으면 그 시각에만(24 를 넘기면 자정 너머까지), scene 이 있으면 도착했을 때 대화 대신 그 장면을 연다.
+ * 사이드스토리(side): 원작 에피소드를 따라가는 이야기. 머리 위에 ! 대신 펼친 책(이야기 표시)이 뜨고, 한 번에 하나만,
+ *   하나를 끝내면 SIDE_GAP 일 동안은 다음 이야기가 열리지 않는다(일상 부탁처럼 되풀이하는 daily 사이드는 따로).
+ *   needStory: state.story[그 이름] 에 적힌 날 다음 날부터(본 일이 있어야) · after: 그 퀘스트를 끝낸 뒤 · hours: 그 시각에만 부탁한다.
+ *   reward.friends: { 친구: 점수 } 같이 한 친구들 친밀도도.
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
  * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
  * state.story = { bossSeen?, bossDown? }, state.truce = 모몽가가 소매치기를 쉬는 마지막 날.
@@ -42,7 +48,8 @@ export const PLACES = {
   cave: { name: '하치와레 동굴', r: 3.2 },
   lair: { name: '바위산 깊은 곳', r: 9 },
   pub: { name: '맥주집', r: 3 },
-  bridge: { name: '강가 다리', r: 3.4 }
+  bridge: { name: '강가 다리', r: 3.4 },
+  plaza: { name: '광장', r: 4.5 }
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -130,6 +137,23 @@ export const QUESTS = {
     steps: [{ type: 'pull', kind: 'reed', n: 5, goal: '물가 갈대 5개 뽑고 시사에게 알리기 (3급부터)', say: ['와아! 고마워요, {name} 님!', '이걸로 국물을 거르면 훨씬 맑아질 거예요!', '감사의 뜻으로… 사부님 몰래 드리는 거예요! 쉿!'] }],
     reward: { money: 700, bond: 3 }
   },
+  // ---------- 사이드스토리: 원작 에피소드(머리 위에 이야기 표시) ----------
+  usagiHome: {
+    title: '우사기의 집', giver: 'hachiware', side: true, needStory: 'usagiSeen', hours: [15, 21], needHearts: 0, ask: '무슨 얘기 해?',
+    offer: [
+      '있잖아, {name}… 우사기는 밤마다 어디로 돌아가는 걸까?',
+      { who: 'chiikawa', text: '…집… 아니야…?' },
+      '{name}도 봤지? 어젯밤에 우사기가 자기 집 말고 숲 쪽으로 쌩~ 가 버리는 거!',
+      { who: 'chiikawa', text: '…!! (궁금해서 눈이 동그래진다)' },
+      '오늘 밤에 셋이서 몰래 따라가 보자! 밤 8시 넘어서 광장에서 만나~'
+    ],
+    steps: [{
+      type: 'visit', place: 'plaza', hours: [20, 24], scene: 'usagiClub', speaker: 'hachiware',
+      goal: '밤에 광장에서 치이카와 · 하치와레와 만나기 (밤 8시 ~ 12시)',
+      say: ['…결국 우사기 집이 어딘지는 하나도 모르겠네~', { who: 'chiikawa', text: '…그래도… 재밌었다…♪' }, '헤헤, 그치? 우사기는 정말 수수께끼야~']
+    }],
+    reward: { bond: 3, friends: { usagi: 3, chiikawa: 2 }, furniture: 'djbooth' }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
@@ -172,11 +196,23 @@ export const QUESTS = {
     offer: ['…{name}.', '수련만 한다고 강해지는 건 아니다. 가끔은 쉬는 것도 수련이지.', '…라멘이나 먹으러 가지. 같이.'],
     steps: [{ type: 'together', act: 'ramen', n: 1, goal: '랏코랑 라멘 로우에서 라멘 먹기', say: ['…훗. 국물이 좋군.', '…이런 날도 나쁘지 않다.', '…또 가자.'] }],
     reward: { bond: 2 }
+  },
+  // 우사기의 집을 본 뒤로는 가끔 저녁에 우사기가 또 클럽에 가자고 한다(사이드스토리 되풀이)
+  clubNight: {
+    title: '우사기랑 클럽', giver: 'usagi', side: true, daily: true, again: 3, after: 'usagiHome', wish: { hours: [19, 21], chance: 0.3 }, needHearts: 0, ask: '우라?',
+    offer: ['우라!', '(숲 쪽을 가리키며 들썩들썩 춤을 춘다)', '(오늘 밤에 또 클럽에 가자는 것 같다…!)'],
+    steps: [{ type: 'scene', scene: 'clubNight', speaker: 'usagi', goal: '우사기를 따라 클럽 가기', say: ['야하~!!', '(실컷 춤추고 나왔다)'] }],
+    reward: { bond: 2 }
   }
 };
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 const NIGHT = (h) => h >= 19 || h < 5;
+/** 시각 h 가 [시작, 끝) 안인지(끝이 24 를 넘으면 자정 너머까지: [20, 26) 은 밤 8시 ~ 새벽 2시). */
+export const inHours = (h, [a, b]) => (b > 24 ? h >= a || h < b - 24 : h >= a && h < b);
+/** 사이드스토리를 하나 끝내면 이만큼 날이 지나야 다음 이야기가 열린다. */
+export const SIDE_GAP = 2;
+const isStorySide = (id) => !!QUESTS[id].side && !QUESTS[id].daily;
 const EVENING = (h) => h >= 17 && h < 21;
 export const questsOf = (state) => state.quests || {};
 export const questState = (state, id) => questsOf(state)[id] || null;
@@ -186,6 +222,13 @@ export const isActive = (state, id) => !!(questState(state, id) && !questState(s
 export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
 /** 그 단계를 누구에게 알리는지. */
 export const reportTo = (id, step) => step.to || QUESTS[id].giver;
+/** 사이드스토리를 지금 새로 열 수 없는지: 하나를 하는 중이거나, 마지막으로 끝낸 지 SIDE_GAP 일이 안 됐다. */
+export function sideBusy(state) {
+  const ids = Object.keys(QUESTS).filter(isStorySide);
+  if (ids.some((id) => isActive(state, id))) return true;
+  const last = Math.max(0, ...ids.map((id) => (questState(state, id) || {}).done || 0));
+  return !!last && !!state.clock && state.clock.day - last < SIDE_GAP;
+}
 
 /** 그 단계를 받았을 때 세어 두는 값(사냥 · 풀 · 같이 하기는 그 뒤로 센다). */
 function snapshot(state, step, id) {
@@ -215,7 +258,7 @@ export function stepReady(state, id) {
   if (!step) return false;
   if (step.type === 'talk') return true;
   if (step.type === 'license') return hasLicense(state, step.id);
-  if (step.type === 'visit' || step.type === 'boss') return false;
+  if (step.type === 'visit' || step.type === 'boss' || step.type === 'scene') return false;
   const p = progressOf(state, id);
   return !!p && p.have >= p.need;
 }
@@ -265,8 +308,12 @@ export function canOffer(state, id) {
 function baseOffer(state, id) {
   const Q = QUESTS[id], q = questState(state, id);
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
-  if ((Q.tutorial || Q.daily) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁도 첫날 안내가 끝난 뒤부터
+  if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
+  if (Q.after && !isDone(state, Q.after)) return false;
+  if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && state.clock.day <= d)) return false; }
+  if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;
+  if (isStorySide(id) && sideBusy(state)) return false;
   return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
 }
 /** 그 친구에게 지금 할 수 있는 퀘스트 일: { offer: [id], report: [id](끝낼 수 있는 것), waiting: [id](알려야 하지만 아직 덜 한 것) } */
@@ -275,15 +322,15 @@ export function questsFor(state, kind) {
   for (const id of QUEST_ORDER) {
     if (QUESTS[id].giver === kind && canOffer(state, id)) out.offer.push(id);
     const step = stepOf(state, id);
-    if (!step || step.type === 'visit' || step.type === 'boss' || reportTo(id, step) !== kind) continue;
+    if (!step || step.type === 'visit' || step.type === 'boss' || step.type === 'scene' || reportTo(id, step) !== kind) continue;
     (stepReady(state, id) ? out.report : out.waiting).push(id);
   }
   return out;
 }
-/** 머리 위 표시: '!'(새 부탁) · '?'(알리러 오면 끝) · null. */
+/** 머리 위 표시: '?'(알리러 오면 끝) · 'story'(사이드스토리 — 펼친 책) · '!'(새 부탁) · null. */
 export function markOf(state, kind) {
   const q = questsFor(state, kind);
-  return q.report.length ? '?' : q.offer.length ? '!' : null;
+  return q.report.length ? '?' : q.offer.some((id) => QUESTS[id].side) ? 'story' : q.offer.length ? '!' : null;
 }
 
 /** 부탁을 받는다(처음 단계를 시작한다). 화면에 띄울 퀘스트로 고른다. */
@@ -339,6 +386,11 @@ export function giveReward(state, id, day) {
     else { const m = Math.round(WEAPONS[R.weapon].price / 2); s = { ...s, money: s.money + m }; add({ kind: 'money', n: m, text: `${m.toLocaleString('ko-KR')}원`, long: `${m.toLocaleString('ko-KR')}원(이미 가진 무기 대신)` }); }
   }
   if (R.furniture) { const home = homeOf(s); s = { ...s, home: { ...home, owned: { ...home.owned, [R.furniture]: (home.owned[R.furniture] || 0) + 1 } } }; add({ kind: 'furniture', id: R.furniture, text: FURNITURE[R.furniture].name, long: `${FURNITURE[R.furniture].name}(가구)` }); }
+  if (R.friends) for (const [k, n] of Object.entries(R.friends)) {
+    const b = bond(s, k, n);
+    s = b.state; if (b.gift) gifts.push(b.gift);
+    add({ kind: 'bond', id: k, n, text: `${FRIENDS[k].name} +${n}`, long: `${FRIENDS[k].name} 친밀도 +${n}` });
+  }
   if (R.truce) { s = { ...s, truce: day + R.truce - 1 }; add({ kind: 'truce', n: R.truce, text: `모몽가 휴전 ${R.truce}일`, long: `모몽가가 ${R.truce}일 동안 소매치기 안 하기` }); }
   return { state: s, got, parts, gifts, up };
 }
@@ -409,6 +461,7 @@ export function shortGoal(state, id) {
 /** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */
 export function arrived(step, place, x, z, hour) {
   if (!step || step.type !== 'visit' || !place) return false;
+  if (step.hours && !inHours(hour, step.hours)) return false;
   if (step.night && !NIGHT(hour)) return false;
   if (step.evening && !EVENING(hour)) return false;
   return Math.hypot(x - place.x, z - place.z) < (PLACES[step.place].r || 3);
@@ -440,6 +493,8 @@ export function checkQuestData() {
       if (st.type === 'pull' && !WEED_KINDS[st.kind]) errs.push(id + ': weed');
       if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
       if (st.type === 'together' && (!ACTS[st.act] || !(st.n > 0))) errs.push(id + ': act');
+      if (st.type === 'scene' && typeof st.scene !== 'string') errs.push(id + ': scene');
+      if (st.hours && !(Array.isArray(st.hours) && st.hours.length === 2)) errs.push(id + ': hours');
       if (Q.daily && !(Q.again >= 1)) errs.push(id + ': again');
       if (!st.goal || !st.say) errs.push(id + ': goal/say');
     }
@@ -447,6 +502,9 @@ export function checkQuestData() {
     if (R.accessory && !ACCESSORY_ITEMS[R.accessory]) errs.push(id + ': accessory');
     if (R.weapon && !WEAPONS[R.weapon]) errs.push(id + ': weapon');
     if (R.furniture && !FURNITURE[R.furniture]) errs.push(id + ': furniture');
+    if (R.friends) for (const k of Object.keys(R.friends)) if (!FRIENDS[k]) errs.push(id + ': friend ' + k);
+    if (Q.after && !QUESTS[Q.after]) errs.push(id + ': after');
+    for (const L of Q.offer || []) if (typeof L !== 'string' && !(L && L.text && (!L.who || FRIENDS[L.who]))) errs.push(id + ': offer line');
     if (R.items) for (const it of Object.keys(R.items)) if (!itemInfo(it)) errs.push(id + ': reward item ' + it);
   }
   return errs;

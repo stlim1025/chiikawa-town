@@ -1174,6 +1174,40 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* ---------- 퀘스트(5단계): 머리 위 ! · ?, 왼쪽 위 퀘스트 쪽지, 퀘스트 앱 ---------- */
 .world-label.qmark { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-top: -10px; border-radius: 50%; font-size: 25px; line-height: 1; color: var(--ink); background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep), 0 0 0 3px #fff; animation: q-bob 0.9s ease-in-out infinite alternate; }
 .world-label.qmark.report { color: #fff; background: #6fb4e8; box-shadow: 0 3px 0 #3f86bf, 0 0 0 3px #fff; }
+/* 사이드스토리 이야기 표시: ! 대신 연보라 동그라미 속 펼친 책 */
+.world-label.qmark.story { width: 38px; height: 38px; background: #f4dcf8; box-shadow: 0 3px 0 #c79ad6, 0 0 0 3px #fff, 0 0 14px rgba(199, 154, 214, 0.75); }
+.world-label.qmark.story svg { width: 25px; height: 25px; }
+.hud-quest.side i { color: #fff; background: #a978c4; }
+.panel .row.q-card .weed-count.side { background: #f4dcf8; color: #6e3f86; }
+/* 우사기 클럽 박자 맞추기: 아래쪽 가운데 줄(도토리가 오른쪽에서 동그라미로) */
+.rhythm { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 12; width: min(560px, calc(100% - 32px)); transform: translateX(-50%); font-family: var(--hand); color: #fff; text-align: center; pointer-events: none; transition: opacity 0.5s ease; }
+.rhythm.done { opacity: 0; }
+.rhythm .rh-hype { display: flex; align-items: center; gap: 8px; margin: 0 auto 8px; width: min(320px, 80%); font-size: 14px; text-shadow: 0 2px 0 #3a1f52; }
+.rhythm .rh-hype b { white-space: nowrap; font-weight: 700; }
+.rhythm .rh-hype i { flex: 1; height: 12px; padding: 2px; border-radius: 999px; background: rgba(30, 14, 48, 0.7); box-shadow: 0 0 0 2px #fff; }
+.rhythm .rh-hype u { display: block; height: 100%; width: 30%; border-radius: 999px; background: linear-gradient(90deg, #ff7ad9, #ffe45f); transition: width 0.15s ease-out; }
+.rhythm .rh-lane { position: relative; height: 74px; border-radius: 999px; background: rgba(30, 14, 48, 0.72); box-shadow: 0 0 0 3px #fff, 0 0 22px rgba(255, 122, 217, 0.55); overflow: hidden; pointer-events: auto; touch-action: manipulation; cursor: pointer; }
+.rhythm .rh-ring { position: absolute; left: 10px; top: 8px; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 0 4px #ffe45f, inset 0 0 0 3px rgba(255, 255, 255, 0.35); }
+.rhythm .rh-ring svg { width: 30px; height: 30px; opacity: 0.35; }
+.rhythm .rh-ring.hit { animation: rh-ring 0.25s ease-out; }
+@keyframes rh-ring { from { transform: scale(1.25); box-shadow: 0 0 0 6px #fff, 0 0 26px #ffe45f; } }
+.rhythm .rh-notes { position: absolute; inset: 0; }
+.rhythm .rh-note { position: absolute; left: 0; top: 15px; width: 44px; height: 44px; margin-left: 17px; will-change: transform; }
+.rhythm .rh-note svg { width: 44px; height: 44px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.25)); }
+.rhythm .rh-note.hit { opacity: 0 !important; transition: opacity 0.18s ease; }
+.rhythm .rh-judge { position: absolute; left: 0; right: 0; bottom: 132px; font-size: 30px; font-weight: 700; text-shadow: 0 3px 0 #3a1f52, 0 0 12px rgba(0, 0, 0, 0.4); opacity: 0; }
+.rhythm .rh-judge.pop { animation: rh-pop 0.55s ease-out; }
+.rhythm .rh-judge.perfect { color: #ffe45f; }
+.rhythm .rh-judge.good { color: #8cff7a; }
+.rhythm .rh-judge.miss { color: #c9c0d8; }
+@keyframes rh-pop { 0% { opacity: 0; transform: translateY(8px) scale(0.8); } 25% { opacity: 1; transform: translateY(0) scale(1.15); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
+.rhythm .rh-count { position: absolute; left: 0; right: 0; bottom: 176px; font-size: 54px; font-weight: 700; color: #fff; text-shadow: 0 4px 0 #3a1f52; }
+.rhythm .rh-count.go { color: #ff9ae3; }
+.rhythm .rh-combo { position: absolute; right: 18px; bottom: 82px; font-size: 18px; color: #ffe45f; text-shadow: 0 2px 0 #3a1f52; }
+.rhythm .rh-hint { margin-top: 8px; font-size: 14px; text-shadow: 0 2px 0 #3a1f52; }
+.rhythm .rh-hint kbd { padding: 0 6px 1px; border-radius: 6px; font-family: var(--hand); color: var(--ink); background: var(--paper); }
+[data-input="touch"] .rhythm .rh-hint kbd { display: none; }
+@media (prefers-reduced-motion: reduce) { .rhythm .rh-judge.pop, .rhythm .rh-ring.hit { animation-duration: 0.01s; } }
 @keyframes q-bob { from { margin-top: -10px; } to { margin-top: -18px; } }
 @media (prefers-reduced-motion: reduce) { .world-label.qmark { animation: none; } }
 .hud-quest { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 8px; max-width: min(380px, 70vw); padding: 5px 16px 7px 10px; border-radius: 18px 20px 18px 16px; background: #fff6dc; box-shadow: 0 3px 0 #e8c97a; font-size: 16px; line-height: 1.25; }

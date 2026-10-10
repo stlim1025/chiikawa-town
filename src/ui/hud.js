@@ -270,8 +270,9 @@ export function createHud(ui, input) {
         const e = nt.el;
         if (quests.children[i] !== e) quests.insertBefore(e, quests.children[i] || null);
         e.classList.toggle('story', !!q.story);
+        e.classList.toggle('side', !!q.side && !q.story);
         e.classList.toggle('incoming', incoming.has(q.id));
-        e.querySelector('i').textContent = q.story ? '이야기' : '부탁';
+        e.querySelector('i').textContent = q.story ? '이야기' : q.side ? '사이드스토리' : '부탁';
         e.querySelector('b').textContent = q.title;
         e.querySelector('em').textContent = q.goal;
         const sm = e.querySelector('small');

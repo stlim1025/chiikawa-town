@@ -13,7 +13,8 @@ export const FURNITURE = {
   lamp: { id: 'lamp', name: '스탠드', price: 140 },
   shelf: { id: 'shelf', name: '책장', price: 180 },
   stove: { id: 'stove', name: '작은 난로', price: 260 },
-  doll: { id: 'doll', name: '먼작귀 인형', price: 220 }
+  doll: { id: 'doll', name: '먼작귀 인형', price: 220 },
+  djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true } // 사이드스토리 '우사기의 집' 선물(가게에서는 안 판다)
 };
 
 /** 새 집: 침대 하나가 안쪽 가운데에 놓여 있다. */
