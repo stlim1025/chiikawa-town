@@ -918,6 +918,7 @@ function boot() {
   let talking = null; // 대화 중인 친구
   let tag = null; // 술래잡기 { n, t: 남은 초 }
   let examPill = false; // 제초 승급 시험 진행을 위 가운데 알약에 띄우는 중
+  const MONSTER_SEE = 18; // 이 거리 안 몬스터는 앞을 가리는 나무를 반투명하게
   let dance = null; // 같이 춤추기 { n, t }
   let escort = false; // 하치와레가 집까지 앞장서는 중
   let overlay = false; // 시험 · 알바 창이 열려 있다
@@ -3365,7 +3366,9 @@ function boot() {
       return;
     }
     cam.setAspect(aspect);
-    village.update(dt, player ? player.position : null);
+    // 내 둘레(18칸) 몬스터 앞을 가리는 나무도 반투명하게(위에서 내려다보는 화면이라 우듬지에 통째로 가려진다)
+    const nearMonsters = player ? monsters.list.filter((m) => !m.dead && !m.under && m.mesh.root.visible && Math.hypot(m.x - player.position.x, m.z - player.position.z) < MONSTER_SEE).map((m) => ({ x: m.x, z: m.z })) : [];
+    village.update(dt, player ? player.position : null, nearMonsters);
     weeds.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza });
     berries.update(dt);
 

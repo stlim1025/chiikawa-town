@@ -1133,7 +1133,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i], M = m.M, root = m.mesh.root;
         const dp = Math.hypot(m.x - p.x, m.z - p.z);
-        m.mesh.ghost.visible = dp < 13; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
+        m.mesh.ghost.visible = dp < 18; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
         if (m.dead) {
           m.deadT += dt;
           const k = m.deadT / 0.35;

@@ -767,15 +767,21 @@ export function buildVillage(scene) {
       windows.forEach((m) => { if (m) m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(0.85 * k); });
       outdoors.glow.forEach((m) => m.emissive.setRGB(0.45, 0.85, 1).multiplyScalar(k));
     },
-    /** 먼 묶음은 감추고, focus(내 캐릭터)와 카메라 사이를 가리는 나무 · 집 · 문을 반투명하게. 카메라는 남쪽(+z)에 있다. */
-    update(dt, focus) {
+    /**
+     * 먼 묶음은 감추고, focus(내 캐릭터)와 카메라 사이를 가리는 나무 · 집 · 문을 반투명하게. 카메라는 남쪽(+z)에 있다.
+     * others: 내 둘레 몬스터 자리 — 위에서 내려다보는 화면이라 나무 앞(남쪽)에 선 몬스터는 우듬지에 통째로 가려지므로 그 나무도 반투명하게.
+     */
+    update(dt, focus, others = []) {
       if (focus) {
         zones.update(focus);
+        // 이 나무가 그 자리(p)를 카메라에서 가리는지: 나무가 조금 남쪽(카메라 쪽)에 있고 옆으로 가까우면
+        const covers = (t, p) => { const z = t.z - p.z, x = Math.abs(t.x - p.x); return z > -0.3 && z < 4.5 * t.s && x < 1.5 * t.s; };
         // 나무: 멀리 있고 이미 불투명한 나무는 건너뛴다(바깥 길가 나무까지 더해 많다)
         for (const t of trees) {
           const dz = t.z - focus.z, dx = Math.abs(t.x - focus.x);
-          if (t.fade === 1 && (dx > 6 || dz < -1 || dz > 8)) continue;
-          const hiding = dz > -0.3 && dz < 4.5 * t.s && dx < 1.5 * t.s;
+          const nearOthers = others.length > 0 && dx < 22 && dz > -20 && dz < 10;
+          if (t.fade === 1 && (dx > 6 || dz < -1 || dz > 8) && !nearOthers) continue;
+          const hiding = covers(t, focus) || (nearOthers && others.some((p) => covers(t, p)));
           t.fade += ((hiding ? 0.3 : 1) - t.fade) * Math.min(1, dt * 8);
           if (t.fade > 0.995) t.fade = 1;
           t.mats.forEach((m) => { m.opacity = t.fade; m.depthWrite = t.fade > 0.95; });
