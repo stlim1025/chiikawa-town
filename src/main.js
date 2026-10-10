@@ -1694,7 +1694,7 @@ function boot() {
       npcs.emote(n, joyAnim(n.kind), r.up ? 1.6 : 0.9);
     }
     if (r.gift) {
-      sayAs(n, [n.kind === 'momonga' ? '흥! 남아서 주는 거야!' : '{name}, 우리 많이 친해졌지? 이거 선물이야!'], () => {
+      sayAs(n, [playLine(n, 'gift')], () => {
         hud.banner('선물을 받았어요!', FURNITURE[r.gift].name, 3000);
         sound.play('done');
         endTalk();
@@ -1716,24 +1716,25 @@ function boot() {
     });
   }
 
-  // 같이 놀기
+  // 같이 놀기: 대사는 친구마다 자기 말투로(core/npclines.js 의 playAsk · rps… · tag… · dance…)
   const HANDS = [['scissors', '가위'], ['rock', '바위'], ['paper', '보']];
+  const playLine = (n, key, vars = {}) => lineOf(n.kind, key, { name: '{name}', ...vars }); // {name} 은 대화 상자가 채운다
   function askPlay(n) {
-    askAs(n, '좋아! 뭐 하고 놀까?', ['가위바위보', '술래잡기', '같이 춤추기', '다음에 놀자'], (i) => {
-      if (i === 0) playRps(n, '가위바위보! 뭐 낼래?');
-      else if (i === 1) sayAs(n, ['내가 도망갈게! 15초 안에 잡아 봐~'], () => startTag(n));
-      else if (i === 2) sayAs(n, ['좋아~ 같이 춤추자! 하나, 둘, 셋!'], () => startDance(n));
+    askAs(n, playLine(n, 'playAsk'), ['가위바위보', '술래잡기', '같이 춤추기', '다음에 놀자'], (i) => {
+      if (i === 0) playRps(n, playLine(n, 'rpsGo'));
+      else if (i === 1) sayAs(n, [playLine(n, 'tagGo')], () => startTag(n));
+      else if (i === 2) sayAs(n, [playLine(n, 'danceGo')], () => startDance(n));
       else endTalk();
     });
   }
   function playRps(n, line) {
     askAs(n, line, HANDS.map((h) => h[1]), (i) => {
-      const theirs = pick(HANDS), res = rps(HANDS[i][0], theirs[0]), said = `나는 ${theirs[1]}!`;
-      if (res === 'draw') { playRps(n, `${said} 비겼다! 한 번 더, 뭐 낼래?`); return; }
+      const theirs = pick(HANDS), res = rps(HANDS[i][0], theirs[0]), said = playLine(n, 'rpsShow', { hand: theirs[1] });
+      if (res === 'draw') { playRps(n, `${said} ${playLine(n, 'rpsDraw')}`); return; }
       if (res === 'win') { player.cheerTime = 1.6; sound.play('pass'); }
       else { npcs.emote(n, joyAnim(n.kind), 1.6); sound.play('none'); }
-      sayAs(n, [said, res === 'win' ? '으앗, 졌다…! {name} 잘한다~' : '내가 이겼다~! 헤헤'], () => {
-        askAs(n, '한 판 더 할래?', ['한 판 더!', '그만할래'], (k) => { if (k === 0) playRps(n, '가위바위보! 뭐 낼래?'); else reward(n, 'play'); });
+      sayAs(n, [said, playLine(n, res === 'win' ? 'rpsLose' : 'rpsWin')], () => {
+        askAs(n, playLine(n, 'rpsAgain'), ['한 판 더!', '그만할래'], (k) => { if (k === 0) playRps(n, playLine(n, 'rpsGo')); else reward(n, 'play'); });
       });
     });
   }
@@ -1754,7 +1755,7 @@ function boot() {
     if (stolen) { endThiefChase(n, stolen, caught); return; }
     beginTalk(n);
     if (caught) { player.cheerTime = 1.6; sound.play('pass'); } else npcs.emote(n, joyAnim(n.kind), 1.6);
-    sayAs(n, caught ? ['으앗, 잡혔다~!', '{name} 진짜 빠르다! 재밌었어~'] : ['못 잡았지롱~!', '헤헤, 다음엔 꼭 잡아 봐~'], () => reward(n, 'play'));
+    sayAs(n, [playLine(n, caught ? 'tagCaught' : 'tagEscaped')], () => reward(n, 'play'));
   }
   /** 같이 춤추기: 둘이 4초 동안 춤춘다. */
   function startDance(n) {
@@ -1781,7 +1782,7 @@ function boot() {
       if (dance.t <= 0) {
         const n = dance.n;
         dance = null;
-        sayAs(n, ['헤헤, 신난다~!', '{name} 춤 잘 추네!'], () => reward(n, 'play'));
+        sayAs(n, [playLine(n, 'danceEnd')], () => reward(n, 'play'));
       }
     }
     updateTheft(dt);

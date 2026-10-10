@@ -1,6 +1,7 @@
 /**
- * 친구마다 말투가 다른 일 · 시험 · 토벌 · 같이 토벌 대사. 말풍선 한 줄이라 짧게 쓰고, 문장을 '.' · '·' 로 잇지 않는다.
- * 목록이면 하나를 고른다. {title} 일감 이름, {mon} 몬스터 이름, {pay} '+120원' 같은 보수를 채운다.
+ * 친구마다 말투가 다른 일 · 시험 · 토벌 · 같이 토벌 · 같이 놀기 · 선물 대사. 말풍선 한 줄이라 짧게 쓰고, 문장을 '.' · '·' 로 잇지 않는다.
+ * 목록이면 하나를 고른다. {title} 일감 이름, {mon} 몬스터 이름, {pay} '+120원' 같은 보수, {hand} 가위바위보 손을 채운다.
+ * {name}(내 이름)은 대화 상자가 채운다.
  *
  * 치이카와: 겁 많고 말이 짧다(…! · 히잉 · 우와앙), 그래도 열심히 한다
  * 하치와레: 밝고 긍정적(어떻게든 될 거야~), 노래하고 남을 북돋운다
@@ -41,7 +42,21 @@ export const NPC_LINES = {
     partyLeave: '…수고했어…!',
     partyTiredLeave: '…힘들어… 먼저 갈게…',
     partyNightLeave: '…졸려… 이제 갈게…',
-    partyFaint: '…괜찮아…?!'
+    partyFaint: '…괜찮아…?!',
+    // 같이 놀기 · 선물
+    playAsk: ['…같이 놀자…! 뭐 할까…?', '…놀 거야…? 헤헤…'],
+    rpsGo: '…가위바위보…! 뭐 낼 거야…?',
+    rpsShow: '…{hand}…!',
+    rpsDraw: '…또 비겼다…! 한 번 더…',
+    rpsLose: ['…졌다… 히잉…', '…{name} 잘한다…!'],
+    rpsWin: ['…이겼다…! 우와아…', '…♪ 이겼어…!'],
+    rpsAgain: '…한 판 더 할래…?',
+    tagGo: '…도망갈게…! 잡아 봐…!',
+    tagCaught: ['…잡혔다…! 히잉…', '…{name} 빠르다…!'],
+    tagEscaped: ['…헉헉… 안 잡혔다…!', '…도망쳤다…♪'],
+    danceGo: '…춤…! 하나 둘 셋…!',
+    danceEnd: ['…신난다…♪', '…헤헤… 재밌다…!'],
+    gift: '…이거 선물…! 받아 줘…!'
   },
   hachiware: {
     jobTake: ['{title}! 맡겨 줘~', '{title}! 내가 할게~'],
@@ -73,7 +88,20 @@ export const NPC_LINES = {
     partyLeave: '재밌었다~ 또 같이 가자!',
     partyTiredLeave: '휴~ 나 먼저 쉴게!',
     partyNightLeave: '벌써 밤이네~ 들어가자!',
-    partyFaint: '괜찮아?! 마을로 가자!'
+    partyFaint: '괜찮아?! 마을로 가자!',
+    playAsk: ['좋아~ 뭐 하고 놀까?', '놀자 놀자~! 뭐 할래?'],
+    rpsGo: '가위바위보 하자~! 뭐 낼래?',
+    rpsShow: '나는 {hand}~!',
+    rpsDraw: '비겼다~ 한 번 더 하자!',
+    rpsLose: ['으앗 졌다~ {name} 잘한다!', '졌지만 재밌다~!'],
+    rpsWin: ['내가 이겼다~ ♪', '헤헤 오늘은 운이 좋다~'],
+    rpsAgain: '한 판 더 할래~?',
+    tagGo: '내가 도망갈게~ 잡아 봐!',
+    tagCaught: ['잡혔다~! {name} 빠르다!', '으앗~ 잡혀 버렸네!'],
+    tagEscaped: ['못 잡았지롱~ ♪', '다음엔 잡을 수 있을 거야~!'],
+    danceGo: '같이 춤추자~ 하나 둘 셋!',
+    danceEnd: ['신난다~! 노래도 부르고 싶다~', '{name} 춤 잘 춘다~!'],
+    gift: '{name}~ 이거 선물이야! ♪'
   },
   usagi: {
     jobTake: '야하!',
@@ -105,7 +133,20 @@ export const NPC_LINES = {
     partyLeave: '우라!',
     partyTiredLeave: '하아…',
     partyNightLeave: '(하품)',
-    partyFaint: '하아?!'
+    partyFaint: '하아?!',
+    playAsk: ['야하~!! (두리번두리번)', '우라! (뭐 하고 놀래?)'],
+    rpsGo: '우라! (주먹을 쥔다)',
+    rpsShow: '우라!! ({hand})',
+    rpsDraw: '하아?! (한 번 더!)',
+    rpsLose: ['하아?!', '…하아 (털썩)'],
+    rpsWin: ['우라~!! 우라!!', '야하~! (빙글빙글)'],
+    rpsAgain: '우라? (한 판 더?)',
+    tagGo: '이야~하!! (후다닥)',
+    tagCaught: ['하아?!', '…후랏 (잡혔다)'],
+    tagEscaped: ['야하~! (메롱)', '우라라라~!'],
+    danceGo: '야하! 야하! (둠칫둠칫)',
+    danceEnd: ['우라~! 우라~!', '야하~!! (신났다)'],
+    gift: '우라! (쓱 내민다)'
   },
   kurimanju: {
     jobTake: '{title}… 슬슬 해 볼까~',
@@ -137,7 +178,20 @@ export const NPC_LINES = {
     partyLeave: '하아~ 수고했어 한 잔 하자고',
     partyTiredLeave: '하아~ 지쳤다… 먼저 간다',
     partyNightLeave: '하아~ 한 잔 하러 가야지',
-    partyFaint: '하아~ 무리했네…'
+    partyFaint: '하아~ 무리했네…',
+    playAsk: ['하아~ 그래 뭐 하고 놀까', '하아~ 한 잔 하고 놀까'],
+    rpsGo: '하아~ 가위바위보나 할까',
+    rpsShow: '하아~ {hand}다',
+    rpsDraw: '하아~ 또 비겼네 한 번 더',
+    rpsLose: ['하아~ 졌다 {name} 제법인데', '하아~ 진 사람이 한 잔 사는 거야?'],
+    rpsWin: ['하아~ 이겼다 오늘 술맛 좋겠네', '하아~ 어른의 실력이야'],
+    rpsAgain: '하아~ 한 판 더 할래',
+    tagGo: '하아~ 나 달리기는 좀…',
+    tagCaught: ['하아~ 숨차… 잡혔다', '하아~ 젊다는 건 좋네'],
+    tagEscaped: ['하아~ 아직 안 죽었다고', '하아~ 의외지?'],
+    danceGo: '하아~ 한 잔 들어간 춤이다~',
+    danceEnd: ['하아~ 땀 났다 맥주 땡기네', '하아~ 오랜만에 신났다'],
+    gift: '하아~ 이거 받아 둬 선물이야'
   },
   rakko: {
     jobTake: '…이것도 수련이다',
@@ -169,13 +223,31 @@ export const NPC_LINES = {
     partyLeave: '…수고했다',
     partyTiredLeave: '…여기까지다',
     partyNightLeave: '…오늘은 여기까지다',
-    partyFaint: '…무리하지 마라'
+    partyFaint: '…무리하지 마라',
+    playAsk: ['…놀이도 수련이다 골라라', '…상대해 주지'],
+    rpsGo: '…승부다',
+    rpsShow: '…{hand}',
+    rpsDraw: '…비겼군 다시',
+    rpsLose: ['…졌군 훗', '…제법이다 {name}'],
+    rpsWin: ['…당연하다', '…훗 아직 멀었다'],
+    rpsAgain: '…한 번 더 하겠나',
+    tagGo: '…잡을 수 있으면 잡아 봐라',
+    tagCaught: ['…잡혔군 훗', '…좋은 발이다'],
+    tagEscaped: ['…아직이다', '…발을 더 단련해라'],
+    danceGo: '…춤도 검의 호흡이다',
+    danceEnd: ['…나쁘지 않군', '…훗 땀이 나는군'],
+    gift: '…받아라 수련의 답례다'
   },
   momonga: {
     eat: '맛있어! 더 줘!',
-    napWake: '흥 잘 잤어'
-  }
+    napWake: '흥 잘 잤어',
+    gift: '흥! 남아서 주는 거야!'
+  },
+  shisa: { gift: '사부님 몰래 주는 선물이에요~!' },
+  kani: { gift: '딱딱! 이거… 선물이야…' }
 };
+/** 같이 놀기 대사(가위바위보 · 술래잡기 · 춤): 같이 노는 친구는 모두 자기 말투로 갖고 있다. */
+export const PLAY_KEYS = ['playAsk', 'rpsGo', 'rpsShow', 'rpsDraw', 'rpsLose', 'rpsWin', 'rpsAgain', 'tagGo', 'tagCaught', 'tagEscaped', 'danceGo', 'danceEnd'];
 /** 친구 말투가 없을 때(다른 마을 사람). */
 const PLAIN = {
   jobTake: '{title}! 할게요', jobSoldOut: '앗 벌써 다 나갔네', sticker: '스티커 붙이는 중', pull: ['영차!'], berry: ['하나 땄다'],
@@ -184,7 +256,10 @@ const PLAIN = {
   huntCry: ['얏!'], huntDone: '토벌 끝! {pay}', huntFail: '못 잡았다…',
   partyJoin: '같이 가자!', partyHearts: '조금 더 친해지면…', partyMyLicense: '토벌 자격증이 있어야 해', partyLicense: '자격증이 없어',
   partyNight: '밤엔 위험해', partyTired: '오늘은 지쳤어', partyFull: '자리가 꽉 찼어', partyBusy: '지금 하던 거 끝내고', partyCry: ['얏!'], partyLeave: '수고했어!',
-  partyTiredLeave: '먼저 쉴게', partyNightLeave: '이제 들어갈게', partyFaint: '괜찮아?!'
+  partyTiredLeave: '먼저 쉴게', partyNightLeave: '이제 들어갈게', partyFaint: '괜찮아?!',
+  playAsk: '좋아! 뭐 하고 놀까?', rpsGo: '가위바위보! 뭐 낼래?', rpsShow: '나는 {hand}!', rpsDraw: '비겼다! 한 번 더', rpsLose: '으앗 졌다! {name} 잘한다~',
+  rpsWin: '내가 이겼다~! 헤헤', rpsAgain: '한 판 더 할래?', tagGo: '내가 도망갈게! 잡아 봐~', tagCaught: '으앗 잡혔다~!', tagEscaped: '못 잡았지롱~!',
+  danceGo: '같이 춤추자! 하나 둘 셋!', danceEnd: '헤헤 신난다~!', gift: '{name} 이거 선물이야!'
 };
 
 /** 그 친구의 그 대사 한 줄(목록이면 하나 골라서 {title} · {mon} · {pay} 를 채운다). */
