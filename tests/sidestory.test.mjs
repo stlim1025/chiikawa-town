@@ -49,7 +49,9 @@ test('다시 클럽 가는 밤: 우사기의 집을 끝낸 뒤에만, 이야기 
   let s = withHearts(fresh(9, 20), 'usagi', 2);
   assert.ok(!Q.canOffer(s, 'clubNight'), '아직 우사기의 집을 안 봤다');
   s = { ...s, quests: { usagiHome: { step: 1, base: 0, done: 2 } } };
-  if (Q.openWishes(s).includes('clubNight')) assert.equal(Q.markOf(s, 'usagi'), 'story');
+  const day = [...Array(60).keys()].map((i) => i + 3).find((d) => Q.openWishes({ ...s, clock: at(d, 20) }).includes('clubNight'));
+  assert.ok(day, '며칠 안에 한 번은 가자고 한다');
+  assert.equal(Q.markOf({ ...s, clock: at(day, 20) }, 'usagi'), 'story');
   assert.equal(Q.QUESTS.clubNight.steps[0].type, 'scene');
   assert.ok(!Q.stepReady(Q.startQuest(s, 'clubNight'), 'clubNight'), '장면이 끝나야 끝난다');
 });
@@ -88,4 +90,41 @@ test('저장: 이야기 기록(story)은 그대로 불러온다', () => {
   const back = S.deserialize(S.serialize(s));
   assert.ok(back.ok);
   assert.equal(back.state.story.usagiSeen, 2);
+});
+
+test('피자호빵: 아침에 라멘 로우 새 메뉴 소식 → 그날 우사기에게 이야기 표시', async () => {
+  let s = withHearts(fresh(3, 9), 'usagi', 1);
+  assert.ok(Q.pizzaNewsDue(s), '셋째 날 아침, 우사기와 하트 1');
+  assert.ok(!Q.pizzaNewsDue({ ...s, clock: at(2, 9) }), '너무 이르다');
+  assert.ok(!Q.pizzaNewsDue({ ...s, clock: at(3, 15) }), '소식은 아침에만');
+  assert.ok(!Q.pizzaNewsDue(withHearts(fresh(3, 9), 'usagi', 0)), '우사기와 조금은 친해야');
+  assert.ok(!Q.canOffer(s, 'pizzaBun'), '소식 전');
+  s = { ...s, story: { pizzaNews: 3 } };
+  assert.ok(!Q.pizzaNewsDue(s), '소식은 한 번');
+  assert.ok(Q.canOffer(s, 'pizzaBun'), '소식 들은 그날부터');
+  assert.equal(Q.markOf(s, 'usagi'), 'story');
+  s = Q.startQuest(s, 'pizzaBun');
+  assert.ok(!Q.stepReady(s, 'pizzaBun'));
+  const Sh = await import(G + 'shop.js');
+  const I = await import(G + 'inventory.js');
+  const before = Sh.buy({ ...s, story: {}, money: 500 }, 'ramen', 'pizzabun');
+  assert.ok(!before.ok, '소식 전에는 안 판다');
+  const r = Sh.buy({ ...s, money: 500, stamina: 100 }, 'ramen', 'pizzabun');
+  assert.ok(r.ok, '배불러도 포장은 산다');
+  assert.equal(I.bagOf(r.state).items.pizzabun, 1, '가방에');
+  assert.ok(Q.stepReady(r.state, 'pizzaBun'));
+  const done = Q.completeStep(r.state, 'pizzaBun', 3);
+  assert.ok(done.finished);
+  assert.equal(I.bagOf(done.state).items.pizzabun, 1, '건넨 하나 대신 우사기가 나눠 준 하나');
+});
+
+test('장면 단계에서 멈춘 퀘스트(장면 도중 새로고침)는 없던 일로: 다시 부탁받을 수 있다', () => {
+  let s = { ...withHearts(fresh(9, 20), 'usagi', 2), quests: { usagiHome: { step: 1, base: 0, done: 2 } } };
+  s = Q.startQuest(s, 'clubNight');
+  assert.deepEqual(Q.staleScenes(s), ['clubNight']);
+  const d = Q.dropQuest(s, 'clubNight');
+  assert.ok(!Q.isActive(d, 'clubNight'));
+  assert.notEqual(d.questTrack, 'clubNight');
+  assert.ok(Q.isDone(d, 'usagiHome'), '다른 기록은 그대로');
+  assert.deepEqual(Q.staleScenes(Q.startQuest(fresh(), 'pillow')), [], '장면이 아닌 단계는 그대로');
 });

@@ -94,6 +94,11 @@ export const FOOD_SHAPES = {
     { m: 'dot', c: '#c4ea8e', p: [-0.125, 0.13, 0.125], s: [0.017, 0.017, 0.012], o: false },
     { m: 'dot', c: '#c4ea8e', p: [-0.1, 0.085, 0.128], s: [0.017, 0.017, 0.012], o: false }
   ] }],
+  // 피자호빵: 노릇한 호빵 반쪽 사이로 빨간 소스
+  'f-pizzabun': [{ arm: 'armR', pose: HOLD.nibble, parts: [
+    { m: 'sphere', c: '#fbd3a0', p: [-0.12, 0.1, 0.1], s: [0.075, 0.06, 0.07] },
+    { m: 'box', c: '#e8573f', p: [-0.12, 0.085, 0.1], s: [0.11, 0.012, 0.1], o: false }
+  ] }],
   'f-jelly': [{ arm: 'armR', pose: HOLD.nibble, parts: [
     { m: 'sphere', c: '#e9a94b', p: [-0.12, 0.1, 0.1], s: [0.07, 0.042, 0.06] },
     { m: 'box', c: '#a8642a', p: [-0.12, 0.14, 0.1], r: [0, 0.5, 0], s: [0.09, 0.006, 0.01], o: false },

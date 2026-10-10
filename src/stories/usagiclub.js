@@ -42,7 +42,7 @@ export function createUsagiClub(ctx) {
 
   // ---------- 1) 목격 ----------
   function canSight(state) {
-    if (S || !state || state.tutorial !== 'done' || !state.clock) return false;
+    if (S || !state || !state.clock || (state.tutorial && state.tutorial !== 'done')) return false; // 옛 저장(안내 기록 없음)도
     if (isActive(state, 'usagiHome') || isDone(state, 'usagiHome') || (state.story || {}).usagiSeen || sideBusy(state)) return false;
     if (hearts(friendOf(state, 'usagi')) < SIGHT_HEARTS) return false;
     const h = hourOf(state.clock), p = ctx.player.position, u = usagi();
@@ -65,14 +65,15 @@ export function createUsagiClub(ctx) {
     ]);
   }
   function sightSeen() {
-    if (!S || S.seen) return;
-    S.seen = true;
     const s = ctx.getState();
+    if (!S || S.seen || !s || !s.clock) return;
+    S.seen = true;
     if (!(s.story || {}).usagiSeen) ctx.commit({ ...s, story: { ...(s.story || {}), usagiSeen: s.clock.day } });
     hud.toast('우사기가 집이 아닌 숲 쪽으로 쌩 달려갔다…?', 3800);
   }
   function sightEnd() {
     if (!S || S.kind !== 'sight') return;
+    if (!ctx.getState()) { S = null; return; }
     sightSeen();
     ctx.putToBed('usagi'); // 덤불 굴로 쏙(다음 날 아침에는 늘 그렇듯 자기 집에서 나온다)
     unstage('usagi');
@@ -145,6 +146,8 @@ export function createUsagiClub(ctx) {
     if (u) npcs.goIn(u);
     S.kind = 'burrow';
     S.diving = false;
+    S.burrowAt = S.t;
+    S.lostT = 0;
     palSay('hachiware', '저기 굴로 쏙 들어갔어! 우리도 가 보자~!');
     setTimeout(() => palSay('chiikawa', '…!! (따라간다)'), 900);
   }
@@ -159,7 +162,11 @@ export function createUsagiClub(ctx) {
     if (!u) return;
     const d = dist(u, p), moved = dist(p, S.last) > 0.7 * dt;
     S.last = { x: p.x, z: p.z };
-    if (S.kind === 'burrow') return;
+    if (S.kind === 'burrow') {
+      if (!S.hinted && S.t - S.burrowAt > 25) { S.hinted = true; palSay('hachiware', '저 덤불 굴로 들어가 보자~!'); }
+      if (dist(p, forest().front) > LOST) { S.lostT += dt; if (S.lostT > 4) { S.kind = 'lost'; abort(); } } else S.lostT = 0;
+      return;
+    }
     if (d > LOST && !u.away) { S.lostT += dt; if (S.lostT > 4) { S.kind = 'lost'; abort(); return; } } else S.lostT = 0;
     const W = S.watch;
     if (W) {
@@ -281,6 +288,7 @@ export function createUsagiClub(ctx) {
     if (u && staged.has('usagi') && !(u.plan && u.plan.length)) { ctx.putToBed('usagi'); unstage('usagi'); }
     if (rhythm.active) rhythm.stop();
     sound.duck(false);
+    if (!guide.open) input.setEnabled(true); // 테스트 앱처럼 퀘스트 없이 본 장면도 다시 움직이게
     S = null;
   }
 
@@ -295,6 +303,8 @@ export function createUsagiClub(ctx) {
     get phase() { return S ? S.kind : null; },
     /** 0.3초마다(한가할 때): 목격 장면을 열 때인지. */
     trySight() { if (canSight(ctx.getState())) sight(); },
+    /** 타이틀로 나갈 때: 하던 연출을 모두 접는다(붙잡은 친구 · 클럽 음악 · 박자 화면). */
+    reset() { if (rhythm.active) rhythm.stop(); sound.duck(false); staged.clear(); S = null; },
     /** 오늘 밤 광장에 와서 시작해도 되는지(놓친 날 밤에는 다시 시작하지 않는다). */
     canPlay(day) { return !S && day !== lostDay; },
     /** 장면 시작: again 이면 우사기랑 클럽만(clubNight). done: 다 보고 나면(퀘스트 마무리 대사 · 보상). */

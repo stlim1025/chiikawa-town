@@ -98,7 +98,7 @@ import { createUsagiClub } from './stories/usagiclub.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
-import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady } from './core/quests.js';
+import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest } from './core/quests.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -220,6 +220,8 @@ function boot() {
         player.setPosition(village.spots.plaza.x + 1, village.spots.plaza.z + 1.5);
         cam.snap(player.position);
       },
+      /** 피자호빵 소식 바로(라멘 로우 새 메뉴 · 우사기에게 이야기 표시). */
+      pizzaNews() { commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } }); hud.toast('테스트: 라멘 로우에 피자호빵이 나왔어요', 2600); },
       /** 우사기 클럽 춤만 바로(보상 없음). */
       club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); }
     },
@@ -262,9 +264,10 @@ function boot() {
     },
     buy(itemId, shopId = 'ramen') {
       const r = buy(state, shopId, itemId);
-      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : r.reason === 'license' ? '술 자격이 있어야 해요' : '지금은 배불러요'); return; }
+      if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : r.reason === 'license' ? '술 자격이 있어야 해요' : r.reason === 'bag' ? '가방이 꽉 찼어요' : r.reason === 'soon' ? '아직 안 팔아요' : '지금은 배불러요'); return; }
       const paid = state.money - r.state.money;
       commit(r.state);
+      if (r.item) { sound.play('coin'); hud.toast(`${itemInfo(r.item).name} 포장 완료! 가방에 넣었어요`, 2400, { icon: itemSvg(r.item) }); gotTicket(paid); return; } // 포장 상품(피자호빵)
       sound.play('eat');
       eatMotion(itemId);
       const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
@@ -454,6 +457,7 @@ function boot() {
       endHunterExam();
       if (bossM) { monsters.clear((m) => m === bossM || m.summoned); bossM = null; }
       questScene = false;
+      usagiClub.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1173,8 +1177,29 @@ function boot() {
   /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
   function reportQuest(n, id) {
     const step = stepOf(state, id);
+    if (step.fx && STEP_FX[step.fx]) STEP_FX[step.fx](n); // 단계마다 짧은 연출(피자호빵을 먹고 우는 우사기 …)
     finishQuestStep(id, n, step.say);
   }
+  /** 퀘스트 단계 연출: 건네받은 친구가 먹고 · 울고, 둘레 친구들이 모여든다. */
+  const STEP_FX = {
+    pizzaCry(n) {
+      npcs.emote(n, 'nibble', 3.4);
+      setTimeout(() => { if (guide.open) npcs.emote(n, 'shy', 7); }, 3400);
+      setTimeout(() => {
+        let k = 0;
+        const tears = setInterval(() => {
+          if (++k > 12 || mode !== 'play') { clearInterval(tears); return; }
+          hud.floatText({ x: n.x + (k % 2 ? -0.2 : 0.2), y: n.chibi.height * 0.72, z: n.z, text: '💧', kind: 'note' });
+        }, 380);
+      }, 2200);
+      ['hachiware', 'chiikawa'].forEach((kind, i) => {
+        const m = npcs.byKind(kind);
+        if (!m || m.away || npcs.busy(m) || staged.has(kind) || Math.hypot(m.x - n.x, m.z - n.z) > 22) return;
+        const at = village.nearestFree(n.x + (i ? -1.3 : 1.3), n.z + 0.7, 0.4);
+        npcs.plan(m, [{ do: 'walk', x: at.x, z: at.z, run: true }, { do: 'act', anim: i ? 'shy' : 'look', time: 6, face: { x: n.x, z: n.z } }]);
+      });
+    }
+  };
   /**
    * 퀘스트 단계를 끝낸다: who(친구 · 없으면 해설)가 lines 를 말하고, 다음 단계를 알리거나 보상을 준다.
    * n 이 null 이면(visit · boss) 대화를 새로 연다.
@@ -1315,6 +1340,7 @@ function boot() {
     checkReady();
     const p = player.position, hour = hourOf(state.clock);
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
+    if (!questScene && !usagiClub.active) for (const id of staleScenes(state)) commit(dropQuest(state, id)); // 장면 도중 새로고침했으면 없던 일로
     for (const id of activeQuests(state)) {
       const step = stepOf(state, id);
       if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || usagiClub.canPlay(state.clock.day))) {
@@ -1326,6 +1352,10 @@ function boot() {
     }
     if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
+    if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
+      commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
+      hud.toast('라멘 로우에 새 메뉴가 나왔대요!', 4200, { chips: [{ icon: itemSvg('pizzabun'), text: '피자호빵' }] });
+    }
     // 왕버섯: 이야기가 바위산 깊은 곳에 이르면 그 자리에 있다. 싸울 차례(boss)가 되기 전에는 잠들어 있다
     const story = state.quests && state.quests.story, sStep = stepOf(state, 'story');
     const bossTime = story && !story.done && story.step >= QUESTS.story.steps.findIndex((s) => s.type === 'visit') && !(state.story && state.story.bossDown);
@@ -1905,7 +1935,13 @@ function boot() {
   // ---------- 사이드스토리 '우사기의 집'(stories/usagiclub.js): 토끼굴 둘 · 클럽 장면 · 박자 맞추기 ----------
   const club = createClub(), rhythm = createRhythm(ui), burrows = createBurrows(scene, village);
   /** 그 친구를 잠자리에(집 안으로): 다음 날 아침 늘 그렇듯 자기 집에서 나온다. */
-  const putToBed = (kind) => { const n = npcs.byKind(kind); if (!n) return; npcs.goIn(n); awayInfo[kind] = { why: 'sleep', until: 0 }; setDoing(kind, 'moon', '자는 중'); };
+  const putToBed = (kind) => {
+    const n = npcs.byKind(kind);
+    if (!n || !state) return;
+    npcs.goIn(n);
+    awayInfo[kind] = { why: 'sleep', until: 0, ...(hourOf(state.clock) >= 18 ? { day: state.clock.day } : {}) }; // 저녁이면 다음 날 아침에
+    setDoing(kind, 'moon', '자는 중');
+  };
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
@@ -2217,7 +2253,7 @@ function boot() {
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
       if (n.away) {
         const a = awayInfo[kind] || { why: 'sleep', until: 0 };
-        const wake = !isSleepHour(hour) && (a.why === 'sleep' ? hour >= wakeHourOf(kind) : lifeClock >= a.until);
+        const wake = !isSleepHour(hour) && (a.why === 'sleep' ? hour >= wakeHourOf(kind) && !(a.day != null && day <= a.day) : lifeClock >= a.until); // 저녁에 든 잠은 날이 바뀐 뒤에
         if (wake && !(visit && visit.kind === kind)) {
           const d = homeDoor(kind);
           npcs.comeOut(n, d.x, d.z + 0.6);

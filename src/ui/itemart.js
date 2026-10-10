@@ -44,6 +44,13 @@ const EXTRA = {
   starshard: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="15" ry="4" fill="#e6d8b8"/>
     <path d="M32 9l6.5 13.5 15 2-11 10.5 3 15-13.5-7.5-13.5 7.5 3-15-11-10.5 15-2z" fill="#ffe23a" ${S}/>
     <path d="M50 10v7M46.5 13.5h7" stroke="#f6c94a" stroke-width="2.4" stroke-linecap="round"/><circle cx="27" cy="29" r="2.4" fill="#fff8d0"/></svg>`,
+  // 피자호빵: 노릇한 호빵 사이로 빨간 토마토 소스 · 치즈 · 피망, 김이 모락모락
+  pizzabun: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="17" ry="4" fill="#e6d8b8"/>
+    <path d="M24 13q2-3 0-6M32 13q2-3 0-6M40 13q2-3 0-6" fill="none" stroke="#d9cbb6" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M10 39q0-21 22-21t22 21q0 12-22 12T10 39z" fill="#fbd3a0" ${S}/>
+    <path d="M24 20q8 4 16 0" fill="none" stroke="#e8a35a" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M14 40q18 7 36 0" fill="none" stroke="#e8573f" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="24" cy="44" r="2.4" fill="#f2c43d"/><circle cx="40" cy="44" r="2" fill="#8fbf5a"/><ellipse cx="22" cy="29" rx="4" ry="2.6" fill="#fff" opacity=".55"/></svg>`,
   // 우사기 주먹밥: 커다란 세모 주먹밥 + 김 띠
   riceball: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
     <path d="M32 9q6 0 14 15t8 20q0 8-10 9H20q-10-1-10-9t8-20 14-15z" fill="#fffdf6" ${S}/>

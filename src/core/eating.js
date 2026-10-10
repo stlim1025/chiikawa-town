@@ -20,6 +20,7 @@ export const EAT_STYLE = Object.freeze({
   berry: style('nibble', 'f-berry'),
   edamame: style('nibble', 'f-edamame'),
   jellybake: style('nibble', 'f-jelly'),
+  pizzabun: style('nibble', 'f-pizzabun'),
   fruitbasket: style('nibble', 'f-apple'),
   cookies: style('nibble', 'f-cookie'),
   candy: style('nibble', 'f-candy')

@@ -39,7 +39,8 @@ import { VILLAGERS, villagerOf } from './villagers.js';
 export const QUEST_ITEMS = {
   riceball: { name: '우사기 주먹밥', kind: 'food', note: '소풍 돗자리 위에서 받은 커다란 주먹밥. 먹으면 기운이 20 찬다.', eat: 20 },
   jellybake: { name: '젤리 구이', kind: 'food', note: '쿠리만쥬가 구운 겉바삭 속쫀득 안주. 먹으면 기운이 30 찬다.', eat: 30 },
-  bottlebeer: { name: '병맥주', kind: 'food', note: '쿠리만쥬가 챙겨 준 시원한 병맥주. 마시면 기운이 25 찬다.', eat: 25 }
+  bottlebeer: { name: '병맥주', kind: 'food', note: '쿠리만쥬가 챙겨 준 시원한 병맥주. 마시면 기운이 25 찬다.', eat: 25 },
+  pizzabun: { name: '피자호빵', kind: 'food', note: '라멘 로우의 새 메뉴. 반으로 가르면 치즈가 쭈욱 늘어나는 피자 맛 호빵. 먹으면 기운이 30 찬다.', eat: 30 }
 };
 registerItems(QUEST_ITEMS);
 
@@ -154,6 +155,16 @@ export const QUESTS = {
     }],
     reward: { bond: 3, friends: { usagi: 3, chiikawa: 2 }, furniture: 'djbooth' }
   },
+  pizzaBun: {
+    title: '우사기의 피자호빵', giver: 'usagi', side: true, needStory: 'pizzaNews', sameDay: true, hours: [9, 20], needHearts: 1, ask: '우라?',
+    offer: ['(라멘 로우 쪽을 가리키며 킁킁…)', '우라…? (침을 꿀꺽)', '(새로 나온 피자호빵이 몹시 궁금한 것 같다…!)'],
+    steps: [{
+      type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사서 우사기에게 (라멘 로우 · 60원)',
+      say: ['(우사기가 피자호빵을 반으로 갈랐다… 치즈가 쭈욱~)', '(한 입 베어 물더니…)', '……', '(그대로 굳어 버렸다…?)', '…우…우라…(눈물이 주르륵)',
+        { who: 'hachiware', text: '우사기가… 울어?! 그렇게 맛있어?!' }, { who: 'chiikawa', text: '…(꿀꺽)' }, '(너무 맛있어서 우는 것 같다…!)', '야하~!! (반쪽을 내밀며 같이 먹자고 한다)']
+    }],
+    reward: { bond: 3, friends: { chiikawa: 1, hachiware: 1 }, items: { pizzabun: 1 } }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
@@ -222,6 +233,12 @@ export const isActive = (state, id) => !!(questState(state, id) && !questState(s
 export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
 /** 그 단계를 누구에게 알리는지. */
 export const reportTo = (id, step) => step.to || QUESTS[id].giver;
+/** '우사기의 피자호빵' 아침 소식(라멘 로우 새 메뉴)을 띄울 때인지: 셋째 날부터 아침(8 ~ 12시), 우사기와 조금 친하고 다른 이야기를 하는 중이 아닐 때 한 번. */
+export function pizzaNewsDue(state) {
+  if (!state.clock || state.tutorial !== 'done' || (state.story || {}).pizzaNews || state.clock.day < 3) return false;
+  const h = hourOf(state.clock);
+  return h >= 8 && h < 12 && !sideBusy(state) && hearts(friendOf(state, 'usagi')) >= 1;
+}
 /** 사이드스토리를 지금 새로 열 수 없는지: 하나를 하는 중이거나, 마지막으로 끝낸 지 SIDE_GAP 일이 안 됐다. */
 export function sideBusy(state) {
   const ids = Object.keys(QUESTS).filter(isStorySide);
@@ -311,7 +328,7 @@ function baseOffer(state, id) {
   if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
   if (Q.after && !isDone(state, Q.after)) return false;
-  if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && state.clock.day <= d)) return false; }
+  if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
   if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;
   if (isStorySide(id) && sideBusy(state)) return false;
   return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
@@ -419,6 +436,15 @@ export function completeStep(state, id, day) {
 export function pickTrack(state) {
   if (state.questTrack && isActive(state, state.questTrack)) return state.questTrack;
   return QUEST_ORDER.find((id) => isActive(state, id)) || null;
+}
+/** 장면 단계(scene)에 멈춘 퀘스트들: 장면은 저장되지 않으니, 장면이 안 돌고 있는데 이 단계면(장면 도중 새로고침) 그만둔 것으로 본다. */
+export const staleScenes = (state) => activeQuests(state).filter((id) => { const st = stepOf(state, id); return !!st && st.type === 'scene'; });
+/** 퀘스트를 없던 일로(다시 부탁받을 수 있게). */
+export function dropQuest(state, id) {
+  const qs = { ...questsOf(state) };
+  delete qs[id];
+  const s = { ...state, quests: qs };
+  return { ...s, questTrack: s.questTrack === id ? pickTrack({ ...s, questTrack: null }) : s.questTrack };
 }
 /** 진행 중인 퀘스트 목록(이야기가 먼저). */
 export const activeQuests = (state) => QUEST_ORDER.filter((id) => isActive(state, id));

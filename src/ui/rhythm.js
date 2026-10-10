@@ -103,5 +103,10 @@ export function createRhythm(ui) {
     stop() { run = null; root.hidden = true; }
   };
   lane.addEventListener('pointerdown', (e) => { e.preventDefault(); api.press(); });
+  window.addEventListener('keydown', (e) => {
+    if (!run || e.repeat || !(e.code === 'Space' || e.code === 'Enter' || e.key === ' ')) return;
+    e.preventDefault();
+    api.press();
+  });
   return api;
 }
