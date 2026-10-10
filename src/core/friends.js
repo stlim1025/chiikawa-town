@@ -5,6 +5,7 @@ import { VILLAGERS, villagerOf, villagerSpend, payVillager } from './villagers.j
  * 마을 친구들: 이름표(대화 상자의 이름과 색), 같이 놀 수 있는지(play), 많이 친해지면 주는 선물 가구(gift).
  * 친밀도는 state.friends[kind] = { pts, talk: 마지막으로 이야기한 날, play: 마지막으로 논 날, gift: 선물을 줬는지 }.
  * 이야기는 하루에 한 번 +1, 놀기는 하루에 한 번 +2. 3점마다 하트 하나(최대 5개), 하트 3개가 되면 선물.
+ * 너무 빨리 친해지지 않게, 이런 일상 친밀도는 한 친구와 하루에 DAY_CAP 점까지만 오른다(capDay · capPts 에 그날 쌓은 점수).
  */
 export const FRIENDS = {
   chiikawa: { name: '치이카와', tag: '#ffd6e2', ink: '#8a3b52', play: true, gift: 'cushion' },
@@ -84,6 +85,10 @@ export const MAX_HEARTS = 5;
 export const GIFT_HEARTS = 3;
 const GAIN = { talk: 1, play: 2, drink: 2, home: 2, hunt: 2, watch: 1 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …), hunt: 같이 토벌해서 몬스터를 잡았다, watch: 하치와레 공연을 끝까지 들었다
 
+/** 한 친구와 하루에 쌓을 수 있는 일상 친밀도(이야기 · 놀기 · 건배 · 공연 · 집 놀이 · 같이 토벌 · 일상 부탁을 다 합쳐). */
+export const DAY_CAP = 2;
+const todayPts = (f, day) => (f.capDay === day ? f.capPts || 0 : 0);
+
 /** 그 친구와의 친밀도(처음 보면 0). */
 export function friendOf(state, kind) {
   return (state.friends && state.friends[kind]) || { pts: 0, talk: 0, play: 0, gift: false };
@@ -102,7 +107,16 @@ export function hearts(f) {
 export function befriend(state, kind, action, day) {
   const f = friendOf(state, kind), field = GAIN[action] ? action : 'talk';
   if (f[field] === day) return { state, gained: 0, hearts: hearts(f), up: false, gift: null };
-  const next = { ...f, pts: f.pts + GAIN[field], [field]: day };
+  return gain(state, kind, { ...f, [field]: day }, GAIN[field], day);
+}
+/** 일상 부탁을 들어줬을 때의 친밀도: befriend 와 같이 그날 상한(DAY_CAP) 안에서만. → befriend 와 같은 모양 */
+export function befriendBy(state, kind, pts, day) {
+  return gain(state, kind, friendOf(state, kind), pts, day);
+}
+/** 그날 상한 안에서 pts 만큼 올리고, 하트가 GIFT_HEARTS 개가 되면 선물 가구를 집에 넣는다. */
+function gain(state, kind, f, pts, day) {
+  const before = friendOf(state, kind), got = Math.max(0, Math.min(pts, DAY_CAP - todayPts(f, day)));
+  const next = { ...f, pts: f.pts + got, capDay: day, capPts: todayPts(f, day) + got };
   let s = state, gift = null;
   const giftId = FRIENDS[kind] && FRIENDS[kind].gift;
   if (giftId && !next.gift && hearts(next) >= GIFT_HEARTS) {
@@ -112,7 +126,7 @@ export function befriend(state, kind, action, day) {
     s = { ...s, home: { ...home, owned: { ...home.owned, [giftId]: (home.owned[giftId] || 0) + 1 } } };
   }
   s = { ...s, friends: { ...(state.friends || {}), [kind]: next } };
-  return { state: s, gained: GAIN[field], hearts: hearts(next), up: hearts(next) > hearts(f), gift };
+  return { state: s, gained: got, hearts: hearts(next), up: hearts(next) > hearts(before), gift };
 }
 
 const BEATS = { rock: 'scissors', scissors: 'paper', paper: 'rock' };
@@ -168,5 +182,5 @@ export function isValidFriends(fr) {
   if (!fr || typeof fr !== 'object' || Array.isArray(fr)) return false;
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   return Object.entries(fr).every(([kind, f]) => FRIENDS[kind] && f && num(f.pts) && f.pts >= 0 && num(f.talk) && num(f.play) && typeof f.gift === 'boolean'
-    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt', 'watch', 'giftDay'].every((k) => f[k] === undefined || num(f[k])));
+    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt', 'watch', 'giftDay', 'capDay', 'capPts'].every((k) => f[k] === undefined || num(f[k])));
 }

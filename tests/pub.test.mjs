@@ -28,7 +28,8 @@ test('drink friendship: +2 once a day, separate from play', () => {
   assert.equal(F.friendOf(s, 'kurimanju').drink, 3);
   assert.equal(F.befriend(s, 'kurimanju', 'drink', 3).gained, 0, 'once per day');
   r = F.befriend(s, 'kurimanju', 'play', 3);
-  assert.equal(r.gained, 2, 'play is its own slot'); s = r.state;
+  assert.equal(r.gained, 0, '같은 날에는 하루 상한(2점)에 걸린다'); s = r.state;
+  assert.equal(F.befriend(s, 'kurimanju', 'play', 4).gained, 2, '다음 날 놀기는 다시 오른다');
   assert.equal(F.befriend(s, 'kurimanju', 'drink', 4).gained, 2);
   assert.ok(F.isValidFriends(s.friends));
   assert.equal(F.isValidFriends({ kurimanju: { pts: 1, talk: 0, play: 0, gift: false, drink: 'x' } }), false);

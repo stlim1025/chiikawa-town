@@ -1,4 +1,4 @@
-import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from './friends.js';
+import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS, befriendBy } from './friends.js';
 import { homeOf, FURNITURE } from './home.js';
 import { hasLicense } from './licenses.js';
 import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.js';
@@ -317,7 +317,12 @@ export function giveReward(state, id, day) {
   const add = (part) => { parts.push(part); got.push(part.long || part.text); };
   let s = state, up = false;
   if (R.money) { s = { ...s, money: s.money + R.money }; add({ kind: 'money', n: R.money, text: `${R.money.toLocaleString('ko-KR')}원` }); }
-  if (R.bond) { const b = bond(s, Q.giver, R.bond); s = b.state; up = b.up; if (b.gift) gifts.push(b.gift); add({ kind: 'bond', id: Q.giver, n: R.bond, text: `${FRIENDS[Q.giver].name} +${R.bond}`, long: `${FRIENDS[Q.giver].name} 친밀도 +${R.bond}` }); }
+  if (R.bond) {
+    // 일상 부탁은 그날 친밀도 상한 안에서만(이미 많이 친해진 날엔 안 오른다), 한 번만 하는 부탁은 그대로
+    const b = Q.daily ? befriendBy(s, Q.giver, R.bond, day) : bond(s, Q.giver, R.bond), n = Q.daily ? b.gained : R.bond;
+    s = b.state; up = b.up; if (b.gift) gifts.push(b.gift);
+    if (n > 0) add({ kind: 'bond', id: Q.giver, n, text: `${FRIENDS[Q.giver].name} +${n}`, long: `${FRIENDS[Q.giver].name} 친밀도 +${n}` });
+  }
   if (R.village) {
     for (const k of ['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko', 'shisa', 'kani']) { const b = bond(s, k, R.village); s = b.state; if (b.gift) gifts.push(b.gift); }
     add({ kind: 'village', n: R.village, text: `마을 친구 모두 +${R.village}`, long: '마을 친구들 모두와 친밀도 +' + R.village });

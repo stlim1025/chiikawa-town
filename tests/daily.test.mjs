@@ -107,3 +107,25 @@ test('같이 한 기록 저장 모양 검사', () => {
   assert.equal(isValidActs({ weed: 'x' }), false);
   assert.equal(isValidActs([]), false);
 });
+
+test('친밀도는 한 친구와 하루에 2점까지만 오른다(이야기 · 놀기 · 공연 · 일상 부탁 다 합쳐)', async () => {
+  const F = await import('../src/core/friends.js');
+  assert.equal(F.DAY_CAP, 2);
+  let s = fresh();
+  let r = F.befriend(s, 'hachiware', 'talk', 5); assert.equal(r.gained, 1); s = r.state;
+  r = F.befriend(s, 'hachiware', 'watch', 5); assert.equal(r.gained, 1, '공연도 상한 안에서'); s = r.state;
+  r = F.befriend(s, 'hachiware', 'play', 5); assert.equal(r.gained, 0, '이미 2점'); s = r.state;
+  assert.equal(F.friendOf(s, 'hachiware').pts, 2);
+  r = F.befriend(s, 'chiikawa', 'play', 5); assert.equal(r.gained, 2, '다른 친구는 따로'); s = r.state;
+  r = F.befriend(s, 'hachiware', 'play', 6); assert.equal(r.gained, 2, '다음 날은 다시'); s = r.state;
+  assert.ok(F.isValidFriends(s.friends));
+  // 일상 부탁 보상도 그날 상한 안에서만(이미 2점 쌓았으면 친밀도는 안 오른다)
+  let q = startQuest(r.state, 'weedPal');
+  for (let i = 0; i < QUESTS.weedPal.steps[0].n; i++) q = logAct(q, 'weed', ['hachiware']);
+  const before = F.friendOf(q, 'hachiware').pts, done = completeStep(q, 'weedPal', 6);
+  assert.equal(F.friendOf(done.state, 'hachiware').pts, before, '이미 그날 2점');
+  // 한 번만 하는 부탁(이야기 · 고충) 보상은 상한과 상관없이 그대로
+  const one = { ...q, quests: { pillow: { step: 0, base: 0 } }, bag: { items: { fluffdown: 3 }, clean: {} } };
+  const p = completeStep(one, 'pillow', 6);
+  assert.equal(F.friendOf(p.state, 'chiikawa').pts, F.friendOf(one, 'chiikawa').pts + QUESTS.pillow.reward.bond);
+});
