@@ -16,7 +16,8 @@ const TEMPO = 100;
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
 /** 친구마다 말소리 높이(Hz). */
-const VOICE = { chiikawa: 820, hachiware: 700, usagi: 980, momonga: 900, kurimanju: 420, rakko: 520, shisa: 760, kani: 640, pochette: 600, labor: 330, ramen: 380, captain: 300 };
+const VOICE = { chiikawa: 820, hachiware: 700, usagi: 980, momonga: 900, kurimanju: 420, rakko: 520, shisa: 760, kani: 640, pochette: 600, labor: 330, ramen: 380, captain: 300,
+  hitoha: 860, futaba: 900, islander: 880, jiro: 280, siren: 560 }; // 수상한 섬 사람들
 
 /**
  * 소리 장치를 만든다. storage 는 localStorage 처럼 getItem/setItem 이 있는 객체(막혀 있어도 동작한다).
@@ -170,7 +171,16 @@ export function createSound(storage) {
     cheer: () => { noise({ dur: 0.9, vol: 0.12, freq: 1700, sweepTo: 1100, q: 0.6 }); [660, 880, 990].forEach((f, i) => tone({ freq: f, type: 'triangle', start: 0.05 + i * 0.09, dur: 0.18, vol: 0.05 })); },
     thump: (v = 0.5) => tone({ freq: 95, slideTo: 42, type: 'sine', dur: 0.22, vol: 0.05 + 0.25 * v }),
     // 아침: 해가 뜨며 올라가는 소리
-    morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 }))
+    morning: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', start: i * 0.12, dur: 0.4, vol: 0.11 })),
+    // 수상한 섬: 세이렌의 노래(살짝 어긋난 두 음이 떨리는 높은 선율) · 물보라 · 파도(쏴아) · 인어 합창 맞힘(딩) · 맥주 캔 두드림(깡)
+    siren: () => [79, 84, 83, 79, 76, 79, 74, 76].forEach((n, i) => {
+      tone({ freq: midi(n), type: 'sine', start: i * 0.32, dur: 0.5, vol: 0.07, attack: 0.08 });
+      tone({ freq: midi(n) * 1.006, type: 'sine', start: i * 0.32 + 0.02, dur: 0.48, vol: 0.04, attack: 0.1 });
+    }),
+    splash: () => { noise({ dur: 0.5, vol: 0.2, freq: 900, sweepTo: 250, q: 0.6, type: 'lowpass' }); noise({ start: 0.05, dur: 0.35, vol: 0.08, freq: 3000, q: 0.8 }); },
+    wave: () => [0, 0.35, 0.7].forEach((st, i) => noise({ start: st, dur: 0.9 - i * 0.15, vol: 0.06, freq: 700 - i * 120, sweepTo: 300, q: 0.5, type: 'lowpass' })),
+    chime: () => { tone({ freq: 1568, type: 'sine', dur: 0.35, vol: 0.08 }); tone({ freq: 2349, type: 'sine', start: 0.02, dur: 0.25, vol: 0.04 }); },
+    can: () => { tone({ freq: 1900, slideTo: 1500, type: 'square', dur: 0.05, vol: 0.05 }); noise({ dur: 0.06, vol: 0.08, freq: 4200, q: 3 }); }
   };
 
   // ---------- 배경음악 ----------

@@ -38,6 +38,14 @@ export const LAKE = { x: -48, z: 60, rx: 15, rz: 10 };
 /** 이보다 남쪽은 넓은 호수(월드 남쪽 끝). */
 export const SOUTH_SHORE = 72;
 /** 남쪽 바다가 보이는 절벽(잠옷 밤나들이에서 별 보는 곳): 해안 앞 바다를 아래로 낮춘 만(cove: x0 ~ x1, 해안 ~ z1, 수면 y)과 가장자리 통나무(log). */
+/** 남쪽 바닷가 선착장(사이드스토리 '수상한 섬 합숙'의 오리 배가 서는 곳): 뭍 끝 x 에서 바다로 len 만큼 뻗은 나무 판. */
+export const PIER = { x: 8, len: 8, boat: { x: 11.3, z: SOUTH_SHORE + 6.5 } };
+/** 수상한 섬(사이드스토리 '수상한 섬 합숙')의 장소들: 마을과 따로 그리는 섬 장면(world/island.js)의 좌표. 대본(stories/islandscript.js)도 이 자리를 기준으로 쓴다. */
+export const ISLE = {
+  voyage: { x: 0, z: 75 }, beach: { x: 0, z: 9 }, stalls: { x: 0, z: 3 }, bungalow: { x: 15, z: 6.6 }, sign: { x: -10.3, z: -1.6 },
+  fire: { x: -8.5, z: 11 }, jetty: { x: 6, z: 17 }, seacave: { x: -20, z: -7 }, grotto: { x: 90, z: 0 }, hut: { x: 3, z: -12 },
+  battle: { x: -7, z: 13.2 }, memory: { x: -70, z: 40 }, far: { x: -40, z: -70 }
+};
 export const CLIFF = { cove: { x0: 19, x1: 33, z1: 82, y: -3 }, log: { x: 26, z: 70.4, r: 0.3, len: 3.6 } };
 /** 북쪽 바위산의 하치와레 동굴: 바위 덩어리 가운데, 크기, 입구 앞. */
 export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };

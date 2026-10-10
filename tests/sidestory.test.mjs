@@ -192,3 +192,69 @@ test('잠옷 밤나들이: 포셰트 갑옷 씨에게 이야기 표시(여섯째
   assert.ok(r.finished);
   for (const k of ['chiikawa', 'hachiware']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
 });
+
+test('수상한 섬 합숙: 우사기(하트 2)가 여덟째 날부터 오후에 전단지 → 다음 날 아침 선착장 → 섬 장면 → 시마지로의 카레 · 조개국', async () => {
+  const I = await import(G + 'inventory.js');
+  const s = withHearts(fresh(8, 14), 'usagi', 2);
+  assert.ok(Q.canOffer(s, 'islandCamp'));
+  assert.ok(!Q.canOffer(withHearts(fresh(7, 14), 'usagi', 2), 'islandCamp'), '여덟째 날부터');
+  assert.ok(!Q.canOffer(withHearts(fresh(8, 14), 'usagi', 1), 'islandCamp'), '우사기와 하트 2개부터');
+  assert.ok(!Q.canOffer({ ...s, clock: at(8, 9) }, 'islandCamp'), '부탁은 오후에(떠나는 건 다음 날 아침)');
+  const step = Q.QUESTS.islandCamp.steps[0];
+  assert.equal(step.place, 'pier');
+  assert.equal(step.scene, 'islandCamp');
+  assert.ok(Q.PLACES.pier);
+  assert.ok(Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 8) && !Q.arrived(step, { x: 0, z: 0 }, 0.5, 0.5, 14), '아침에만 떠난다');
+  const r = Q.completeStep(Q.startQuest(s, 'islandCamp'), 'islandCamp', 9);
+  assert.ok(r.finished);
+  assert.equal(r.state.story.islandDone, 9, '섬 합숙을 다녀온 날');
+  assert.equal(I.countOf(r.state, 'katsucurry'), 2);
+  assert.equal(I.countOf(r.state, 'shellsoup'), 2);
+  assert.ok(I.itemInfo('katsucurry').eat > 0 && I.itemInfo('shellsoup').eat > 0, '먹을 수 있다');
+  for (const k of ['chiikawa', 'hachiware', 'usagi', 'rakko']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
+});
+
+test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, 말하는 사람 · 연출 · 놀이 · 사람 · 하늘이 모두 알려진 것', async () => {
+  const { BEATS, GATHER, CHORUS, BATTLE } = await import('../src/stories/islandscript.js');
+  const ids = BEATS.map((b) => b.id);
+  assert.equal(new Set(ids).size, ids.length, '장면 이름은 하나씩');
+  let last = -1;
+  for (const id of ['voyage', 'welcome', 'stalls', 'bungalow', 'sign', 'campfire', 'row', 'grotto', 'poster', 'attack', 'search', 'cave2', 'alone', 'dive', 'rescue', 'plan', 'battle', 'memory', 'farewell', 'depart', 'far']) {
+    const i = ids.indexOf(id);
+    assert.ok(i > last, '원작 순서: ' + id);
+    last = i;
+  }
+  const SPEAK = new Set(['c', 'h', 'u', 'r', 'm', 'k', 'q', 's', 'j', 't', 'f', 'i', 'z', 'me']);
+  const DO = new Set(['pose', 'cast', 'hide', 'siren', 'sirenMouth', 'mer', 'tendrils', 'bind', 'unbind', 'boat', 'cam', 'fire', 'sign', 'lid', 'snd', 'shake', 'splash', 'notes', 'bubbles', 'lei', 'scale', 'wait', 'ask', 'game', 'branch', 'sleep']);
+  const KINDS = new Set(['me', 'chiikawa', 'hachiware', 'usagi', 'rakko', 'momonga', 'kani', 'kurimanju', 'shisa', 'hitoha', 'futaba', 'isl1', 'isl2', 'isl3', 'isl4', 'jiro']);
+  const SKIES = new Set(['day', 'sunset', 'dawn', 'night', 'cave', 'memory', 'under']);
+  const SOUNDS = new Set(['song', 'siren', 'splash', 'wave', 'thud', 'growl', 'hurt', 'pass', 'faint', 'hit', 'chime', 'can']);
+  const games = [];
+  let sleeps = 0;
+  const kinds = (k) => (Array.isArray(k) ? k : [k]).forEach((x) => assert.ok(KINDS.has(x), x));
+  const castOk = (cast, boats, id) => Object.entries(cast).forEach(([k, e]) => { assert.ok(KINDS.has(k), id + ': ' + k); if (e[5]) assert.ok(boats && boats[e[5]], id + ': ' + k + ' 탄 배'); });
+  const walk = (items, b, played) => items.forEach((L) => {
+    if (typeof L === 'string') return;
+    if (Array.isArray(L)) { assert.ok(SPEAK.has(L[0]) && L[1], b.id + ': ' + L[0]); return; }
+    assert.ok(DO.has(L.do), b.id + ': ' + L.do);
+    if (L.do === 'game') { played.add(L.game); games.push(L.game); }
+    if (L.do === 'branch') { assert.ok(played.has(L.on), b.id + ': 놀이 뒤에 갈림'); walk(L.good, b, played); walk(L.bad, b, played); }
+    if (L.do === 'ask') { assert.equal(L.then.length, L.choices.length); L.then.forEach((t) => walk(t, b, played)); }
+    if (L.do === 'cast') castOk(L.cast, b.boats, b.id);
+    if (['pose', 'hide', 'bind', 'lei', 'notes'].includes(L.do)) kinds(L.k);
+    if (L.do === 'snd') assert.ok(SOUNDS.has(L.name), L.name);
+    if (L.do === 'sleep') sleeps++;
+  });
+  for (const b of BEATS) {
+    assert.ok(SKIES.has(b.sky), b.id + ' 하늘');
+    assert.ok(Number.isFinite(b.at.x) && Number.isFinite(b.at.z), b.id + ' 자리');
+    castOk(b.cast || {}, b.boats, b.id);
+    (b.binds || []).forEach((k) => assert.ok(KINDS.has(k)));
+    walk(b.lines, b, new Set());
+  }
+  walk(GATHER, { id: 'gather' }, new Set());
+  assert.deepEqual(games, ['row', 'chorus', 'swim', 'battle', 'throw'], '노 젓기 → 인어 합창 → 헤엄 → 박자 → 카레 던지기');
+  assert.equal(sleeps, 1, '마지막 밤에 한 번 잔다');
+  assert.ok(BEATS[ids.indexOf('farewell')].lines.at(-1).do === 'sleep', '모닥불 뒤에 잠');
+  for (const ch of [CHORUS, BATTLE]) { assert.ok(ch[0] >= 4, '처음 4박은 준비'); for (let i = 1; i < ch.length; i++) assert.ok(ch[i] > ch[i - 1]); }
+});

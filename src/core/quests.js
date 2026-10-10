@@ -40,7 +40,9 @@ export const QUEST_ITEMS = {
   riceball: { name: '우사기 주먹밥', kind: 'food', note: '소풍 돗자리 위에서 받은 커다란 주먹밥. 먹으면 기운이 20 찬다.', eat: 20 },
   jellybake: { name: '젤리 구이', kind: 'food', note: '쿠리만쥬가 구운 겉바삭 속쫀득 안주. 먹으면 기운이 30 찬다.', eat: 30 },
   bottlebeer: { name: '병맥주', kind: 'food', note: '쿠리만쥬가 챙겨 준 시원한 병맥주. 마시면 기운이 25 찬다.', eat: 25 },
-  pizzabun: { name: '피자호빵', kind: 'food', note: '라멘 로우의 새 메뉴. 반으로 가르면 치즈가 쭈욱 늘어나는 피자 맛 호빵. 먹으면 기운이 30 찬다.', eat: 30 }
+  pizzabun: { name: '피자호빵', kind: 'food', note: '라멘 로우의 새 메뉴. 반으로 가르면 치즈가 쭈욱 늘어나는 피자 맛 호빵. 먹으면 기운이 30 찬다.', eat: 30 },
+  katsucurry: { name: '시마지로 카츠카레', kind: 'food', note: '섬 정글의 시마지로가 싸 준 바삭한 카츠카레. 살짝 맵다! 먹으면 기운이 45 찬다.', eat: 45 },
+  shellsoup: { name: '섬 조개국', kind: 'food', note: '시마지로의 레시피로 끓인 뜨끈한 조개국. 먹으면 기운이 30 찬다.', eat: 30 }
 };
 registerItems(QUEST_ITEMS);
 
@@ -52,7 +54,8 @@ export const PLACES = {
   bridge: { name: '강가 다리', r: 3.4 },
   plaza: { name: '광장', r: 4.5 },
   exam: { name: '검정소', r: 3 },
-  home: { name: '내 집 앞', r: 2.6 }
+  home: { name: '내 집 앞', r: 2.6 },
+  pier: { name: '선착장', r: 3 }
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -205,6 +208,24 @@ export const QUESTS = {
       say: ['헤헤… 밖에서 자 버렸네~', '잠옷 입고 밤에 노는 거 진짜 재밌었다!', '또 하자, {name}! 다음엔 간식도 챙겨 오자~']
     }],
     reward: { bond: 2, friends: { chiikawa: 3, hachiware: 3 } }
+  },
+  islandCamp: {
+    title: '수상한 섬 합숙', giver: 'usagi', side: true, minDay: 8, hours: [12, 20], needHearts: 2, ask: '우라?',
+    offer: [
+      '우라!', '(우사기가 구깃구깃한 전단지를 내밀었다…)',
+      '『특별한 섬으로 초대합니다! 간단한 토벌로 보수가 무려 100배!! 섬 한정 라멘 & 디저트도 공짜!』',
+      { who: 'hachiware', text: '우와~ 섬 합숙이래! 보수 100배에 공짜 라멘이라니~!' },
+      { who: 'chiikawa', text: '…(전단지를 보며 조금 불안한 얼굴)…' },
+      { who: 'rakko', text: '…너무 좋은 얘기는 수상한 법이다. 나도 같이 가지.' },
+      '야하! (내일 아침 남쪽 바닷가 선착장으로 오라는 듯 손짓한다)'
+    ],
+    steps: [{
+      type: 'visit', place: 'pier', hours: [6, 11], scene: 'islandCamp', speaker: 'hachiware',
+      goal: '아침에 남쪽 바닷가 선착장으로 (아침 6시 ~ 11시) · 섬 합숙 출발!',
+      say: ['{name}~ 우리 다 새카맣게 탔다~!', '(셋이서 서로 등에 벗겨진 껍질을 뜯어 준다… 뿌직, 뿌직)', '보수 100배는… 결국 음식이었지만~',
+        '그래도 엄청난 여름이었다! 시마지로 씨 카레, 집에서도 먹자~', { who: 'chiikawa', text: '…(바다 쪽을 한 번 돌아본다)' }, '(…어디선가, 노랫소리 같은 웃음소리가 들린 것 같았다)']
+    }],
+    reward: { bond: 3, friends: { chiikawa: 3, hachiware: 3, usagi: 3, rakko: 2, momonga: 1 }, items: { katsucurry: 2, shellsoup: 2 }, story: 'islandDone' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

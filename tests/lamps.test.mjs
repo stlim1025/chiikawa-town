@@ -66,7 +66,7 @@ function distToSeg(p, [ax, az], [bx, bz]) {
 test('간판 명찰: 마을 건물 · 문 간판마다 동그라미 아이콘이 있다', async () => {
   const { hasSignIcon, signHtml } = await import('../src/ui/signart.js');
   const { LOTS } = await import('../src/core/layout.js');
-  const keys = [...LOTS.map((l) => l.label), '치이카와 마을', '바다 절벽', '바위산 가는 길', '숲 가는 길', '들판 가는 길'];
+  const keys = [...LOTS.map((l) => l.label), '치이카와 마을', '바다 절벽', '선착장', '바위산 가는 길', '숲 가는 길', '들판 가는 길'];
   assert.deepEqual(keys.filter((k) => !hasSignIcon(k)), []);
   assert.match(signHtml('빌린 집', '내 집'), /빌린 집/, '글이 바뀌어도 아이콘은 처음 간판 것');
   assert.doesNotMatch(signHtml('<b>'), /<b>/, '글은 그대로 찍지 않는다');

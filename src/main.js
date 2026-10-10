@@ -96,6 +96,10 @@ import { createClub } from './world/club.js';
 import { createBurrows } from './world/burrows.js';
 import { createRhythm } from './ui/rhythm.js';
 import { createUsagiClub } from './stories/usagiclub.js';
+import { createIsland } from './world/island.js';
+import { createPier } from './world/pier.js';
+import { createIslandTrip } from './stories/island.js';
+import { createMinigame } from './ui/minigame.js';
 import { createShisaStory } from './stories/shisa.js';
 import { createHachiPit } from './stories/hachipit.js';
 import { createPajamaStory } from './stories/pajama.js';
@@ -276,7 +280,17 @@ function boot() {
         cam.snap(player.position);
       },
       /** 우사기 클럽 춤만 바로(보상 없음). */
-      club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); }
+      club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); },
+      /** 수상한 섬 합숙: from 이 없으면 부탁을 받은 다음 날 아침 선착장 앞(보상까지), 있으면 그 장면부터 바로(보상 없음). */
+      island(from) {
+        if (islandTrip.active) return;
+        if (from) { islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.islandCamp;
+        commit({ ...startQuest({ ...state, quests: qs }, 'islandCamp'), clock: { day: Math.max(8, state.clock.day), t: (8 - 6) / 24 } });
+        player.setPosition(pier.spot.x - 3, pier.spot.z - 5);
+        cam.snap(player.position);
+      }
     },
     toggleSound: (kind) => sound.toggle(kind),
     getPowerSave: () => perf.powerSave,
@@ -516,6 +530,7 @@ function boot() {
       shisaStory.reset();
       hachiPit.reset();
       pajama.reset();
+      islandTrip.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1002,6 +1017,7 @@ function boot() {
       return;
     }
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
+    if (mode === 'island') return; // 수상한 섬: 놀이 화면(ui/minigame · rhythm)이 자기 버튼 · 스페이스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
@@ -1051,10 +1067,11 @@ function boot() {
   let overlay = false; // 시험 · 알바 창이 열려 있다
   let starShow = null; // 별똥별 소원 연출 중(아래 별똥별 밤 참고)
   let usagiClub = null; // 사이드스토리 '우사기의 집' 연출(stories/usagiclub.js — 아래에서 만든다)
+  let islandTrip = null; // 사이드스토리 '수상한 섬 합숙'(stories/island.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (islandTrip && islandTrip.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -1348,6 +1365,7 @@ function boot() {
       const done = () => finishQuestStep(id, null, lines);
       if (step.scene === 'shisaExam') shisaStory.exam(done);
       else if (step.scene === 'pajamaNight') pajama.play(done);
+      else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
@@ -1422,7 +1440,7 @@ function boot() {
     refreshLook();
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
@@ -1458,7 +1476,7 @@ function boot() {
     if (!questScene && !usagiClub.active) for (const id of staleScenes(state)) commit(dropQuest(state, id)); // 장면 도중 새로고침했으면 없던 일로
     for (const id of activeQuests(state)) {
       const step = stepOf(state, id);
-      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || usagiClub.canPlay(state.clock.day))) {
+      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || (usagiClub.canPlay(state.clock.day) && !islandTrip.active))) {
         if (step.place === 'lair') commit({ ...state, story: { ...(state.story || {}), bossSeen: true } });
         if (step.with) endBuddy(reportTo(id, step));
         questSceneStep(id);
@@ -2085,6 +2103,16 @@ function boot() {
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), putToBed: (k) => putToBed(k), homeDoor: (k) => homeDoor(k),
     myLook: () => myLook(), onAbort: () => unlockAfterScene()
+  });
+  // 사이드스토리 '수상한 섬 합숙'(stories/island.js): 남쪽 선착장 · 섬 장면 · 섬 놀이 화면(연타 · 타이밍)
+  const isle = createIsland(), pier = createPier(scene, village), minigame = createMinigame(ui);
+  islandTrip = createIslandTrip({
+    npcs, village, hud, guide, sound, input, staged, isle, rhythm, minigame, pier, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), me: () => meWho(), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(),
+    // 마지막 밤: 밤 10시로 맞추고 진짜로 잔다(다음 날 아침). 섬에 있는 동안 마을 시계는 멈춰 있다
+    sleepOver: (after) => { const late = (22 - 6) / 24; if (state.clock.t < late) commit({ ...state, clock: { ...state.clock, t: late } }); doSleep('home', after); },
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); delete awayInfo[kind]; setDoing(kind, null, null); }
   });
   let visit = null; // { kind, lodge }
   const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
@@ -3747,7 +3775,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -3823,6 +3851,7 @@ function boot() {
       staged: () => [...staged],
       burrows: () => burrows.spots,
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
+      island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState }),
       pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),
       drawCalls: () => gfx.renderer.info.render.calls,
@@ -3906,6 +3935,16 @@ function boot() {
       hud.placeLabels([], club.camera);
       return;
     }
+    // 수상한 섬(사이드스토리): 섬 장면을 그린다. 섬에 있는 동안 마을 시계 · 친구들은 멈춰 있다(마지막 밤에 진짜로 잔다)
+    if (mode === 'island' && state) {
+      isle.resize(aspect);
+      islandTrip.tick(dt, t);
+      setCelLight(isle.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(isle.scene, isle.camera);
+      hud.placeLabels([], isle.camera);
+      return;
+    }
     if (mode === 'home' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
       newDayCheck();
@@ -3962,6 +4001,7 @@ function boot() {
       shisaStory.update(dt);
       hachiPit.update(dt);
       pajama.update(dt);
+      islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) {
         const before = pulling.pull.power;

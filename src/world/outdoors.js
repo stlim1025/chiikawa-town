@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, riverZ, roadDist, shoreDist } from '../core/layout.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const m4 = (x, y, z, sx, sy, sz, yaw = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
@@ -155,7 +155,7 @@ export function buildOutdoors(ctx) {
   // 물가 나무 몇 그루
   for (let k = 0, made = 0; k < 60 && made < 10; k++) {
     const x = (rand() - 0.5) * 140, z = 42 + rand() * 26;
-    if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5) || Math.hypot(x - CLIFF.log.x, z - CLIFF.log.z) < 9) continue; // 절벽 위는 탁 트이게
+    if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5) || Math.hypot(x - CLIFF.log.x, z - CLIFF.log.z) < 9 || Math.hypot(x - PIER.x, z - SOUTH_SHORE) < 7) continue; // 절벽 위 · 선착장 앞은 탁 트이게
     made++;
     tree(x, z, 1.0 + rand() * 0.3, '#6cc77e', zones.groupAt(x, z));
   }

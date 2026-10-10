@@ -52,6 +52,16 @@ const EXTRA = {
     <path d="M24 20q8 4 16 0" fill="none" stroke="#e8a35a" stroke-width="2.2" stroke-linecap="round"/>
     <path d="M14 40q18 7 36 0" fill="none" stroke="#e8573f" stroke-width="3.4" stroke-linecap="round"/>
     <circle cx="24" cy="44" r="2.4" fill="#f2c43d"/><circle cx="40" cy="44" r="2" fill="#8fbf5a"/><ellipse cx="22" cy="29" rx="4" ry="2.6" fill="#fff" opacity=".55"/></svg>`,
+  // 시마지로 카츠카레: 하얀 접시에 밥 · 카레 · 바삭한 돈가스 조각
+  katsucurry: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="20" ry="4" fill="#e6d8b8"/>
+    <ellipse cx="32" cy="38" rx="25" ry="14" fill="#ffffff" ${S}/><path d="M14 37q4-10 16-9 2 7-3 13-9 3-13-4z" fill="#fbf7ee" ${S}/>
+    <path d="M28 30q12-6 22 2 2 8-8 11-12 2-14-5z" fill="#c9802b" ${S}/><path d="M30 31l14-4 4 8-14 5z" fill="#e7a54b" ${S}/>
+    <path d="M35 30l3 9M41 28l3 9" stroke="#a8743a" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="35" r="1.6" fill="#e8573f"/></svg>`,
+  // 섬 조개국: 국그릇에 조개 둘 · 김
+  shellsoup: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
+    <path d="M24 16q2-3 0-6M32 16q2-3 0-6M40 16q2-3 0-6" fill="none" stroke="#d9cbb6" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M10 30h44q-2 20-22 20T10 30z" fill="#e8573f" ${S}/><ellipse cx="32" cy="30" rx="22" ry="6" fill="#f6e3c4" ${S}/>
+    <path d="M22 31q4-7 9 0zM34 30q4-7 9 0z" fill="#d9c2a6" ${S}/><path d="M18 42q14 5 28 0" fill="none" stroke="#fff" stroke-width="2" opacity=".5"/></svg>`,
   // 우사기 주먹밥: 커다란 세모 주먹밥 + 김 띠
   riceball: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
     <path d="M32 9q6 0 14 15t8 20q0 8-10 9H20q-10-1-10-9t8-20 14-15z" fill="#fffdf6" ${S}/>
