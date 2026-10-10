@@ -53,8 +53,9 @@ export function examStep(exam, result) {
 }
 
 /** 합격: 급수 숫자를 하나 내리고 경험치를 비운다. */
-/** 한 급 올린다. day 를 주면 딴 날로 적어 둔다(자격증 앱 · 자격증 카드의 발급일). */
-export function promote(license, day) {
+/** 한 급 올린다. day · look 을 주면 딴 날과 그때 모습을 적어 둔다(자격증 카드의 발급일 · 사진). */
+export function promote(license, day, look) {
   const next = { grade: Math.max(1, license.grade - 1), xp: 0 };
-  return day === undefined ? next : { ...next, day };
+  if (day === undefined) return next;
+  return look ? { ...next, day, look: { ...look } } : { ...next, day };
 }

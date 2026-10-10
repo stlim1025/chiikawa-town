@@ -88,9 +88,9 @@ export function revoke(state, id) {
   const { [id]: _gone, ...rest } = licensesOf(state);
   return { ...state, licenses: rest };
 }
-/** 합격: 자격증을 준다. */
-export function grant(state, id, day) {
-  return { ...state, licenses: { ...licensesOf(state), [id]: { day } } };
+/** 합격: 자격증을 준다. look 을 주면 그때 모습을 적어 둔다(자격증 사진은 딴 그때 모습 그대로). */
+export function grant(state, id, day, look) {
+  return { ...state, licenses: { ...licensesOf(state), [id]: look ? { day, look: { ...look } } : { day } } };
 }
 
 const NUMBER_PREFIX = { weed: 'W', liquor: 'L', arbeiter: 'A', hunter: 'H' };

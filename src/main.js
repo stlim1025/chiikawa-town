@@ -176,9 +176,9 @@ function boot() {
     dev: {
       money(n) { commit(addMoney(state, n)); sound.play('coin'); hud.toast(`테스트: ${won(n)}을 넣었어요`); },
       stamina() { commit({ ...state, stamina: MAX_STAMINA }); },
-      grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0 }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
+      grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0, day: state.clock.day, look: myLook() }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
       hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); },
-      license(id, on) { commit(on ? grant(state, id, state.clock.day) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); }
+      license(id, on) { commit(on ? grant(state, id, state.clock.day, myLook()) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); }
     },
     toggleSound: (kind) => sound.toggle(kind),
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
@@ -759,7 +759,7 @@ function boot() {
       const exam = examStep(next.exam, result);
       if (exam.done) {
         if (exam.passed) {
-          next = { ...next, exam: null, license: promote(next.license, next.clock.day) };
+          next = { ...next, exam: null, license: promote(next.license, next.clock.day, myLook()) };
           sound.play('pass');
           const unlocked = kindsOfGrade(next.license.grade);
           showLicenseCard('weed', `제초 검정 ${next.license.grade}급 합격!`, next, unlocked.length ? { sub: '이제 이 풀도 뽑을 수 있어요', chips: unlocked.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })) } : null);
@@ -1255,10 +1255,13 @@ function boot() {
    */
   function licenseCardData(id, s = state) {
     const name = s.profile.name;
-    const own = id === 'weed' ? { day: s.license.day || 1 } : licensesOf(s)[id];
+    const own = id === 'weed' ? { day: s.license.day || 1, look: s.license.look } : licensesOf(s)[id];
     const title = id === 'weed' ? `제초 검정 ${s.license.grade}급` : LICENSES[id].name;
-    if (!own) return { id, title, none: true, hint: `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
-    return { id, title, name, photo: playerPortrait(myLook()), fields: [['이름', name], ['발급', cardDate(s, own.day)], ['번호', licenseNumber(name, id, own.day)]] };
+    // 카드에 크게 쓰는 두 줄(원작 '草むしり / 3級' 처럼): 제초는 '풀 뽑기 / N급', 나머지는 자격 이름 / 합격
+    const big = id === 'weed' ? ['풀 뽑기', `${s.license.grade}급`] : [LICENSES[id].name, own ? '합격' : '아직 없어요'];
+    if (!own) return { id, title, big, none: true, hint: `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
+    // 사진은 딴 그때 모습(예전에 딴 자격증은 기본 모습)
+    return { id, title, big, name, photo: playerPortrait(own.look || s.profile.look), fields: [['이름', name], ['발급', cardDate(s, own.day)], ['번호', licenseNumber(name, id, own.day)]] };
   }
   /** 합격하면 진짜 자격증 카드를 받는다(확인을 눌러야 닫힌다). extra: { sub, chips } — 카드 아래 덧붙일 것 */
   function showLicenseCard(id, kicker, s = state, extra = null) {
@@ -1274,7 +1277,7 @@ function boot() {
     // 불합격: 동물의 숲처럼 도장 카드(불합격 · 까닭 · 공부거리)를 확인할 때까지 띄운다
     const fail = (why, tip) => { endOverlay(); hud.notice({ kicker: L.name, stamp: '불합격', tone: 'bad', sub: why, chips: tip ? [{ icon: ICO.book, text: tip }] : null, ok: '다음에 또 올게요' }); };
     const pass = () => {
-      commit(grant(state, id, state.clock.day));
+      commit(grant(state, id, state.clock.day, myLook())); // 사진은 딴 그때 모습으로
       endOverlay();
       happen({ type: 'playerLicense', who: 'me', lic: L.name });
       staffSay('captain', 'pass', 16, player.position);

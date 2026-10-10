@@ -21,3 +21,14 @@ test('제초 승급에 딴 날을 적어 두면 자격증에 발급일로 나온
   assert.deepEqual(promote({ grade: 4, xp: 9 }, 6), { grade: 3, xp: 0, day: 6 });
   assert.deepEqual(promote({ grade: 4, xp: 9 }), { grade: 3, xp: 0 });
 });
+
+test('자격증 사진은 딴 그때 모습으로 남는다: 땄을 때의 모습을 자격증에 적어 둔다', async () => {
+  const { grant } = await import('../src/core/licenses.js');
+  const look = { body: '#ffd6e0', ears: 'bunny', accessory: 'ribbon' };
+  const s = grant({ licenses: {} }, 'hunter', 5, look);
+  assert.deepEqual(s.licenses.hunter, { day: 5, look });
+  look.accessory = 'crown'; // 나중에 갈아입어도
+  assert.equal(s.licenses.hunter.look.accessory, 'ribbon');
+  assert.deepEqual(grant({}, 'liquor', 2).licenses.liquor, { day: 2 }); // 모습 없이 주면 예전처럼
+  assert.deepEqual(promote({ grade: 3, xp: 1 }, 9, { body: '#fff' }), { grade: 2, xp: 0, day: 9, look: { body: '#fff' } });
+});
