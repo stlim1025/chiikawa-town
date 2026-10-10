@@ -1,6 +1,7 @@
 // 효과음과 배경음악. 음원 파일 없이 Web Audio 로 그 자리에서 합성한다(외부 파일을 불러올 수 없는 환경이라).
 // 브라우저는 사용자가 한 번 누르기 전까지 소리를 막으므로, 첫 누름에서 unlock() 을 부른다.
 
+import { speak } from './voices.js';
 const PREFS_KEY = 'chiikawa-town-sound';
 const MUSIC_VOL = 0.28, SFX_VOL = 0.9;
 
@@ -219,6 +220,11 @@ export function createSound(storage) {
     play(name, arg) {
       if (!prefs.sfx || !ensure() || ctx.state !== 'running') return;
       SFX[name]?.(arg);
+    },
+    /** 대사 한 줄의 말소리(audio/voices.js): 치이카와 · 우사기 · 모몽가 · 하치와레는 목소리처럼 합성한 소리, 다른 친구는 톡톡 말소리. */
+    voice(kind, text) {
+      if (!prefs.sfx || !ensure() || ctx.state !== 'running') return;
+      if (!speak({ ctx, bus: sfxBus, noise: noiseBuf }, kind, text)) SFX.talk(kind);
     },
     /** 뽑는 동안 힘에 따라 높아지는 소리. */
     chargeStart() {

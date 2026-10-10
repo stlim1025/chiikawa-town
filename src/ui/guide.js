@@ -5,7 +5,7 @@
  *   줄은 글 한 줄이거나 { text, chips: [{ icon(SVG), text, done? }] }: 글 밑에 물건 · 몬스터 그림 꼬리표를 단다(몇 개 모았는지 등).
  * ask(text, choices, onPick, who): 말 한 줄과 오른쪽 위 선택지 말풍선. 고르면 onPick(번호).
  * onDone · onPick 안에서 다시 say · ask 를 부르면 상자가 닫히지 않고 바로 이어진다.
- * opts.onLine(who): 새 줄이 나올 때마다(말소리용). opts.dock: 할 일 쪽지를 붙일 곳(HUD 왼쪽 위 기둥).
+ * opts.onLine(who, text): 새 줄이 나올 때마다(말소리용 — 글을 보고 그 친구 목소리를 고른다). opts.dock: 할 일 쪽지를 붙일 곳(HUD 왼쪽 위 기둥).
  * opts.onCue(cue): { text, cue } 줄이 나올 때(연출 신호: 피자호빵 클로즈업 · 울기 시작 …).
  */
 const HACHI = { kind: 'hachiware', name: '하치와레', tag: '#a9d4f2', ink: '#2f5577' };
@@ -73,7 +73,7 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
     text.textContent = typeof L === 'string' ? L : L.text;
     setChips(typeof L === 'string' ? [] : L.chips);
     next.setAttribute('aria-label', i === lines.length - 1 ? '알겠어!' : '다음');
-    onLine?.(who);
+    onLine?.(who, text.textContent);
   }
   /** 다음 줄로(마지막 줄이면 닫고 onDone). */
   function advance() {
@@ -149,7 +149,7 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
       next.hidden = true;
       text.textContent = line;
       setChips();
-      onLine?.(who);
+      onLine?.(who, line);
       choicesEl.replaceChildren(...choices.map((label, k) => {
         const b = document.createElement('button');
         b.type = 'button';

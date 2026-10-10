@@ -185,7 +185,7 @@ function boot() {
   // 예전엔 pointerdown · keydown 에서만 깨워 아이폰(터치)에서는 소리가 영영 나지 않았다
   for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) document.addEventListener(type, () => sound.unlock(), true);
   ui.addEventListener('click', (e) => { if (e.target.closest('button')) sound.play('click'); }, true);
-  const guide = createGuide(ui, { onLine: (who) => sound.play('talk', who.kind), dock: hud.dock, onCue: (cue) => storyCue(cue) });
+  const guide = createGuide(ui, { onLine: (who, text) => sound.voice(who.kind, text), dock: hud.dock, onCue: (cue) => storyCue(cue) });
 
   let state = null;
   let player = null;
