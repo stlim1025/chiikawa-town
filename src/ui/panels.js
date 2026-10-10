@@ -213,7 +213,8 @@ export function createPanels(ui, handlers) {
     } else {
       // 테두리는 .panel 에, 스크롤은 .panel-body 에 둔다(스크롤해도 테두리가 따라 움직이지 않게)
       body = h('div', { class: 'panel-body' });
-      panel = h('div', { class: `panel panel-${kind}`, role: 'dialog', 'aria-modal': 'true' }, body);
+      panel = h('div', { class: `panel panel-${kind}`, role: 'dialog', 'aria-modal': 'true' },
+        h('button', { class: 'panel-x', type: 'button', 'aria-label': '닫기', onClick: () => close() }, '×'), body); // 스크롤 밖 오른쪽 위에 늘 보이는 닫기
     }
     backdrop.append(panel);
     ui.append(backdrop);
@@ -247,7 +248,8 @@ export function createPanels(ui, handlers) {
     if (current.kind === 'bag' && current.sel) { current.sel = null; render(); return; }
     close();
   });
-  const closeBtn = () => h('button', { class: 'btn', type: 'button', onClick: () => close() }, '닫기');
+  // 닫기는 창 오른쪽 위 X 하나로(show): 아래 '닫기' 버튼은 휴대폰에서 스크롤해야 보여서 뺐다. 다른 버튼과 같이 있던 줄은 그 버튼만 남는다
+  const closeBtn = () => null;
   const after = (fn) => () => { fn(); if (current) render(); };
   /**
    * 노동 접수 일감 한 줄(장부처럼 줄마다 점선으로 나눈다): 그림 | 이름 + 어디서 | 보수 + 남은 건수 | 받기.

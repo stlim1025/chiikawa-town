@@ -261,11 +261,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* 월드 라벨: 간판은 나무 팻말, 대사는 크림색 말풍선 */
 .world-label { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; font-family: var(--hand); font-weight: 700; }
 /* 간판 명찰(동물의 숲처럼): 크림색 둥근 판 · 갈색 글씨 · 건물마다 다른 색 동그라미 아이콘 · 아래로 살짝 꼬리. 먼 간판은 작고 흐리게 */
-.world-label.sign { display: flex; align-items: center; gap: 6px; padding: 3px 13px 4px 4px; margin-top: -8px; font-size: 15px; line-height: 1.15; color: #5d4128; background: #fffaf0; border-radius: 999px; box-shadow: 0 0 0 2px #f1e3c6, 0 3px 0 2px #e2cba2, 0 6px 10px rgba(90, 60, 25, 0.16); transition: opacity 0.35s ease, transform 0.35s ease; animation: sign-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards; }
+.world-label.sign { display: flex; align-items: center; gap: 6px; padding: 3px 13px 4px 4px; margin-top: -8px; font-size: 15px; line-height: 1.15; color: #5d4128; background: #fffaf0; border-radius: 999px; box-shadow: 0 0 0 2px #f1e3c6, 0 3px 0 2px #e2cba2, 0 6px 10px rgba(90, 60, 25, 0.16); transition: opacity 0.35s ease; animation: sign-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards; }
 .world-label.sign::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -6px; border: 6px solid transparent; border-top: 7px solid #fffaf0; border-bottom: 0; filter: drop-shadow(0 2px 0 #e2cba2); }
 .world-label.sign .sg-ico { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--c); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12); }
 .world-label.sign .sg-ico svg { width: 15px; height: 15px; }
-.world-label.sign.far { opacity: 0.5; transform: translate(-50%, -100%) scale(0.84); }
+.world-label.sign.far { opacity: 0.5; } /* 먼 간판은 흐리게만(줄이면 글자 · 아이콘이 소수 픽셀에 걸려 휴대폰에서 떨렸다) */
 @keyframes sign-in { from { opacity: 0; transform: translate(-50%, -70%) scale(0.7); } }
 @media (prefers-reduced-motion: reduce) { .world-label.sign { animation: none; transition: none; } }
 .world-label.bubble { padding: 4px 16px 6px; font-size: 19px; color: var(--ink); background: var(--paper); border-radius: 22px 26px 24px 20px / 20px 24px 26px 22px; box-shadow: 0 3px 0 var(--shadow); margin-top: -14px; }
@@ -1345,6 +1345,11 @@ button.pocket-slot:hover { transform: translateY(-2px); }
 .task-card { width: max-content; }
 .notice-wrap, .raffle-wrap { align-items: flex-start; overflow-y: auto; }
 .notice-card, .raffle-stage { margin: auto; }
+/* 창 닫기: 오른쪽 위 X(스크롤 밖이라 늘 보인다). 첫 줄(이름표 · 지갑)은 X 와 겹치지 않게 비켜 두고, 닫기만 있던 아래 줄은 감춘다 */
+.panel-x { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding-bottom: 3px; border-radius: 50%; background: var(--paper-2); box-shadow: 0 3px 0 var(--shadow); font-size: 26px; line-height: 1; }
+.panel-x:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.panel-x ~ .panel-body > :first-child { padding-right: 44px; }
+.panel .actions:empty { display: none; }
 .creator { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .home-bar { width: min(760px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
 .home-tray { width: min(820px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }

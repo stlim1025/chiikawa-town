@@ -868,7 +868,9 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
       new THREE.Vector3(body.position.x, body.position.y + body.scale.y * k, body.position.z + body.scale.z * 1.04 * Math.sqrt(1 - k * k)),
       new THREE.Vector3(0.026, 0.026, 0.018), 0.012));
   }
-  ['armL', 'armR', 'legL', 'legR'].forEach((k) => (P[k] ? P[k].children : []).filter((m) => m.isMesh).forEach((m) => {
+  // 손에 든 물건(소품 · 무기)은 잠옷을 씌우지 않는다: 물건은 제 색 그대로(전에는 소품마다 잠옷 색 껍질이 씌워져 들고 있는 무기까지 잠옷 색이 됐다)
+  const held = new Set(Object.values(chibi.props || {}).flat());
+  ['armL', 'armR', 'legL', 'legR'].forEach((k) => (P[k] ? P[k].children : []).filter((m) => m.isMesh && !held.has(m)).forEach((m) => {
     const sh = put(P[k], m.geometry, mat, m.position, m.scale.clone().multiplyScalar(1.16));
     sh.rotation.copy(m.rotation);
   }));

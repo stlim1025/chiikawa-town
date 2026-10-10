@@ -121,12 +121,18 @@ export function createHud(ui, input) {
   const labelLayer = el('div');
   labelLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
   /**
-   * 머리 위 표시를 (x, y) 에 놓는다. 기기 픽셀 단위로 맞춘다: 소수점 픽셀로 놓으면 고해상도 휴대폰에서 글자와 아이콘이
-   * 장면마다 서로 다르게 픽셀에 맞춰져 간판 아이콘이 부들부들 떨렸다. 자리가 그대로면 다시 쓰지 않는다(스타일 계산 덜기).
+   * 머리 위 표시를 (x, y) 에 놓는다(표시는 CSS 로 가운데 · 아래 기준: translate(-50%, -100%)). 놓인 왼쪽 위가 늘 정수 픽셀이 되게
+   * 폭 · 높이의 소수 부분까지 보정한다: 이름표 크기가 소수(87.3px …)라 가운데 기준으로 놓으면 글자 · 아이콘이 소수 픽셀에 걸려,
+   * 걸을 때마다 고해상도 휴대폰에서 아이콘이 글자와 따로 부들부들 떨렸다. 크기는 내용 · 모양이 바뀔 때(와 3초마다 — 글꼴이 늦게 와도) 잰다.
    */
   const placeAt = (e, x, y) => {
-    const dpr = window.devicePixelRatio || 1;
-    const lx = Math.round(x * dpr) / dpr, ly = Math.round(y * dpr) / dpr;
+    const key = (e.dataset.v || e.textContent) + '|' + e.className;
+    if (e._key !== key || ++e._age > 90) {
+      const r = e.getBoundingClientRect(), t = getComputedStyle(e).transform;
+      const k = t && t !== 'none' ? Math.hypot(new DOMMatrixReadOnly(t).a, new DOMMatrixReadOnly(t).b) || 1 : 1; // 톡 나타나는 중(줄어 있음)이면 원래 크기로
+      e._w = r.width / k; e._h = r.height / k; e._key = key; e._age = 0;
+    }
+    const lx = Math.round(x - e._w / 2) + e._w / 2, ly = Math.round(y - e._h) + e._h;
     if (e._lx !== lx) { e._lx = lx; e.style.left = lx + 'px'; }
     if (e._ly !== ly) { e._ly = ly; e.style.top = ly + 'px'; }
   };
