@@ -27,11 +27,13 @@ const OK = ['Space', 'Enter', 'NumpadEnter'], UP = ['KeyW', 'ArrowUp'], DOWN = [
 /**
  * 필기시험: 문제를 하나씩 보여 주고 보기를 고른다(W/S · ↑/↓ 로 고르고 스페이스 · 엔터로 정하거나, 눌러서).
  * questions: [{ q, choices, answer }], pass: 합격에 필요한 개수. seconds: 문제마다 제한 시간(없으면 무제한, 넘기면 틀린 것).
- * onDone(맞힌 개수, 합격했는지).
+ * onDone(맞힌 개수, 합격했는지). hint: 떨어졌을 때 검정관이 다시 보라고 짚어 줄 공부거리(토벌 안내서 · 쿠리만쥬 강의 · 레시피 북).
+ * 결과는 동물의 숲처럼: 합격 · 불합격 도장이 쾅, 문제마다 맞힌 것 동그라미, 검정관(대장 갑옷 씨) 말풍선.
  */
-export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, sound }) {
+export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, sound, hint = '' }) {
   const s = sheet(ui, title);
   let i = 0, sel = 0, correct = 0, locked = false, ended = false, clock = 0, qStart = 0;
+  const results = []; // 문제마다 맞혔는지(결과 동그라미)
   const stopClock = () => { clearInterval(clock); clock = 0; };
   // 남은 시간 막대: 0.1초마다 줄고, 다 되면 시간 초과(틀린 것)
   function startClock() {
@@ -78,6 +80,7 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
     const q = questions[i], items = [...s.body.querySelectorAll('.exam-choice')];
     const right = k === q.answer;
     if (right) correct++;
+    results.push(right);
     items[q.answer].classList.add('right');
     if (k < 0) s.body.querySelector('.exam-tip').textContent = '시간 초과!';
     else if (!right) items[k].classList.add('wrong');
@@ -88,15 +91,24 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
       if (i < questions.length) render(); else end();
     }, 750);
   }
+  /** 검정관의 한마디: 붙으면 칭찬, 아깝게 떨어지면 다독이고, 많이 모자라면 공부거리를 짚어 준다. */
+  function examinerLine(passed) {
+    if (passed) return '흠흠! 훌륭하다. 이어서 실기다.';
+    if (correct >= pass - 1) return '흠흠… 한 문제 차이로군. 다음엔 붙을 거다.';
+    return hint ? `흠흠. ${hint} 다시 보고 오도록.` : '흠흠. 다시 공부하고 오도록.';
+  }
   function end() {
     ended = true;
     const passed = correct >= pass;
     s.step.textContent = '결과';
-    s.body.innerHTML = '<p class="exam-score"></p><p class="exam-count"></p><p class="exam-tip"></p><div class="actions"><button class="btn primary" type="button">확인</button></div>';
-    s.body.querySelector('.exam-score').textContent = passed ? '필기 합격!' : '필기 불합격…';
-    s.body.querySelector('.exam-count').textContent = `${correct} / ${questions.length}`;
-    s.body.querySelector('.exam-tip').textContent = passed ? '이어서 실기!' : `합격 ${pass}개`;
+    s.body.innerHTML = `<div class="exam-result ${passed ? 'pass' : 'fail'}"><b class="stamp"></b><div class="score-dots" aria-hidden="true"></div><p class="exam-count"></p>`
+      + '<div class="examiner"><span class="ex-name">대장 갑옷 씨</span><p class="ex-say"></p></div></div><div class="actions"><button class="btn primary" type="button"></button></div>';
+    s.body.querySelector('.stamp').textContent = passed ? '합격' : '불합격';
+    s.body.querySelector('.score-dots').append(...results.map((r) => { const d = document.createElement('i'); d.className = r ? 'on' : 'off'; return d; }));
+    s.body.querySelector('.exam-count').textContent = `${correct} / ${questions.length} · 합격 ${pass}개`;
+    s.body.querySelector('.ex-say').textContent = examinerLine(passed);
     const ok = s.body.querySelector('button');
+    ok.textContent = passed ? '실기 보러 가기' : '다음에 또 올게요';
     ok.addEventListener('click', () => { stopClock(); s.close(); onDone?.(correct, passed); });
     ok.focus();
     sound?.play(passed ? 'pass' : 'fail');

@@ -552,7 +552,8 @@ export function createNpcs(scene, village, weeds, berries) {
         } else if (n.state === 'work') {
           n.workT += dt;
           const task = n.task;
-          if (task.type === 'weed') {
+          if (!task) { n.state = 'idle'; n.timer = 0.5; } // 일이 이미 끝났는데 일하는 중으로 남아 있으면 쉬기로(한 프레임 멈춤 방지)
+          else if (task.type === 'weed') {
             const w = task.weed;
             if (!weeds.list.includes(w)) endTask(n); // 그새 다른 누가 뽑았다
             else {

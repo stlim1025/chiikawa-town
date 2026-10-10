@@ -1251,7 +1251,8 @@ function boot() {
     if (!r.ok) { hud.toast(r.reason === 'money' ? '응시료가 부족해요' : '이미 있는 자격이에요'); return; }
     commit(r.state);
     beginOverlay();
-    const fail = (why, tip) => { endOverlay(); hud.banner(`${L.name} 불합격…`, why, 3800, tip ? [{ icon: ICO.book, text: tip }] : null); };
+    // 불합격: 동물의 숲처럼 도장 카드(불합격 · 까닭 · 공부거리)를 확인할 때까지 띄운다
+    const fail = (why, tip) => { endOverlay(); hud.notice({ kicker: L.name, stamp: '불합격', tone: 'bad', sub: why, chips: tip ? [{ icon: ICO.book, text: tip }] : null, ok: '다음에 또 올게요' }); };
     const pass = () => {
       commit(grant(state, id, state.clock.day));
       endOverlay();
@@ -1264,8 +1265,9 @@ function boot() {
     const questions = id === 'liquor' ? liquorQuiz(L.questions) : id === 'hunter' ? huntQuiz(L.questions) : ramenQuiz(L.questions);
     openQuiz(ui, {
       title: `${L.name} 필기`, questions, pass: L.pass, seconds: L.seconds || 0, sound,
+      hint: id === 'hunter' ? '토벌 안내서' : id === 'liquor' ? '쿠리만쥬 강의' : '레시피 북',
       onDone: (correct, ok) => {
-        if (!ok) { fail('필기에서 떨어졌어요', id === 'hunter' ? '검정소 토벌 안내서 읽기' : null); return; }
+        if (!ok) { endOverlay(); return; } // 시험지 결과(도장 · 검정관 말)로 이미 알렸다
         if (id === 'liquor') openHighball(ui, { sound, onDone: (good) => (good ? pass() : fail('하이볼을 다시 연습해요')) });
         else if (id === 'hunter') startHunterPractical(pass, fail);
         else openRamenShop(ui, { mode: 'exam', sound, onEnd: (res) => (res.completed ? pass() : fail(res.reason)) });
