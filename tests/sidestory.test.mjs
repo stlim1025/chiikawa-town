@@ -244,12 +244,14 @@ test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, �
     if (['pose', 'hide', 'bind', 'lei', 'notes'].includes(L.do)) kinds(L.k);
     if (L.do === 'snd') assert.ok(SOUNDS.has(L.name), L.name);
     if (L.do === 'sleep') sleeps++;
+    if (L.do === 'mer') assert.ok(L.list.length <= 2, b.id + ': 인어는 둘(하나는 먹혔다)');
   });
   for (const b of BEATS) {
     assert.ok(SKIES.has(b.sky), b.id + ' 하늘');
     assert.ok(Number.isFinite(b.at.x) && Number.isFinite(b.at.z), b.id + ' 자리');
     castOk(b.cast || {}, b.boats, b.id);
     (b.binds || []).forEach((k) => assert.ok(KINDS.has(k)));
+    assert.ok(!b.mer || b.mer.length <= 2, b.id + ': 인어는 둘');
     walk(b.lines, b, new Set());
   }
   walk(GATHER, { id: 'gather' }, new Set());

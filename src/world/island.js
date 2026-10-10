@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
-import { buildChibi, buildNpc, animateChibi, propFor, showOnlyProp } from '../actors/models.js';
+import { buildChibi, buildNpc, animateChibi, propFor } from '../actors/models.js';
 import { ISLE } from '../core/layout.js';
 import { buildSiren, buildMermaid, buildIslander, addBatteryLid, buildJiro, buildDuckBoat, buildRowBoat, buildVineWrap, buildTendrils, giveLei, textBoard } from './islandcast.js';
 import { batchStatic } from '../render/batch.js';
@@ -99,7 +99,7 @@ export function createIsland() {
   const siren = buildSiren();
   g.add(siren.root);
   const sv = { state: 'hide', t: 0, x: 0, z: 0, face: 0, y: -9, mouth: null };
-  const mermaids = [buildMermaid(), buildMermaid(), buildMermaid()];
+  const mermaids = [buildMermaid(), buildMermaid()]; // 인어는 둘(하나는 먹혀 버렸다)
   mermaids.forEach((mm) => { mm.root.visible = false; g.add(mm.root); });
   let merSpec = [];
   const VINES = 6, vines = buildTendrils(VINES, 8); // 덩굴 줄기 여섯(인스턴스 하나)
@@ -123,10 +123,14 @@ export function createIsland() {
     scene, camera, light, cast,
     /** 새로 섬에 간다: 내 생김새로 나를 만들고 모든 연출을 처음 상태로. */
     start(look) {
-      if (cast.me) g.remove(cast.me.root);
-      cast.me = buildChibi(look);
-      giveLei(cast.me);
-      g.add(cast.me.root);
+      const key = JSON.stringify(look || {});
+      if (!cast.me || cast.me.lookKey !== key) { // 생김새가 같으면 지난번 모형을 그대로 쓴다
+        if (cast.me) { g.remove(cast.me.root); disposeMerged(cast.me.root); }
+        cast.me = buildChibi(look);
+        cast.me.lookKey = key;
+        giveLei(cast.me);
+        g.add(cast.me.root);
+      }
       api.clear();
     },
     /** 모두 치운다(사람 · 세이렌 · 인어 · 덩굴 · 불 · 효과). 배는 선착장에. */
@@ -160,7 +164,7 @@ export function createIsland() {
       if (!spec) { delete who[kind]; c.root.visible = false; return; }
       const prev = who[kind];
       who[kind] = { ...spec };
-      if (!prev || prev.mode !== spec.mode) showOnlyProp(c, propFor(kind, spec.mode));
+      if (!prev || prev.mode !== spec.mode) showProp(c, propFor(kind, spec.mode));
     },
     pos(kind) { const c = cast[kind]; return who[kind] && c ? { x: c.root.position.x, y: c.root.position.y + 0.6, z: c.root.position.z } : null; },
     boatPos(kind) { const b = boats[kind]; return b.spec ? { x: b.spec.x, z: b.spec.z } : null; },
@@ -295,7 +299,7 @@ export function createIsland() {
       mm.root.position.set(ms.x, Math.sin(t * 2 + i) * 0.08 - 0.1, ms.z);
       mm.root.rotation.y = ms.face || 0;
       mm.fin.rotation.x = Math.sin(t * 5 + i) * 0.35;
-      mm.mouth.scale.y = ms.state === 'sing' ? 0.03 + 0.025 * (0.5 + 0.5 * Math.sin(t * 6 + i)) : 0.028;
+      mm.mouth.scale.y = ms.state === 'sing' ? 0.035 + 0.025 * (0.5 + 0.5 * Math.sin(t * 6 + i)) : 0.04;
       mm.root.position.x += ms.state === 'bitten' ? Math.sin(t * 40) * 0.05 : 0;
       fx.notes(ms.state === 'sing', { x: ms.x, y: 1.3, z: ms.z, w: 0.3, size: 0.4 }, 'mer' + i);
     });
@@ -316,7 +320,10 @@ export function createIsland() {
       c.root.position.set(x, y, z);
       c.root.rotation.y = faceAngle(w);
       if (c.animate) c.animate(w.mode || 'idle', t, w.x * 1.7 + w.z); // 섬사람(자기 몸짓)
-      else animateChibi(c, w.mode || 'idle', t, { phase: w.x * 1.7 + w.z });
+      else {
+        const swinging = w.mode === 'swing' || w.mode === 'thrust'; // 휘두르기 · 찌르기는 진행(swing)을 줘야 움직인다
+        animateChibi(c, w.mode || 'idle', t, { phase: w.x * 1.7 + w.z, ...(swinging ? { swing: (t * 1.4 + w.x) % 1 } : {}) });
+      }
       const b = binds[k];
       if (b && b.visible) { b.position.set(x, y, z); b.rotation.y = t * 0.3; b.scale.setScalar(k === 'jiro' ? 1.4 : 1); }
     }
@@ -332,6 +339,18 @@ export function createIsland() {
     if (shakeT > 0) { shakeT -= dt; camera.position.x += Math.sin(t * 60) * 0.12; camera.position.y += Math.cos(t * 47) * 0.08; }
   }
   return api;
+}
+
+/** 몸짓에 맞는 소품만 보인다. 등에 멘 칼('sheathed')은 칼을 뽑아 들 때만 숨는다(actors/npcs.js 의 showProp 과 같은 규칙). */
+function showProp(c, want) {
+  for (const tag in c.props || {}) {
+    const on = tag === 'sheathed' ? want !== 'sword' : tag === want;
+    c.props[tag].forEach((m) => { m.visible = on; });
+  }
+}
+/** 버리는 모형에서 그 모형만의 합친 도형(userData.merged)만 정리한다(나눠 쓰는 도형 · 재질은 그대로). */
+function disposeMerged(root) {
+  root.traverse((o) => { if (o.userData && o.userData.merged) { o.geometry.dispose(); o.children.forEach((l) => l.geometry && l.geometry.dispose()); } });
 }
 
 // ---------- 장소 짓기 ----------

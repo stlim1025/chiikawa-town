@@ -126,7 +126,7 @@ export function createIslandTrip(ctx) {
       minigame.mash({
         label: '노 젓기! 연타!', button: '영차!', gain: 0.07, decay: 0.08,
         onTick: (p) => { best = Math.max(best, p); isle.boat('row', { x: b0.x + best * ROW_SPAN, z: b0.z, face: Math.PI / 2 }); },
-        onDone: () => { S.follow = null; done(); }
+        onDone: () => { S.follow = null; setTimeout(() => S && done(), 600); } // 연타하던 손이 다음 대사를 넘기지 않게 잠깐 쉰다
       });
     },
     /** 인어 합창(박자): 우사기 노래에 박자를 맞춰 인어가 따라 부르게. */
@@ -306,7 +306,7 @@ export function createIslandTrip(ctx) {
       if (!S) return;
       stopGames();
       isle.clear();
-      PIER_PALS.forEach((k) => staged.delete(k));
+      PIER_PALS.forEach((k) => { const n = npcs.byKind(k); if (n && staged.has(k)) npcs.plan(n, []); staged.delete(k); }); // 선착장으로 걸어오던 계획도 접는다
       S = null;
     }
   };

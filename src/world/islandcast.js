@@ -63,7 +63,6 @@ const GEOS = {}; // 처음 쓸 때 한 번 만든다
 const MAKE = {
   hairCap: () => new THREE.SphereGeometry(1, 40, 14, 0, Math.PI * 2, 0, Math.PI * 0.44), // 눈 바로 위까지
   fish: () => paintedSphere(fishBody),
-  cap: () => new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
   arc: () => new THREE.TorusGeometry(1, 0.22, 6, 14, Math.PI),
   skirt: () => new THREE.CylinderGeometry(0.3, 0.42, 0.44, 22).translate(0, 0.22, 0)
 };
@@ -137,19 +136,19 @@ export function buildSiren() {
   return { root, parts: { body, head, armL, armR, tail, fin, ...face } };
 }
 
-/** 인어: 세이렌을 작게 줄인 아이(하얀 몸 · 빨간 모자 머리와 꼭지 · 동그랗게 벌린 입 · 지느러미 손 · 분홍 띠 아래 빨간 꼬리). */
+/** 인어(원작에서 둘): 하얀 동그란 머리 · 정수리에 작은 빨간 술 하나 · 작게 붙은 점 눈(눈썹 없음) · 동그랗게 벌린 입 · 지느러미 손 · 분홍 띠 아래 빨간 비늘 꼬리. */
 export function buildMermaid() {
   const root = new THREE.Group();
   add(root, geo('fish'), null, { material: painted(), position: [0, 0.2, 0], scale: [0.36, 0.36, 0.34], outline: 0.02 });
   add(root, GEO.sphere, WHITE, { position: [0, 0.62, 0], scale: [0.4, 0.38, 0.37], outline: 0.025 });
-  add(root, geo('cap'), TAIL, { position: [0, 0.64, -0.01], scale: [0.415, 0.395, 0.385], outline: 0.02 });
-  [-1, 1].forEach((sd) => add(root, GEO.sphere, TAIL, { position: [sd * 0.035, 1.03, 0.04], rotation: [0, 0, sd * 0.45], scale: [0.05, 0.085, 0.05], outline: 0.012 })); // 머리 위 빨간 꼭지
+  // 정수리의 작은 빨간 술(가운데 하나, 끝이 살짝 뾰족)
+  add(root, GEO.sphere, TAIL, { position: [0, 1.0, 0.02], scale: [0.11, 0.07, 0.1], outline: 0.012 });
+  add(root, GEO.cone, TAIL, { position: [0, 1.04, 0.02], scale: [0.07, 0.11, 0.06], outline: 0.012 });
   [-1, 1].forEach((sd) => {
-    add(root, GEO.dot, INK, { position: [sd * 0.1, 0.64, 0.355], scale: [0.04, 0.055, 0.02], outline: false }); // 가까이 붙은 점 눈
-    add(root, GEO.box, INK, { position: [sd * 0.11, 0.735, 0.348], rotation: [0, 0, -sd * 0.35], scale: [0.08, 0.016, 0.015], outline: false }); // 안쪽이 올라간 짧은 눈썹
-    add(root, GEO.sphere, WHITE, { position: [sd * 0.44, 0.56, 0.02], rotation: [0, 0, sd * 0.5], scale: [0.16, 0.09, 0.06], outline: 0.012 });
+    add(root, GEO.dot, INK, { position: [sd * 0.08, 0.68, 0.36], scale: [0.026, 0.034, 0.02], outline: false }); // 작게 붙은 점 눈
+    add(root, GEO.sphere, WHITE, { position: [sd * 0.44, 0.56, 0.02], rotation: [0, 0, sd * 0.5], scale: [0.16, 0.09, 0.06], outline: 0.012 }); // 지느러미 손
   });
-  const mouth = add(root, GEO.dot, '#7a2a36', { position: [0, 0.5, 0.36], scale: [0.042, 0.03, 0.02], outline: false }); // 동그랗게 벌린 입
+  const mouth = add(root, GEO.dot, '#5a2430', { position: [0, 0.56, 0.37], scale: [0.034, 0.04, 0.02], outline: false }); // 동그랗게 벌린 입
   const fin = new THREE.Group();
   fin.position.set(0.1, 0.08, -0.34);
   root.add(fin);
@@ -288,8 +287,8 @@ export function buildVineWrap() {
  * set(i, j, x, y, z, s): i 번째 줄기의 j 번째 마디 자리 · 크기. 다 놓았으면 done().
  */
 export function buildTendrils(n = 6, len = 8) {
-  const count = n * len, zero = new THREE.Matrix4().makeScale(0, 0, 0);
-  const group = toonInstances(GEO.sphereMid, '#ffffff', Array.from({ length: count }, () => zero), { outline: 0.02, shadow: false });
+  const count = n * len, seed = new THREE.Matrix4().makeScale(0.25, 0.25, 0.25); // 외곽선 굵기는 처음 크기로 정해진다(마디 평균 크기)
+  const group = toonInstances(GEO.sphereMid, '#ffffff', Array.from({ length: count }, () => seed), { outline: 0.02, shadow: false });
   const [mesh, line] = group.children, c = new THREE.Color(), m4 = new THREE.Matrix4();
   for (let i = 0; i < count; i++) mesh.setColorAt(i, c.set(i % 2 ? '#4f9a4a' : '#5aa653'));
   [mesh, line].forEach((o) => { if (o) o.frustumCulled = false; }); // 매 장면 자리가 바뀐다

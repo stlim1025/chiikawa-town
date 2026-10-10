@@ -345,7 +345,7 @@ export const BEATS = [
   {
     id: 'battle', at: ISLE.battle, sky: 'day', title: '(결전!)',
     siren: { state: 'rise', x: 0, z: 11, face: PI }, tendrils: { x: 0, z: 6, r: 3.5 },
-    mer: [{ x: -4, z: 8, face: PI, state: 'sing' }, { x: 4, z: 8.3, face: PI, state: 'sing' }, { x: 0.6, z: 7.4, face: PI, state: 'sing' }],
+    mer: [{ x: -3, z: 8, face: PI, state: 'sing' }, { x: 3, z: 8.3, face: PI, state: 'sing' }], // 인어는 둘(하나는 먹혀 버렸다)
     cast: {
       kurimanju: [-3.0, 0.2, 0, 'gulp'], usagi: [-1.8, 0.8, 0, 'dance'], momonga: [-0.6, 1.0, 0, 'flail'], rakko: [1.6, 1.6, 0, 'train'], chiikawa: [0.3, -0.6, 0, 'look'], hachiware: [1.1, -0.8, 0, 'idle'],
       me: [-0.4, -1.0, 0, 'idle'], jiro: [2.9, -1.6, 0, 'idle'], shisa: [-3.8, -1.2, 0, 'cheer'], kani: [3.9, -0.6, 0, 'idle'], isl1: [-5, -3, 0, 'look'], isl2: [5, -3, 0, 'look'], hitoha: [-2.4, -3.4, 0, 'idle'], futaba: [2.2, -3.6, 0, 'idle']
@@ -359,7 +359,7 @@ export const BEATS = [
       ['h', '{name}! 우리도 박자 맞춰~!'],
       { do: 'game', game: 'battle' },
       { do: 'branch', on: 'battle', good: ['(인어들의 합창이 엉망진창이 됐다! 세이렌의 노래가 흔들린다!)'], bad: ['(합창이 조금씩 어긋나기 시작했다!)'] },
-      { do: 'mer', list: [{ x: -4, z: 8, face: PI, state: 'swim' }, { x: 4, z: 8.3, face: PI, state: 'swim' }, { x: 0.6, z: 7.4, face: PI, state: 'swim' }] },
+      { do: 'mer', list: [{ x: -3, z: 8, face: PI, state: 'swim' }, { x: 3, z: 8.3, face: PI, state: 'swim' }] },
       { do: 'pose', k: 'rakko', mode: 'swing' }, { do: 'tendrils', spec: null }, { do: 'snd', name: 'hit' }, '(그 틈에 랏코가 덩굴을 단칼에 베어 냈다!)',
       { do: 'cast', cast: { momonga: [0.3, 8.6, PI, 'flail', 3.2] } }, '(모몽가가 덩굴을 타고 올라가 꼬리로 세이렌의 코를 간질간질…)',
       { do: 'siren', state: 'idle' }, { do: 'sirenMouth', v: 0.8 }, ['z', '…하… 하아… (입이 크게 벌어진다!)'],
