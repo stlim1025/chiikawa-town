@@ -46,20 +46,20 @@ export function createPajamaStory(ctx) {
     hud.curtain(true, '(셋이서 살금살금 마을을 빠져나와, 바다가 보이는 절벽으로…)');
     setTimeout(() => {
       if (!S) return;
-      const L = ctx.cliff.log, lift = ctx.cliff.seatY;
-      // 통나무 위에 나란히(바다 쪽 = 남쪽을 보고): 가운데가 나
-      P().setPosition(L.x, L.z);
-      P().face(L.x, L.z + 6);
+      const L = ctx.cliff.log, lift = ctx.cliff.seatY, [west, mid, east] = ctx.cliff.seats;
+      // 통나무 위에 나란히(통나무 축을 따라, 바다 쪽 = 남쪽을 보고): 가운데가 나, 치이카와는 서쪽 · 하치와레는 동쪽 자리
+      P().setPosition(mid.x, mid.z);
+      P().face(mid.x, mid.z + 6);
       P().lift = lift;
       P().act('sit', 9999);
       PALS.forEach(([k, dx]) => {
-        const n = npcs.byKind(k);
+        const n = npcs.byKind(k), seat = dx < 0 ? west : east;
         if (!n) return;
-        npcs.comeOut(n, L.x + dx, L.z);
-        n.x = L.x + dx; n.z = L.z;
+        npcs.comeOut(n, seat.x, seat.z);
+        n.x = seat.x; n.z = seat.z; // comeOut 은 통나무(장애물) 밖 빈자리로 비켜 주므로 자리를 다시 박는다
         n.sink = -lift;
         ctx.wear(n.chibi, k, true);
-        npcs.act(n, 'sit', { face: { x: L.x + dx, z: L.z + 6 }, time: 9999 });
+        npcs.act(n, 'sit', { face: { x: seat.x, z: seat.z + 6 }, time: 9999 });
       });
       ctx.starfall.setSky(true);
       Object.assign(S, { kind: 'stars', t: 0, spot: { x: L.x, z: L.z }, from: ctx.cam.poseFor(L.x, L.z) });

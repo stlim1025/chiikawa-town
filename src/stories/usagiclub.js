@@ -6,11 +6,11 @@ import { VILLAGE_R } from '../core/layout.js';
 
 /**
  * 사이드스토리 '우사기의 집'(원작 319 · 320화) 연출. 데이터(부탁 · 보상)는 core/quests.js 의 usagiHome · clubNight.
- *  1) 목격: 밤 7시 반 ~ 9시 반, 우사기(하트 2개 이상)가 내 뒤에서 쌩 달려와 손목시계를 보고 "우라!" → 숲 쪽 덤불 굴로(story.usagiSeen).
+ *  1) 목격: 밤 7시 반 ~ 9시 반, 우사기(하트 2개 이상)가 내 뒤에서 쌩 달려와 손목시계를 보고 "우라!" → 숲속 큰 나무 구멍으로(story.usagiSeen).
  *  2) 다음 날 저녁 하치와레에게 이야기 표시: "오늘 밤 셋이서 몰래 따라가 보자"
  *  3) 밤 8 ~ 12시 광장: 치이카와 · 하치와레와 만나 우사기를 몰래 따라간다. 우사기가 뒤돌아보면 멈춰야 한다(움직이면 "…하?").
  *     너무 멀어지면 우사기가 흥얼거리며 기다려 주고, 아예 놓치면(40m) 그날은 접고 다음 밤에 다시.
- *  4) 숲 굴 앞에서 '따라 들어가기' → 어두운 터널 → 클럽(world/club.js): 무대 위 우사기 DJ, 박자 맞추기 춤(ui/rhythm.js).
+ *  4) 숲 깊숙이 큰 나무 밑동 구멍(world/burrows.js) 앞에서 '따라 들어가기' → 어두운 터널 → 클럽(world/club.js): 무대 위 우사기 DJ, 박자 맞추기 춤(ui/rhythm.js).
  *  5) 강가 굴로 나온다. 우사기는 "야하!" 하고 집 쪽으로 달려가고, 마지막 대사 · 보상은 퀘스트(done)가.
  *  clubNight(되풀이): 우사기가 가자고 하면 바로 클럽(터널 없이) → 춤 → 강가 굴.
  * ctx: { getState, commit, npcs, player, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged(Set),
@@ -21,8 +21,8 @@ const SPB = 60 / CLUB_BPM;
 const SEE = 15; // 우사기가 돌아봤을 때 이 안에서 움직이면 들킨다
 const TOO_CLOSE = 2.2, TOO_FAR = 16, CATCH_UP = 11, LOST = 40;
 const LOOK_SEC = 1.7, WARN_SEC = 0.7, STILL_SEC = 1.3;
-// 광장 → 서쪽 큰길 → 서쪽 문 → 숲길(지날 때마다 한 번씩 뒤돌아본다)
-const ROUTE = [{ x: -6, z: 0.6 }, { x: -15, z: 0.6 }, { x: -23, z: 0.4 }, { x: -30, z: 0 }, { x: -34, z: 1.6 }];
+// 광장 → 서쪽 큰길 → 서쪽 문 → 숲길 깊숙이(지날 때마다 한 번씩 뒤돌아본다). 다 오면 숲길 옆 큰 나무 구멍 앞으로
+const ROUTE = [{ x: -6, z: 0.6 }, { x: -15, z: 0.6 }, { x: -23, z: 0.4 }, { x: -31, z: -0.5 }, { x: -39, z: -0.3 }, { x: -47, z: 2.3 }];
 const HUMS = ['우라~♪', '야하~', '(흥얼흥얼)', '우라라~♪'];
 const PALS = ['chiikawa', 'hachiware'];
 
@@ -75,7 +75,7 @@ export function createUsagiClub(ctx) {
     if (!S || S.kind !== 'sight') return;
     if (!ctx.getState()) { S = null; return; }
     sightSeen();
-    ctx.putToBed('usagi'); // 덤불 굴로 쏙(다음 날 아침에는 늘 그렇듯 자기 집에서 나온다)
+    ctx.putToBed('usagi'); // 나무 구멍으로 쏙(다음 날 아침에는 늘 그렇듯 자기 집에서 나온다)
     unstage('usagi');
     S = null;
   }
@@ -148,7 +148,7 @@ export function createUsagiClub(ctx) {
     S.diving = false;
     S.burrowAt = S.t;
     S.lostT = 0;
-    palSay('hachiware', '저기 굴로 쏙 들어갔어! 우리도 가 보자~!');
+    palSay('hachiware', '저 큰 나무 구멍으로 쏙 들어갔어! 우리도 가 보자~!');
     setTimeout(() => palSay('chiikawa', '…!! (따라간다)'), 900);
   }
   function abort() {
@@ -163,7 +163,7 @@ export function createUsagiClub(ctx) {
     const d = dist(u, p), moved = dist(p, S.last) > 0.7 * dt;
     S.last = { x: p.x, z: p.z };
     if (S.kind === 'burrow') {
-      if (!S.hinted && S.t - S.burrowAt > 25) { S.hinted = true; palSay('hachiware', '저 덤불 굴로 들어가 보자~!'); }
+      if (!S.hinted && S.t - S.burrowAt > 25) { S.hinted = true; palSay('hachiware', '저 나무 밑 구멍으로 들어가 보자~!'); }
       if (dist(p, forest().front) > LOST) { S.lostT += dt; if (S.lostT > 4) { S.kind = 'lost'; abort(); } } else S.lostT = 0;
       return;
     }
@@ -207,7 +207,7 @@ export function createUsagiClub(ctx) {
     hud.setAction(null);
     if (!again) PALS.forEach((k) => { const n = npcs.byKind(k); if (n) { npcs.setFollow(k, false); npcs.goIn(n); } });
     else { const u = usagi(); if (u) npcs.goIn(u); }
-    hud.curtain(true, again ? '(우사기를 따라 숲 속 토끼굴로…)' : '');
+    hud.curtain(true, again ? '(우사기를 따라 숲속 큰 나무 구멍으로…)' : '');
     setTimeout(() => {
       if (!S) return;
       ctx.setMode('club');
@@ -298,7 +298,7 @@ export function createUsagiClub(ctx) {
     get inClub() { return !!S && S.kind === 'club'; },
     /** 연출 중인 퀘스트 · 지금 할 일(화면 왼쪽 위 쪽지). */
     get questId() { return S ? S.id : null; },
-    get goal() { return S ? { meet: '우사기를 몰래 따라가기', follow: '우사기를 몰래 따라가기 · 돌아보면 멈추기!', burrow: '토끼굴로 따라 들어가기', club: '우사기 클럽에서 춤추기' }[S.kind] || null : null; },
+    get goal() { return S ? { meet: '우사기를 몰래 따라가기', follow: '우사기를 몰래 따라가기 · 돌아보면 멈추기!', burrow: '큰 나무 구멍으로 따라 들어가기', club: '우사기 클럽에서 춤추기' }[S.kind] || null : null; },
     /** 지금 단계(디버그 · 테스트용). */
     get phase() { return S ? S.kind : null; },
     /** 0.3초마다(한가할 때): 목격 장면을 열 때인지. */
@@ -322,7 +322,7 @@ export function createUsagiClub(ctx) {
     update(dt) {
       if (!S) return;
       S.t += dt;
-      if (S.kind === 'sight' && S.t > 40) sightEnd(); // 우사기가 길을 못 찾아도 끝낸다
+      if (S.kind === 'sight' && S.t > 60) sightEnd(); // 우사기가 길을 못 찾아도 끝낸다(숲 깊숙이 나무까지 뛰어가는 시간보다 넉넉히)
       else if (S.kind === 'follow' || S.kind === 'burrow') updateFollow(dt);
       else if (S.kind === 'outro' && S.doneCalled && !guide.open) cleanup();
     },
@@ -346,13 +346,13 @@ export function createUsagiClub(ctx) {
       if (e !== S.eighth) { S.eighth = e; sound.play(e % 2 ? 'hat' : 'kick'); }
       if (rhythm.active) { const h = rhythm.hype; rhythm.update(); club.setHype(rhythm.active ? rhythm.hype : h); } // 곡이 끝나도 마지막 흥은 남긴다
     },
-    /** 행동 안내(굴 앞에 서면 '따라 들어가기'). */
+    /** 행동 안내(나무 구멍 앞에 서면 '따라 들어가기'). */
     target(p) {
       if (!S || S.kind !== 'burrow') return null;
-      const f = forest();
-      return dist(p, f.front) < 1.7 ? { type: 'story', label: '따라 들어가기', x: f.x, z: f.z + 0.6, r: 0.75, y: 1.3 } : null;
+      const f = forest(), m = f.mark;
+      return dist(p, f.front) < 1.7 ? { type: 'story', label: '따라 들어가기', x: m.x, z: m.z, r: 0.75, y: m.y } : null;
     },
-    /** 행동 버튼: 연출 중이면 받는다(굴 앞이면 들어가기, 클럽에서는 박자). */
+    /** 행동 버튼: 연출 중이면 받는다(나무 구멍 앞이면 들어가기, 클럽에서는 박자). */
     press() {
       if (!S || S.kind === 'sight') return false;
       if (S.kind === 'club') { if (rhythm.active) rhythm.press(); return true; }

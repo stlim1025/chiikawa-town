@@ -26,14 +26,19 @@ export function createCliff(scene, village) {
   // (통나무 뒤쪽 = 북쪽은 비워 둔다: 별 볼 때 카메라가 그쪽에서 바다를 본다)
   [[-3.7, 0.9, 0.34], [3.9, 0.7, 0.3], [-5.6, 0.4, 0.42], [6.0, 0.2, 0.4]].forEach(([dx, dz, s]) => m(GEO.sphere, '#7ec476', { position: [L.x + dx, s * 0.3, L.z + dz], scale: [s, s * 0.6, s], outline: 0.025 }));
   m(GEO.dot, '#b9ab9a', { position: [L.x + 2.6, 0.08, L.z + 0.6], scale: [0.22, 0.14, 0.18], outline: 0.015 });
-  // 통나무: 동서로 눕힌 둥근 나무 + 양 끝 나이테
-  m(GEO.cylinder, '#a0703f', { position: [L.x, L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r, L.len, L.r], outline: 0.03, receive: true });
+  // 통나무: 동서로 눕힌 둥근 나무 + 양 끝 나이테. GEO.cylinder 는 밑면이 원점이라 z 축으로 눕히면 -x 쪽으로만 뻗는다
+  // → 가운데가 cx 가 되게 길이 절반만큼 +x 에 놓는다(예전엔 L.x 에서 서쪽으로만 뻗어 동쪽 자리가 허공이었다)
+  const lay = (cx, len) => cx + len / 2;
+  m(GEO.cylinder, '#a0703f', { position: [lay(L.x, L.len), L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r, L.len, L.r], outline: 0.03, receive: true });
   [-1, 1].forEach((sd) => {
-    m(GEO.cylinder, '#e3c28e', { position: [L.x + sd * L.len / 2, L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r * 0.86, 0.02, L.r * 0.86], outline: false });
-    m(GEO.cylinder, '#c69a63', { position: [L.x + sd * (L.len / 2 + 0.006), L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r * 0.45, 0.02, L.r * 0.45], outline: false });
+    const end = L.x + sd * L.len / 2; // 나이테는 끝면 바깥으로 살짝 나오게(끝면과 겹쳐 깜빡이지 않게)
+    m(GEO.cylinder, '#e3c28e', { position: [lay(end + sd * 0.01, 0.02), L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r * 0.86, 0.02, L.r * 0.86], outline: false });
+    m(GEO.cylinder, '#c69a63', { position: [lay(end + sd * 0.016, 0.02), L.r, L.z], rotation: [0, 0, Math.PI / 2], scale: [L.r * 0.45, 0.02, L.r * 0.45], outline: false });
   });
   scene.add(g);
   village.obstacles.push({ x: L.x - L.len / 4, z: L.z, r: L.r + 0.2 }, { x: L.x + L.len / 4, z: L.z, r: L.r + 0.2 });
   village.labels.push({ x: L.x, y: 1.6, z: L.z - 0.4, text: '바다 절벽' });
-  return { log: L, seatY: L.r * 2 - 0.06 };
+  // 앉는 자리 셋(서 · 가운데 · 동): 통나무 축(동서) 위, 양 끝에서 0.55 안쪽까지 고르게. seatY: 통나무 윗면
+  const gap = Math.min(1.15, L.len / 2 - 0.55);
+  return { log: L, seatY: L.r * 2 - 0.06, seats: [-1, 0, 1].map((k) => ({ x: L.x + k * gap, z: L.z })) };
 }
