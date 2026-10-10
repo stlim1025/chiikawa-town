@@ -22,6 +22,27 @@ const SKIES = {
   under: { bg: '#0d3a52', fog: '#0d3a52', sea: '#1d5263', light: '#8fd0e8', near: 2, far: 16, hemi: 0.8, sun: 0.3 }
 };
 const PALS = ['chiikawa', 'hachiware', 'usagi', 'rakko', 'momonga', 'kani', 'kurimanju', 'shisa'];
+// 섬 배치(짓기와 걷기 영역이 같이 쓴다): 야자수 [x, z, 높이, 기울기] · 정글 덤불 [x, z] · 동굴 바위 [x, z, 반지름, 높이] · 포장마차 x
+const PALMS = [[-14, 7, 4.2, 0.6], [11.8, 12.2, 4.6, -0.5], [-17, 1, 3.8, 0.7], [11, -4, 4.0, -0.4], [-6, -4.5, 4.4, 0.3], [9, 13, 3.6, -0.6], [-15.5, 6.5, 3.9, 0.5],
+  [-2, -9.5, 4.6, 0.2], [8.5, -9, 4.2, -0.3], [-5.5, -13, 4.8, 0.4], [7.5, -15, 4.0, -0.5], [0, -16.5, 4.4, 0.1], [11, -12, 3.8, -0.6], [-8.5, -8.5, 4.0, 0.5]];
+const BUSHES = [[-1, -13.5], [6.5, -13], [-3.5, -11], [9.5, -10.5], [1.5, -15.5], [-6.5, -10]];
+const ROCKS = [[-13, -7, 4.4, 3.8], [-16.2, -5.4, 3.2, 2.9], [-10.4, -8.6, 3.1, 2.7], [-14.6, -10.4, 3.4, 3.1], [-10.8, -4.4, 2.2, 1.8], [-17.4, -8.8, 2.4, 2.2]];
+const STALLS = [['섬 한정 라멘', '#e9584f', -6], ['과일 파르페', '#f48fb1', -2], ['야키소바', '#f2a03d', 2], ['솜사탕', '#7cbfe8', 6]];
+const BUNGALOWS = [[ISLE.bungalow.x, ISLE.bungalow.z - 2.4], [ISLE.bungalow.x + 2.6, ISLE.bungalow.z - 8]];
+/** 해변 섬에서 부딪히는 것(동그라미 { x, z, r }): 야자수 줄기 · 덤불 · 바위 · 포장마차 · 아치 기둥 · 게시판 · 방갈로 · 오두막 · 모닥불. */
+function beachObstacles() {
+  const o = [], H = ISLE.hut;
+  PALMS.forEach(([x, z]) => o.push({ x, z, r: 0.35 }));
+  BUSHES.forEach(([x, z]) => o.push({ x, z, r: 1.0 }));
+  ROCKS.forEach(([x, z, r]) => o.push({ x, z, r: r * 0.92 }));
+  STALLS.forEach(([, , x]) => [-0.75, 0, 0.75].forEach((dx) => o.push({ x: x + dx, z: ISLE.stalls.z, r: 0.55 })));
+  [-2.3, 2.3].forEach((x) => o.push({ x, z: 12.2, r: 0.3 }));
+  o.push({ x: 5, z: 9.6, r: 0.75 });
+  BUNGALOWS.forEach(([x, z]) => o.push({ x, z: z + 0.3, r: 2.3 }));
+  [[H.x - 1.3, H.z - 0.7, 1.0], [H.x + 1.3, H.z - 0.7, 1.0], [H.x, H.z - 0.9, 1.1], [H.x - 0.6, H.z + 1.1, 0.75], [H.x + 1.2, H.z + 0.6, 0.55]].forEach(([x, z, r]) => o.push({ x, z, r }));
+  o.push({ x: ISLE.fire.x, z: ISLE.fire.z, r: 0.7 });
+  return o;
+}
 const ISLANDERS = [['isl1', { ears: 'bunny', crown: true }], ['isl2', { crown: true }], ['isl3', { ears: 'round', shade: '#958f96' }], ['isl4', { shade: '#87828a' }]];
 const ease = (k) => k * k * (3 - 2 * k);
 
@@ -213,6 +234,20 @@ export function createIsland() {
     /** 카레 그릇을 던진다: from → to(Vector3 | [x,y,z]), 도착하면 onArrive. */
     throwCurry(from, to, onArrive) { fx.throwBowl(from, to, onArrive); },
     flyScale(from) { fx.scale(from); },
+    /**
+     * 직접 걷는 곳(stories/islandroam.js): inside(x, z) · heightAt(x, z) · obstacles. beach: 해변 섬 전체 · grotto: 동굴 속 바위 턱과 얕은 물(잠든 세이렌 둘레는 못 간다).
+     */
+    walkArea(name) {
+      if (name === 'grotto') {
+        const G = ISLE.grotto;
+        return {
+          inside: (x, z) => ((x - (G.x - 2.2)) / 5.6) ** 2 + ((z - (G.z - 0.6)) / 4.0) ** 2 < 1 && Math.hypot(x - sv.x, z - sv.z) > 2.8,
+          heightAt: (x, z) => (((x - (G.x - 4)) / 3.3) ** 2 + ((z - (G.z - 2)) / 2.3) ** 2 < 1 ? 0.4 : 0),
+          obstacles: []
+        };
+      }
+      return { inside: (x, z) => (x / 17.6) ** 2 + (z / 14.8) ** 2 < 1, heightAt: () => 0, obstacles: beachObstacles() };
+    },
     resize(aspect) { camera.aspect = aspect; camera.fov = aspect < 1 ? 62 : 45; camera.updateProjectionMatrix(); },
     update(dt, t) {
       updateBoats(dt, t);
@@ -374,14 +409,12 @@ function palm(m, x, z, h, lean) {
   m(GEO.sphere, '#7a5a3a', { position: [top[0], top[1] - 0.1, top[2]], scale: [0.2, 0.2, 0.2], outline: 0.015 });
 }
 function buildPalms(m) {
-  [[-14, 7, 4.2, 0.6], [11.8, 12.2, 4.6, -0.5], [-17, 1, 3.8, 0.7], [11, -4, 4.0, -0.4], [-6, -4.5, 4.4, 0.3], [9, 13, 3.6, -0.6], [-15.5, 6.5, 3.9, 0.5],
-    [-2, -9.5, 4.6, 0.2], [8.5, -9, 4.2, -0.3], [-5.5, -13, 4.8, 0.4], [7.5, -15, 4.0, -0.5], [0, -16.5, 4.4, 0.1], [11, -12, 3.8, -0.6], [-8.5, -8.5, 4.0, 0.5]]
-    .forEach(([x, z, h, l]) => palm(m, x, z, h, l));
+  PALMS.forEach(([x, z, h, l]) => palm(m, x, z, h, l));
   // 정글 덤불
-  [[-1, -13.5], [6.5, -13], [-3.5, -11], [9.5, -10.5], [1.5, -15.5], [-6.5, -10]].forEach(([x, z], i) => m(GEO.sphere, i % 2 ? '#5aa653' : '#6fbf63', { position: [x, 0.4, z], scale: [1.1, 0.75, 1.0], outline: 0.03 }));
+  BUSHES.forEach(([x, z], i) => m(GEO.sphere, i % 2 ? '#5aa653' : '#6fbf63', { position: [x, 0.4, z], scale: [1.1, 0.75, 1.0], outline: 0.03 }));
 }
 function buildStalls(g, m) {
-  [['섬 한정 라멘', '#e9584f', -6], ['과일 파르페', '#f48fb1', -2], ['야키소바', '#f2a03d', 2], ['솜사탕', '#7cbfe8', 6]].forEach(([name, col, x]) => {
+  STALLS.forEach(([name, col, x]) => {
     const z = ISLE.stalls.z;
     m(GEO.box, '#e8c48e', { position: [x, 0.5, z], scale: [2.2, 1.0, 0.9], outline: 0.03 });
     [-1, 1].forEach((sd) => m(GEO.cylinder, '#8a5a34', { position: [x + sd * 1.05, 0, z - 0.4], scale: [0.06, 2.3, 0.06], outline: 0.012 }));
@@ -408,7 +441,7 @@ function buildWelcome(g, m) {
 }
 function buildBungalows(m) {
   const roof = new THREE.ConeGeometry(1, 1, 4).translate(0, 0.5, 0);
-  [[ISLE.bungalow.x, ISLE.bungalow.z - 2.4], [ISLE.bungalow.x + 2.6, ISLE.bungalow.z - 8]].forEach(([x, z]) => {
+  BUNGALOWS.forEach(([x, z]) => {
     [[-1.3, -1.3], [1.3, -1.3], [-1.3, 2.2], [1.3, 2.2]].forEach(([dx, dz]) => m(GEO.cylinder, '#8a5a34', { position: [x + dx, -0.6, z + dz], scale: [0.1, 1.2, 0.1], outline: 0.01 }));
     m(GEO.box, '#c49a6c', { position: [x, 0.55, z + 0.5], scale: [3, 0.14, 4], outline: 0.02 });
     m(GEO.box, '#ecd3a5', { position: [x, 1.42, z - 0.4], scale: [2.3, 1.6, 2], outline: 0.025 });
@@ -417,8 +450,7 @@ function buildBungalows(m) {
   });
 }
 function buildCave(g, m) {
-  [[-13, -7, 4.4, 3.8], [-16.2, -5.4, 3.2, 2.9], [-10.4, -8.6, 3.1, 2.7], [-14.6, -10.4, 3.4, 3.1], [-10.8, -4.4, 2.2, 1.8], [-17.4, -8.8, 2.4, 2.2]]
-    .forEach(([x, z, r, h], i) => m(GEO.sphereMid, i % 2 ? '#8f8174' : '#a39584', { position: [x, 0, z], scale: [r, h, r * 0.9], outline: 0.05 }));
+  ROCKS.forEach(([x, z, r, h], i) => m(GEO.sphereMid, i % 2 ? '#8f8174' : '#a39584', { position: [x, 0, z], scale: [r, h, r * 0.9], outline: 0.05 }));
   const dark = new THREE.MeshBasicMaterial({ color: '#140e0c' });
   [[-12.2, 0.3, -2.95, 1.3, 1.5, 0.5], [-18.3, 0.2, -7, 0.5, 1.5, 1.6]].forEach(([x, y, z, sx, sy, sz]) => {
     const hole = new THREE.Mesh(GEO.sphereMid, dark);

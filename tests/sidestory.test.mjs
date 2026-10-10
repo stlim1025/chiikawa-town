@@ -215,21 +215,21 @@ test('수상한 섬 합숙: 우사기(하트 2)가 여덟째 날부터 오후에
 });
 
 test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, 말하는 사람 · 연출 · 놀이 · 사람 · 하늘이 모두 알려진 것', async () => {
-  const { BEATS, GATHER, CHORUS, BATTLE } = await import('../src/stories/islandscript.js');
+  const { BEATS, GATHER, CHORUS, BATTLE, ROAMS } = await import('../src/stories/islandscript.js');
   const ids = BEATS.map((b) => b.id);
   assert.equal(new Set(ids).size, ids.length, '장면 이름은 하나씩');
   let last = -1;
-  for (const id of ['voyage', 'welcome', 'stalls', 'bungalow', 'sign', 'campfire', 'row', 'grotto', 'poster', 'attack', 'search', 'cave2', 'alone', 'dive', 'rescue', 'plan', 'battle', 'memory', 'farewell', 'depart', 'far']) {
+  for (const id of ['voyage', 'welcome', 'festival', 'bungalow', 'sign', 'campfire', 'row', 'grotto', 'poster', 'attack', 'search', 'cave2', 'alone', 'dive', 'rescue', 'plan', 'battle', 'memory', 'farewell', 'depart', 'far']) {
     const i = ids.indexOf(id);
     assert.ok(i > last, '원작 순서: ' + id);
     last = i;
   }
   const SPEAK = new Set(['c', 'h', 'u', 'r', 'm', 'k', 'q', 's', 'j', 't', 'f', 'i', 'z', 'me']);
-  const DO = new Set(['pose', 'cast', 'hide', 'siren', 'sirenMouth', 'mer', 'tendrils', 'bind', 'unbind', 'boat', 'cam', 'fire', 'sign', 'lid', 'snd', 'shake', 'splash', 'notes', 'bubbles', 'lei', 'scale', 'wait', 'ask', 'game', 'branch', 'sleep']);
+  const DO = new Set(['pose', 'cast', 'hide', 'siren', 'sirenMouth', 'mer', 'tendrils', 'bind', 'unbind', 'boat', 'cam', 'fire', 'sign', 'lid', 'snd', 'shake', 'splash', 'notes', 'bubbles', 'lei', 'scale', 'wait', 'ask', 'game', 'branch', 'sleep', 'roam']);
   const KINDS = new Set(['me', 'chiikawa', 'hachiware', 'usagi', 'rakko', 'momonga', 'kani', 'kurimanju', 'shisa', 'hitoha', 'futaba', 'isl1', 'isl2', 'isl3', 'isl4', 'jiro']);
   const SKIES = new Set(['day', 'sunset', 'dawn', 'night', 'cave', 'memory', 'under']);
   const SOUNDS = new Set(['song', 'siren', 'splash', 'wave', 'thud', 'growl', 'hurt', 'pass', 'faint', 'hit', 'chime', 'can']);
-  const games = [];
+  const games = [], roams = [];
   let sleeps = 0;
   const kinds = (k) => (Array.isArray(k) ? k : [k]).forEach((x) => assert.ok(KINDS.has(x), x));
   const castOk = (cast, boats, id) => Object.entries(cast).forEach(([k, e]) => { assert.ok(KINDS.has(k), id + ': ' + k); if (e[5]) assert.ok(boats && boats[e[5]], id + ': ' + k + ' 탄 배'); });
@@ -244,6 +244,7 @@ test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, �
     if (['pose', 'hide', 'bind', 'lei', 'notes'].includes(L.do)) kinds(L.k);
     if (L.do === 'snd') assert.ok(SOUNDS.has(L.name), L.name);
     if (L.do === 'sleep') sleeps++;
+    if (L.do === 'roam') { assert.ok(ROAMS[L.id], b.id + ': 걷기 ' + L.id); roams.push(L.id); }
     if (L.do === 'mer') assert.ok(L.list.length <= 2, b.id + ': 인어는 둘(하나는 먹혔다)');
   });
   for (const b of BEATS) {
@@ -255,8 +256,24 @@ test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, �
     walk(b.lines, b, new Set());
   }
   walk(GATHER, { id: 'gather' }, new Set());
+  roams.length = 0; for (const b of BEATS) for (const L of b.lines) if (L && L.do === 'roam') roams.push(L.id);
   assert.deepEqual(games, ['row', 'chorus', 'swim', 'battle', 'throw'], '노 젓기 → 인어 합창 → 헤엄 → 박자 → 카레 던지기');
   assert.equal(sleeps, 1, '마지막 밤에 한 번 잔다');
+  assert.deepEqual(roams, ['festival', 'jungle', 'rescue'], '축제 · 밤의 정글 · 동굴 구출은 직접 걷는다');
+  for (const [id, r] of Object.entries(ROAMS)) {
+    assert.ok(['beach', 'grotto'].includes(r.area) && r.me.length >= 2 && r.goal, id);
+    assert.equal(new Set(r.targets.map((t) => t.id)).size, r.targets.length, id + ': 할 일 이름은 하나씩');
+    for (const t of r.targets) {
+      assert.ok(t.k ? KINDS.has(t.k) : Array.isArray(t.at), id + '/' + t.id + ' 자리');
+      assert.ok(t.auto || t.label, id + '/' + t.id + ' 행동 이름');
+      walk(t.lines || [], { id: id + '/' + t.id }, new Set());
+      walk(t.again || [], { id: id + '/' + t.id }, new Set());
+    }
+  }
+  assert.ok(ROAMS.festival.targets.some((t) => t.ask && t.k === 'hachiware'), '축제는 하치와레에게 말해서 끝낸다');
+  assert.ok(ROAMS.festival.targets.filter((t) => t.eat === 'slurp' || t.eat === 'nibble').length >= 4, '포장마차 넷에서 먹기');
+  assert.ok(ROAMS.rescue.targets.filter((t) => t.free).length === 7 && ROAMS.rescue.watch, '붙잡힌 일곱 · 세이렌이 뒤척이면 멈추기');
+  assert.ok(ROAMS.jungle.targets.some((t) => t.end) && ROAMS.jungle.follow === 'chiikawa', '치이카와와 오두막까지');
   assert.ok(BEATS[ids.indexOf('farewell')].lines.at(-1).do === 'sleep', '모닥불 뒤에 잠');
   for (const ch of [CHORUS, BATTLE]) { assert.ok(ch[0] >= 4, '처음 4박은 준비'); for (let i = 1; i < ch.length; i++) assert.ok(ch[i] > ch[i - 1]); }
 });

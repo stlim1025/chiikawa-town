@@ -1,9 +1,11 @@
-import { BEATS, GATHER, CHORUS, BATTLE } from './islandscript.js';
+import { BEATS, GATHER, CHORUS, BATTLE, ROAMS } from './islandscript.js';
+import { createIslandRoam } from './islandroam.js';
 
 /**
  * 사이드스토리 '수상한 섬 합숙'(원작 세이렌(섬) 편) 진행. 데이터(부탁 · 보상)는 core/quests.js 의 islandCamp, 대본은 stories/islandscript.js.
  *  1) 아침 선착장: 치이카와 · 하치와레 · 우사기 · 랏코가 모인다(우사기는 맨몸) → 오리 배에 올라 섬 모드(world/island.js)로.
  *  2) 대본의 장면을 차례로: 검은 화면(제목) → 자리 · 카메라 · 하늘을 맞추고 → 대사 · 연출 · 놀이(노 젓기 · 인어 합창 · 헤엄 · 박자 · 카레 던지기).
+ *     축제 · 밤의 정글 · 동굴 구출은 직접 걷는다(stories/islandroam.js): 말 걸기 · 먹기 · 춤 · 덩굴 끊기.
  *  3) 마지막 밤 모닥불 뒤 진짜로 잔다(sleepOver: 밤 10시로 맞추고 잠 → 다음 날 아침). 섬에 있는 동안 마을 시계는 멈춰 있다.
  *  4) 떠나는 배 · 먼 바다 장면 → 마을 선착장으로 돌아와 마무리 대사 · 보상(퀘스트 done).
  * ctx: { npcs, village, hud, guide, sound, input, staged, isle, rhythm, minigame, pier, cam, getPlayer, who(kind), me(), narrator, fill(lines),
@@ -78,6 +80,18 @@ export function createIslandTrip(ctx) {
     S.camPos = { x: o.x + pos[0], z: o.z + pos[2] };
   }
 
+  /** 사람 이름(kind) → 말하는 사람(이름표). */
+  const whoKind = (k) => Object.values(GUESTS).find((g) => g.kind === k) || (String(k).startsWith('isl') ? GUESTS.i : k === 'me' ? ctx.me() : ctx.who(k));
+  const roam = createIslandRoam({
+    isle, input, hud, guide, sound, run: (items, done) => run(items, done), who: whoKind,
+    move: (k, x, z, face, mode, y) => { S.pos[k] = { dx: x - S.o.x, dz: z - S.o.z, face, mode, y: y || 0, ride: null }; put(k); },
+    face: (k, x, z) => { const p = S.pos[k]; if (p) { p.saved = p.face; repose(k, { face: [x - S.o.x, z - S.o.z] }); } },
+    unface: (k) => { const p = S.pos[k]; if (p && 'saved' in p) { const f = p.saved; delete p.saved; repose(k, { face: f }); } },
+    pose: (k, mode) => repose(k, { mode }),
+    others: () => Object.keys(S.pos).filter((k) => k !== 'me').map((k) => ({ k, ...worldOf(k) })).filter((p) => p.x !== undefined),
+    setBody: (on) => document.body.classList.toggle('in-roam', on)
+  });
+
   // ---------- 연출 ----------
   const SYNC = {
     pose: (a) => list(a.k).forEach((k) => repose(k, { mode: a.mode, ...(a.face !== undefined ? { face: a.face } : {}) })),
@@ -109,6 +123,7 @@ export function createIslandTrip(ctx) {
     else if (a.do === 'game') GAMES[a.game](() => S && next());
     else if (a.do === 'branch') run(good(S.res[a.on]) ? a.good : a.bad, next);
     else if (a.do === 'sleep') ctx.sleepOver(() => S && next());
+    else if (a.do === 'roam') roam.start(ROAMS[a.id], S.o, () => S && next());
     else next();
   }
 
@@ -231,6 +246,7 @@ export function createIslandTrip(ctx) {
     }, 900);
   }
   function stopGames() {
+    roam.stop();
     if (rhythm.active) rhythm.stop();
     minigame.stop();
     S.follow = null;
@@ -284,6 +300,7 @@ export function createIslandTrip(ctx) {
     /** 섬 모드에서 매 프레임: 장면 · 놀이 화면 · 박자 소리. */
     tick(dt, t) {
       if (!S) return;
+      roam.tick(dt);
       isle.update(dt, t);
       minigame.update(dt);
       if (S.follow) S.follow();
@@ -295,6 +312,14 @@ export function createIslandTrip(ctx) {
         if (e !== S.eighth) { S.eighth = e; if (S.beatSnd === 'beat') sound.play(e % 2 ? 'hat' : 'kick'); else if (e % 2 === 0) sound.play('hat'); }
       }
     },
+    /** 직접 걷는 중인지(행동 버튼 · 머리 위 안내를 받는다). */
+    get roaming() { return roam.active; },
+    /** 행동 버튼 · 스페이스(직접 걷는 중): 가까운 곳에서 할 일. */
+    press() { if (S) roam.press(); },
+    /** 직접 걷기 상태(디버그 · 헤드리스 시험용). */
+    roamInfo() { return roam.info(); },
+    /** 머리 위 안내(직접 걷는 중). */
+    labels() { return S ? roam.labels() : []; },
     /** 마을에서 매 프레임(돌아온 뒤 마무리 대사가 끝나면 정리). */
     update(dt) {
       if (!S || S.kind !== 'outro') return;

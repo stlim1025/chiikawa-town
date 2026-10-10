@@ -1018,7 +1018,7 @@ function boot() {
       return;
     }
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
-    if (mode === 'island') return; // 수상한 섬: 놀이 화면(ui/minigame · rhythm)이 자기 버튼 · 스페이스로 받는다
+    if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
@@ -3852,7 +3852,9 @@ function boot() {
       staged: () => [...staged],
       burrows: () => burrows.spots,
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
-      island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState }),
+      island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
+      /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
+      islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
       pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),
       drawCalls: () => gfx.renderer.info.render.calls,
@@ -3943,7 +3945,7 @@ function boot() {
       setCelLight(isle.light);
       lights.update('off', player.position, player.yaw, 0);
       if (!skipRender && drawNow) gfx.renderer.render(isle.scene, isle.camera);
-      hud.placeLabels([], isle.camera);
+      hud.placeLabels(islandTrip.labels(), isle.camera);
       return;
     }
     if (mode === 'home' && state) {
