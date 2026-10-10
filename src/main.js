@@ -203,7 +203,9 @@ function boot() {
       stamina() { commit({ ...state, stamina: MAX_STAMINA }); },
       grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0, day: state.clock.day, look: myLook() }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
       hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); },
-      license(id, on) { commit(on ? grant(state, id, state.clock.day, myLook()) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); }
+      license(id, on) { commit(on ? grant(state, id, state.clock.day, myLook()) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); },
+      /** 별똥별맨 미리 보기: 밤 · 별똥별 밤을 기다리지 않고 바로(하늘만 잠깐 밤으로, 소원은 안 이뤄진다). */
+      starfall() { startWish(true); }
     },
     toggleSound: (kind) => sound.toggle(kind),
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
@@ -3237,14 +3239,14 @@ function boot() {
   const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
   const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓
   /** 소원 빌기: 고개를 들어 밤하늘 → 소원 고르기 → 진짜 별똥별이 앞에 쿵 → 별똥별맨이 빤히 보다가 날아간다. */
-  function startWish() {
-    if (starShow || !canWish(state)) return;
+  function startWish(preview = false) {
+    if (starShow || mode !== 'play' || (!preview && !canWish(state))) return;
     const p = player.position, land = village.nearestFree(p.x, p.z - 3.4, 0.9), from = cam.poseFor(p.x, p.z);
     player.face(land.x, land.z);
     player.busy = true;
     streaks.setActive(false);
     starfall.setSky(true);
-    starShow = { phase: 'look', t: 0, land, p: { x: p.x, z: p.z }, fromPos: from.pos, fromLook: from.look, kinds: [] };
+    starShow = { phase: 'look', t: 0, land, p: { x: p.x, z: p.z }, fromPos: from.pos, fromLook: from.look, kinds: [], preview };
   }
   function askWish() {
     guide.ask('(별똥별이 쏟아진다…!) 무슨 소원을 빌까?', [...WISHES.map((w) => w.label), '역시 안 빌래'], (i) => {
@@ -3283,6 +3285,11 @@ function boot() {
   function starGone() {
     const S = starShow;
     if (!S) return;
+    if (S.preview) { // 미리 보기: 소원은 이뤄지지 않고 오늘 밤 진짜로 빌 기회도 그대로
+      sound.play('done');
+      guide.say(['(미리 보기라 소원은 이뤄지지 않았다… 별똥별이 쏟아지는 밤에 진짜로 빌어 봐요)'], () => endWish(true), meWho());
+      return;
+    }
     const r = makeWish(state, S.wish, S.kinds);
     if (r.ok) commit(r.state);
     sound.play('done');
@@ -3723,7 +3730,7 @@ function boot() {
     }
     npcs.update(dt, t, focus);
     if (mode !== 'play') streaks.setActive(false);
-    applySky(state ? state.clock : { day: 1, t: 0.15 });
+    applySky(starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 }); // 별똥별맨 미리 보기 동안은 하늘만 밤
     if (mode === 'play') { if (starShow) starCamera(dt); else cam.follow(focus, dt); }
     else if (mode === 'title') {
       // 타이틀: 마을 위를 천천히 돈다

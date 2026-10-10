@@ -2,6 +2,12 @@ import * as THREE from 'three';
 
 /** 외곽선 색. */
 export const LINE_COLOR = 0x2b2224;
+/**
+ * 가려진 몬스터 실루엣(monsters.js 의 ghostMat 은 스텐실이 1 이 아닌 곳에만 칠한다)이 칠해지지 않게 남기는 표시.
+ * 외곽선(몬스터 제 테두리 · 다른 물체의 선)과 캐릭터 몸에 남겨, 탁 트인 곳 몬스터 둘레 · 안쪽 선에 빨간 테두리가 끼거나
+ * 내 캐릭터 몸 위로 몬스터 실루엣이 비치지 않게 한다(나무 · 집 같은 몸통 뒤에 가린 곳에만 실루엣).
+ */
+const NO_GHOST = { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp };
 
 let gradient = null;
 /** 명암을 3단으로 끊는 그라디언트 텍스처(공유). */
@@ -86,7 +92,8 @@ export function celMaterial(color, opts = {}) {
     fragmentShader: CEL_FRAG,
     vertexColors: !!opts.vertexColors,
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
-    fog: true
+    fog: true,
+    ...NO_GHOST
   });
   m.uniforms.uLight = celLight; // merge 는 값을 복제하므로 공유 빛은 나중에 붙인다
   celCache.set(key, m);
@@ -101,7 +108,7 @@ const outlineCache = new Map();
 function outlineMaterial(thickness, hand = false) {
   const key = (hand ? 'hand:' : '') + thickness;
   if (outlineCache.has(key)) return outlineCache.get(key);
-  const m = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide });
+  const m = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide, ...NO_GHOST });
   const push = hand
     ? `float wob = 0.8 + 0.4 * (0.5 + 0.5 * sin(position.x * 5.0 + position.y * 3.0) * sin(position.z * 4.0 - position.y * 3.0 + 1.3));
 float press = 1.0 + 0.3 * clamp(-normal.y, 0.0, 1.0);
@@ -128,7 +135,7 @@ export function addOutline(mesh, world = 0.035, hand = false, geometry = mesh.ge
   return o;
 }
 
-const shellMaterial = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide });
+const shellMaterial = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide, ...NO_GHOST });
 /** 상자·지붕처럼 각진 메시용 외곽선: 살짝 키운 뒷면 껍질. world 는 월드 두께. */
 export function addShellOutline(mesh, world = 0.035) {
   const o = new THREE.Mesh(mesh.geometry, shellMaterial);
