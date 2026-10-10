@@ -3,6 +3,7 @@ import { groundY } from '../core/layout.js';
 
 const SPEED = 3.2;
 const RADIUS = 0.35;
+const SWING_SLOW = 0.55; // 휘두르는 동안은 발걸음이 느려진다(미끄러지듯 팔만 휘두르지 않게)
 
 /** 입력을 받아 내 캐릭터를 움직인다. */
 export function createPlayer(scene, chibi, village) {
@@ -86,7 +87,8 @@ export function createPlayer(scene, chibi, village) {
       const len = Math.min(1, Math.hypot(v.x, v.y));
       if (len > 0.12) {
         const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y);
-        const step = SPEED * len * dt, ox = position.x, oz = position.z;
+        const pace = swingT > 0 ? SWING_SLOW : 1;
+        const step = SPEED * len * pace * dt, ox = position.x, oz = position.z;
         // 막혀도 장애물을 따라 미끄러지며 간다(가로등 · 건물 모서리에 살짝 걸려도 멈추지 않게)
         const p = village.move(position.x, position.z, position.x + dx * step, position.z + dz * step, RADIUS);
         position.x = p.x; position.z = p.z;
@@ -96,7 +98,7 @@ export function createPlayer(scene, chibi, village) {
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
         yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
-        if (moving) phase += dt * SPEED * len * 3.2;
+        if (moving) phase += dt * SPEED * len * pace * 3.2;
       }
       api.cheerTime = Math.max(0, api.cheerTime - dt);
       api.danceTime = Math.max(0, api.danceTime - dt);
@@ -110,7 +112,7 @@ export function createPlayer(scene, chibi, village) {
       if (blinkT > 0) { blinkT = Math.max(0, blinkT - dt); model.root.visible = blinkT === 0 || Math.floor(blinkT * 14) % 2 === 0; }
       model.root.position.set(position.x, groundY(position.x, position.z), position.z); // 다리 위면 판 높이
       model.root.rotation.y = yaw;
-      animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0 });
+      animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0, moving });
     }
   };
   return api;

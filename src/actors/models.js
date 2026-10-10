@@ -767,9 +767,15 @@ const ZERO = [0, 0, 0];
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
- * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이) }
+ * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
+ *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다) }
  */
 export function animateChibi(chibi, mode, t, opts = {}) {
+  applyPose(chibi, mode === 'swing' || mode === 'thrust' ? attackPose(mode, t, opts) : basePose(mode, t, opts));
+}
+
+/** 몸짓 하나의 자세: 마디 회전(a)과 몸통(bob 통통 · lean 숙이기 · waddle 뒤뚱 · spin 돌기 · push 앞으로 쏠리기 · squash 눌림). */
+function basePose(mode, t, opts) {
   const a = {};
   const phase = opts.phase || 0, s = Math.sin(phase);
   let bob = 0, lean = 0, waddle = 0, spin = 0;
@@ -829,29 +835,6 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     const up = (Math.sin(t * 1.4) + 1) / 2;
     a.armR = [-1.0 - up * 0.5, -0.35 * up, -0.5]; a.armL = [0, 0, -0.12];
     a.head = [-0.3 * up, 0, 0];
-  } else if (mode === 'swing') {
-    // 무기 휘두르기(opts.swing 0 → 1): 번쩍 들었다가(0~0.3) 앞으로 내리치고(~0.55) 제자리로
-    // 무기는 팔을 내렸을 때 칼끝이 앞을 보게 쥐고 있어서, 팔을 끝까지 내리쳐야(+) 칼끝이 앞아래를 친다
-    const k = opts.swing || 0;
-    const ease = (x) => 1 - (1 - x) * (1 - x);
-    const ax = k < 0.3 ? -2.9 * ease(k / 0.3) : k < 0.5 ? -2.9 + 3.15 * ease((k - 0.3) / 0.2) : 0.25 * (1 - ease((k - 0.5) / 0.5));
-    a.armR = [ax, 0, -0.25]; a.armL = [k < 0.5 ? -0.5 * Math.min(1, k / 0.3) : -0.5 * (1 - (k - 0.5) / 0.5), 0, 0.2];
-    const slam = k > 0.3 && k < 0.75;
-    a.head = [slam ? 0.18 : -0.08, 0, 0];
-    lean = slam ? 0.18 : -0.06 * Math.min(1, k / 0.3);
-    bob = k < 0.3 ? 0.05 * (k / 0.3) : 0;
-  } else if (mode === 'thrust') {
-    // 찌르기(사스마타, opts.swing 0 → 1): 뒤로 당겼다가(~0.3) 앞으로 쭉 내찌르고(~0.5) 제자리로. 몸도 앞으로 쏠린다
-    const k = opts.swing || 0;
-    const ease = (x) => 1 - (1 - x) * (1 - x);
-    // 창끝이 수평을 유지하도록 팔은 조금만 들고, 몸 전체가 뒤로 빠졌다가 앞으로 쑥 나간다
-    let ax, push;
-    if (k < 0.3) { const e = ease(k / 0.3); ax = -0.25 * e; push = -0.14 * e; lean = -0.08 * e; }
-    else if (k < 0.5) { const e = ease((k - 0.3) / 0.2); ax = -0.25 - 0.12 * e; push = -0.14 + 0.46 * e; lean = -0.08 + 0.28 * e; }
-    else { const e = ease((k - 0.5) / 0.5); ax = -0.37 * (1 - e); push = 0.32 * (1 - e); lean = 0.2 * (1 - e); }
-    a.armR = [ax, 0, -0.12]; a.armL = [-0.6 - ax, 0, 0.3];
-    a.head = [k > 0.3 && k < 0.7 ? 0.1 : -0.04, 0, 0];
-    chibi.inner.position.z = push;
   } else if (mode === 'hurt') {
     // 맞았을 때: 뒤로 휘청
     a.armL = [0, 0, -0.9]; a.armR = [0, 0, 0.9];
@@ -935,15 +918,82 @@ export function animateChibi(chibi, mode, t, opts = {}) {
     a.head = [Math.sin(t * 1.7 + phase) * 0.04, opts.look || 0, 0];
     a.armL = [0, 0, -0.1 - br]; a.armR = [0, 0, 0.1 + br];
   }
-  // 손에 든 무기(내 캐릭터만): 공격할 때만 팔과 한 줄, 평소에는 바깥 위로 비스듬히 든다
-  if (mode !== 'swing' && mode !== 'thrust') a.weapon = mode === 'walk' ? [-0.75 + s * 0.12, 0.6, 0] : [-0.8, 0.6, 0];
+  // 손에 든 무기(내 캐릭터만): 평소에는 바깥 위로 비스듬히 든다(휘두를 때는 attackPose 가 손목까지 잡는다)
+  a.weapon = mode === 'walk' ? [-0.75 + s * 0.12, 0.6, 0] : [-0.8, 0.6, 0];
   const ear = mode === 'walk' ? -0.25 - Math.abs(s) * 0.25 : mode === 'pull' ? -0.4 : -0.1;
   a.earL = [ear, 0, -0.08]; a.earR = [ear, 0, 0.08];
+  return { a, bob, lean, waddle, spin, push: 0, squash: 0 };
+}
+
+/** 자세를 모델에 입힌다. */
+function applyPose(chibi, p) {
   for (const name in chibi.pivots) {
-    const r = a[name] || ZERO;
+    const r = p.a[name] || ZERO;
     chibi.pivots[name].rotation.set(r[0], r[1], r[2], 'YXZ');
   }
-  chibi.inner.position.y = bob;
-  if (mode !== 'thrust') chibi.inner.position.z = 0;
-  chibi.inner.rotation.set(lean, spin, waddle, 'YXZ');
+  chibi.inner.position.set(0, p.bob, p.push);
+  chibi.inner.rotation.set(p.lean, p.spin, p.waddle, 'YXZ');
+  chibi.inner.scale.set(1 + p.squash * 0.5, 1 - p.squash, 1 + p.squash * 0.5); // 눌리면(+) 납작, 펴지면(-) 길쭉
+}
+
+const EASE = { out: (u) => 1 - (1 - u) * (1 - u), in: (u) => u * u, io: (u) => u * u * (3 - 2 * u) };
+const mix = (r1 = ZERO, r2 = ZERO, u) => [r1[0] + (r2[0] - r1[0]) * u, r1[1] + (r2[1] - r1[1]) * u, r1[2] + (r2[2] - r1[2]) * u];
+const JOINTS = ['armR', 'armL', 'weapon', 'head', 'legL', 'legR'], TRUNK = ['spin', 'lean', 'bob', 'push', 'squash'];
+
+/**
+ * 공격 몸짓의 열쇠 자세(k: 진행 0 → 1, e: 그 자세로 들어가는 빠르기 — out 빨리 들어가 천천히 · in 점점 빠르게 · io 부드럽게).
+ * 팔이 짧고 몸이 둥글어서 팔만 크게 휘두르면 몸에 박힌다: 크게 휘두르는 건 몸 틀기(spin)와 손목(weapon)이 맡는다.
+ * 맞는 때(main.js HIT_DELAY / SWING_TIME ≈ 0.41)와 궤적(0.3 ~ 0.8)에 맞춘다.
+ */
+const SLASH_KEYS = [
+  { k: 0, e: 'io', armR: [-0.3, 0.2, 0.15], armL: [-0.2, 0, -0.15], weapon: [-0.5, 0.3, 0] },
+  // 번쩍: 무기 쪽 어깨를 뒤로 틀며 무기를 머리 옆으로 높이 치켜들고(뒤에서 봐도 칼날이 머리 위로 보이게), 반대 팔은 앞으로 겨눈다. 살짝 젖히며 앞발을 든다
+  { k: 0.28, e: 'out', armR: [-2.5, 0.9, 0.5], armL: [-1.1, 0, -0.35], weapon: [0.85, -0.2, 0], head: [-0.1, -0.35, 0], legL: [-0.4, 0, 0], legR: [0.15, 0, 0], spin: 0.55, lean: -0.1, bob: 0.03, push: -0.04, squash: -0.05 },
+  // 베는 순간: 몸을 반대로 틀며 앞발을 디디고 숙인다. 칼끝이 앞을 지나고 몸이 꾹 눌린다
+  { k: 0.43, e: 'in', armR: [-1.1, -0.15, 0.1], armL: [0.45, 0, -0.45], weapon: [0.95, -0.45, 0], head: [0.16, 0.15, 0], legL: [-0.5, 0, 0], legR: [0.4, 0, 0], spin: -0.25, lean: 0.22, bob: -0.03, push: 0.1, squash: 0.08 },
+  // 끝까지 베어 반대쪽 아래로
+  { k: 0.6, e: 'out', armR: [-0.9, -0.3, 0.05], armL: [0.4, 0, -0.5], weapon: [0.65, -1.25, 0], head: [0.1, 0.3, 0], legL: [-0.45, 0, 0], legR: [0.35, 0, 0], spin: -0.6, lean: 0.18, bob: -0.02, push: 0.09, squash: 0.03 },
+  { k: 0.78, e: 'io', armR: [-0.65, -0.2, 0.08], armL: [0.2, 0, -0.35], weapon: [0.55, -0.75, 0], head: [0.05, 0.25, 0], legL: [-0.3, 0, 0], legR: [0.25, 0, 0], spin: -0.45, lean: 0.1, push: 0.05 }
+];
+// 찌르기(사스마타): 웅크리며 두 손으로 자루를 뒤로 당겼다가, 앞발을 크게 디디며 몸째 쭉 내찌른다. 창끝은 수평 그대로
+const THRUST_KEYS = [
+  { k: 0, e: 'io', armR: [-0.2, 0, -0.1], armL: [-0.5, 0, 0.25], weapon: [-0.5, 0.4, 0] },
+  { k: 0.3, e: 'out', armR: [-0.25, 0.1, -0.12], armL: [-0.75, 0.25, 0.35], head: [0.05, -0.2, 0], legL: [-0.2, 0, 0], legR: [0.2, 0, 0], spin: 0.3, lean: -0.08, bob: -0.03, push: -0.14, squash: 0.06 },
+  { k: 0.48, e: 'in', armR: [-0.4, -0.05, -0.12], armL: [-0.3, -0.2, 0.3], head: [0.1, 0.1, 0], legL: [-0.6, 0, 0], legR: [0.45, 0, 0], spin: -0.15, lean: 0.24, bob: 0.01, push: 0.34, squash: -0.06 },
+  { k: 0.7, e: 'out', armR: [-0.3, 0, -0.12], armL: [-0.35, -0.1, 0.3], head: [0.05, 0.05, 0], legL: [-0.45, 0, 0], legR: [0.35, 0, 0], spin: -0.1, lean: 0.15, push: 0.22 }
+];
+
+/** 열쇠 자세 사이를 이어 k 때의 자세를 구한다(마지막 열쇠 뒤는 그대로). */
+function sampleKeys(keys, k) {
+  let i = 0;
+  while (i < keys.length - 2 && k > keys[i + 1].k) i++;
+  const A = keys[i], B = keys[i + 1], u = EASE[B.e](Math.max(0, Math.min(1, (k - A.k) / (B.k - A.k))));
+  const out = {};
+  for (const j of JOINTS) out[j] = mix(A[j], B[j], u);
+  for (const c of TRUNK) out[c] = (A[c] || 0) + ((B[c] || 0) - (A[c] || 0)) * u;
+  return out;
+}
+
+/**
+ * 휘두르기 · 찌르기: 서 있기(걷는 중이면 걷기) 자세 위에 공격 열쇠 자세를 얹는다.
+ * 시작은 바로 끼어들고 끝(0.78 ~)은 원래 자세로 부드럽게 돌아온다. 걸으면서 휘두르면 다리는 계속 걷고 몸통 · 팔이 휘두른다.
+ */
+function attackPose(mode, t, opts) {
+  const k = opts.swing || 0, moving = !!opts.moving;
+  const base = basePose(moving ? 'walk' : 'idle', t, opts);
+  const key = sampleKeys(mode === 'thrust' ? THRUST_KEYS : SLASH_KEYS, k);
+  const w = k < 0.08 ? EASE.io(k / 0.08) : k > 0.78 ? EASE.io((1 - k) / 0.22) : 1;
+  const legW = moving ? w * 0.25 : w, bodyW = moving ? w * 0.6 : w;
+  const a = { ...base.a };
+  for (const j of ['armR', 'armL', 'weapon', 'head']) a[j] = mix(base.a[j], key[j], w);
+  for (const j of ['legL', 'legR']) { const r = mix(base.a[j], key[j], legW); a[j] = [r[0], r[1] - key.spin * w, r[2]]; } // 몸을 틀어도 발끝은 앞으로
+  return {
+    a,
+    spin: base.spin + key.spin * w,
+    lean: base.lean + (key.lean - base.lean) * w,
+    waddle: base.waddle * (1 - w),
+    bob: base.bob * (1 - bodyW) + key.bob * bodyW,
+    push: key.push * bodyW,
+    squash: key.squash * w
+  };
 }

@@ -1590,8 +1590,9 @@ function boot() {
     endHunterExam();
     setTimeout(pass, 500);
   }
-  // 휘두를 때 앞에 그려지는 하얀 반달 궤적(맞는 범위: 앞쪽 ±60도, 무기 길이만큼)
-  const slash = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.0, 28, 1, -Math.PI / 3, (Math.PI * 2) / 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+  // 휘두를 때 앞에 그려지는 하얀 반달 궤적(맞는 범위: 앞쪽 ±60도, 무기 길이만큼). 칼끝을 따라 무기 쪽부터 펼쳐진다
+  const SLASH_SEG = 28;
+  const slash = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.0, SLASH_SEG, 1, -Math.PI / 3, (Math.PI * 2) / 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
   slash.visible = false;
   slash.renderOrder = 3;
   scene.add(slash);
@@ -1605,13 +1606,24 @@ function boot() {
     const k = player.swingK, wid = weaponNow(), thrust = !!(wid && WEAPONS[wid].thrust);
     const trail = thrust ? stab : slash;
     (thrust ? slash : stab).visible = false;
-    trail.visible = k > 0.32 && k < 0.75;
+    trail.visible = k > 0.3 && k < 0.78;
     if (trail.visible) {
       const reach = wid ? WEAPONS[wid].range + 0.2 : 1.5;
-      trail.position.set(player.position.x, 0.35, player.position.z);
-      trail.rotation.set(-Math.PI / 2, player.yaw - Math.PI / 2, 0, 'YXZ');
-      trail.scale.setScalar(reach);
-      trail.material.opacity = 0.75 * (1 - Math.abs(k - 0.45) / 0.3);
+      // 머리(칼끝이 지나간 자리)가 먼저 그려지고 꼬리가 뒤따라 사라진다
+      const head = Math.min(1, (k - 0.3) / 0.25), tail = Math.max(0, Math.min(1, (k - 0.45) / 0.33));
+      if (thrust) {
+        trail.position.set(player.position.x, 0.4, player.position.z);
+        trail.rotation.set(-Math.PI / 2, player.yaw - Math.PI / 2, 0, 'YXZ');
+        trail.scale.setScalar(reach * (0.5 + 0.5 * head)); // 찌르기: 앞으로 쭉 뻗어 나간다
+      } else {
+        // 베기: 무기 쪽 위에서 반대쪽 아래로 비스듬히(몸짓과 같은 방향)
+        const from = Math.round(SLASH_SEG * (1 - head)), to = Math.round(SLASH_SEG * (1 - tail));
+        trail.geometry.setDrawRange(from * 6, Math.max(0, to - from) * 6);
+        trail.position.set(player.position.x, 0.42, player.position.z);
+        trail.rotation.set(-Math.PI / 2 + 0.18, player.yaw - Math.PI / 2, 0, 'YXZ');
+        trail.scale.setScalar(reach);
+      }
+      trail.material.opacity = 0.8 * (1 - tail * 0.85);
       trail.material.color.set(wid === 'star' ? 0xfff2a8 : 0xffffff);
     }
     if (examCleanup) { examCleanup = false; monsters.clear((m) => m.exam); }
