@@ -4067,6 +4067,7 @@ function boot() {
     }
     hud.placeLabels(bubbles.length ? near.concat(bubbles) : near, cam.camera);
   }
+  village.warmShaders(gfx.renderer, cam.camera); // 처음 나무 · 집 뒤에 갈 때 멈칫하지 않게 반투명 셰이더를 미리
   requestAnimationFrame(frame);
 }
 

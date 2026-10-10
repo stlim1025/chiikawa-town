@@ -126,6 +126,29 @@ transformed += normalize(normal) * uThickness * wob * press * far;`
   return m;
 }
 
+const bakedCache = new Map();
+/**
+ * 덩어리로 합친 외곽선 재질(batch.js): 미는 방향 · 길이를 꼭짓점 속성 outlinePush 에 미리 담는다(원래 부품의 크기 · 늘임까지 그대로).
+ * 두께가 달랐던 외곽선도 재질 하나로 그려 칸마다 외곽선 그리기가 한 번이 된다. hand 면 붓펜 선(굵기 들쭉날쭉 · 멀어도 비슷한 굵기)도 같다.
+ */
+export function bakedOutlineMaterial(hand = false) {
+  if (bakedCache.has(hand)) return bakedCache.get(hand);
+  const m = new THREE.MeshBasicMaterial({ color: LINE_COLOR, side: THREE.BackSide, ...NO_GHOST });
+  const push = hand
+    ? `float wob = 0.8 + 0.4 * (0.5 + 0.5 * sin(position.x * 5.0 + position.y * 3.0) * sin(position.z * 4.0 - position.y * 3.0 + 1.3));
+float press = 1.0 + 0.3 * clamp(-normal.y, 0.0, 1.0);
+float far = clamp(-(modelViewMatrix * vec4(position, 1.0)).z / 9.0, 1.0, 1.8);
+transformed += outlinePush * wob * press * far;`
+    : 'transformed += outlinePush;';
+  m.onBeforeCompile = (shader) => {
+    shader.vertexShader = 'attribute vec3 outlinePush;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + push);
+  };
+  m.customProgramCacheKey = () => (hand ? 'toon-outline-baked-hand' : 'toon-outline-baked');
+  m.userData.baked = true;
+  bakedCache.set(hand, m);
+  return m;
+}
+
 /** mesh 에 외곽선 자식 메시를 붙인다. world 는 대략적인 월드 두께, hand 는 손그림 선, geometry 는 외곽선 모양(겉모양만 같으면 더 성긴 도형). */
 export function addOutline(mesh, world = 0.035, hand = false, geometry = mesh.geometry) {
   const s = (Math.abs(mesh.scale.x) + Math.abs(mesh.scale.y) + Math.abs(mesh.scale.z)) / 3 || 1;

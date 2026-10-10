@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { outlineMaterial, toonMaterial } from './toon.js';
+import { bakedOutlineMaterial, toonMaterial } from './toon.js';
 
 // 움직이지 않는 풍경을 덩어리로 합친다(정적 배칭): 가로등 · 울타리 · 덤불 · 바위처럼 재질을 여럿이 같이 쓰는 불투명 소품을
 // 칸마다 한 메시로(같은 색끼리 나눠 쓰는 재질은 색을 꼭짓점에 칠해 색이 달라도 하나로), 그 외곽선도 굵기별로 한 메시로. 물체 수가 줄면 위치 계산 · 화면 안 검사 · 그리기 명령이 함께 준다
@@ -24,21 +24,28 @@ export function mergedGeometry(parts) {
   })), { color });
 }
 
-/** [{ geometry, matrix, tint }] 를 matrix 를 굳혀 한 도형으로. 위치 · 법선(과 색 · uv)만. 색은 tint(그 부품 전체 한 색)가 있으면 그것, 없으면 도형의 색. */
+/**
+ * [{ geometry, matrix, tint, push }] 를 matrix 를 굳혀 한 도형으로. 위치 · 법선(과 색 · uv)만. 색은 tint(그 부품 전체 한 색)가 있으면 그것, 없으면 도형의 색.
+ * push(외곽선 두께, 부품 단위)가 있으면 원래 외곽선 셰이더가 밀던 만큼(부품 크기 · 늘임까지)을 꼭짓점 속성 outlinePush 로 굳힌다.
+ */
 function mergeInto(items, { color = false, uv = false } = {}) {
+  const pushed = items.some((it) => it.push != null);
   let verts = 0, idx = 0;
   for (const { geometry: g } of items) { verts += g.attributes.position.count; idx += g.index ? g.index.count : g.attributes.position.count; }
   const pos = new Float32Array(verts * 3), nor = new Float32Array(verts * 3);
   const col = color ? new Float32Array(verts * 3) : null, tex = uv ? new Float32Array(verts * 2) : null;
   const index = new (verts > 65535 ? Uint32Array : Uint16Array)(idx);
-  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  const psh = pushed ? new Float32Array(verts * 3) : null;
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3(), lin = new THREE.Matrix3();
   let vo = 0, io = 0;
-  for (const { geometry: g, matrix, tint } of items) {
+  for (const { geometry: g, matrix, tint, push } of items) {
     const p = g.attributes.position, n = g.attributes.normal;
     nm.getNormalMatrix(matrix);
+    lin.setFromMatrix4(matrix);
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i).applyMatrix4(matrix);
       pos[(vo + i) * 3] = v.x; pos[(vo + i) * 3 + 1] = v.y; pos[(vo + i) * 3 + 2] = v.z;
+      if (psh) { v.fromBufferAttribute(n, i).normalize().applyMatrix3(lin).multiplyScalar(push || 0); psh[(vo + i) * 3] = v.x; psh[(vo + i) * 3 + 1] = v.y; psh[(vo + i) * 3 + 2] = v.z; }
       v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize();
       nor[(vo + i) * 3] = v.x; nor[(vo + i) * 3 + 1] = v.y; nor[(vo + i) * 3 + 2] = v.z;
       if (col && tint) { col[(vo + i) * 3] = tint.r; col[(vo + i) * 3 + 1] = tint.g; col[(vo + i) * 3 + 2] = tint.b; }
@@ -54,6 +61,7 @@ function mergeInto(items, { color = false, uv = false } = {}) {
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   if (tex) out.setAttribute('uv', new THREE.BufferAttribute(tex, 2));
+  if (psh) out.setAttribute('outlinePush', new THREE.BufferAttribute(psh, 3));
   out.setIndex(new THREE.BufferAttribute(index, 1));
   out.computeBoundingSphere();
   return out;
@@ -69,14 +77,15 @@ function plainBody(m) {
   return m.children.every((c) => isOutline(c) && c.children.length === 0 && c.geometry && c.geometry.attributes.normal);
 }
 
-/** 외곽선 하나를 합칠 때의 묶음 열쇠와 만들 재질: 법선으로 미는 선은 굳힌 좌표계 단위 두께로, 껍질 선은 그대로. */
-function lineKey(line, matrix) {
+/**
+ * 외곽선 하나를 합칠 때의 묶음 열쇠 · 재질 · 미는 두께: 법선으로 미는 선은 두께를 꼭짓점에 굳혀(push) 붓펜 선 · 보통 선 재질 하나씩으로,
+ * 껍질 선은 크기를 굳히면 그대로라 재질째로.
+ */
+function lineKey(line) {
   const lm = line.material;
-  if (lm.userData.thickness === undefined) return { key: 's|' + lm.uuid, material: () => lm };
-  const e = matrix.elements;
-  const s = (Math.hypot(e[0], e[1], e[2]) + Math.hypot(e[4], e[5], e[6]) + Math.hypot(e[8], e[9], e[10])) / 3;
-  const w = Math.round(lm.userData.thickness * s * 1000) / 1000, hand = !!lm.userData.hand;
-  return { key: 'o|' + w + '|' + hand, material: () => outlineMaterial(w, hand) };
+  if (lm.userData.thickness === undefined) return { key: 's|' + lm.uuid, material: () => lm, push: null };
+  const hand = !!lm.userData.hand;
+  return { key: 'p|' + hand, material: () => bakedOutlineMaterial(hand), push: lm.userData.thickness };
 }
 
 /**
@@ -99,9 +108,9 @@ export function mergeUnit(unit, meshes, recolor = (m) => ({ key: m.material.uuid
     gr.items.push({ geometry: m.geometry, matrix: mat, tint: rc.tint });
     if (rc.tint || (m.material.vertexColors && m.geometry.attributes.color)) gr.color = true;
     for (const line of m.children) {
-      const lmat = inv.clone().multiply(line.matrixWorld), { key: lk, material } = lineKey(line, lmat);
+      const lmat = inv.clone().multiply(line.matrixWorld), { key: lk, material, push } = lineKey(line);
       if (!gr.lines.has(lk)) gr.lines.set(lk, { material, items: [] });
-      gr.lines.get(lk).items.push({ geometry: line.geometry, matrix: lmat });
+      gr.lines.get(lk).items.push({ geometry: line.geometry, matrix: lmat, push });
     }
   }
   const merged = [];
@@ -168,9 +177,8 @@ export function batchStatic(root, { skip = [], cell = 20 } = {}) {
       (geo) => { const mesh = new THREE.Mesh(geo, out); mesh.castShadow = m.castShadow; mesh.receiveShadow = m.receiveShadow; return mesh; },
       { geometry: m.geometry, matrix: m.matrixWorld.clone(), color: tinted || !!mat.vertexColors, tint: tinted ? mat.color : null });
     for (const line of m.children) {
-      // 법선으로 미는 외곽선은 월드 단위 두께로(원래는 메시 단위 두께 × 그 메시 크기), 껍질 외곽선은 그대로
-      const { key, material } = lineKey(line, line.matrixWorld);
-      put(holder.uuid + '|' + key, holder, (geo) => new THREE.Mesh(geo, material()), { geometry: line.geometry, matrix: line.matrixWorld.clone() });
+      const { key, material, push } = lineKey(line);
+      put(holder.uuid + '|' + key, holder, (geo) => new THREE.Mesh(geo, material()), { geometry: line.geometry, matrix: line.matrixWorld.clone(), push });
     }
     taken.push(m);
   }

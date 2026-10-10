@@ -67,7 +67,6 @@ function rng(seed) {
   };
 }
 
-/** 마을 전체를 장면에 만든다. */
 // 나무 잎 덩어리 넷(위치 · 반지름): 진한 잎 · 밝은 잎을 번갈아 꼭짓점 색으로 칠해 한 도형으로(나무마다 그리기 잎 4번 + 외곽선 4번 → 1번 + 1번).
 // 잎 색이 같은 나무끼리 도형을 같이 쓴다
 const CANOPY = [[0, 1.65, 0, 0.82], [0.48, 1.35, 0.18, 0.58], [-0.42, 1.42, -0.12, 0.6], [0.05, 1.3, -0.45, 0.55]];
@@ -78,6 +77,7 @@ const canopyGeometry = (leaf, light) => {
   return canopyGeos.get(key);
 };
 
+/** 마을 전체를 장면에 만든다. */
 export function buildVillage(scene) {
   const rand = rng(7);
   const obstacles = createObstacleIndex(4), labels = [], spots = {}, clouds = [];
@@ -714,6 +714,15 @@ export function buildVillage(scene) {
   for (const m of [...trees, ...houses, ...gates].flatMap((o) => o.mats)) seeThrough(m, false);
 
   return {
+    /**
+     * 처음 가릴 때 멈칫하지 않게: 나무 · 집 · 문의 반투명용 셰이더를 미리 만들어 둔다(평소엔 불투명으로 그려서 반투명용은 처음 가릴 때에야
+     * 만들어졌다 — 휴대폰에서 0.1초 안팎 멈춤). 모든 빛 · 물체가 장면에 들어간 뒤 한 번 부른다.
+     */
+    warmShaders(renderer, camera) {
+      const mats = [...trees, ...houses, ...gates].flatMap((o) => o.mats);
+      mats.forEach((m) => seeThrough(m, true));
+      try { renderer.compile(scene, camera); } finally { mats.forEach((m) => seeThrough(m, false)); }
+    },
     /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */
