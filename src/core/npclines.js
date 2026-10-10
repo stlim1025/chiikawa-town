@@ -59,7 +59,8 @@ export const NPC_LINES = {
     gift: '…이거 선물…! 받아 줘…!',
     // 별똥별맨(진짜 별똥별이 떨어졌다)
     starShock: ['…!! (덜덜덜)', '…우와아앙…!'],
-    starBye: '…가 버렸다…'
+    starBye: '…가 버렸다…',
+    starPray: '…(꾸욱) 소원… 빌어야지…!'
   },
   hachiware: {
     jobTake: ['{title}! 맡겨 줘~', '{title}! 내가 할게~'],
@@ -106,7 +107,8 @@ export const NPC_LINES = {
     danceEnd: ['신난다~! 노래도 부르고 싶다~', '{name} 춤 잘 춘다~!'],
     gift: '{name}~ 이거 선물이야! ♪',
     starShock: ['에엣?! 진짜 떨어졌어?!', '별똥별… 얼굴이 있어…!'],
-    starBye: '소원… 들어준 걸까~?'
+    starBye: '소원… 들어준 걸까~?',
+    starPray: '지금이야! 소원 빌자~!'
   },
   usagi: {
     jobTake: '야하!',
@@ -153,7 +155,8 @@ export const NPC_LINES = {
     danceEnd: ['우라~! 우라~!', '야하~!! (신났다)'],
     gift: '우라! (쓱 내민다)',
     starShock: ['하아?!', '…후랏?! (뒷걸음)'],
-    starBye: '야하~!'
+    starBye: '야하~!',
+    starCopy: '우라라라라~!! (같이 발광)'
   },
   kurimanju: {
     jobTake: '{title}… 슬슬 해 볼까~',
@@ -273,7 +276,7 @@ const PLAIN = {
   playAsk: '좋아! 뭐 하고 놀까?', rpsGo: '가위바위보! 뭐 낼래?', rpsShow: '나는 {hand}!', rpsDraw: '비겼다! 한 번 더', rpsLose: '으앗 졌다! {name} 잘한다~',
   rpsWin: '내가 이겼다~! 헤헤', rpsAgain: '한 판 더 할래?', tagGo: '내가 도망갈게! 잡아 봐~', tagCaught: '으앗 잡혔다~!', tagEscaped: '못 잡았지롱~!',
   danceGo: '같이 춤추자! 하나 둘 셋!', danceEnd: '헤헤 신난다~!', gift: '{name} 이거 선물이야!',
-  starShock: '에엣?! 별똥별이…!', starBye: '가 버렸다…'
+  starShock: '에엣?! 별똥별이…!', starBye: '가 버렸다…', starPray: '소원을 빌자…!', starCopy: '으아아~!'
 };
 
 /** 그 친구의 그 대사 한 줄(목록이면 하나 골라서 {title} · {mon} · {pay} 를 채운다). */

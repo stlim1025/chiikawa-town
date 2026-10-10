@@ -464,6 +464,17 @@ export function createNpcs(scene, village, weeds, berries) {
     comeOut(n, x, z) { const p = nearFree(x, z); n.x = p.x; n.z = p.z; n.away = false; n.state = 'idle'; n.timer = 1.5; n.talk = 0; n.chibi.root.visible = true; },
     /** 몸짓을 sec 초 동안(같이 춤추기 'dance', 이겼다 'cheer'). */
     emote(n, anim, sec) { n.emote = { anim, t: sec }; },
+    /** 연출: 하던 일 · 일정을 멈추고 곧바로 몸짓(anim)을 time 초 동안. face: 바라볼 곳, say: 말풍선(별똥별맨 소동 등). */
+    act(n, anim, { face = null, time = 4, say: line = null } = {}) {
+      if (n.task) endTask(n);
+      clearRoute(n);
+      n.plan = null; n.emote = null; n.talk = 0;
+      if (face) n.yaw = Math.atan2(face.x - n.x, face.z - n.z);
+      n.task = { type: 'act', anim, time, quick: true };
+      n.state = 'work';
+      n.workT = 0;
+      if (line) say(n, line);
+    },
     /** 술래잡기: 내 캐릭터에게서 도망간다. */
     flee(n, on) {
       if (n.task) endTask(n);

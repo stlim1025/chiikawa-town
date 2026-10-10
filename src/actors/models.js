@@ -796,6 +796,7 @@ const ZERO = [0, 0, 0];
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
+ *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
  *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다), eat (한 번 먹기 진행 0..1 — 없으면 계속 먹는다) }
  */
@@ -953,6 +954,20 @@ function basePose(mode, t, opts) {
     a.head = [-0.55, Math.sin(t * 0.5 + phase) * 0.3, 0];
     a.armL = [0.45, 0, -0.18]; a.armR = [0.45, 0, 0.18];
     lean = -0.06;
+  } else if (mode === 'pray') {
+    // 소원 빌기: 두 손을 가슴 앞에 꼭 모으고 고개를 숙인다(조금씩 끄덕)
+    a.armL = [-1.25, 0, 0.62]; a.armR = [-1.25, 0, -0.62];
+    a.head = [0.24 + Math.sin(t * 2.2 + phase) * 0.03, 0, 0];
+    bob = Math.sin(t * 2.2 + phase) * 0.008;
+  } else if (mode === 'flail') {
+    // 발광: 팔다리를 마구 휘두르며 들썩들썩(별똥별맨 따라 하기)
+    a.armL = [-1 + Math.sin(t * 19 + phase) * 1.4, 0, -1.2 + Math.sin(t * 13 + phase) * 0.8];
+    a.armR = [-1 + Math.cos(t * 17 + phase) * 1.4, 0, 1.2 + Math.sin(t * 11 + phase + 1) * 0.8];
+    a.legL = [Math.sin(t * 18 + phase) * 0.7, 0, 0]; a.legR = [-Math.sin(t * 18 + phase) * 0.7, 0, 0];
+    a.head = [Math.sin(t * 15 + phase) * 0.25, Math.sin(t * 9 + phase) * 0.5, Math.sin(t * 12 + phase) * 0.3];
+    bob = Math.abs(Math.sin(t * 14 + phase)) * 0.22;
+    waddle = Math.sin(t * 16 + phase) * 0.25;
+    lean = Math.sin(t * 10 + phase) * 0.18;
   } else if (EAT_ANIMS.includes(mode)) {
     const e = eatPose(mode, t, opts);
     Object.assign(a, e.a);

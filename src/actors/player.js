@@ -14,6 +14,7 @@ export function createPlayer(scene, chibi, village) {
   let held = null, weapon = null, weaponShown = true, engraved = new Set(); // engraved: 얼굴을 새긴 무기(랭커)
   let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   let eatT = 0, eatDur = 1, eatMode = null, food = null; // 먹는 중: 몸짓('slurp' | 'gulp' | 'nibble') · 손에 든 음식 꼬리표('f-…')
+  let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
   const knock = { x: 0, z: 0 };
   // 먹는 동안은 음식만 든다(무기 · 손전등은 잠깐 넣어 둔다)
   const showHeld = () => {
@@ -54,14 +55,16 @@ export function createPlayer(scene, chibi, village) {
     /** 얼굴을 새긴 무기들(토벌 랭커). */
     setEngraved(list) { const key = (list || []).join(','); if ([...engraved].join(',') === key) return; engraved = new Set(list || []); showHeld(); },
     /** 무기를 휘두른다(seconds 동안 휘두르기 몸짓). */
-    swing(seconds = 0.32, style = 'swing') { stopEat(); swingT = seconds; api.swingDur = seconds; swingStyle = style; },
+    swing(seconds = 0.32, style = 'swing') { stopEat(); actT = 0; swingT = seconds; api.swingDur = seconds; swingStyle = style; },
     /** 먹는다(mode: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 냠냠, prop: 손에 드는 음식). 걷거나 휘두르거나 맞으면 그만 먹는다. */
     eat(mode, prop, seconds) { eatT = seconds; eatDur = seconds; eatMode = mode; food = prop; showHeld(); },
+    /** 연출 몸짓을 seconds 초 동안(mode: 'pray' 등, 0 이면 그만). 걷거나 휘두르거나 맞으면 그만둔다. */
+    act(mode, seconds) { actMode = mode; actT = mode ? seconds : 0; },
     get swinging() { return swingT > 0; },
     /** 휘두르기 진행(0 → 1, 안 휘두르면 0). */
     get swingK() { return swingT > 0 ? 1 - swingT / api.swingDur : 0; },
     /** 맞았다: 밀려나고, 잠깐 휘청이며 깜빡인다. (vx, vz) 는 밀려나는 거리. */
-    hurt(vx, vz, seconds = 1.0) { stopEat(); knock.x = vx * 7; knock.z = vz * 7; hurtT = 0.3; blinkT = seconds; },
+    hurt(vx, vz, seconds = 1.0) { stopEat(); actT = 0; knock.x = vx * 7; knock.z = vz * 7; hurtT = 0.3; blinkT = seconds; },
     /** 깜빡임(맞은 뒤 잠깐 무적)을 멈춘다. */
     stopBlink() { blinkT = 0; model.root.visible = true; },
     /** 지점을 바라본다. */
@@ -91,6 +94,7 @@ export function createPlayer(scene, chibi, village) {
       const v = api.busy || api.walkTo || moving || hurtT > 0 ? { x: 0, y: 0 } : input.vector();
       const len = Math.min(1, Math.hypot(v.x, v.y));
       if (len > 0.12 && eatT > 0) stopEat(); // 걸어가면 그만 먹는다
+      if (len > 0.12) actT = 0;
       if (len > 0.12) {
         const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y);
         const pace = swingT > 0 ? SWING_SLOW : 1;
@@ -111,7 +115,8 @@ export function createPlayer(scene, chibi, village) {
       swingT = Math.max(0, swingT - dt);
       hurtT = Math.max(0, hurtT - dt);
       if (eatT > 0) { eatT = Math.max(0, eatT - dt); if (eatT === 0) stopEat(); }
-      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : eatT > 0 ? eatMode : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      actT = Math.max(0, actT - dt);
+      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : eatT > 0 ? eatMode : actT > 0 ? actMode : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
       // 풀 뽑기 · 춤 · 만세 중에는 무기를 넣어 둔다(손이 풀 · 머리에 박히지 않게)
       const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer');
       if (show !== weaponShown) { weaponShown = show; showHeld(); }

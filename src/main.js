@@ -3238,6 +3238,20 @@ function boot() {
   const meWho = () => ({ kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
   const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
   const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓
+  // 원작처럼 셋이 같이 별똥별을 본다: 내 옆자리 [dx, dz]. 별똥별맨이 발광하면 우사기는 따라 발광, 둘은 소원을 빈다
+  const STAR_PALS = [['chiikawa', -1.3, 0.4, 'pray'], ['hachiware', 1.3, 0.4, 'pray'], ['usagi', 2.6, -0.2, 'flail']];
+  const north = (n) => ({ x: n.x, z: n.z - 10 });
+  /** 하늘을 올려다보는 사이(땅이 화면에 안 보일 때) 셋이 내 옆에 와서 같이 하늘을 본다. */
+  function gatherPals(S) {
+    S.pals = [];
+    for (const [kind, dx, dz] of STAR_PALS) {
+      const n = npcs.byKind(kind);
+      if (!n) continue;
+      npcs.comeOut(n, S.p.x + dx, S.p.z + dz);
+      npcs.act(n, 'gaze', { face: north(n), time: 30 });
+      S.pals.push(kind);
+    }
+  }
   /** 소원 빌기: 고개를 들어 밤하늘 → 소원 고르기 → 진짜 별똥별이 앞에 쿵 → 별똥별맨이 빤히 보다가 날아간다. */
   function startWish(preview = false) {
     if (starShow || mode !== 'play' || (!preview && !canWish(state))) return;
@@ -3255,6 +3269,8 @@ function boot() {
       if (!w) { S.phase = 'back'; S.t = 0; return; }
       Object.assign(S, { wish: w.id, phase: 'fall', t: 0 });
       sound.play('swing');
+      player.act('pray', 2);
+      (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n && kind !== 'usagi') npcs.act(n, 'pray', { face: north(n), time: 3 }); });
       starfall.drop(new THREE.Vector3(S.p.x - 7, 15, S.p.z - 22), S.land.x, S.land.z, starLanded);
     }, meWho());
   }
@@ -3267,9 +3283,20 @@ function boot() {
     sound.play('thud');
     setTimeout(() => sound.play('poof'), 120);
     starfall.setSky(false);
+    const crater = { x: S.land.x, z: S.land.z }, pals = S.pals || [];
+    for (const kind of pals) { const n = npcs.byKind(kind); if (n) npcs.act(n, 'hop', { face: crater, time: 2.2, say: lineOf(kind, 'starShock') }); }
+    setTimeout(() => {
+      if (starShow !== S) return;
+      player.act('pray', 6);
+      pals.forEach((kind, i) => {
+        const n = npcs.byKind(kind), how = STAR_PALS.find((q) => q[0] === kind)[3];
+        if (n) setTimeout(() => npcs.act(n, how, { face: crater, time: 7, say: lineOf(kind, how === 'flail' ? 'starCopy' : 'starPray') }), i * 350);
+      });
+    }, 1000);
     for (const n of npcs.list) {
       if (n.away || !FRIENDS[n.kind] || Math.hypot(n.x - S.land.x, n.z - S.land.z) > 16) continue;
       S.kinds.push(n.kind);
+      if (pals.includes(n.kind)) continue;
       const a = Math.atan2(n.x - S.land.x, n.z - S.land.z);
       // 하던 일을 멈추고 그 자리에서 바로 놀란 뒤(말 걸기처럼 끼어든다), 구덩이 옆으로 달려와 본다
       npcs.plan(n, [{ do: 'walk', x: S.land.x + Math.sin(a) * 2.2, z: S.land.z + Math.cos(a) * 2.2, near: 0.6 },
@@ -3278,8 +3305,8 @@ function boot() {
     }
     setTimeout(() => {
       if (starShow !== S) return;
-      guide.say(['……', '(엄청 사실적인 얼굴로 빤히 쳐다본다)', '……!'], () => { sound.play('swing'); starfall.leave(starGone); }, STARMAN);
-    }, 1700);
+      guide.say(['(별똥별맨이 갑자기 미친 듯이 발광한다!!)', '(부들부들부들부들…!!)'], () => { sound.play('swing'); starfall.leave(starGone); }, STARMAN);
+    }, 2600);
   }
   /** 별똥별맨이 날아갔다: 소원이 시시하게 조금 이루어지고 별 조각이 남는다. */
   function starGone() {
@@ -3304,6 +3331,7 @@ function boot() {
     starShow = null;
     starfall.setSky(false);
     player.busy = false;
+    player.act(null, 0);
     cam.snap(done ? { x: S.p.x, z: (S.p.z + S.land.z) / 2 } : S.p); // 따라가기 카메라가 지금 자리에서 부드럽게 이어 간다
   }
   /** 연출 카메라: 올려다보기 → (소원) → 떨어지는 별을 따라 내려와 나와 구덩이가 함께 보이게. */
@@ -3316,9 +3344,17 @@ function boot() {
     if (S.phase === 'look') {
       const e = ease(Math.min(1, S.t / 1.3));
       pos = S.fromPos.clone().lerp(skyPos, e); look = S.fromLook.clone().lerp(skyLook, e);
+      if (!S.pals && S.t >= 0.75) gatherPals(S);
       if (S.t >= 1.3) { S.phase = 'wish'; askWish(); }
     } else if (S.phase === 'wish') { pos = skyPos; look = skyLook; }
-    else if (S.phase === 'fall') { const e = ease(Math.min(1, S.t / 1.4)); pos = skyPos.clone().lerp(mid.pos, e); look = skyLook.clone().lerp(mid.look, e); }
+    else if (S.phase === 'fall') {
+      // 별은 점점 빨라지며 떨어지고(카메라보다 늦게 내려온다) 카메라는 먼저 땅을 향하니, 도중에는 시선을 별 쪽으로 당겨 화면 밖으로 안 나가게
+      // 별이 높이 있을수록 많이 당기고(땅에 닿는 순간 0), 처음 0.4초는 하늘 보던 시선에서 부드럽게 넘어간다
+      const e = ease(Math.min(1, S.t / 1.4)), h = starfall.head;
+      const w = starfall.phase === 'fall' ? 0.7 * Math.min(1, Math.max(0, (h.y - 0.75) / 6)) * ease(Math.min(1, S.t / 0.4)) : 0;
+      pos = skyPos.clone().lerp(mid.pos, e);
+      look = skyLook.clone().lerp(mid.look, e).lerp(h, w);
+    }
     else if (S.phase === 'back') {
       const e = ease(Math.min(1, S.t / 0.9));
       pos = skyPos.clone().lerp(S.fromPos, e); look = skyLook.clone().lerp(S.fromLook, e);

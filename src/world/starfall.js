@@ -171,11 +171,13 @@ export function createStarfall(scene) {
   /** 화면에서 a → b 로 가는 방향 각도(꼬리 스프라이트를 그쪽으로 돌린다). */
   const screenAngle = (camera, a, b) => {
     const pa = v.copy(a).project(camera), ax = pa.x, ay = pa.y, pb = v.copy(b).project(camera);
-    return Math.atan2(pb.y - ay, pb.x - ax);
+    return Math.atan2(pb.y - ay, (pb.x - ax) * camera.aspect); // 화면 비율만큼 가로를 펴야 실제로 보이는 각도
   };
 
   return {
     get phase() { return phase; },
+    /** 별똥별맨의 지금 자리(떨어지는 동안 카메라가 따라본다). */
+    get head() { return man.position; },
     /** 올려다본 밤하늘(별 · 지나가는 별똥별)을 켜고 끈다. */
     setSky(on) { skyOn = on; stars.visible = on; if (!on) streaks.forEach((s) => { s.sp.visible = false; }); },
     /** 별똥별이 하늘(from)에서 (x, z) 로 떨어진다. 부딪히면 land(), 별똥별맨이 다 솟아나면 다음 단계. */
@@ -193,7 +195,7 @@ export function createStarfall(scene) {
       pool.visible = false;
     },
     /** 별똥별맨이 하늘로 날아간다. 다 날아가면 gone(). */
-    leave(gone) { onGone = gone; phase = 'leave'; pt = 0; trail.visible = true; },
+    leave(gone) { onGone = gone; phase = 'leave'; pt = 0; trail.visible = true; man.rotation.x = man.rotation.y = 0; },
     /** 구덩이까지 바로 치운다. */
     clear() { phase = 'idle'; man.visible = trail.visible = flash.visible = crater.visible = pool.visible = false; },
     update(dt, camera) {
@@ -217,7 +219,7 @@ export function createStarfall(scene) {
           if (!live) continue;
           s.x += s.vx * dt; s.y += s.vy * dt;
           s.sp.position.copy(camera.position).addScaledVector(fwd, 120).addScaledVector(right, s.x).addScaledVector(up, s.y);
-          s.sp.material.rotation = Math.atan2(s.vy, s.vx) + Math.PI; // 머리(오른쪽 끝)가 가는 쪽
+          s.sp.material.rotation = Math.atan2(s.vy, s.vx); // 머리(오른쪽 끝)가 가는 쪽, 꼬리는 뒤로
           s.sp.material.opacity = Math.sin((s.t / s.life) * Math.PI);
           s.sp.scale.set(10, 0.5, 1);
         }
@@ -227,7 +229,7 @@ export function createStarfall(scene) {
         man.position.lerpVectors(start, land, e).y += 0.75 * e;
         man.rotation.z += dt * 6;
         trail.position.copy(man.position);
-        trail.material.rotation = screenAngle(camera, start, land) + Math.PI;
+        trail.material.rotation = screenAngle(camera, start, land); // 머리가 떨어지는 쪽, 꼬리는 온 쪽으로
         trail.scale.set(3 + 5 * e, 0.9, 1);
         if (u >= 1) {
           phase = 'rise'; pt = 0;
@@ -244,18 +246,20 @@ export function createStarfall(scene) {
         const u = Math.min(1, pt / RISE), over = 1 + 0.18 * Math.sin(u * Math.PI);
         man.position.set(land.x, 0.15 + 0.6 * u, land.z);
         man.scale.setScalar((0.45 + 0.55 * u) * over);
-        if (u >= 1) { phase = 'stare'; pt = 0; }
-      } else if (phase === 'stare') {
-        man.position.set(land.x, 0.75, land.z);
-        man.scale.setScalar(1);
-        man.rotation.z = Math.sin(pt * 31) * 0.025; // 부들부들
+        if (u >= 1) { phase = 'flail'; pt = 0; }
+      } else if (phase === 'flail') {
+        // 원작처럼 솟아나자마자 미친 듯이 발광: 들썩들썩 뛰고 이리저리 비틀며 찌그러졌다 늘어났다(점점 격해진다)
+        const k = Math.min(1, pt / 0.4), sq = Math.sin(pt * 19) * 0.2 * k;
+        man.position.set(land.x + Math.sin(pt * 37) * 0.12 * k, 0.75 + Math.abs(Math.sin(pt * 13)) * 0.55 * k, land.z + Math.sin(pt * 29) * 0.06 * k);
+        man.rotation.set(Math.sin(pt * 17) * 0.25 * k, Math.sin(pt * 11) * 0.6 * k, (Math.sin(pt * 23) * 0.7 + Math.sin(pt * 7) * 0.3) * k);
+        man.scale.set(1 + sq, 1 - sq, 1);
       } else if (phase === 'leave') {
         const u = Math.min(1, pt / LEAVE), e = ease(u);
         man.position.set(land.x - 4 * e, 0.75 + 26 * e, land.z - 6 * e);
         man.scale.setScalar(1 - 0.5 * e);
         man.rotation.z += dt * 8;
         trail.position.copy(man.position);
-        trail.material.rotation = screenAngle(camera, land, man.position) + Math.PI;
+        trail.material.rotation = screenAngle(camera, land, man.position);
         trail.scale.set(2 + 6 * e, 0.9, 1);
         if (u >= 1) { phase = 'gone'; man.visible = trail.visible = false; const cb = onGone; onGone = null; cb?.(); }
       }

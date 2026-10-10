@@ -69,4 +69,7 @@ test('친구들은 별똥별맨을 보고 자기 말투로 놀란다', async () 
     assert.ok(NPC_LINES[k].starShock && NPC_LINES[k].starBye, k);
   }
   assert.notEqual(String(NPC_LINES.usagi.starShock), String(NPC_LINES.rakko.starShock));
+  // 원작: 별똥별맨이 발광하면 우사기는 따라 발광하고, 치이카와 · 하치와레는 소원을 빈다
+  assert.ok(NPC_LINES.chiikawa.starPray && NPC_LINES.hachiware.starPray && NPC_LINES.usagi.starCopy);
+  assert.match(NPC_LINES.usagi.starCopy.replace(/\([^)]*\)/g, ''), /^[우라야하아후랏이~!?…\s]*$/, '우사기는 소리로만');
 });
