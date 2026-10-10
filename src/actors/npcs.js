@@ -470,7 +470,7 @@ export function createNpcs(scene, village, weeds, berries) {
       clearRoute(n);
       n.plan = null; n.emote = null; n.talk = 0;
       if (face) n.yaw = Math.atan2(face.x - n.x, face.z - n.z);
-      n.task = { type: 'act', anim, time, quick: true };
+      n.task = { type: 'act', anim, time, quick: true, hold: true };
       n.state = 'work';
       n.workT = 0;
       if (line) say(n, line);
@@ -542,6 +542,7 @@ export function createNpcs(scene, village, weeds, berries) {
         const pd0 = Math.hypot(player.x - n.x, player.z - n.z);
         // 술래잡기: 내 캐릭터 반대쪽으로 달아난다(멀리 떨어지면 숨을 고르며 약 올린다)
         if (n.down) { n.state = 'idle'; n.timer = 99; } // 기절: 제자리에 누워 있는다(깨워 줄 때까지)
+        else if (n.task && n.task.hold && n.state === 'work') { /* 연출 몸짓 중(별똥별맨 소동): 따라다니기 · 앞장서기는 잠시 멈춤 */ }
         else if (n.flee && !n.emote) {
           n.state = 'walk';
           const away = Math.atan2(n.x - player.x, n.z - player.z) + Math.sin(t * 1.7 + n.phase) * 0.6;

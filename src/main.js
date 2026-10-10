@@ -2159,6 +2159,7 @@ function boot() {
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
       if (!n) continue;
+      if (starShow && starShow.pals && starShow.pals.includes(kind)) continue; // 별똥별을 같이 보는 중: 끝나면 일과대로(밤이면 하품하고 집으로)
       if (!n.away) minds[kind] = growNeeds(mindOf(kind), kind, 1.5); // 깨어 있으면 심심함 · 외로움이 조금씩 찬다
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
       if (n.away) {
@@ -3248,7 +3249,7 @@ function boot() {
       const n = npcs.byKind(kind);
       if (!n) continue;
       npcs.comeOut(n, S.p.x + dx, S.p.z + dz);
-      npcs.act(n, 'gaze', { face: north(n), time: 30 });
+      npcs.act(n, 'gaze', { face: north(n), time: 90 });
       S.pals.push(kind);
     }
   }
@@ -3270,7 +3271,7 @@ function boot() {
       Object.assign(S, { wish: w.id, phase: 'fall', t: 0 });
       sound.play('swing');
       player.act('pray', 2);
-      (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n && kind !== 'usagi') npcs.act(n, 'pray', { face: north(n), time: 3 }); });
+      (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n && kind !== 'usagi') npcs.act(n, 'pray', { face: north(n), time: 90 }); });
       starfall.drop(new THREE.Vector3(S.p.x - 7, 15, S.p.z - 22), S.land.x, S.land.z, starLanded);
     }, meWho());
   }
@@ -3284,13 +3285,13 @@ function boot() {
     setTimeout(() => sound.play('poof'), 120);
     starfall.setSky(false);
     const crater = { x: S.land.x, z: S.land.z }, pals = S.pals || [];
-    for (const kind of pals) { const n = npcs.byKind(kind); if (n) npcs.act(n, 'hop', { face: crater, time: 2.2, say: lineOf(kind, 'starShock') }); }
+    for (const kind of pals) { const n = npcs.byKind(kind); if (n) npcs.act(n, 'hop', { face: crater, time: 2.5, say: lineOf(kind, 'starShock') }); }
     setTimeout(() => {
       if (starShow !== S) return;
       player.act('pray', 6);
       pals.forEach((kind, i) => {
         const n = npcs.byKind(kind), how = STAR_PALS.find((q) => q[0] === kind)[3];
-        if (n) setTimeout(() => npcs.act(n, how, { face: crater, time: 7, say: lineOf(kind, how === 'flail' ? 'starCopy' : 'starPray') }), i * 350);
+        if (n) setTimeout(() => { if (starShow === S) npcs.act(n, how, { face: crater, time: 90, say: lineOf(kind, how === 'flail' ? 'starCopy' : 'starPray') }); }, i * 350);
       });
     }, 1000);
     for (const n of npcs.list) {
@@ -3312,6 +3313,7 @@ function boot() {
   function starGone() {
     const S = starShow;
     if (!S) return;
+    (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n) npcs.act(n, 'gaze', { face: north(n), time: 90 }); });
     if (S.preview) { // 미리 보기: 소원은 이뤄지지 않고 오늘 밤 진짜로 빌 기회도 그대로
       sound.play('done');
       guide.say(['(미리 보기라 소원은 이뤄지지 않았다… 별똥별이 쏟아지는 밤에 진짜로 빌어 봐요)'], () => endWish(true), meWho());
@@ -3332,6 +3334,7 @@ function boot() {
     starfall.setSky(false);
     player.busy = false;
     player.act(null, 0);
+    (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n) npcs.plan(n, []); }); // 몸짓을 멈추고 일과로(밤이면 하품하고 집으로)
     cam.snap(done ? { x: S.p.x, z: (S.p.z + S.land.z) / 2 } : S.p); // 따라가기 카메라가 지금 자리에서 부드럽게 이어 간다
   }
   /** 연출 카메라: 올려다보기 → (소원) → 떨어지는 별을 따라 내려와 나와 구덩이가 함께 보이게. */

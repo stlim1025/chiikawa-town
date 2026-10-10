@@ -156,7 +156,7 @@ export const NPC_LINES = {
     gift: '우라! (쓱 내민다)',
     starShock: ['하아?!', '…후랏?! (뒷걸음)'],
     starBye: '야하~!',
-    starCopy: '우라라라라~!! (같이 발광)'
+    starCopy: '우라라라라~!!'
   },
   kurimanju: {
     jobTake: '{title}… 슬슬 해 볼까~',
