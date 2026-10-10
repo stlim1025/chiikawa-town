@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
-import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
+import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
 import { HOME_GRID } from '../core/home.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
@@ -135,6 +135,7 @@ export function createInterior() {
   // 집 안을 걷는 내 캐릭터: 자리 · 바라보는 방향 · 걸음
   const pos = { x: DOOR.x, z: DOOR.z - 0.5 };
   let yaw = Math.PI, phase = 0, moving = false;
+  let mePose = null; // 잠깐 하는 몸짓(먹기) { mode, t, dur, prop }
 
   // 옷장(늘 왼쪽 벽에 붙어 있다): 나무 장 + 문 두 짝 + 거울
   {
@@ -282,11 +283,15 @@ export function createInterior() {
       camera.fov = aspect < 1 ? 62 : 38;
       camera.updateProjectionMatrix();
     },
+    /** 내 캐릭터가 잠깐 몸짓을 한다(먹기: mode 'slurp' | 'gulp' | 'nibble', prop: 그동안 손에 드는 음식). */
+    pose(mode, dur, prop = null) { mePose = { mode, t: dur, dur, prop }; if (me) showOnlyProp(me, prop); },
     update(dt, t) {
       if (!me) return;
       me.root.position.set(pos.x, 0, pos.z);
       me.root.rotation.y = yaw;
-      animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
+      if (mePose) { mePose.t -= dt; if (mePose.t <= 0 || moving) { if (mePose.prop) showOnlyProp(me, null); mePose = null; } } // 걸어가면 그만 먹는다
+      if (mePose) animateChibi(me, mePose.mode, t, { phase, eat: 1 - mePose.t / mePose.dur });
+      else animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
     }
   };
 }

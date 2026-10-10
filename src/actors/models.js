@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { celMaterial, addOutline, addShellOutline, GEO } from '../render/toon.js';
+import { EAT_ANIMS, FOOD_SHAPES, eatPose, eatWeight } from './eatmotion.js';
 import { POCHETTES } from '../core/pochette.js';
 
 const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', MOUTH = '#5a2b33';
@@ -326,6 +327,11 @@ function held(def, arm, pose, parts) {
   });
 }
 
+/** 음식(eatmotion.js 의 FOOD_SHAPES 꼬리표 'f-…')을 그 팔들에 단다. */
+function foodParts(def, tag) {
+  return FOOD_SHAPES[tag].flatMap(({ arm, pose, parts }) => held(def, arm, pose, parts));
+}
+
 /**
  * 소품 꼬리표 → 부품. 손에 드는 것은 HOLD 자세에서 손끝 기준으로 적는다(+z 앞, +x 오른쪽 바깥, +y 위).
  * 긴 막대는 원기둥 대신 상자로 만든다(원기둥 외곽선은 평균 크기로 밀어서 가늘고 길면 옆 선이 거의 안 보인다).
@@ -451,10 +457,15 @@ export const PROP_FOR = {
   hachiware: { dance: 'mic', drink: 'bowl', train: 'fork' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };
 
+// 누구나 같은 것을 드는 몸짓: 라멘 로우에서 후루룩 먹을 때는 그릇과 젓가락
+const EAT_PROP = { slurp: 'f-ramen' };
+/** 그 친구가 그 몸짓을 할 때 드는 소품 꼬리표(없으면 null). */
+export const propFor = (kind, mode) => (PROP_FOR[kind] || {})[mode] || EAT_PROP[mode] || null;
+
 /** 그 친구가 쓰는 소품 부품에 꼬리표(tag)를 달아 덧붙인다(buildFromDef 가 숨겨 둔다). */
 function withProps(kind, def) {
-  new Set(Object.values(PROP_FOR[kind] || {})).forEach((tag) => {
-    PROP_PARTS[tag](def).forEach((pt) => def.parts.push({ ...pt, tag }));
+  new Set([...Object.values(PROP_FOR[kind] || {}), ...Object.values(EAT_PROP)]).forEach((tag) => {
+    (PROP_PARTS[tag] ? PROP_PARTS[tag](def) : foodParts(def, tag)).forEach((pt) => def.parts.push({ ...pt, tag }));
   });
   return def;
 }
@@ -691,6 +702,8 @@ function playerDef(rawLook) {
   for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag }));
   // 랭커가 무기에 새긴 내 얼굴(꼬리표 'wf-무기id', player.setEngraved 로 보인다)
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
+  // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
+  for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
   const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
@@ -762,16 +775,33 @@ export function buildNpc(kind) {
   return chibi;
 }
 
+/** 손에 든 소품을 꼬리표 tag 하나만 보이게(null 이면 모두 숨김). 집 안 내 캐릭터가 잠깐 음식을 들 때. */
+export function showOnlyProp(chibi, tag) {
+  for (const [k, list] of Object.entries(chibi.props || {})) list.forEach((m) => { m.visible = k === tag; });
+}
+
 const ZERO = [0, 0, 0];
 /**
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
+ *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
- *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다) }
+ *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다), eat (한 번 먹기 진행 0..1 — 없으면 계속 먹는다) }
  */
 export function animateChibi(chibi, mode, t, opts = {}) {
-  applyPose(chibi, mode === 'swing' || mode === 'thrust' ? attackPose(mode, t, opts) : basePose(mode, t, opts));
+  if (mode === 'swing' || mode === 'thrust') applyPose(chibi, attackPose(mode, t, opts));
+  else if (opts.eat != null && EAT_ANIMS.includes(mode)) applyPose(chibi, blendPose(basePose('idle', t, opts), basePose(mode, t, opts), eatWeight(opts.eat)));
+  else applyPose(chibi, basePose(mode, t, opts));
+}
+
+/** 두 자세를 w 만큼 섞는다(0 이면 A, 1 이면 B). */
+function blendPose(A, B, w) {
+  const a = {};
+  for (const j of new Set([...Object.keys(A.a), ...Object.keys(B.a)])) a[j] = mix(A.a[j], B.a[j], w);
+  const out = { a };
+  for (const c of [...TRUNK, 'waddle']) out[c] = (A[c] || 0) + ((B[c] || 0) - (A[c] || 0)) * w;
+  return out;
 }
 
 /** 몸짓 하나의 자세: 마디 회전(a)과 몸통(bob 통통 · lean 숙이기 · waddle 뒤뚱 · spin 돌기 · push 앞으로 쏠리기 · squash 눌림). */
@@ -913,6 +943,10 @@ function basePose(mode, t, opts) {
     a.head = [-0.55, Math.sin(t * 0.5 + phase) * 0.3, 0];
     a.armL = [0.45, 0, -0.18]; a.armR = [0.45, 0, 0.18];
     lean = -0.06;
+  } else if (EAT_ANIMS.includes(mode)) {
+    const e = eatPose(mode, t, opts);
+    Object.assign(a, e.a);
+    bob = e.bob || 0; lean = e.lean || 0; waddle = e.waddle || 0;
   } else {
     const br = Math.sin(t * 2 + phase) * 0.08;
     a.head = [Math.sin(t * 1.7 + phase) * 0.04, opts.look || 0, 0];

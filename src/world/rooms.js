@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, GEO } from '../render/toon.js';
-import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
+import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
 import { furnitureModel, placeOnDome } from './interior.js';
 
 /**
@@ -210,8 +210,8 @@ export function createRooms() {
       cue.position.set(t.x, 0.03, t.z);
       cue.scale.setScalar(t.r * (1 + 0.07 * Math.sin(time * 6)));
     },
-    /** 내 캐릭터 · 집주인이 잠깐 몸짓을 한다(mode: 'swing' | 'dance' | 'cheer' …). */
-    pose(mode, dur) { mePose = { mode, t: dur, dur }; },
+    /** 내 캐릭터 · 집주인이 잠깐 몸짓을 한다(mode: 'swing' | 'dance' | 'cheer' | 먹기 …, prop: 그동안 손에 드는 것). */
+    pose(mode, dur, prop = null) { mePose = { mode, t: dur, dur, prop }; if (me) showOnlyProp(me, prop); },
     hostPose(mode, dur) { hostPose = { mode, t: dur, dur }; },
     /** 놀이 자리 (x, z) 옆으로 옮겨 그쪽을 본다(이미 가까우면 바라보기만). 문 쪽으로 d 만큼 떨어진 빈자리. */
     moveNear(x, z, d = 0.95) {
@@ -237,9 +237,9 @@ export function createRooms() {
       if (!me) return;
       me.root.position.set(pos.x, 0, pos.z);
       me.root.rotation.y = yaw;
-      if (mePose) { mePose.t -= dt; if (mePose.t <= 0) mePose = null; }
+      if (mePose) { mePose.t -= dt; if (mePose.t <= 0) { if (mePose.prop) showOnlyProp(me, null); mePose = null; } }
       if (hostPose) { hostPose.t -= dt; if (hostPose.t <= 0) hostPose = null; }
-      if (mePose) animateChibi(me, mePose.mode, t, { phase, swing: 1 - mePose.t / mePose.dur });
+      if (mePose) animateChibi(me, mePose.mode, t, { phase, swing: 1 - mePose.t / mePose.dur, eat: 1 - mePose.t / mePose.dur });
       else animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
       if (host) {
         host.root.rotation.y = Math.atan2(pos.x - hostAt.x, pos.z - hostAt.z); // 집주인은 나를 바라본다

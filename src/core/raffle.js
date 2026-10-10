@@ -3,11 +3,13 @@ import { trySpend } from './state.js';
 
 /**
  * 상점가 경품 추첨(원작에서 치이카와가 전골 세트에 당첨된 그 가라가라 추첨): 손잡이를 돌리면 구슬이 하나 툭 나오고, 구슬 색이 상품.
- * 가게에서 물건을 사면 추첨권을 한 장 받고(하루 DAILY_TICKETS 장까지), 추첨권이 없으면 RAFFLE_PRICE 원을 내고 돌린다.
+ * 가게에서 TICKET_MIN_PRICE 원 이상인 물건을 사면 추첨권을 한 장 받고(하루 DAILY_TICKETS 장까지, 라멘 · 맥주처럼 싼 것은 안 준다),
+ * 추첨권이 없으면 RAFFLE_PRICE 원을 내고 돌린다.
  * state.raffle = { tickets: 가진 추첨권, day: 마지막으로 추첨권을 받은 날, got: 그날 받은 장수 }
  */
 export const RAFFLE_PRICE = 150;
 export const DAILY_TICKETS = 3;
+export const TICKET_MIN_PRICE = 200;
 
 /** 상품(좋은 것부터). weight 가 클수록 자주 나온다. */
 export const PRIZES = [
@@ -32,8 +34,9 @@ export function raffleOf(state) {
   return state.raffle || { tickets: 0, day: 0, got: 0 };
 }
 
-/** 가게에서 물건을 샀다: 추첨권 한 장(그날 DAILY_TICKETS 장까지). → { state, earned } */
-export function earnTicket(state, day) {
+/** 가게에서 price 원짜리 물건을 샀다: TICKET_MIN_PRICE 원 이상이면 추첨권 한 장(그날 DAILY_TICKETS 장까지). → { state, earned } */
+export function earnTicket(state, day, price) {
+  if (!(price >= TICKET_MIN_PRICE)) return { state, earned: false };
   const r = raffleOf(state), got = r.day === day ? r.got : 0;
   if (got >= DAILY_TICKETS) return { state, earned: false };
   return { state: { ...state, raffle: { tickets: r.tickets + 1, day, got: got + 1 } }, earned: true };

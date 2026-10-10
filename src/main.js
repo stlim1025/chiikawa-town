@@ -87,6 +87,7 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { createMonsters } from './world/monsters.js';
+import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
 import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady } from './core/quests.js';
@@ -241,11 +242,13 @@ function boot() {
     buy(itemId, shopId = 'ramen') {
       const r = buy(state, shopId, itemId);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : r.reason === 'license' ? '술 자격이 있어야 해요' : '지금은 배불러요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('eat');
+      eatMotion(itemId);
       const SAY = { ramen: '후루룩!', highball: '캬~ 시원하다!', beer: '캬~ 생맥주!', edamame: '짭짤한 풋콩!' };
       hud.toast(SAY[itemId] || '냠냠!', 2000);
-      gotTicket();
+      gotTicket(paid);
       if (itemId === 'ramen') didAct('ramen'); // 일상 부탁: 같이 라멘 먹기
     },
     // 경품 추첨: 추첨권(없으면 돈)으로 가라가라를 돌린다 → 연출 → 당첨 카드
@@ -271,10 +274,11 @@ function boot() {
     buyFurniture(id) {
       const r = buyFurniture(state, id);
       if (!r.ok) { hud.toast('돈이 부족해요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('coin');
       hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 2600);
-      gotTicket();
+      gotTicket(paid);
     },
     // 부동산
     dayLabel: (day) => dateLabel(state.startDate, day),
@@ -297,12 +301,13 @@ function boot() {
     buyPochette(id) {
       const r = buyPochette(state, id);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 포셰트예요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(POCHETTES[id].name, '을/를')} 장착했어요!`, 2800);
-      gotTicket();
+      gotTicket(paid);
     },
     wearPochette(id) {
       commit(wearPochette(state, id));
@@ -316,12 +321,13 @@ function boot() {
     buyAccessory(id) {
       const r = buyAccessory(state, id);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 소품이에요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       refreshLook();
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(ACCESSORY_ITEMS[id].name, '을/를')} 장착했어요!`, 3400);
-      gotTicket();
+      gotTicket(paid);
     },
     wearAccessory(id) {
       commit(wearAccessory(state, id));
@@ -336,27 +342,30 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'full' ? '지금은 배불러요' : '먹을 수 없어요'); return; }
       commit(r.state);
       sound.play('eat');
+      eatMotion(id);
       hud.toast(`${itemInfo(id).name} 냠냠!`, 2200, { icon: itemSvg(id), chips: [{ icon: 'energy', text: `기운 +${r.gain}` }] });
     },
     // 헌책방 · 도구점 · 지도 앱
     buyTool(id) {
       const r = buyTool(state, id);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가지고 있어요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('coin');
       hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
-      gotTicket();
+      gotTicket(paid);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
     // 도구점 무기 · 가방에서 바꿔 들기 · 노동 접수 전리품 팔기(4단계)
     buyWeapon(id) {
       const r = buyWeapon(state, id);
       if (!r.ok) { hud.toast(r.reason === 'money' ? '돈이 부족해요' : '이미 가진 무기예요'); return; }
+      const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('coin');
       player.cheerTime = 1.2;
       hud.toast(`${josa(WEAPONS[id].name, '을/를')} 장착했어요!`, 2800, { icon: weaponSvg(id) });
-      gotTicket();
+      gotTicket(paid);
     },
     /** 토벌 랭커 특전: 지금 든 무기에 내 얼굴을 새긴다. */
     engrave() {
@@ -1178,7 +1187,7 @@ function boot() {
         player.face(k.x, k.z);
         k.yaw = Math.atan2(player.position.x - k.x, player.position.z - k.z);
         npcs.hold(k, true);
-        setTimeout(() => { npcs.emote(k, 'drink', 3.6); player.cheerTime = 1.4; hud.floatText({ x: (player.position.x + k.x) / 2, y: 1.7, z: (player.position.z + k.z) / 2, text: '짠!', kind: 'note' }); sound.play('heart'); }, 1200);
+        setTimeout(() => { npcs.emote(k, 'drink', 3.6); drinkBeer(); hud.floatText({ x: (player.position.x + k.x) / 2, y: 1.7, z: (player.position.z + k.z) / 2, text: '짠!', kind: 'note' }); sound.play('heart'); }, 1200);
         setTimeout(() => npcs.hold(k, false), 9000);
       }
       sound.play('heartUp');
@@ -1335,8 +1344,9 @@ function boot() {
   // ---------- 경품 추첨 ----------
   let drumSpin = 0; // 마을의 가라가라 통이 도는 남은 시간
   /** 가게에서 물건을 샀다: 경품 추첨권 한 장(하루 몇 장까지). 처음 받으면 어디서 쓰는지 알려 준다. */
-  function gotTicket() {
-    const r = earnTicket(state, state.clock.day);
+  /** 가게에서 paid 원을 냈다: 비싼 것(TICKET_MIN_PRICE 원 이상)이면 추첨권 한 장. 라멘 · 맥주처럼 싼 것은 안 준다. */
+  function gotTicket(paid) {
+    const r = earnTicket(state, state.clock.day, paid);
     if (!r.earned) return;
     commit(r.state);
     setTimeout(() => hud.toast('추첨권 +1', 1800, { icon: TICKET_SVG, chips: [{ text: `${raffleOf(state).tickets}장` }] }), 700);
@@ -2433,7 +2443,7 @@ function boot() {
   const isBuddyStep = (st) => !!st && (st.type === 'together' || (st.type === 'visit' && st.with));
   const buddies = new Set(); // 일상 부탁으로 나를 따라다니는 친구들
   const buddyDone = []; // 같이 하기를 다 해서, 창이 닫히면 그 자리에서 끝낼 부탁
-  const ACT_ANIM = { ramen: 'drink', weed: 'pull', berry: 'pull' };
+  const ACT_ANIM = { ramen: 'slurp', weed: 'pull', berry: 'pull' };
   // 같이 다닐 때 친구마다 하는 말: go 따라나설 때 · stop 헤어질 때 · 일마다 한마디
   const BUDDY_SAY = {
     chiikawa: { go: '…응! 같이 가…!', stop: '…응… 다음에 또 같이 하자…', ramen: '…후루룩…♪', weed: '…영차…!', berry: '…빨갛다…♪' },
@@ -2489,7 +2499,7 @@ function boot() {
   function npcEat(n) {
     const r = village.spots.ramen;
     setDoing(n.kind, 'bowl', '라멘 먹기');
-    npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat'), ramen: true }, {
+    npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'slurp', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat'), ramen: true }, {
       do: 'call', ramen: true,
       fn: () => {
         commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
@@ -2667,10 +2677,10 @@ function boot() {
       if (n === a) s.push({ do: 'sync', group: invite, max: 30 });
       s.push(...ramenSeatSteps(n, () => { group.cancel = true; }), { do: 'sync', group, face, max: RAMEN_WAIT + 15, ramen: true }); // 짝이 줄 서 있으면 앉아서 기다려 준다
       if (n === a) s.push({ do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) });
-      s.push({ do: 'act', anim: 'drink', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true, ramen: true });
+      s.push({ do: 'act', anim: 'slurp', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true, ramen: true });
       for (const [who, text] of conv.lines) {
         const t = npcs.lineTime(text) + 0.25;
-        s.push(who === n.kind ? { do: 'act', anim: 'talk', face, time: t, say: text, quick: true, ramen: true } : { do: 'act', anim: 'drink', face, time: t, quick: true, ramen: true });
+        s.push(who === n.kind ? { do: 'act', anim: 'talk', face, time: t, say: text, quick: true, ramen: true } : { do: 'act', anim: 'slurp', face, time: t, quick: true, ramen: true });
       }
       s.push({ do: 'call', ramen: true, fn: () => end(n) });
       return s;
@@ -2924,7 +2934,7 @@ function boot() {
     const r = village.spots.ramen, face = { x: r.x, z: r.z - 1.5 };
     setDoing(n.kind, 'bowl', '점심 라멘');
     npcs.plan(n, [...ramenSeatSteps(n, () => npcs.plan(n, backToPost(n))), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) },
-      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true, ramen: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true, ramen: true },
+      { do: 'act', anim: 'slurp', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true, ramen: true }, { do: 'act', anim: 'slurp', face, time: 3, quick: true, ramen: true },
       { do: 'call', ramen: true, fn: () => {} }, ...backToPost(n)]); // 빈 call: 두 번째 그릇을 다 비울 때까지 자리를 지킨다
   }
   /** 대장 갑옷 씨 순찰: 광장과 문 몇 곳을 돌며 둘러본다. */
@@ -3042,6 +3052,22 @@ function boot() {
     npcs.plan(n, steps);
   }
   /** 쿠리만쥬와 건배: 두 잔 값을 내고 짠! 하루 한 번 하트 +2 · 기운도 조금. */
+  /** 먹는 몸짓: 창을 닫고 그 음식을 손에 들고 먹는다(라멘은 그릇 들고 후루룩, 술은 잔 들고 꿀꺽, 과자는 냠냠). */
+  function eatMotion(id) {
+    const st = eatStyle(id);
+    if (!st) return;
+    panels.close();
+    if (mode === 'home') interior.pose(st.mode, st.dur, st.prop);
+    else if (mode === 'visit') rooms.pose(st.mode, st.dur, st.prop);
+    else {
+      const c = cam.camera.position;
+      player.face(c.x, c.z); // 화면 쪽으로 돌아서 먹는다(뒷모습이면 그릇 · 잔이 몸에 가려진다)
+      player.eat(st.mode, st.prop, st.dur);
+    }
+  }
+  /** 건배: 생맥주 잔을 들고 꿀꺽. */
+  function drinkBeer() { const st = eatStyle('beer'); player.eat(st.mode, st.prop, st.dur); }
+
   function cheersWith(n) {
     if (!talking) beginTalk(n);
     if (!hasLicense(state, 'liquor')) { sayAs(n, ['하아~ 술은 술 자격증부터!', '검정소에서 따 오면 같이 마시자~'], endTalk); return; }
@@ -3053,7 +3079,7 @@ function boot() {
     player.face(n.x, n.z);
     n.yaw = Math.atan2(p.x - n.x, p.z - n.z);
     npcs.emote(n, 'drink', 3.6);
-    player.cheerTime = 1.4;
+    drinkBeer();
     hud.floatText({ x: (p.x + n.x) / 2, y: 1.7, z: (p.z + n.z) / 2, text: '짠!', kind: 'note' });
     setTimeout(() => sound.play('heart'), 250);
     sayAs(n, ['건배~!', '…캬~ 같이 마시니까 훨씬 맛있다. 하아~', { text: '(생맥주 두 잔을 비웠다)', chips: [{ icon: ICO.coin, text: `-${won(CHEERS_PRICE)}` }, { icon: ICO.heart, text: `기운 +${CHEERS_STAMINA}` }] }], () => reward(n, 'drink'));

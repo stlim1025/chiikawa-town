@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRIZES, RAFFLE_PRICE, DAILY_TICKETS, raffleOf, earnTicket, pickPrize, drawRaffle, isValidRaffle } from '../src/core/raffle.js';
+import { PRIZES, RAFFLE_PRICE, DAILY_TICKETS, TICKET_MIN_PRICE, raffleOf, earnTicket, pickPrize, drawRaffle, isValidRaffle } from '../src/core/raffle.js';
+import { SHOPS } from '../src/core/shop.js';
 import { itemInfo, countOf } from '../src/core/inventory.js';
 import { createState } from '../src/core/state.js';
 
@@ -26,16 +27,27 @@ test('구슬은 무게대로 나온다: 1등은 드물고 참가상이 가장 �
 
 test('물건을 사면 추첨권을 받는다(하루에 정해진 장수까지)', () => {
   let s = fresh();
-  for (let i = 0; i < DAILY_TICKETS + 2; i++) s = earnTicket(s, 4).state;
+  for (let i = 0; i < DAILY_TICKETS + 2; i++) s = earnTicket(s, 4, 500).state;
   assert.equal(raffleOf(s).tickets, DAILY_TICKETS);
-  assert.equal(earnTicket(s, 4).earned, false);
-  const next = earnTicket(s, 5);
+  assert.equal(earnTicket(s, 4, 500).earned, false);
+  const next = earnTicket(s, 5, 500);
   assert.equal(next.earned, true);
   assert.equal(raffleOf(next.state).tickets, DAILY_TICKETS + 1);
 });
 
+test('라멘 · 맥주 · 하이볼처럼 싼 것을 사면 추첨권을 안 준다(그날 받을 장수도 그대로)', () => {
+  const foods = Object.values(SHOPS).flatMap((sh) => sh.items);
+  for (const it of foods) assert.ok(it.price < TICKET_MIN_PRICE, `${it.name} ${it.price}원`);
+  let s = fresh();
+  for (const it of foods) { const r = earnTicket(s, 4, it.price); assert.equal(r.earned, false, it.name); s = r.state; }
+  assert.equal(raffleOf(s).tickets, 0);
+  for (let i = 0; i < DAILY_TICKETS; i++) s = earnTicket(s, 4, TICKET_MIN_PRICE).state;
+  assert.equal(raffleOf(s).tickets, DAILY_TICKETS, '싼 건 그날 장수에 안 센다');
+  assert.equal(earnTicket(fresh(), 4).earned, false, '값을 모르면 안 준다');
+});
+
 test('추첨권이 있으면 그걸로, 없으면 돈을 내고 돌린다. 상품은 가방에', () => {
-  let s = earnTicket(fresh({ money: 0 }), 1).state;
+  let s = earnTicket(fresh({ money: 0 }), 1, 500).state;
   const a = drawRaffle(s, () => 0);
   assert.equal(a.ok, true);
   assert.equal(a.paid, 'ticket');
@@ -50,7 +62,7 @@ test('추첨권이 있으면 그걸로, 없으면 돈을 내고 돌린다. 상�
 });
 
 test('가방이 꽉 차 상품을 못 넣으면 돌리지 않는다(추첨권 · 돈 그대로)', () => {
-  const full = earnTicket(fresh(), 1).state;
+  const full = earnTicket(fresh(), 1, 500).state;
   const s = { ...full, bag: { items: { hotpot: 99, fruitbasket: 99, cookies: 99, candy: 99, tissue: 99 }, clean: {} } };
   const r = drawRaffle(s, () => 0);
   assert.deepEqual([r.ok, r.reason], [false, 'bag']);
