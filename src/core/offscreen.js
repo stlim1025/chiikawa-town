@@ -1,10 +1,10 @@
 import { chooseActivity, satisfy, growNeeds, freshMind } from './brain.js';
 import {
-  VILLAGERS, BED_HOUR, MAX_JOBS_PER_DAY, MEAL_PRICE, MEAL_ENERGY, NAP_ENERGY, isSleepHour,
+  VILLAGERS, BED_HOUR, WAKE_HOUR, MAX_JOBS_PER_DAY, MEAL_PRICE, MEAL_ENERGY, NAP_ENERGY, isSleepHour,
   boardOf, villagerOf, villagerEnergy, villagerTakesJob, payVillager, villagerSpend, villagerPay
 } from './villagers.js';
 import { JOB_TYPES } from './jobs.js';
-import { DAY_SECONDS } from './clock.js';
+import { DAY_SECONDS, hourOf } from './clock.js';
 import { goalOf, canBuy, buyGoal } from './goals.js';
 
 /** 게임 속 한 시간의 실제 길이(초). 욕구가 차는 빠르기(brain.js 의 NEED_RATE)는 실제 초 기준이다. */
@@ -19,6 +19,20 @@ const shuffle = (list, random) => {
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 };
+/**
+ * 내가 from → to 동안 자는 사이 친구들이 보내는 시간. evening: 잠든 날 밤 9시(또는 깬 시각)까지 깨어 지낸 때,
+ * night: 친구들도 밤잠을 잤는지(밤 9시를 넘겼거나 밤잠 시간에 잠들었다), morning: 밤잠 뒤 일어나서(6시 반)부터 내가 깰 때까지.
+ * 시각은 그날 06:00 부터 센 시(6 ~ 30)로 비교한다(하루는 06:00 에 바뀐다). → { evening, night, morning } (구간은 { day, from, to } | null)
+ */
+export function asleepSpans(from, to) {
+  const r = (x) => Math.round(x * 1e6) / 1e6, lin = (c) => r(6 + c.t * 24);
+  const h0 = lin(from), h1 = lin(to), days = to.day - from.day, end = h1 + days * 24;
+  const evening = h0 >= WAKE_HOUR && h0 < BED_HOUR ? { day: from.day, from: h0, to: Math.min(end, BED_HOUR) } : null;
+  const night = isSleepHour(hourOf(from)) || end > BED_HOUR;
+  const morning = night && (days > 0 || h0 < WAKE_HOUR) && h1 > WAKE_HOUR && h1 < BED_HOUR ? { day: to.day, from: WAKE_HOUR, to: h1 } : null;
+  return { evening, night, morning };
+}
+
 const eat = (s, kind, day) => villagerEnergy(villagerSpend(s, kind, MEAL_PRICE, day), kind, MEAL_ENERGY, day);
 
 /**

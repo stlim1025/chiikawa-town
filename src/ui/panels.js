@@ -1,5 +1,5 @@
 import { JOB_TYPES, availableJobs, isComplete, payout } from '../core/jobs.js';
-import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, canTakeExam } from '../core/license.js';
+import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
 import { FURNITURE, homeOf } from '../core/home.js';
@@ -119,8 +119,6 @@ const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y=
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
 const jobArt = (type) => (type.hunt ? monsterSvg(type.kind) : type.kind === 'sticker' ? STICKER_ART : itemSvg(type.kind));
 
-/** 하트 2개부터 집(동굴)에 놀러 가서 같이 놀 수 있는 친구. */
-const HOME_VISIT = new Set(['chiikawa', 'hachiware', 'usagi', 'kurimanju', 'momonga', 'rakko']);
 
 /**
  * 몬스터 카드(토벌 안내서 · 몬스터 도감): 구역마다 머리글 아래 셋씩. 카드에는 얼굴 · 이름 · 공격 방식 · 단단함 · 공격 · 전리품.
@@ -367,7 +365,7 @@ export function createPanels(ui, handlers) {
       // 제초 검정
       let side;
       if (s.exam) side = h('span', { class: 'lic-badge going' }, `시험 중 ${s.exam.streak} / ${s.exam.need || 5}번`);
-      else if (canTakeExam(lic)) side = h('button', { class: 'btn pink', type: 'button', onClick: after(handlers.startExam) }, `${lic.grade - 1}급 시험 보기`);
+      else if (canTakeExam(lic)) { const fee = EXAM_FEE[lic.grade]; side = h('button', { class: 'btn pink', type: 'button', disabled: s.money < fee, onClick: after(handlers.startExam) }, s.money < fee ? `${won(fee)} 부족` : `${lic.grade - 1}급 시험 보기 ${won(fee)}`); }
       else if (lic.grade <= 1) side = h('span', { class: 'lic-badge done' }, ico('star'), '최고 급수');
       const xpNeed = XP_TO_EXAM[lic.grade];
       out.push(card('<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V18" stroke="#5e9f80" stroke-width="3" stroke-linecap="round"/><path d="M20 20q-2-9-11-11q0 9 11 11zM20 17q2-9 11-10q-1 9-11 10z" fill="#8fd16a" stroke="#5e9f80" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 33h20" stroke="#c9a77c" stroke-width="3" stroke-linecap="round"/></svg>', `제초 검정 ${lic.grade}급`, side, [
@@ -497,7 +495,7 @@ export function createPanels(ui, handlers) {
     },
     // 마을폰 '친구' 앱: 마을 친구마다 하트 · 다음 하트까지 · 오늘 이야기했는지 · 놀았는지 · 선물 · 빌린 돈
     friends(s) {
-      const today = s.clock.day, kinds = Object.keys(FRIENDS);
+      const kinds = Object.keys(FRIENDS);
       // 마을 살림(main): 친구마다 지금 하는 일 · 오늘 마을 소식
       const live = handlers.villageLive ? handlers.villageLive() : { doing: {}, news: [] };
       const hourLabel = (hr) => { const hh = Math.floor(hr); return `${hh < 12 ? '오전' : '오후'} ${((hh + 11) % 12) + 1}시`; };
@@ -517,22 +515,14 @@ export function createPanels(ui, handlers) {
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
         const F = FRIENDS[k], hc = hearts(f);
-        const talked = f.talk === today, played = f.play === today;
-        // 오늘 한 일(이야기 · 놀기)은 체크 / 빈 동그라미로, 빌린 돈은 짧은 꼬리표로
-        const chips = [
-          h('span', { class: 'chip-lab' }, '오늘'),
-          chip(talked ? 'check' : 'todo', talked ? 'done' : 'todo', '이야기'),
-          F.play ? chip(played ? 'check' : 'todo', played ? 'done' : 'todo', '놀기') : null,
-          k === 'kurimanju' ? chip(f.drink === today ? 'check' : 'todo', f.drink === today ? 'done' : 'todo', '건배') : null,
-          HOME_VISIT.has(k) && hc >= 2 ? chip(f.home === today ? 'check' : 'todo', f.home === today ? 'done' : 'todo', '집에서') : null,
-          f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null // 하트 몇 개면 무슨 선물, 다음 하트까지 몇 같은 건 앱에서 알려 주지 않는다
-        ];
+        // 하트 몇 개면 무슨 선물 · 다음 하트까지 몇 · 오늘 한 일 같은 건 앱에서 알려 주지 않는다(빌린 돈만)
+        const chips = [f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null];
         out.push(h('div', { class: `row f-card${f.pts ? '' : ' new'}` }, face(k),
           h('div', {},
             h('div', { class: 't' }, F.name,
               h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
             live.doing[k] ? h('div', { class: 'f-now' }, live.doing[k].svg ? svgSpan('f-now-ico', live.doing[k].svg) : null, live.doing[k].text) : null,
-            h('div', { class: 'mon-chips' }, chips))));
+            f.debt ? h('div', { class: 'mon-chips' }, chips) : null)));
       });
       return out;
     },
@@ -677,7 +667,7 @@ export function createPanels(ui, handlers) {
         const lot = hs.lottery;
         let lotRow;
         if (!lot) {
-          lotRow = h('button', { class: 'btn', type: 'button', disabled: s.money < LOTTERY_FEE, onClick: after(handlers.applyLottery) }, `신청하기 ${won(LOTTERY_FEE)}`);
+          lotRow = h('button', { class: 'btn primary', type: 'button', disabled: s.money < LOTTERY_FEE, onClick: after(handlers.applyLottery) }, `신청하기 ${won(LOTTERY_FEE)}`);
         } else if (lot.won) {
           lotRow = h('button', { class: 'btn primary', type: 'button', disabled: s.money < LOTTERY_PRICE || hs.unpaid > 0, onClick: after(handlers.buyByLottery) }, `${won(LOTTERY_PRICE)}에 사기`);
         } else {
@@ -865,6 +855,7 @@ export function createPanels(ui, handlers) {
         row('기운', `지금 ${s.stamina} / ${MAX_STAMINA}`, b('가득', () => handlers.dev.stamina())),
         row('제초 검정', `지금 ${s.license.grade}급`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
+        ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),
         h('p', { class: 'note' }, '마을폰 제목을 다시 다섯 번 누르면 이 앱이 숨어요.')];
     },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)

@@ -1,4 +1,12 @@
 import { WEED_KINDS } from './weeding.js';
+import { trySpend } from './state.js';
+
+/** 승급 시험 값(지금 급수 → 다음 급). 떨어지면 다시 내야 하니 깔끔하게 뽑을 자신이 있을 때. */
+export const EXAM_FEE = { 5: 200, 4: 400, 3: 700, 2: 1000 };
+/** 승급 시험 값을 낸다 → { ok, state } */
+export function payExamFee(state) {
+  return trySpend(state, EXAM_FEE[state.license.grade] || 0);
+}
 
 /** 급수별 보수 배율. */
 export const PAY_MULT = { 5: 1.0, 4: 1.2, 3: 1.4, 2: 1.7, 1: 2.0 };

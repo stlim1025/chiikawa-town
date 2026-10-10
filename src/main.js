@@ -30,10 +30,10 @@ import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
 import { createOrientationGuard } from './ui/orientation.js';
 import { createState, addMoney, useStamina, restoreStamina, MAX_STAMINA } from './core/state.js';
-import { advance, hourOf, sleepUntilMorning } from './core/clock.js';
+import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
-import { gainXp, canTakeExam, startExam, examStep, examCounts, promote, PAY_MULT } from './core/license.js';
+import { gainXp, canTakeExam, startExam, examStep, examCounts, promote, PAY_MULT, EXAM_FEE, payExamFee } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { createSound } from './audio/sound.js';
@@ -47,7 +47,7 @@ import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
-import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
+import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
@@ -59,12 +59,12 @@ import { openQuiz, openHighball } from './ui/exams.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, villagerTakesJob, payVillager, villagerSpend, villagerPay,
   canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY,
-  boardOf, MAX_JOBS_PER_DAY
+  boardOf, MAX_JOBS_PER_DAY, updateVillager
 } from './core/villagers.js';
 import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, killPoints, PARTY_HEARTS } from './core/hunters.js';
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
-import { liveOffscreen } from './core/offscreen.js';
+import { liveOffscreen, asleepSpans } from './core/offscreen.js';
 import { goalOf, canBuy, buyGoal, npcPower } from './core/goals.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
@@ -175,7 +175,8 @@ function boot() {
       money(n) { commit(addMoney(state, n)); sound.play('coin'); hud.toast(`테스트: ${won(n)}을 넣었어요`); },
       stamina() { commit({ ...state, stamina: MAX_STAMINA }); },
       grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0 }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
-      hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); }
+      hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); },
+      license(id, on) { commit(on ? grant(state, id, state.clock.day) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); }
     },
     toggleSound: (kind) => sound.toggle(kind),
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
@@ -206,8 +207,10 @@ function boot() {
     },
     startExam() {
       if (!canTakeExam(state.license)) return;
+      const paid = payExamFee(state); // 승급 시험도 공짜가 아니다(떨어지면 다시 낸다)
+      if (!paid.ok) { hud.toast(`시험 값 ${won(EXAM_FEE[state.license.grade])}이 모자라요`); return; }
       const exam = startExam(state.license.grade);
-      commit({ ...state, exam });
+      commit({ ...paid.state, exam });
       sound.play('job');
       panels.close();
       hud.announce({ kicker: '승급 시험 시작!', title: `깔끔하게 연속 ${exam.need}번`, sub: '', chips: kindsOfGrade(state.license.grade).map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })) });
@@ -402,7 +405,7 @@ function boot() {
   function askSleep() {
     input.setEnabled(false);
     hud.setAction(null);
-    guide.ask('잘까요?', ['잘래요', '아직이요'], (i) => {
+    guide.ask(`${SLEEP_HOURS}시간 푹 잘까요?`, ['잘래요', '아직이요'], (i) => {
       if (i === 0) doSleep();
       else if (mode === 'home') input.setEnabled(true);
     }, BED);
@@ -414,10 +417,21 @@ function boot() {
     input.setEnabled(false);
     hud.setAction(null);
     sound.play('sleep');
-    const lived = liveWhileAsleep(); // 내가 잠든 사이 친구들도 밤 9시까지 저녁을 마저 보낸다
-    const rolled = rollDays(restoreStamina({ ...lived, clock: sleepUntilMorning(state.clock) }, how === 'rough' ? ROUGH_REST : MAX_STAMINA));
-    const next = rolled.state;
-    playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day) }, () => { commit(next); villageOvernight(); }, () => sound.play('morning')).then(() => {
+    // 아침까지가 아니라 SLEEP_HOURS 시간만 흐른다. 그사이 친구들도 그 시간을 보낸다(저녁 · 밤잠 · 다음 날 아침)
+    const to = sleepFor(state.clock), spans = asleepSpans(state.clock, to), wakeHour = hourOf(to);
+    const lived = liveWhileAsleep(spans);
+    const rolled = rollDays(restoreStamina({ ...lived.state, clock: to }, how === 'rough' ? ROUGH_REST : MAX_STAMINA));
+    const next = rolled.state, phase = phaseOf(to);
+    const onDark = () => {
+      commit(next);
+      if (!spans.night) villageAfterNap(lived.evening); // 낮잠: 친구들은 그사이 한 일에 맞는 곳에 가 있다
+      else {
+        villageOvernight(); // 밤잠: 각자 집에서 자고
+        if (spans.morning) villageAfterNap(lived.morning, (k) => wakeHourOf(k) <= wakeHour); // 이미 일어날 때가 지난 친구는 나와서 지내는 중
+      }
+    };
+    const light = phase === 'morning' || phase === 'day';
+    playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(to), phase }, onDark, () => { if (light) sound.play('morning'); }).then(() => {
       sleeping = false;
       if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
       homeUI.refresh();
@@ -1885,12 +1899,42 @@ function boot() {
     }]);
   }
   /** 내가 잠든 사이 친구들도 밤 9시까지 저녁을 마저 보낸다(core/offscreen.js). 그날 일은 친구들이 기억해 다음 날 이야기한다. → 바뀐 state */
-  function liveWhileAsleep() {
-    const day = state.clock.day;
-    const r = liveOffscreen(state, minds, { day, fromHour: hourOf(state.clock), skip: tutorialActive(state.tutorial) ? ['hachiware'] : [] });
-    for (const [k, m] of Object.entries(r.minds)) minds[k] = { ...mindOf(k), ...m }; // 기억 · 하는 일 칸이 없는 마음이 들어오지 않게
-    r.events.forEach((ev) => happen({ ...ev, day }));
-    return r.state;
+  function liveWhileAsleep(spans) {
+    const skip = tutorialActive(state.tutorial) ? ['hachiware'] : [], out = { state, evening: [], morning: [] };
+    const live = (span, list) => {
+      const r = liveOffscreen(out.state, minds, { day: span.day, fromHour: span.from, toHour: span.to, skip });
+      for (const [k, m] of Object.entries(r.minds)) minds[k] = { ...mindOf(k), ...m }; // 기억 · 하는 일 칸이 없는 마음이 들어오지 않게
+      r.events.forEach((ev) => { list.push(ev); happen({ ...ev, day: span.day }); });
+      out.state = r.state;
+    };
+    if (spans.evening) live(spans.evening, out.evening);
+    if (spans.morning) { // 밤잠을 자고 일어났다: 기운이 가득 찬 채로 아침을 보낸다
+      for (const k of Object.keys(VILLAGERS)) out.state = updateVillager(out.state, k, spans.morning.day, { energy: 100 });
+      live(spans.morning, out.morning);
+    }
+    return out;
+  }
+  /**
+   * 밤을 넘기지 않은 잠(또는 밤잠 뒤 이미 일어난 친구): 그사이 마지막으로 한 일에 맞는 곳에 가 있다
+   * (일감 → 게시판, 라멘 → 라멘 가게, 그 밖 → 광장이나 집 앞). 하던 일 · 같이 토벌 · 공연은 끝나 있다.
+   */
+  function villageAfterNap(events, awake = () => true) {
+    show = null;
+    partyEnd(null, null);
+    const S = village.spots;
+    for (const kind of Object.keys(VILLAGERS)) {
+      const n = npcs.byKind(kind);
+      if (!n || !awake(kind) || (visit && visit.kind === kind) || (kind === 'hachiware' && tutorialActive(state.tutorial))) continue;
+      const last = [...events].reverse().find((e) => e.who === kind || e.with === kind);
+      const at = !last ? (Math.random() < 0.5 ? S.plaza : homeDoor(kind) || S.plaza) : last.type === 'job' ? S.board : last.type === 'meal' ? S.ramen : S.plaza;
+      npcs.lead(kind, null);
+      if (n.flee) npcs.flee(n, false);
+      npcs.plan(n, []);
+      npcs.comeOut(n, at.x + (Math.random() - 0.5) * 2.4, at.z + 1.2 + Math.random() * 1.2);
+      delete awayInfo[kind];
+      restUntil[kind] = 0;
+      setDoing(kind, null, null);
+    }
   }
   /**
    * 하룻밤이 지났다(내가 자는 동안 화면이 깜깜할 때): 하던 일 · 같이 토벌 · 공연은 끝나고, 친구들은 각자 집에서 자다가

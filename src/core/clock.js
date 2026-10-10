@@ -37,7 +37,9 @@ export function phaseOf(clock) {
   return 'night';
 }
 
-/** 집에서 자면 다음 날 06:30 이 된다. 하루는 06:00 에 바뀌므로 새벽 2시에 자도 다음 day 의 아침이다. */
-export function sleepUntilMorning(clock) {
-  return createClock(clock.day + 1, 6.5);
+/** 한 번 자면 흐르는 시간(시). 언제 자든 아침까지가 아니라 이만큼만 흐른다. */
+export const SLEEP_HOURS = 8;
+/** hours 시간 자고 난 시계(하루는 06:00 에 바뀌니 밤 11시에 자면 다음 day 아침 7시). */
+export function sleepFor(clock, hours = SLEEP_HOURS) {
+  return advance(clock, (hours / 24) * DAY_SECONDS);
 }
