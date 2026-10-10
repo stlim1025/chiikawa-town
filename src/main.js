@@ -95,6 +95,8 @@ import { createBurrows } from './world/burrows.js';
 import { createRhythm } from './ui/rhythm.js';
 import { createUsagiClub } from './stories/usagiclub.js';
 import { createShisaStory } from './stories/shisa.js';
+import { createHachiPit } from './stories/hachipit.js';
+import { createPit } from './world/pit.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
@@ -239,6 +241,18 @@ function boot() {
         cam.snap(player.position);
         const n = npcs.byKind('shisa');
         if (n) startBuddy(n);
+      },
+      /** 하치와레가 구덩이에!: 4급 · 하트 2 · 낮 12시, 덩굴풀 3개를 들고 숲 구덩이 앞으로(가까이 가면 "살려줘~"). */
+      hachiPit() {
+        const qs = { ...(state.quests || {}) };
+        delete qs.hachiPit;
+        const f = friendOf(state, 'hachiware');
+        let s = { ...state, quests: qs, license: { ...state.license, grade: Math.min(state.license.grade, 4) }, clock: { day: Math.max(4, state.clock.day), t: (12 - 6) / 24 },
+          friends: { ...(state.friends || {}), hachiware: { ...f, pts: Math.max(f.pts || 0, 6) } } };
+        s = addItem(s, 'vine', 3).state;
+        commit(s);
+        player.setPosition(pit.front.x, pit.front.z + 6);
+        cam.snap(player.position);
       },
       /** 우사기 클럽 춤만 바로(보상 없음). */
       club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); }
@@ -477,6 +491,7 @@ function boot() {
       questScene = false;
       usagiClub.reset();
       shisaStory.reset();
+      hachiPit.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -964,6 +979,7 @@ function boot() {
     }
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
+    if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
     if (!down) {
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -995,6 +1011,7 @@ function boot() {
     else if (target.type === 'raffle') panels.openRaffle();
     else if (target.type === 'wake') wakeAlly(target.npc);
     else if (target.type === 'wish') startWish();
+    else if (target.type === 'pit') hachiPit.press();
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -1010,8 +1027,9 @@ function boot() {
   let overlay = false; // 시험 · 알바 창이 열려 있다
   let starShow = null; // 별똥별 소원 연출 중(아래 별똥별 밤 참고)
   let usagiClub = null; // 사이드스토리 '우사기의 집' 연출(stories/usagiclub.js — 아래에서 만든다)
+  let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -1417,6 +1435,7 @@ function boot() {
     }
     if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
+    if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
       commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
       hud.toast('라멘 로우에 새 메뉴가 나왔대요!', 4200, { chips: [{ icon: itemSvg('pizzabun'), text: '피자호빵' }] });
@@ -2011,6 +2030,14 @@ function boot() {
   const shisaStory = createShisaStory({
     guide, npcs, hud, sound, input, village, staged, who: (kind) => whoOf({ kind }), me: () => meWho(), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     skipHours: (h) => commit({ ...state, clock: { ...state.clock, t: Math.min(0.999, state.clock.t + h / 24) } }), getPlayer: () => player
+  });
+  // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js): 숲 구덩이 · 밧줄 영차
+  const pit = createPit(scene, village);
+  hachiPit = createHachiPit({
+    getState: () => state, npcs, village, hud, guide, sound, input, staged, pit, who: (kind) => whoOf({ kind }), narrator: NARRATOR,
+    fill: (lines) => lines.map(fillName), getPlayer: () => player, regionAt,
+    startStory: (id) => { commit(startQuest(state, id)); sound.play('job'); hud.announce({ kicker: '사이드스토리 시작!', title: QUESTS[id].title, sub: shortGoal(state, id).goal, to: 'quest', id }); },
+    finishStory: (id) => { const st = stepOf(state, id), lines = [...st.say]; lines.speaker = st.speaker || QUESTS[id].giver; questScene = true; input.setEnabled(false); finishQuestStep(id, null, lines); }
   });
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
@@ -3381,6 +3408,8 @@ function boot() {
       if (dd < 1.8) options.push({ d: dd - 0.5, t: { type: 'friendHome', kind, label: kind === 'hachiware' ? '동굴 들여다보기' : '문 두드리기' } });
     }
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
+    const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
+    if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
@@ -3536,6 +3565,7 @@ function boot() {
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
+    if (tg.type === 'pit') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'pit' };
     if (tg.type === 'story') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'story' }; // 사이드스토리(토끼굴 들어가기)
     if (tg.type === 'wish') return { x: player.position.x, z: player.position.z, r: 0.7, y: 1.9, id: 'wish' }; // 내 발밑 · 머리 위에
     const s = village.spots[tg.type];
@@ -3748,6 +3778,7 @@ function boot() {
       staged: () => [...staged],
       burrows: () => burrows.spots,
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
+      pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),
       drawCalls: () => gfx.renderer.info.render.calls,
       /** 렌더 통계(최적화 확인용): 그리기 호출 · 삼각형 · 기하 · 텍스처 · 셰이더 수. */
@@ -3884,6 +3915,7 @@ function boot() {
       updateQuests(dt);
       usagiClub.update(dt);
       shisaStory.update(dt);
+      hachiPit.update(dt);
       updateCryFx(dt);
       if (pulling) {
         const before = pulling.pull.power;
@@ -3900,7 +3932,7 @@ function boot() {
       villageLife(dt);
       // 무기를 들고 몬스터가 근처에 있으면(닿지 않아도) 휘두르기 버튼을 띄운다(휴대폰)
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
-      hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
+      hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
       // 제초 승급 시험: 토벌 실기처럼 위 가운데 노란 알약에 진행(깔끔하게 연속 ●○)을 크게. 실기 · 술래잡기가 알약을 쓰는 동안은 비켜 준다
       // 시험에 세는 풀은 마을에서 그 풀 위에 노란 화살표, 알약에도 그 풀 그림 · 이름

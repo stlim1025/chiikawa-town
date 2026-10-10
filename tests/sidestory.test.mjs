@@ -153,3 +153,25 @@ test('시사의 슈퍼 알바이터: 면 삶기 특훈 뒤 아침에 이야기 �
   assert.ok(Sh.buy({ ...r2.state, money: 500, stamina: 10 }, 'ramen', 'shisaramen').ok, '합격 뒤에는 특제 라멘');
   assert.ok(F.friendOf(r2.state, 'ramen').pts > 0, '사부님과도 친해진다');
 });
+
+test('하치와레가 구덩이에!: 말로는 시작 안 함(숲에서 발견) · 덩굴풀 3개면 끌어올릴 수 있다', async () => {
+  const I = await import(G + 'inventory.js');
+  let s = withHearts(fresh(5, 12), 'hachiware', 2);
+  const g4 = { ...s, license: { ...(s.license || {}), grade: 4 } };
+  assert.ok(!Q.canOffer(g4, 'hachiPit'), '말 걸어서는 시작하지 않는다');
+  assert.notEqual(Q.markOf(g4, 'hachiware'), 'story');
+  assert.ok(Q.pitDue(g4), '4급 · 하트 2 · 낮 · 넷째 날부터');
+  assert.ok(!Q.pitDue({ ...g4, license: { ...g4.license, grade: 5 } }), '5급이면 덩굴풀을 못 뽑는다');
+  assert.ok(!Q.pitDue({ ...g4, clock: at(5, 20) }), '밤에는 아니다');
+  assert.ok(!Q.pitDue({ ...g4, clock: at(3, 12) }), '넷째 날부터');
+  s = Q.startQuest(g4, 'hachiPit');
+  assert.ok(!Q.pitDue(s), '한 번만');
+  assert.ok(!Q.questsFor(s, 'hachiware').report.includes('hachiPit'), '덩굴풀이 모자라면 아직');
+  s = I.addItem(s, 'vine', 3).state;
+  assert.ok(Q.questsFor(s, 'hachiware').report.includes('hachiPit'));
+  assert.equal(Q.markOf(s, 'hachiware'), '?');
+  const r = Q.completeStep(s, 'hachiPit', 5);
+  assert.ok(r.finished);
+  assert.equal(I.bagOf(r.state).items.vine || 0, 0, '밧줄로 엮었다');
+  assert.ok(F.friendOf(r.state, 'chiikawa').pts > 0, '달려온 치이카와와도');
+});

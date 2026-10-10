@@ -660,7 +660,7 @@ export function createNpcs(scene, village, weeds, berries) {
           while (dy < -Math.PI) dy += Math.PI * 2;
           if (pd0 >= 2.8) n.yaw += dy * Math.min(1, dt * 3);
         }
-        n.chibi.root.position.set(n.x, groundY(n.x, n.z), n.z);
+        n.chibi.root.position.set(n.x, groundY(n.x, n.z) - (n.sink || 0), n.z); // sink: 구덩이에 빠져 머리만(하치와레가 구덩이에!)
         if (n.faceYaw != null) n.yaw = n.faceYaw; // 연출: 정해진 쪽(카메라)을 본다(우는 얼굴 클로즈업)
         n.chibi.root.rotation.y = n.yaw;
         showProp(n, propFor(n.kind, mode)); // 맥주 · 책 · 빗자루 · 라멘 그릇처럼 그 몸짓에 드는 물건

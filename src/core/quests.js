@@ -184,6 +184,16 @@ export const QUESTS = {
     ],
     reward: { bond: 4, friends: { ramen: 2 }, money: 300, story: 'shisaPass' }
   },
+  // 하치와레가 구덩이에!(원작: 구덩이에 빠진 하치와레) — 말로 부탁하지 않고 숲에서 "살려줘~" 소리를 듣고 찾아낸다(stories/hachipit.js)
+  hachiPit: {
+    title: '하치와레가 구덩이에!', giver: 'hachiware', side: true, noOffer: true, needHearts: 2, ask: '',
+    offer: ['(숲 속 구덩이에서 하치와레를 찾았다)'],
+    steps: [{
+      type: 'bring', items: { vine: 3 }, goal: '덩굴풀 3개로 밧줄 엮어 구덩이의 하치와레 끌어올리기 (숲 · 4급부터)', speaker: 'hachiware',
+      say: ['영차~ 하고 끌어올려 줘서 고마워, {name}!', '구덩이 속에서 하늘만 보고 있으니까 조금 무서웠어~', '이제 발밑 조심할게! 헤헤.']
+    }],
+    reward: { bond: 4, friends: { chiikawa: 2 }, money: 300 }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
@@ -257,6 +267,13 @@ export function pizzaNewsDue(state) {
   if (!state.clock || state.tutorial !== 'done' || (state.story || {}).pizzaNews || state.clock.day < 3) return false;
   const h = hourOf(state.clock);
   return h >= 8 && h < 12 && !sideBusy(state) && hearts(friendOf(state, 'usagi')) >= 1;
+}
+/** '하치와레가 구덩이에!'가 일어날 수 있는지: 넷째 날부터 낮(10 ~ 17시), 덩굴풀을 뽑을 수 있는 급수(4급), 하치와레와 하트 2, 다른 이야기가 없을 때 한 번. */
+export function pitDue(state) {
+  if (!state.clock || (state.tutorial && state.tutorial !== 'done') || state.clock.day < 4) return false;
+  if (isActive(state, 'hachiPit') || isDone(state, 'hachiPit')) return false;
+  const h = hourOf(state.clock), grade = (state.license || {}).grade ?? 5;
+  return h >= 10 && h < 17 && grade <= WEED_KINDS.vine.grade && !sideBusy(state) && hearts(friendOf(state, 'hachiware')) >= 2;
 }
 /** 사이드스토리를 지금 새로 열 수 없는지: 하나를 하는 중이거나, 마지막으로 끝낸 지 SIDE_GAP 일이 안 됐다. */
 export function sideBusy(state) {
@@ -343,6 +360,7 @@ export function canOffer(state, id) {
 /** 기본 조건: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
 function baseOffer(state, id) {
   const Q = QUESTS[id], q = questState(state, id);
+  if (Q.noOffer) return false; // 말로는 부탁하지 않는 이야기(숲에서 찾아내는 구덩이 같은)
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
   if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
