@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { celMaterial, addOutline, addShellOutline, GEO } from '../render/toon.js';
 import { EAT_ANIMS, FOOD_SHAPES, eatPose, eatWeight } from './eatmotion.js';
 import { POCHETTES } from '../core/pochette.js';
+import { mergeUnit } from '../render/batch.js';
 
 const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', MOUTH = '#5a2b33', TEAR = '#8fd3ff';
 const NAVY = '#6f94bb', USAGI = '#f6e8b6', EAR_PINK = '#f4b6c2'; // 하치와레 무늬는 원작처럼 연한 파랑
@@ -789,7 +790,34 @@ function buildFromDef(def) {
       (roles[pt.role] = roles[pt.role] || []).push(mesh);
     }
   });
+  mergeDetails(pivots, props, roles);
   return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label };
+}
+
+const partVolume = (m) => m.scale.x * m.scale.y * m.scale.z;
+/**
+ * 가볍게: 관절(몸통 · 머리 · 귀 …) 안의 작은 부품(볼 · 입 · 코 · 무늬 …)을 색을 꼭짓점에 칠해 몇 덩어리로 합친다(캐릭터마다 그리기 30여 번 → 20번 안팎).
+ * 관절 안에서는 서로 움직이지 않아 합쳐도 몸짓은 그대로다. 그대로 두는 것: 팔 · 다리(잠옷이 부품마다 덧씌운다), 표정(roles: 울 때 움직인다),
+ * 소품(props: 보였다 숨었다), 관절에서 가장 큰 부품(몸통 · 머리 본체: 잠옷이 크기를 잰다). 머리 위로 솟은 부품(귀)은 따로 합쳐 headTop 표시(잠옷 후드가 숨긴다).
+ */
+function mergeDetails(pivots, props, roles) {
+  const keep = new Set([...Object.values(props), ...Object.values(roles)].flat());
+  for (const [name, pivot] of Object.entries(pivots)) {
+    if (/^(arm|leg)/.test(name)) continue;
+    const parts = pivot.children.filter((m) => m.isMesh && !keep.has(m));
+    if (parts.length < 3) continue;
+    const big = parts.reduce((a, m) => (partVolume(m) > partVolume(a) ? m : a));
+    const top = (m) => name === 'head' && m.position.y > big.position.y + big.scale.y * 0.55;
+    const recolor = (m) => {
+      const u = m.material.uniforms, flat = u.uShade.value === 0, ds = m.material.side === THREE.DoubleSide;
+      return { key: [flat, ds].join('|'), material: celMaterial('#ffffff', { vertexColors: true, flat, doubleSide: ds }), tint: m.material.vertexColors ? null : u.uColor.value };
+    };
+    const rest = parts.filter((m) => m !== big && m.material.isShaderMaterial && m.material.uniforms && m.material.uniforms.uColor);
+    for (const [list, high] of [[rest.filter(top), true], [rest.filter((m) => !top(m)), false]]) {
+      if (list.length < 2) continue;
+      mergeUnit(pivot, list, recolor).forEach((m) => { if (m.userData.merged) m.userData.headTop = high; });
+    }
+  }
 }
 
 /** 내 캐릭터 모델. 빠진 항목은 기본값을 쓴다. */
@@ -821,7 +849,7 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
   if (!on) return;
   const added = [], hidden = [], mat = celMaterial(color, { doubleSide: true }), white = celMaterial('#fffaf0');
   const vol = (m) => m.scale.x * m.scale.y * m.scale.z;
-  const biggest = (g) => { let b = null; (g ? g.children : []).forEach((m) => { if (m.isMesh && (!b || vol(m) > vol(b))) b = m; }); return b; };
+  const biggest = (g) => { let b = null; (g ? g.children : []).forEach((m) => { if (m.isMesh && !m.userData.merged && (!b || vol(m) > vol(b))) b = m; }); return b; }; // 합친 덩어리(크기 1)는 빼고
   const put = (parent, geo, material, pos, scale, outline = 0.022) => {
     const m = new THREE.Mesh(geo, material);
     m.position.copy(pos);
@@ -847,7 +875,7 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
   // 후드: 머리 부품보다 살짝 크게, 얼굴 쪽은 트였다. 머리 위로 솟은 원래 귀는 숨기고 동그란 귀 둘
   const head = biggest(P.head);
   if (head) {
-    P.head.children.forEach((m) => { if (m !== head && m.isMesh && m.visible && m.position.y > head.position.y + head.scale.y * 0.55) { m.visible = false; hidden.push(m); } });
+    P.head.children.forEach((m) => { if (m !== head && m.isMesh && m.visible && (m.userData.headTop || m.position.y > head.position.y + head.scale.y * 0.55)) { m.visible = false; hidden.push(m); } });
     ['earL', 'earR'].forEach((k) => { if (P[k] && P[k].visible) { P[k].visible = false; hidden.push(P[k]); } }); // 토끼 귀처럼 따로 노는 귀
     const sc = head.scale.clone().multiplyScalar(1.09);
     put(P.head, hoodGeo.back, mat, head.position, sc);

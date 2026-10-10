@@ -42,7 +42,7 @@ function mergeInto(items, { color = false, uv = false } = {}) {
       v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize();
       nor[(vo + i) * 3] = v.x; nor[(vo + i) * 3 + 1] = v.y; nor[(vo + i) * 3 + 2] = v.z;
       if (col && tint) { col[(vo + i) * 3] = tint.r; col[(vo + i) * 3 + 1] = tint.g; col[(vo + i) * 3 + 2] = tint.b; }
-      else if (col) { const c = g.attributes.color; col[(vo + i) * 3] = c.getX(i); col[(vo + i) * 3 + 1] = c.getY(i); col[(vo + i) * 3 + 2] = c.getZ(i); }
+      else if (col) { const c = g.attributes.color; col[(vo + i) * 3] = c ? c.getX(i) : 1; col[(vo + i) * 3 + 1] = c ? c.getY(i) : 1; col[(vo + i) * 3 + 2] = c ? c.getZ(i) : 1; }
       if (tex) { const t = g.attributes.uv; tex[(vo + i) * 2] = t.getX(i); tex[(vo + i) * 2 + 1] = t.getY(i); }
     }
     if (g.index) for (let i = 0; i < g.index.count; i++) index[io++] = vo + g.index.getX(i);
@@ -82,8 +82,10 @@ function lineKey(line, matrix) {
 /**
  * 한 물체(집 · 가게 · 문)의 부품을 그 물체 안에서 같은 재질끼리 합친다. 재질은 그대로라 가릴 때 반투명해지는 것 · 밤 창문은 그대로 된다.
  * 외곽선은 합친 몸통의 자식으로 붙는다(여럿일 수 있다). unit: 부품들이 들어 있는 물체 그룹. 돌려주는 값: 새 부품 목록.
+ * recolor(m) → { key, material, tint } 를 주면 그 규칙으로 묶는다(캐릭터 얼굴 장식처럼 색이 다른 부품을 꼭짓점 색 재질 하나로).
+ * 합친 메시는 userData.merged = true.
  */
-export function mergeUnit(unit, meshes) {
+export function mergeUnit(unit, meshes, recolor = (m) => ({ key: m.material.uuid, material: m.material, tint: null })) {
   unit.updateMatrixWorld(true);
   const inv = unit.matrixWorld.clone().invert();
   const ok = (m) => m.isMesh && !m.isInstancedMesh && !Array.isArray(m.material) && !m.material.map && m.renderOrder === 0 && m.geometry.attributes.normal
@@ -91,10 +93,11 @@ export function mergeUnit(unit, meshes) {
   const kept = [], groups = new Map();
   for (const m of meshes) {
     if (!ok(m)) { kept.push(m); continue; }
-    const key = [m.material.uuid, m.castShadow, m.receiveShadow].join('|');
-    if (!groups.has(key)) groups.set(key, { body: m, items: [], lines: new Map() });
+    const rc = recolor(m), key = [rc.key, m.castShadow, m.receiveShadow].join('|');
+    if (!groups.has(key)) groups.set(key, { body: m, material: rc.material, color: false, items: [], lines: new Map() });
     const gr = groups.get(key), mat = inv.clone().multiply(m.matrixWorld);
-    gr.items.push({ geometry: m.geometry, matrix: mat });
+    gr.items.push({ geometry: m.geometry, matrix: mat, tint: rc.tint });
+    if (rc.tint || (m.material.vertexColors && m.geometry.attributes.color)) gr.color = true;
     for (const line of m.children) {
       const lmat = inv.clone().multiply(line.matrixWorld), { key: lk, material } = lineKey(line, lmat);
       if (!gr.lines.has(lk)) gr.lines.set(lk, { material, items: [] });
@@ -102,8 +105,9 @@ export function mergeUnit(unit, meshes) {
     }
   }
   const merged = [];
-  for (const { body, items, lines } of groups.values()) {
-    const mesh = new THREE.Mesh(mergeInto(items, { color: !!body.material.vertexColors && !!body.geometry.attributes.color }), body.material);
+  for (const { body, material, color, items, lines } of groups.values()) {
+    const mesh = new THREE.Mesh(mergeInto(items, { color }), material);
+    mesh.userData.merged = true;
     mesh.castShadow = body.castShadow;
     mesh.receiveShadow = body.receiveShadow;
     for (const { material, items: li } of lines.values()) {
