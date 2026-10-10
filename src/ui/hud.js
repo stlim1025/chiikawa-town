@@ -120,6 +120,16 @@ export function createHud(ui, input) {
   timer.setAttribute('role', 'timer');
   const labelLayer = el('div');
   labelLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+  /**
+   * 머리 위 표시를 (x, y) 에 놓는다. 기기 픽셀 단위로 맞춘다: 소수점 픽셀로 놓으면 고해상도 휴대폰에서 글자와 아이콘이
+   * 장면마다 서로 다르게 픽셀에 맞춰져 간판 아이콘이 부들부들 떨렸다. 자리가 그대로면 다시 쓰지 않는다(스타일 계산 덜기).
+   */
+  const placeAt = (e, x, y) => {
+    const dpr = window.devicePixelRatio || 1;
+    const lx = Math.round(x * dpr) / dpr, ly = Math.round(y * dpr) / dpr;
+    if (e._lx !== lx) { e._lx = lx; e.style.left = lx + 'px'; }
+    if (e._ly !== ly) { e._ly = ly; e.style.top = ly + 'px'; }
+  };
   // 맞았을 때 붉은 테두리 · 기절할 때 어둡게 덮는 막
   const hurtFx = el('div', 'hurt-fx');
   const curtain = el('div', 'curtain');
@@ -574,8 +584,7 @@ export function createHud(ui, input) {
           if (e.dataset.v !== it.html) { e.dataset.v = it.html; e.innerHTML = it.html; }
         } else if (e.textContent !== it.text) e.textContent = it.text;
         if ('far' in it) e.classList.toggle('far', !!it.far);
-        e.style.left = ((v.x + 1) / 2) * w + 'px';
-        e.style.top = ((1 - v.y) / 2) * h + 'px';
+        placeAt(e, ((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h);
         seen.add(it.id);
       }
       labelEls.forEach((e, id) => { if (!seen.has(id)) { e.remove(); labelEls.delete(id); } });
@@ -585,8 +594,7 @@ export function createHud(ui, input) {
         const f = fx[i];
         if (t > f.until) { f.el.remove(); fx.splice(i, 1); continue; }
         v.set(f.x, f.y, f.z).project(camera);
-        f.el.style.left = ((v.x + 1) / 2) * w + 'px';
-        f.el.style.top = ((1 - v.y) / 2) * h + 'px';
+        placeAt(f.el, ((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h);
       }
     }
   };
