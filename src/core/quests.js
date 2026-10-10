@@ -5,6 +5,8 @@ import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.j
 import { ACCESSORY_ITEMS, wardrobeOf } from './wardrobe.js';
 import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
 import { WEED_KINDS } from './weeding.js';
+import { hourOf } from './clock.js';
+import { VILLAGERS, villagerOf } from './villagers.js';
 
 /**
  * 퀘스트(5단계): 친구마다 고충(부탁)과 마을 이야기. 친구 머리 위에 ! 가 뜨면 부탁이 있다는 뜻이고,
@@ -19,6 +21,8 @@ import { WEED_KINDS } from './weeding.js';
  *                                       with 면 부탁한 친구와 같이 가야 한다)
  *   together { act, n }                부탁한 친구와 같이(친구가 따라다니는 동안) 일상 일(ACTS)을 n 번 하면 저절로 끝난다
  * daily: 일상 부탁(같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일). again: 끝내고 그만큼 날이 지나면 또 부탁한다.
+ *   wish: { hours: [시작, 끝), need?: 'hungry' 배고플 때 | 'broke' 돈이 모자랄 때 | 'tired' 지쳤을 때, chance: 그날 그 마음이 들 확률 }
+ *   — 일상 부탁은 늘 떠 있지 않고, 그 친구가 정말 그럴 형편 · 시간일 때만, 마을 전체에 많아야 MAX_WISHES 개만 뜬다.
  *   boss    { }                        이야기 속 왕버섯을 쓰러뜨리면 저절로 끝난다
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
  * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
@@ -128,43 +132,43 @@ export const QUESTS = {
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
-    title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, needHearts: 0, ask: '무슨 일 있어?',
+    title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
     offer: ['…저기… {name}…', '라멘 로우 라멘… 먹고 싶은데…', '혼자 가면… 좀 떨려서…', '…같이… 먹으러 가 줄래…?'],
     steps: [{ type: 'together', act: 'ramen', n: 1, goal: '치이카와랑 라멘 로우에서 라멘 먹기', say: ['…후루룩…! 맛있어…!', '같이 먹으니까… 훨씬 맛있다…', '…또 같이 오자…♪'] }],
     reward: { bond: 2 }
   },
   weedChii: {
-    title: '치이카와랑 풀 뽑기', giver: 'chiikawa', daily: true, again: 3, needHearts: 0, ask: '풀 뽑으러 가?',
+    title: '치이카와랑 풀 뽑기', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [8, 16], need: 'broke', chance: 0.25 }, needHearts: 0, ask: '풀 뽑으러 가?',
     offer: ['…{name}…', '오늘 풀 뽑기… 하려고 하는데…', '혼자 하면… 조금 무서워서…', '히잉… 같이 해 줄래…?'],
     steps: [{ type: 'together', act: 'weed', n: 4, goal: '치이카와랑 같이 풀 4개 뽑기', say: ['…다 뽑았다…!', '같이 하니까… 금방이었어…', '…이거… 아까 찾은 거… 너 줄게…'] }],
     reward: { bond: 2, items: { clover: 1 } }
   },
   weedPal: {
-    title: '하치와레랑 풀 뽑기', giver: 'hachiware', daily: true, again: 2, needHearts: 0, ask: '오늘 뭐 해?',
+    title: '하치와레랑 풀 뽑기', giver: 'hachiware', daily: true, again: 2, wish: { hours: [8, 16], need: 'broke', chance: 0.3 }, needHearts: 0, ask: '오늘 뭐 해?',
     offer: ['있잖아, {name}! 오늘 풀 뽑기 같이 할래?', '둘이 하면 금방 끝나고, 수다도 떨 수 있잖아~', '어떻게든 될 거야!'],
     steps: [{ type: 'together', act: 'weed', n: 5, goal: '하치와레랑 같이 풀 5개 뽑기', say: ['우와~ 벌써 다 했다!', '같이 하니까 하나도 안 힘들었어!', '이거 아까 주운 동전이야. 반씩 나누자!'] }],
     reward: { money: 120, bond: 2 }
   },
   berryPal: {
-    title: '우사기랑 열매 따기', giver: 'usagi', daily: true, again: 2, needHearts: 0, ask: '우라?',
+    title: '우사기랑 열매 따기', giver: 'usagi', daily: true, again: 2, wish: { hours: [10, 17], chance: 0.22 }, needHearts: 0, ask: '우라?',
     offer: ['우라!', '(빨간 열매 덤불 쪽을 가리키며 펄쩍펄쩍 뛴다)', '(바구니를 내밀며 같이 가자고 손짓한다)'],
     steps: [{ type: 'together', act: 'berry', n: 4, goal: '우사기랑 빨간 열매 4개 따기 (마을 가장자리 열매 덤불)', say: ['야하~!', '(열매를 하나 입에 쏙 넣고는 행복한 얼굴을 한다)', '(바구니에서 열매를 한 줌 나눠 준다)'] }],
     reward: { bond: 2, items: { berry: 2 } }
   },
   hangover: {
-    title: '쿠리만쥬의 해장 라멘', giver: 'kurimanju', daily: true, again: 3, needHearts: 0, ask: '오늘 기분은 어때?',
+    title: '쿠리만쥬의 해장 라멘', giver: 'kurimanju', daily: true, again: 3, wish: { hours: [7, 11], chance: 0.3 }, needHearts: 0, ask: '오늘 기분은 어때?',
     offer: ['하아~ 어젯밤에 조금 많이 마셨나 봐…', '이럴 땐 뜨끈한 라멘 국물이 최고지~', '같이 한 그릇 할래? 혼자 먹으면 심심하잖아~'],
     steps: [{ type: 'together', act: 'ramen', n: 1, goal: '쿠리만쥬랑 라멘 로우에서 라멘 먹기', say: ['후루룩… 하아~ 살 것 같다~', '역시 라멘은 같이 먹어야 맛있어~', '다음엔 내가 한 잔 살게~'] }],
     reward: { bond: 2 }
   },
   walkRiver: {
-    title: '모몽가랑 강가 산책', giver: 'momonga', daily: true, again: 3, needHearts: 1, ask: '심심해?',
+    title: '모몽가랑 강가 산책', giver: 'momonga', daily: true, again: 3, wish: { hours: [14, 19], chance: 0.22 }, needHearts: 1, ask: '심심해?',
     offer: ['야, {name}.', '…강가 다리에서 물 구경하고 싶은데, 혼자 가긴 좀 그렇잖아.', '너도 같이 와. 싫다고 하면 지갑 털 거야. 흥!'],
     steps: [{ type: 'visit', place: 'bridge', with: true, goal: '모몽가랑 남쪽 강가 다리까지 같이 걷기', speaker: 'momonga', say: ['(다리 아래로 강물이 졸졸 흐른다…)', '…뭐야, 생각보다 좋잖아.', '…가끔 또 데려와. 흥!'] }],
     reward: { bond: 2 }
   },
   restDay: {
-    title: '랏코의 쉬는 날', giver: 'rakko', daily: true, again: 4, needHearts: 1, ask: '오늘도 수련이야?',
+    title: '랏코의 쉬는 날', giver: 'rakko', daily: true, again: 4, wish: { hours: [11, 19], need: 'tired', chance: 0.4 }, needHearts: 1, ask: '오늘도 수련이야?',
     offer: ['…{name}.', '수련만 한다고 강해지는 건 아니다. 가끔은 쉬는 것도 수련이지.', '…라멘이나 먹으러 가지. 같이.'],
     steps: [{ type: 'together', act: 'ramen', n: 1, goal: '랏코랑 라멘 로우에서 라멘 먹기', say: ['…훗. 국물이 좋군.', '…이런 날도 나쁘지 않다.', '…또 가자.'] }],
     reward: { bond: 2 }
@@ -215,8 +219,50 @@ export function stepReady(state, id) {
   const p = progressOf(state, id);
   return !!p && p.have >= p.need;
 }
-/** 부탁을 들을 수 있는지: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
+/** 일상 부탁이 마을에 한꺼번에 떠 있을 수 있는 수(이미 받은 일상 부탁도 센다). */
+export const MAX_WISHES = 2;
+/** 그날 · 그 부탁의 주사위(0..1): 날마다 다르고, 하루 안에서는 같다(느낌표가 깜빡이지 않게). */
+function dayRoll(day, id) {
+  let h = 2166136261;
+  for (const ch of `${day}:${id}`) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+}
+/** 그 친구가 지금 그 일상 부탁을 할 형편인지: 시간대 · 형편(배고픔 · 돈 · 기운) · 그날 마음(chance). */
+export function wishNow(state, id) {
+  const Q = QUESTS[id], W = Q.wish;
+  if (!W) return true;
+  const day = state.clock.day, hour = hourOf(state.clock);
+  if (hour < W.hours[0] || hour >= W.hours[1] || dayRoll(day, id) >= W.chance) return false;
+  const v = VILLAGERS[Q.giver] ? villagerOf(state, Q.giver, day) : null;
+  if (W.need === 'hungry') return !!v && v.energy < 55;
+  if (W.need === 'tired') return !!v && v.energy < 45;
+  if (W.need === 'broke') return !!v && v.money < 200;
+  return true;
+}
+/** 지금 마을에 떠 있는 일상 부탁: 형편이 맞는 것 중 그날 주사위 순으로, 친구마다 하나, 많아야 MAX_WISHES 개(받은 것 포함). */
+export function openWishes(state) {
+  const active = QUEST_ORDER.filter((id) => isActive(state, id));
+  const room = MAX_WISHES - active.filter((id) => QUESTS[id].daily).length;
+  if (room <= 0 || !state.clock) return [];
+  const busy = new Set(active.map((id) => QUESTS[id].giver)); // 부탁 중인 친구는 새 부탁을 안 한다
+  const out = [];
+  const cands = QUEST_ORDER.filter((id) => QUESTS[id].daily && baseOffer(state, id) && wishNow(state, id))
+    .sort((a, b) => dayRoll(state.clock.day, a) - dayRoll(state.clock.day, b));
+  for (const id of cands) {
+    if (out.length >= room) break;
+    if (busy.has(QUESTS[id].giver)) continue;
+    busy.add(QUESTS[id].giver);
+    out.push(id);
+  }
+  return out;
+}
+/** 부탁을 들을 수 있는지. 일상 부탁은 지금 마을에 떠 있는 것(openWishes)만. */
 export function canOffer(state, id) {
+  return QUESTS[id].daily ? baseOffer(state, id) && openWishes(state).includes(id) : baseOffer(state, id);
+}
+/** 기본 조건: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
+function baseOffer(state, id) {
   const Q = QUESTS[id], q = questState(state, id);
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
   if ((Q.tutorial || Q.daily) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁도 첫날 안내가 끝난 뒤부터
