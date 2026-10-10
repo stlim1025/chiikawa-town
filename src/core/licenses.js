@@ -83,14 +83,25 @@ export function payFee(state, id) {
   return { ok: true, state: paid.state };
 }
 
-/** 합격: 자격증을 준다. */
 /** 자격증을 없앤다(테스트 도구). */
 export function revoke(state, id) {
   const { [id]: _gone, ...rest } = licensesOf(state);
   return { ...state, licenses: rest };
 }
+/** 합격: 자격증을 준다. */
 export function grant(state, id, day) {
   return { ...state, licenses: { ...licensesOf(state), [id]: { day } } };
+}
+
+const NUMBER_PREFIX = { weed: 'W', liquor: 'L', arbeiter: 'A', hunter: 'H' };
+/**
+ * 자격증 번호(카드에 찍힌다): 자격 머리글자 - 딴 날 - 이름 · 자격 · 날로 만든 네 자리. 같은 사람이 같은 날 딴 같은 자격이면 늘 같다.
+ * 예: H-012-4827
+ */
+export function licenseNumber(name, id, day) {
+  let hash = 2166136261;
+  for (const ch of `${name}|${id}|${day}`) hash = Math.imul(hash ^ ch.codePointAt(0), 16777619) >>> 0;
+  return `${NUMBER_PREFIX[id] || 'X'}-${String(day).padStart(3, '0')}-${String(hash % 10000).padStart(4, '0')}`;
 }
 
 function shuffle(list, random) {

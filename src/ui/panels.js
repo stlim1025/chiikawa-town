@@ -25,6 +25,7 @@ import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
+import { EMBLEM, licenseCardEl } from './licensecard.js';
 import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
 
 // 마을폰 앱 아이콘
@@ -368,17 +369,12 @@ export function createPanels(ui, handlers) {
       else if (canTakeExam(lic)) { const fee = EXAM_FEE[lic.grade]; side = h('button', { class: 'btn pink', type: 'button', disabled: s.money < fee, onClick: after(handlers.startExam) }, s.money < fee ? `${won(fee)} 부족` : `${lic.grade - 1}급 시험 보기 ${won(fee)}`); }
       else if (lic.grade <= 1) side = h('span', { class: 'lic-badge done' }, ico('star'), '최고 급수');
       const xpNeed = XP_TO_EXAM[lic.grade];
-      out.push(card('<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V18" stroke="#5e9f80" stroke-width="3" stroke-linecap="round"/><path d="M20 20q-2-9-11-11q0 9 11 11zM20 17q2-9 11-10q-1 9-11 10z" fill="#8fd16a" stroke="#5e9f80" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 33h20" stroke="#c9a77c" stroke-width="3" stroke-linecap="round"/></svg>', `제초 검정 ${lic.grade}급`, side, [
+      out.push(card(EMBLEM.weed, `제초 검정 ${lic.grade}급`, side, [
         ['coin', `보수 ${mult}배`],
         lic.grade > 1 ? ['up', `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
         lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
       ]));
       // 술 자격 · 슈퍼 알바이터 · 토벌: 필기 · 실기 · 준비를 한 줄씩
-      const LIC_ART = {
-        liquor: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 9h18l-2 22a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2"/><path d="M12.5 17h15l-1.3 13.5a2 2 0 0 1-2 1.8h-8.4a2 2 0 0 1-2-1.8z" fill="#f2b45a"/><circle cx="17" cy="23" r="1.4" fill="#fff"/><circle cx="22" cy="27" r="1.1" fill="#fff"/></svg>',
-        arbeiter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 19h28a14 13 0 0 1-28 0z" fill="#d9675b"/><path d="M9 19q5-4 11 0t11 0" fill="none" stroke="#fcd95b" stroke-width="2.6" stroke-linecap="round"/><path d="M24 6l-6 13M29 7l-7 12" stroke="#c9a77c" stroke-width="2.4" stroke-linecap="round"/></svg>',
-        hunter: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 33 22 19" stroke="#f3a6b8" stroke-width="3.4" stroke-linecap="round"/><path d="M19 15a7 7 0 1 0 6 6" fill="none" stroke="#f3a6b8" stroke-width="3.2" stroke-linecap="round"/><path d="M27 13l4-1M28 18l4 1M22 11l1-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>'
-      };
       const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].pass} / ${L[id].questions}`];
       const LINES = {
         liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
@@ -389,7 +385,7 @@ export function createPanels(ui, handlers) {
         const own = hasLicense(s, id);
         const side2 = own ? h('span', { class: 'lic-badge done' }, ico('check'), '합격')
           : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L[id].fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L[id].fee ? `${won(L[id].fee)} 부족` : `시험 보기 ${won(L[id].fee)}`);
-        out.push(card(LIC_ART[id], L[id].name, side2, own ? [['check', `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요`]] : LINES[id]));
+        out.push(card(EMBLEM[id], L[id].name, side2, own ? [['check', `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요`]] : LINES[id]));
       }
       // 토벌 랭킹: 내 순위(자격증이 있으면) · 랭커 특전(무기에 얼굴 새기기)
       const me = ranking(s, s.profile.name).find((r) => r.who === 'me');
@@ -596,13 +592,15 @@ export function createPanels(ui, handlers) {
     // 마을폰 '자격증' 앱(폰 안 화면: 닫기는 아래 홈 버튼)
     licenses(s) {
       const out = [appBar('자격증')];
-      out.push(h('div', { class: 'row license-card' }, h('div', {}, h('div', { class: 't' }, `제초 검정 ${s.license.grade}급`), chipLine(chip('coin', '', `보수 ${PAY_MULT[s.license.grade]}배`), chip('check', '', `풀 ${WEED_ORDER.filter((k) => canPullKind(s.license.grade, k)).length}종 뽑기`)))));
-      for (const id of ['liquor', 'arbeiter', 'hunter']) {
-        const own = hasLicense(s, id);
-        out.push(h('div', { class: `row license-card${own ? '' : ' none'}` },
-          h('div', {}, h('div', { class: 't' }, LICENSES[id].name), h('div', { class: 'd' }, own ? `${handlers.dayLabel(licensesOf(s)[id].day)} 취득` : '아직 없어요'),
-            own && id === 'hunter' ? (() => { const me = ranking(s, s.profile.name).find((r) => r.who === 'me'); return me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `랭킹 ${me.rank}위`), chip(null, '', `${me.points}점`)) : null; })() : null)));
-      }
+      // 딴 자격증은 내 사진이 박힌 카드로, 아직 없는 것은 흐린 빈 카드로. 카드 아래 한 줄: 제초는 보수 · 뽑을 수 있는 풀, 토벌은 랭킹
+      const extra = (id) => {
+        if (id === 'weed') return chipLine(chip('coin', '', `보수 ${PAY_MULT[s.license.grade]}배`), chip('check', '', `풀 ${WEED_ORDER.filter((k) => canPullKind(s.license.grade, k)).length}종 뽑기`));
+        if (id !== 'hunter' || !hasLicense(s, id)) return null;
+        const me = ranking(s, s.profile.name).find((r) => r.who === 'me');
+        return me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `랭킹 ${me.rank}위`), chip(null, '', `${me.points}점`)) : null;
+      };
+      const ids = ['weed', 'liquor', 'arbeiter', 'hunter'].sort((a, b) => (a === 'weed' || hasLicense(s, a) ? 0 : 1) - (b === 'weed' || hasLicense(s, b) ? 0 : 1));
+      out.push(h('div', { class: 'lic-list' }, ids.map((id) => h('div', { class: 'lic-item' }, licenseCardEl(handlers.licenseCard(id)), extra(id)))));
       return out;
     },
     // 동물의 숲 카탈로그처럼: 왼쪽 목록에서 고르면 오른쪽에 크게 보인다

@@ -155,6 +155,8 @@ export function createHud(ui, input) {
     q(wrap, '.nk').textContent = n.kicker || '';
     q(wrap, '.stamp').textContent = n.stamp || '';
     q(wrap, '.ns').textContent = n.sub || '';
+    if (n.card) q(wrap, '.nk').after(n.card); // 자격증 카드 같은 큰 그림(도장 대신 보여 줄 때는 stamp 를 비운다)
+    if (!n.stamp) q(wrap, '.stamp').remove();
     const row = q(wrap, '.nc');
     (n.chips || []).forEach((c) => {
       const ch = el('i', 'banner-chip');
@@ -446,7 +448,8 @@ export function createHud(ui, input) {
     },
     /**
      * 꼭 봐야 하는 소식(청약 발표 같은): 화면 가운데 큰 카드에 도장을 쾅 찍어 보여 주고, 확인을 눌러야 닫힌다.
-     * { kicker: 위 작은 알약, stamp: 도장 글(당첨 · 낙첨), tone: 'good' | 'bad' | 'info', sub: 한 줄, chips: [{ icon, text }], ok: 버튼 글 }
+     * { kicker: 위 작은 알약, stamp: 도장 글(당첨 · 낙첨), tone: 'good' | 'bad' | 'info', sub: 한 줄, chips: [{ icon, text }], ok: 버튼 글,
+     *   card: 알약 아래 넣을 요소(자격증 카드) }
      * 엔터 · 스페이스로도 닫힌다(게임으로 새지 않게 막는다). 여러 개면 차례로 하나씩.
      */
     notice(n) {

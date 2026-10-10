@@ -47,7 +47,7 @@ import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
-import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense, canWorkRamen, workedRamen } from './core/licenses.js';
+import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
@@ -56,6 +56,7 @@ import { openRamenShop } from './ui/ramenshop.js';
 import { itemSvg, accessorySvg } from './ui/itemart.js';
 import { weaponSvg, monsterSvg } from './ui/monsterart.js';
 import { openQuiz, openHighball } from './ui/exams.js';
+import { licenseCardEl } from './ui/licensecard.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, villagerTakesJob, payVillager, villagerSpend, villagerPay,
   canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY,
@@ -73,13 +74,14 @@ import {
 import { DOING_ICONS } from './ui/doingicons.js';
 import { charSvg } from './ui/art.js';
 import { furnitureThumbs } from './world/thumbs.js';
+import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
 import { VILLAGE_R, REGION_NAMES, GATES, POND, regionAt } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
-import { todayISO, dateLabel, weekdayOf } from './core/calendar.js';
+import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { createMonsters } from './world/monsters.js';
 import { createGround } from './world/ground.js';
@@ -228,6 +230,7 @@ function boot() {
     cheers() { const k = kuriAtPub(); if (k) cheersWith(k); },
     // 검정소 시험 · 라멘 로우 알바
     takeLicense: (id) => takeLicense(id),
+    licenseCard: (id) => licenseCardData(id),
     workRamen: () => workRamen(),
     // 가구점
     thumbs: () => furnitureThumbs(),
@@ -756,10 +759,10 @@ function boot() {
       const exam = examStep(next.exam, result);
       if (exam.done) {
         if (exam.passed) {
-          next = { ...next, exam: null, license: promote(next.license) };
+          next = { ...next, exam: null, license: promote(next.license, next.clock.day) };
           sound.play('pass');
           const unlocked = kindsOfGrade(next.license.grade);
-          hud.banner(`제초 검정 ${next.license.grade}급!`, '', 3400, unlocked.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })));
+          showLicenseCard('weed', `제초 검정 ${next.license.grade}급 합격!`, next, unlocked.length ? { sub: '이제 이 풀도 뽑을 수 있어요', chips: unlocked.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })) } : null);
           staffSay('captain', 'pass', 16, player.position);
           player.cheerTime = 2;
         } else {
@@ -1244,6 +1247,23 @@ function boot() {
   /** 시험 · 알바 창이 열려 있는 동안 마을 조작을 막는다. */
   function beginOverlay() { cancelPull(); input.setEnabled(false); hud.setAction(null); overlay = true; }
   function endOverlay() { overlay = false; if (mode === 'play') input.setEnabled(true); }
+  /** 자격증 카드에 적는 날짜: 진짜 자격증처럼 2026.10.08 */
+  const cardDate = (s, day) => { const { y, m, d } = dateOf(s.startDate || todayISO(), day); return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`; };
+  /**
+   * 자격증 카드에 들어갈 것(합격 카드 · 마을폰 자격증 앱). id: 'weed'(제초 검정, 급수가 이름에) | 'liquor' | 'arbeiter' | 'hunter'.
+   * 아직 없는 자격은 흐린 빈 카드(none). 사진은 지금 내 모습을 정면에서 찍는다.
+   */
+  function licenseCardData(id, s = state) {
+    const name = s.profile.name;
+    const own = id === 'weed' ? { day: s.license.day || 1 } : licensesOf(s)[id];
+    const title = id === 'weed' ? `제초 검정 ${s.license.grade}급` : LICENSES[id].name;
+    if (!own) return { id, title, none: true, hint: `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
+    return { id, title, name, photo: playerPortrait(myLook()), fields: [['이름', name], ['발급', cardDate(s, own.day)], ['번호', licenseNumber(name, id, own.day)]] };
+  }
+  /** 합격하면 진짜 자격증 카드를 받는다(확인을 눌러야 닫힌다). extra: { sub, chips } — 카드 아래 덧붙일 것 */
+  function showLicenseCard(id, kicker, s = state, extra = null) {
+    hud.notice({ kicker, card: licenseCardEl(licenseCardData(id, s)), tone: 'good', sub: (extra && extra.sub) || '자격증 앱에 넣어 뒀어요', chips: extra && extra.chips, ok: '받았다!' });
+  }
   /** 검정소 시험: 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. */
   function takeLicense(id) {
     if (hunterExam) { hud.toast('토벌 실기 중이에요!'); return; }
@@ -1258,7 +1278,7 @@ function boot() {
       endOverlay();
       happen({ type: 'playerLicense', who: 'me', lic: L.name });
       staffSay('captain', 'pass', 16, player.position);
-      hud.banner(`${L.name} 합격!`, '', 3200);
+      showLicenseCard(id, `${L.name} 합격!`);
       sound.play('done');
       player.cheerTime = 1.8;
     };
@@ -3100,6 +3120,7 @@ function boot() {
       pull: () => pulling && { kind: pulling.weed.kind, power: pulling.pull.power, from: pulling.pull.greenFrom, to: pulling.pull.greenTo, label: pulling.label },
       npcWork: (kind, typeId) => npcWork(npcs.byKind(kind), typeId),
       announce: (events) => announce(events),
+      licenseCard: (id) => showLicenseCard(id, '자격증 카드 확인'), // 합격 카드를 바로 띄워 보기
       monsterHp: (id, hp) => { const m = monsters.list.find((o) => o.id === id); if (m) m.hp = hp; },
       npcEat: (kind) => npcEat(npcs.byKind(kind)),
       npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),

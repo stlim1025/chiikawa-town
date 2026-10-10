@@ -165,6 +165,52 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .examiner .ex-name { position: absolute; left: 20px; top: -15px; padding: 1px 14px 3px; border-radius: 999px; background: #c9d3dc; color: #44505c; font-size: 17px; rotate: -4deg; box-shadow: 0 2px 0 rgba(68, 80, 92, 0.35); }
 .examiner .ex-say { margin: 0; font-size: 22px; line-height: 1.35; word-break: keep-all; }
 @media (prefers-reduced-motion: reduce) { .exam-result .stamp, .score-dots i { animation: none; } }
+/* 자격증 카드(진짜 자격증처럼): 자격 색 띠 · 증명사진(내 캐릭터) · 이름 · 발급일 · 번호 · 빨간 검정소 도장 · 홀로그램. 글씨는 카드 폭(cqw)에 맞춰 커진다 */
+.lic-card { --tone: #8fd16a; --tone-deep: #5e9f80; --tone-soft: #e3f4d6; position: relative; container-type: inline-size; width: 100%; aspect-ratio: 1.586; box-sizing: border-box; overflow: hidden; border-radius: 18px; text-align: left; color: var(--ink);
+  background: repeating-radial-gradient(circle at 80% 125%, transparent 0 9px, rgba(255, 255, 255, 0.4) 9px 10px), linear-gradient(160deg, #fffdf4 30%, var(--tone-soft));
+  box-shadow: inset 0 0 0 2px rgba(90, 68, 49, 0.1), 0 5px 0 rgba(120, 88, 48, 0.22), 0 10px 18px rgba(84, 62, 38, 0.16); }
+.lic-card.tone-weed { --tone: #86c95f; --tone-deep: #5e9f80; --tone-soft: #e3f4d6; }
+.lic-card.tone-liquor { --tone: #eeaa4e; --tone-deep: #c4844f; --tone-soft: #fbead0; }
+.lic-card.tone-arbeiter { --tone: #ec8473; --tone-deep: #c45a4c; --tone-soft: #fde0d8; }
+.lic-card.tone-hunter { --tone: #ef9cb1; --tone-deep: #d36f89; --tone-soft: #fde3ea; }
+.lc-band { display: flex; align-items: center; gap: 3cqw; height: 26%; padding: 0 4.5cqw; box-sizing: border-box; background: var(--tone); color: #fff; box-shadow: inset 0 -0.9cqw 0 var(--tone-deep); }
+.lc-emb { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 13.5cqw; height: 13.5cqw; border-radius: 50%; background: #fffaeb; box-shadow: 0 0.7cqw 0 var(--tone-deep); }
+.lc-emb svg { display: block; width: 80%; height: 80%; }
+.lc-head { flex: 1 1 auto; min-width: 0; line-height: 1.05; }
+.lc-head small { display: block; font-size: 4.6cqw; }
+.lc-head b { display: block; font-weight: inherit; font-size: 8.6cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0.5cqw 0 var(--tone-deep); }
+.lc-chip { position: relative; flex: 0 0 auto; width: 10.5cqw; height: 8cqw; border-radius: 1.8cqw; background: linear-gradient(135deg, #fff0b8, #e2b24e); box-shadow: inset 0 0 0 0.5cqw rgba(160, 110, 30, 0.35); }
+.lc-chip::before { content: ""; position: absolute; inset: 30% 0; border-top: 0.45cqw solid rgba(160, 110, 30, 0.45); border-bottom: 0.45cqw solid rgba(160, 110, 30, 0.45); }
+.lc-chip::after { content: ""; position: absolute; inset: 0 42%; border-left: 0.45cqw solid rgba(160, 110, 30, 0.45); border-right: 0.45cqw solid rgba(160, 110, 30, 0.45); }
+.lc-body { display: flex; gap: 4.5cqw; height: 74%; padding: 4.2cqw 4.5cqw 4.5cqw; box-sizing: border-box; }
+.lc-photo { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: center; height: 100%; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 2.4cqw; background: linear-gradient(#eaf4fb, #cfe3f2); box-shadow: 0 0 0 0.9cqw #fff, 0 0 0 1.3cqw rgba(90, 68, 49, 0.14); }
+.lc-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lc-nophoto { display: block; width: 72%; } .lc-nophoto svg { display: block; width: 100%; }
+.lc-fields { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; gap: 1.4cqw 3cqw; margin: 0; padding-right: 2cqw; }
+.lc-fields dt { padding-top: 0.8cqw; font-size: 4.4cqw; color: var(--tone-deep); }
+.lc-fields dd { margin: 0; overflow: hidden; border-bottom: 0.4cqw dashed rgba(90, 68, 49, 0.2); font-size: 6.2cqw; line-height: 1.15; white-space: nowrap; text-overflow: ellipsis; }
+.lc-fields .lc-empty { grid-column: 1 / -1; border: 0; font-size: 5.6cqw; line-height: 1.3; white-space: normal; word-break: keep-all; color: var(--ink-soft); }
+.lc-seal { position: absolute; left: 25cqw; bottom: 2.2cqw; width: 15.5cqw; color: #e0465e; opacity: 0.85; rotate: -14deg; mix-blend-mode: multiply; pointer-events: none; }
+.lc-seal svg { display: block; width: 100%; height: auto; }
+.lc-holo { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.5) 46%, rgba(190, 232, 255, 0.4) 50%, rgba(255, 214, 236, 0.4) 54%, transparent 62%) 33% 0 / 250% 100% no-repeat; mix-blend-mode: screen; }
+.lic-card.none { border: 2.5px dashed #cdb98f; background: var(--paper-2); box-shadow: none; }
+.lic-card.none .lc-band { background: #d8ccb2; box-shadow: inset 0 -0.9cqw 0 #c4b593; }
+.lic-card.none .lc-head b { text-shadow: none; }
+.lic-card.none .lc-emb { filter: grayscale(1); opacity: 0.7; box-shadow: none; }
+.lic-card.none .lc-chip { filter: grayscale(1); opacity: 0.5; }
+.lic-card.none .lc-photo { background: #efe6d0; }
+/* 합격했을 때 받는 카드: 휙 날아와 앉고 → 반짝 지나가고 → 도장 쾅 */
+.notice-card .lic-card { margin: 14px 0 2px; animation: card-deal 0.6s cubic-bezier(0.2, 1.45, 0.4, 1) both; }
+.notice-card .lc-holo { animation: holo-sweep 2.8s ease-in-out 0.55s infinite; }
+.notice-card .lc-seal { animation: seal-in 0.42s cubic-bezier(0.3, 1.8, 0.5, 1) 0.8s both; }
+@keyframes card-deal { from { opacity: 0; transform: translateY(40px) rotate(-12deg) scale(0.6); } }
+@keyframes holo-sweep { 0% { background-position: 110% 0; } 45%, 100% { background-position: -10% 0; } }
+@keyframes seal-in { from { opacity: 0; transform: scale(2.4); } }
+@media (max-height: 420px) { .notice-card .lic-card { width: 250px; margin: 8px auto 0; } }
+@media (prefers-reduced-motion: reduce) { .notice-card .lic-card, .notice-card .lc-holo, .notice-card .lc-seal { animation: none; } }
+/* 마을폰 자격증 앱: 카드를 차례로 쌓고, 카드 아래 한 줄(보수 · 랭킹) */
+.lic-list { display: grid; gap: 16px; margin: 6px 0 4px; }
+.lic-item .chip-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: 8px 4px 0; color: var(--ink); }
 /* 보상 꼬리표: 아이콘 + 짧은 글 */
 .banner-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: min(520px, 80vw); margin: 12px auto 0; }
 .banner-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px 5px 8px; border-radius: 999px; background: #fff6dc; box-shadow: 0 2px 0 #e8c97a; font-style: normal; font-size: 20px; white-space: nowrap; }
@@ -750,8 +796,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @media (max-height: 420px) { .hb-glass { height: 150px; width: 92px; } .exam-q { font-size: 21px; margin: 8px 4px; } }
 
 /* 자격증 지갑(마을폰) */
-.panel .row.license-card { background: linear-gradient(120deg, #fff4cf, #e6f5ec); box-shadow: 0 3px 0 var(--shadow); }
-.panel .row.license-card.none { background: var(--paper-2); box-shadow: none; opacity: 0.7; }
 
 /* 노동 접수(몬스터 헌터 퀘스트 카운터 · 동물의 숲 마일 목록 참고): 알약은 탭과 버튼에만 두고,
    일감은 한 판(장부)에 점선으로 줄을 나눈다. 보수는 오른쪽 한 칸에 모아 숫자끼리 줄을 맞춘다. */
