@@ -77,6 +77,14 @@ const hairCaps = {
   })()
 };
 
+const SMALL_PART = 0.09, SPECK_PART = 0.03, SHADOW_MIN = 0.06;
+/** 부품 도형: 작은 구 · 점은 성긴 것으로(화면에서 몇 픽셀이라 차이가 안 보인다). size 는 가장 긴 축의 크기. */
+function partGeometry(m, size) {
+  if (m === 'sphere' && size < SMALL_PART) return GEO.sphereLow;
+  if (m === 'dot' && size < SPECK_PART) return GEO.speck;
+  return geometryFor(m);
+}
+
 function geometryFor(m) {
   switch (m) {
     case 'sphere': return GEO.sphere;
@@ -747,14 +755,16 @@ function buildFromDef(def) {
     const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'kani' || pt.m.startsWith('part:');
     // 2D 손그림처럼: 단색 칠(얼굴 부품은 그늘도 없이) + 붓펜 같은 외곽선
     const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned, doubleSide: !!pt.ds, flat: pt.o === false });
-    const mesh = new THREE.Mesh(geometryFor(pt.m), material);
+    const size = Math.max(Math.abs(pt.s[0]), Math.abs(pt.s[1]), Math.abs(pt.s[2]));
+    const mesh = new THREE.Mesh(partGeometry(pt.m, size), material);
     mesh.position.set(pt.p[0] - pv[0], pt.p[1] - pv[1], pt.p[2] - pv[2]);
     const r = pt.r || [0, 0, 0];
     mesh.rotation.set(r[0], r[1], r[2], 'YXZ');
     mesh.scale.set(pt.s[0], pt.s[1], pt.s[2]);
     if (pt.o !== false) {
-      mesh.castShadow = true;
-      if (pt.m === 'box') addShellOutline(mesh, 0.02); else addOutline(mesh, 0.022, true);
+      mesh.castShadow = size >= SHADOW_MIN; // 손톱만 한 부품의 그림자는 보이지도 않는다
+      // 무늬 구(촘촘한 1만 2천 삼각형)의 외곽선은 겉모양만 같으면 되니 보통 구로
+      if (pt.m === 'box') addShellOutline(mesh, 0.02); else addOutline(mesh, 0.022, true, patterned ? GEO.sphere : mesh.geometry);
     }
     holder.add(mesh);
     if (pt.tag) { mesh.visible = false; (props[pt.tag] = props[pt.tag] || []).push(mesh); }

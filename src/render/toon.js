@@ -117,10 +117,10 @@ transformed += normalize(normal) * uThickness * wob * press * far;`
   return m;
 }
 
-/** mesh 에 외곽선 자식 메시를 붙인다. world 는 대략적인 월드 두께, hand 는 손그림 선. */
-export function addOutline(mesh, world = 0.035, hand = false) {
+/** mesh 에 외곽선 자식 메시를 붙인다. world 는 대략적인 월드 두께, hand 는 손그림 선, geometry 는 외곽선 모양(겉모양만 같으면 더 성긴 도형). */
+export function addOutline(mesh, world = 0.035, hand = false, geometry = mesh.geometry) {
   const s = (Math.abs(mesh.scale.x) + Math.abs(mesh.scale.y) + Math.abs(mesh.scale.z)) / 3 || 1;
-  const o = new THREE.Mesh(mesh.geometry, outlineMaterial(Math.round((world / s) * 1000) / 1000, hand));
+  const o = new THREE.Mesh(geometry, outlineMaterial(Math.round((world / s) * 1000) / 1000, hand));
   o.raycast = () => {};
   o.castShadow = false;
   o.receiveShadow = false;
@@ -139,10 +139,16 @@ export function addShellOutline(mesh, world = 0.035) {
   return o;
 }
 
-/** 공유 기본 도형. */
+/**
+ * 공유 기본 도형. 구는 화면에서 가장 큰 머리도 외곽선이 매끈해 보일 만큼만 나눈다(예전 28×18 은 한 화면 80만 ~ 150만 삼각형의 주범).
+ * sphereMid: 숲 나무 · 바위처럼 수백 개 깔리는 것용, sphereLow · speck: 손 · 단추 · 꽃처럼 작은 것용.
+ */
 export const GEO = {
-  sphere: new THREE.SphereGeometry(1, 28, 18),
-  dot: new THREE.SphereGeometry(1, 14, 10),
+  sphere: new THREE.SphereGeometry(1, 20, 14),
+  sphereMid: new THREE.SphereGeometry(1, 16, 10),
+  sphereLow: new THREE.SphereGeometry(1, 12, 8),
+  dot: new THREE.SphereGeometry(1, 10, 7),
+  speck: new THREE.SphereGeometry(1, 6, 4),
   box: new THREE.BoxGeometry(1, 1, 1),
   cone: new THREE.ConeGeometry(1, 1, 18).translate(0, 0.5, 0),
   cylinder: new THREE.CylinderGeometry(1, 1, 1, 18).translate(0, 0.5, 0)
@@ -152,8 +158,10 @@ export const GEO = {
  * 만화풍 메시를 만든다.
  * opts: { outline: 월드 두께 | false, shadow: boolean, receive: boolean, material }
  */
+const SMALL_SPHERE = 0.09; // 이보다 작은 구는 화면에서 몇 픽셀이라 성긴 구로 그린다
 export function toonMesh(geometry, color, opts = {}) {
-  const mesh = new THREE.Mesh(geometry, opts.material || toonMaterial(color));
+  const small = geometry === GEO.sphere && opts.scale && Math.max(...opts.scale.map(Math.abs)) < SMALL_SPHERE;
+  const mesh = new THREE.Mesh(small ? GEO.sphereLow : geometry, opts.material || toonMaterial(color));
   if (opts.position) mesh.position.set(...opts.position);
   if (opts.scale) mesh.scale.set(...opts.scale);
   if (opts.rotation) mesh.rotation.set(opts.rotation[0], opts.rotation[1], opts.rotation[2], 'YXZ');

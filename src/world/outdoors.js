@@ -31,7 +31,7 @@ export function buildOutdoors(ctx) {
     addInstance('trunk', GEO.cylinder, '#b88c66', { outline: 0.03 }, x, z, m4(x, 0, z, 0.16 * s, 1.1 * s, 0.16 * s));
     for (const [px, py, pz, r] of TREE_PARTS) {
       const wx = x + (px * c + pz * sn) * s, wz = z + (-px * sn + pz * c) * s;
-      addInstance('leaf' + leaf, GEO.sphere, leaf, { outline: 0.04 }, x, z, m4(wx, py * s, wz, r * s, r * 0.92 * s, r * s));
+      addInstance('leaf' + leaf, GEO.sphereMid, leaf, { outline: 0.04 }, x, z, m4(wx, py * s, wz, r * s, r * 0.92 * s, r * s));
     }
     obstacles.push({ x, z, r: 0.6 * s });
   }
@@ -56,13 +56,13 @@ export function buildOutdoors(ctx) {
     const x = (rand() - 0.5) * 152, z = -VILLAGE_R - 4 - rand() * 40;
     if (rand() < 0.75 || Math.abs(x) > Math.abs(z) + 4 || roadDist(x, z) < 2 || Math.hypot(x - CAVE.x, z - CAVE.z) < 8) continue;
     const s = 0.5 + rand() * 1.2;
-    addInstance('rock' + (k % 3), GEO.sphere, ROCK[k % 3], { outline: 0.045, receive: true }, x, z, m4(x, 0, z, s * (1 + rand() * 0.4), s * (0.6 + rand() * 0.3), s, rand() * 6));
+    addInstance('rock' + (k % 3), GEO.sphereMid, ROCK[k % 3], { outline: 0.045, receive: true }, x, z, m4(x, 0, z, s * (1 + rand() * 0.4), s * (0.6 + rand() * 0.3), s, rand() * 6));
     obstacles.push({ x, z, r: s * 1.05 });
   }
   // 북쪽 끝 절벽: 큰 바위를 이어 붙인다
   for (let x = -WORLD_HALF; x <= WORLD_HALF; x += 4.5) {
     const z = -72 - rand() * 3, s = 3.2 + rand() * 1.6;
-    addInstance('cliff', GEO.sphere, '#8f8174', { outline: 0.06, receive: true }, x, z, m4(x, 0, z, s * 1.2, s * 1.6, s));
+    addInstance('cliff', GEO.sphereMid, '#8f8174', { outline: 0.06, receive: true }, x, z, m4(x, 0, z, s * 1.2, s * 1.6, s));
     obstacles.push({ x, z, r: s * 1.1 });
   }
   // 하치와레 동굴: 바위 덩어리에 문 없이 뚫린 입구(원작처럼 문이 없다)
@@ -87,7 +87,7 @@ export function buildOutdoors(ctx) {
     if (Math.abs(x) > Math.abs(z) + 2 || roadDist(x, z) < 0.6 || obstacles.hits(x, z, 0.3)) continue;
     made++;
     addInstance('stem', GEO.cylinder, '#f3eedf', { outline: 0.015, shadow: false }, x, z, m4(x, 0, z, 0.05, 0.22, 0.05));
-    addInstance('cap', GEO.sphere, null, { outline: 0.015, shadow: false, material: capMat }, x, z, m4(x, 0.24, z, 0.14, 0.09, 0.14));
+    addInstance('cap', GEO.sphereLow, null, { outline: 0.015, shadow: false, material: capMat }, x, z, m4(x, 0.24, z, 0.14, 0.09, 0.14));
   }
 
   // ---------- 동쪽 들판: 외딴 나무, 꽃밭, 동쪽 끝 둔덕(지나갈 수 없다) ----------
@@ -106,7 +106,7 @@ export function buildOutdoors(ctx) {
     const x = VILLAGE_R + 2 + rand() * (WORLD_HALF - VILLAGE_R - 6), z = (rand() - 0.5) * 150;
     if (Math.abs(z) > x || roadDist(x, z) < 0.4 || shoreDist(x, z) < 0.6 || obstacles.hits(x, z, 0.05, true)) continue;
     const c = FLOWER[k % FLOWER.length];
-    addInstance('flower' + c, GEO.dot, c, { outline: false, shadow: false }, x, z, m4(x, 0.07, z, 0.09, 0.07, 0.09));
+    addInstance('flower' + c, GEO.speck, c, { outline: false, shadow: false }, x, z, m4(x, 0.07, z, 0.09, 0.07, 0.09));
   }
 
   // ---------- 남쪽 물: 강 띠, 호수, 바다(월드 남쪽 끝) ----------

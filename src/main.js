@@ -3369,6 +3369,7 @@ function boot() {
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+    gfx.adapt(now - last); // 버벅이면 해상도를 낮춘다
     last = now;
     if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
     try {
@@ -3436,6 +3437,8 @@ function boot() {
       mode: () => mode,
       action: (down) => input.setAction(down),
       drawCalls: () => gfx.renderer.info.render.calls,
+      /** 렌더 통계(최적화 확인용): 그리기 호출 · 삼각형 · 기하 · 텍스처 · 셰이더 수. */
+      renderInfo: () => { const I = gfx.renderer.info; return { calls: I.render.calls, triangles: I.render.triangles, geometries: I.memory.geometries, textures: I.memory.textures, programs: I.programs ? I.programs.length : 0 }; },
       scene: () => scene, // 그리기 호출을 무엇이 쓰는지 들여다보기
       region: () => player && regionAt(player.position.x, player.position.z),
       // 토벌(4단계) 확인용

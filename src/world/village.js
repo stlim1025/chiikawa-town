@@ -170,7 +170,7 @@ export function buildVillage(scene) {
     mats.forEach((m) => { m.transparent = true; });
     const canopy = [];
     [[0, 1.65, 0, 0.82], [0.48, 1.35, 0.18, 0.58], [-0.42, 1.42, -0.12, 0.6], [0.05, 1.3, -0.45, 0.55]].forEach(([px, py, pz, r], i) => {
-      canopy.push(place(g, toonMesh(GEO.sphere, null, { material: mats[i % 2], position: [px, py, pz], scale: [r, r * 0.92, r], outline: 0.04 })));
+      canopy.push(place(g, toonMesh(GEO.sphereMid, null, { material: mats[i % 2], position: [px, py, pz], scale: [r, r * 0.92, r], outline: 0.04 })));
     });
     parent.add(g);
     obstacles.push({ x, z, r: 0.6 * s });
@@ -182,7 +182,7 @@ export function buildVillage(scene) {
     g.position.set(x, 0, z);
     g.scale.setScalar(s);
     [[0, 0.28, 0, 0.42], [0.38, 0.22, 0.08, 0.32], [-0.36, 0.2, 0.05, 0.3]].forEach(([px, py, pz, r], i) => {
-      place(g, toonMesh(GEO.sphere, i ? '#9dd394' : '#8fcd86', { position: [px, py, pz], scale: [r, r * 0.85, r], outline: 0.03 }));
+      place(g, toonMesh(GEO.sphereMid, i ? '#9dd394' : '#8fcd86', { position: [px, py, pz], scale: [r, r * 0.85, r], outline: 0.03 }));
     });
     world.add(g);
     obstacles.push({ x, z, r: 0.55 * s, soft: true }); // 덤불은 지나갈 수 있다(꽃 · 풀이 그 자리에 나지 않게만)
@@ -618,7 +618,7 @@ export function buildVillage(scene) {
   const m4 = new THREE.Matrix4();
   flowerColors.forEach((c, i) => {
     const list = flowerSpots[i];
-    const petals = new THREE.InstancedMesh(GEO.dot, toonMaterial(c), list.length);
+    const petals = new THREE.InstancedMesh(GEO.speck, toonMaterial(c), list.length); // 몇 픽셀짜리 꽃잎: 성긴 구로 충분하다
     list.forEach(([fx, fz], j) => petals.setMatrixAt(j, m4.compose(new THREE.Vector3(fx, 0.07, fz), new THREE.Quaternion(), new THREE.Vector3(0.09, 0.07, 0.09))));
     world.add(petals);
   });

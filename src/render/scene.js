@@ -48,6 +48,20 @@ export function createScene(canvas) {
     return w / h;
   }
 
+  // 화면이 버벅이면(느린 프레임이 3초 넘게 쌓이면) 해상도를 0.25 씩 낮춘다(1 까지). 다시 올리지는 않는다: 오르내림을 되풀이하지 않게
+  const SLOW_FRAME_MS = 24, SLOW_BUDGET_MS = 3000;
+  let ratio = pixelRatio, slow = 0;
+  function adapt(frameMs) {
+    if (!(frameMs > 0) || frameMs > 250) return; // 탭을 오갔을 때처럼 튄 값은 빼고
+    slow = frameMs > SLOW_FRAME_MS ? slow + frameMs : Math.max(0, slow - frameMs * 0.5);
+    if (slow < SLOW_BUDGET_MS || ratio <= 1) return;
+    slow = 0;
+    ratio = Math.max(1, ratio - 0.25);
+    renderer.setPixelRatio(ratio);
+    const size = renderer.getSize(new THREE.Vector2());
+    renderer.setSize(size.x, size.y, false);
+  }
+
   /** 해를 target 근처에 두어 그림자를 선명하게 한다. */
   function followSun(x, z) {
     sun.position.set(x + 10, 20, z + 8);
@@ -63,7 +77,8 @@ export function createScene(canvas) {
   }
 
   return {
-    renderer, scene, sun, hemi, coarse, resize, followSun, setSky,
+    renderer, scene, sun, hemi, coarse, resize, followSun, setSky, adapt,
+    get pixelRatio() { return ratio; },
     render: (camera) => { sky.position.copy(camera.position); renderer.render(scene, camera); }
   };
 }
