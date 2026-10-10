@@ -1296,8 +1296,8 @@ function boot() {
   // ---------- 토벌(4단계): 무기 휘두르기 · 몬스터에게 맞기 · 기절 · 토벌 실기 ----------
   const SWING_TIME = 0.34, HIT_DELAY = 0.14;
   let swingCool = 0, iframe = 0, fainting = false, swingHit = null; // swingHit: { t: 맞히기까지 남은 초, id: 무기 }
-  let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비 · 몬스터, hits: 맞은 수, pass, fail, foes: { at: 나올 자리, in: 나오기까지 초 } | null }
-  const EXAM_FOE_DELAY = 3; // 실기 몬스터가 나오기까지(초)
+  let hunterExam = null; // 토벌 실기 { t: 남은 초, left: 남은 허수아비 · 몬스터, hits: 맞은 수, pass, fail, foes: { at: 나올 자리, next: 다음에 나올 몬스터 번호, in: 나오기까지 초 | null } }
+  const EXAM_FOE_DELAY = 2; // 앞엣것을 쓰러뜨리고 다음 몬스터가 나오기까지(초)
   let examCleanup = false; // 실기 몬스터를 치울 차례(endHunterExam(true))
   let growlCool = 0, warnCool = 0;
   /** 지금 손에 든 무기(실기 중에 무기가 없으면 빌린 사스마타). */
@@ -1411,8 +1411,8 @@ function boot() {
     }, 1500);
   }
   /**
-   * 토벌 자격증 실기: 검정소 앞마당 앞줄에 허수아비, 뒤쪽에 쫓아와 공격하는 몬스터(LICENSES.hunter.foes)가 선다.
-   * 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
+   * 토벌 자격증 실기: 검정소 앞마당에 허수아비가 먼저 서고, 다 쓰러뜨리면 쫓아와 공격하는 몬스터(LICENSES.hunter.foes)가
+   * 한 마리씩 차례로 나온다(앞 몬스터를 쓰러뜨리면 다음). 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
    */
   function startHunterPractical(pass, fail) {
     const L = LICENSES.hunter, ex = village.spots.exam;
@@ -1421,11 +1421,11 @@ function boot() {
     const dummies = [[-2.4, 1.6], [2.4, 1.6], [0, 3.0]].slice(0, L.dummies).map(at);
     const foes = [[-3.4, 5.4], [0, 6.4], [3.4, 5.4]].slice(0, L.foes.length).map(at);
     dummies.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
-    // 몬스터는 시작 안내를 읽을 틈을 두고 조금 뒤에 나온다(그동안 허수아비로 몸풀기)
-    hunterExam = { t: L.practical, left: dummies.length + foes.length, hits: 0, pass, fail, foes: { at: foes, in: EXAM_FOE_DELAY } };
+    // 몬스터는 허수아비를 다 쓰러뜨린 뒤에 한 마리씩(foes.in: 다음 몬스터가 나오기까지 초, null 이면 아직 차례가 아니다)
+    hunterExam = { t: L.practical, left: dummies.length + foes.length, hits: 0, pass, fail, foes: { at: foes, next: 0, in: null } };
     player.face(ex.x, ex.z + 2);
     sound.play('job');
-    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${dummies.length}개 · 몬스터 ${foes.length}마리`, sub: '',
+    hud.announce({ kicker: '토벌 실기 시작!', title: `허수아비 ${dummies.length}개 다음 몬스터 ${foes.length}마리`, sub: '',
       chips: [{ icon: ICO.clock, text: `${L.practical}초 안에` }, { text: `${L.hits}번 맞으면 불합격` },
         heldWeapon(state) ? null : { icon: weaponSvg('fork'), text: '사스마타 빌려줌' }].filter(Boolean) });
   }
@@ -1450,7 +1450,13 @@ function boot() {
   function examDummyDown() {
     if (!hunterExam) return;
     hunterExam.left -= 1;
-    if (hunterExam.left > 0) { hud.toast(`${hunterExam.left}개 남았어요!`, 1400); return; }
+    if (hunterExam.left > 0) {
+      // 서 있는 것(허수아비 · 나온 몬스터)을 다 쓰러뜨렸으면 다음 몬스터가 나온다
+      const F = hunterExam.foes, waiting = F.at.length - F.next;
+      if (hunterExam.left === waiting && waiting > 0) { F.in = EXAM_FOE_DELAY; hud.toast(F.next === 0 ? '허수아비 끝! 이제 몬스터가 와요' : '좋아요! 다음 몬스터가 와요', 1600); }
+      else hud.toast(`${hunterExam.left}개 남았어요!`, 1400);
+      return;
+    }
     const pass = hunterExam.pass;
     endHunterExam();
     setTimeout(pass, 500);
@@ -1490,11 +1496,12 @@ function boot() {
     if (hunterExam) {
       hunterExam.t -= dt;
       const F = hunterExam.foes;
-      if (F && (F.in -= dt) <= 0) {
-        F.at.forEach((sp, i) => monsters.spawnAt(LICENSES.hunter.foes[i], sp.x, sp.z, { exam: true }));
-        hunterExam.foes = null;
+      if (F.in != null && (F.in -= dt) <= 0) { // 차례가 된 몬스터 한 마리
+        const i = F.next++, sp = F.at[i];
+        monsters.spawnAt(LICENSES.hunter.foes[i], sp.x, sp.z, { exam: true });
+        F.in = null;
         sound.play('growl');
-        hud.toast('몬스터가 나왔어요!', 1600);
+        hud.toast(`몬스터 ${i + 1} / ${F.at.length}`, 1600);
       }
       const lives = LICENSES.hunter.hits - hunterExam.hits;
       hud.setTimer(['토벌 실기', { icon: monsterSvg('dummy'), text: `${hunterExam.left}개` }, { text: '♥'.repeat(lives) + '♡'.repeat(hunterExam.hits) },

@@ -69,13 +69,13 @@ test('필기: 따옴표로 묶은 전리품 이름 뒤 조사도 받침에 맞�
   }
 });
 
-test('실기: 허수아비만이 아니라 쫓아와 공격하는 몬스터도 나오고, 세 번 맞으면 불합격', () => {
+test('실기: 허수아비 뒤에 쫓아와 공격하는 몬스터가 차례로 나오고, 세 번 맞으면 불합격', () => {
   assert.ok(Array.isArray(L.foes) && L.foes.length >= 3, '몬스터 셋 이상');
   for (const k of L.foes) {
     const M = MONSTERS[k];
     assert.ok(M && !M.boss && M.attack && M.dmg > 0 && M.speed > 0 && !M.night, `${k} 는 낮에 쫓아와 공격하는 몬스터`);
   }
   assert.ok(L.hits >= 2 && L.hits <= 3, `맞으면 불합격: ${L.hits}번`);
-  assert.ok(L.practical <= 60, `제한 시간 ${L.practical}초`);
+  assert.ok(L.practical >= 70 && L.practical <= 90, `제한 시간 ${L.practical}초(몬스터가 하나씩 나오니 넉넉히)`);
   assert.ok(L.dummies + L.foes.length >= 5, '쓰러뜨릴 것 다섯 이상');
 });

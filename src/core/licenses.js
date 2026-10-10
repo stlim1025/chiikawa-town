@@ -10,8 +10,8 @@ export const LICENSES = {
   liquor: { name: '술 자격', fee: 600, questions: 6, pass: 5, seconds: 15 },
   arbeiter: { name: '슈퍼 알바이터', fee: 800, questions: 6, pass: 5, seconds: 12 },
   // 4단계: 토벌 자격증 — 필기(토벌 안내서를 꼼꼼히 봐야 푸는 8문제 중 7개, 문제당 10초)
-  //   + 실기(허수아비 2개와 쫓아와 공격하는 몬스터 foes 를 60초 안에 모두 쓰러뜨리기, hits 번 맞으면 불합격) → 토벌 일감
-  hunter: { name: '토벌 자격증', fee: 300, questions: 8, pass: 7, seconds: 10, dummies: 2, foes: ['fluff', 'hopper', 'shroom'], hits: 3, practical: 60 }
+  //   + 실기(허수아비 2개를 먼저, 그다음 쫓아와 공격하는 몬스터 foes 가 한 마리씩 차례로 — 75초 안에 모두 쓰러뜨리기, hits 번 맞으면 불합격) → 토벌 일감
+  hunter: { name: '토벌 자격증', fee: 300, questions: 8, pass: 7, seconds: 10, dummies: 2, foes: ['fluff', 'hopper', 'shroom'], hits: 3, practical: 75 }
 };
 
 /**
