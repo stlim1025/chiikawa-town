@@ -281,7 +281,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @media (prefers-reduced-motion: reduce) { .world-label.mark { animation: none; } }
 
 /* 조이스틱 */
-.stick { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; background: rgba(255, 250, 235, 0.4); box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.85); pointer-events: none; }
+/* 조이스틱은 제 층(will-change)으로 이름표 층(.wl-pos 들) 위에: 이름표가 GPU 층이 된 뒤 아이폰 Safari 에서 조이스틱이 3D 화면 뒤로 숨어 안 보였다 */
+.stick { position: absolute; z-index: 1; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; background: rgba(255, 250, 235, 0.4); box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.85); pointer-events: none; will-change: transform; }
 .stick > i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: var(--paper); box-shadow: 0 3px 0 var(--shadow); }
 
 /* ---------- 창: 크림색 말랑 상자 + 기울어진 이름표 ---------- */
