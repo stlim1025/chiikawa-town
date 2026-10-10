@@ -2,7 +2,7 @@ const RADIUS = 56;
 const KEYS = { KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
 
 /**
- * 가상 조이스틱(화면 왼쪽 절반, 터치만)과 키보드(WASD/방향키, 스페이스 · E)를 하나로 묶는다.
+ * 가상 조이스틱(화면 왼쪽 절반, 터치만)과 키보드(WASD/방향키, 스페이스)를 하나로 묶는다. E · F · I 단축키는 main.js 에서.
  * vector() 는 길이 1 이하, y 는 화면 위쪽이 + 이다.
  * 입력 방식: 마지막으로 쓴 것이 터치면 'touch'(조이스틱 · 행동 버튼을 보인다), 키보드 · 마우스면 'desk'(숨긴다).
  * <html data-input="touch | desk"> 로 CSS 가 나눠 그린다. 두 손가락으로 벌리고 오므리면 확대 · 축소. 마우스 오른쪽 버튼은 막는다.
