@@ -77,14 +77,16 @@ export const likeOf = (a, b) => (PERSONA[a] && PERSONA[a].likes[b]) || 0.4;
 /**
  * 다음에 할 일을 고른다. → { act, with: 같이 할 친구 kind | null, scores }
  * ctx: { kind, hour, energy, money, fun, social, diligence, appetite,
- *        jobs: 받을 수 있는 일감이 있는지, hunter: { exam, hunt, want } | null,
+ *        jobs: 받을 수 있는 일감이 있는지, hunter: { exam, hunt, want } | null, goal: { kind, cost } | null 돈 모으는 목표(core/goals.js),
  *        friends: [{ kind, dist }] 지금 한가한 친구들, show: { by, dist } | null 공연 중,
  *        player: { dist, hearts, ready } | null 내 캐릭터(ready: 요즘 인사 안 했다), guiding: 첫날 안내 중 }
  */
 export function chooseActivity(ctx, random = Math.random) {
   const { kind, hour, energy, money } = ctx;
   if (isSleepHour(hour)) return { act: 'sleep', with: null, scores: {} };
-  if (energy < TIRED) return { act: money >= MEAL_PRICE && hour >= 7 && hour < 20 ? 'eat' : 'nap', with: null, scores: {} };
+  // 지쳤으면 돈이 있으면 라멘, 없으면 낮잠. 목표 값을 모으는 중이면 라멘값도 아끼고 집에서 낮잠
+  const saving = !!ctx.goal && money < ctx.goal.cost;
+  if (energy < TIRED) return { act: money >= MEAL_PRICE && hour >= 7 && hour < 20 && !saving ? 'eat' : 'nap', with: null, scores: {} };
   const P = PERSONA[kind] || { greet: 0.5, likes: {} };
   const fun = ctx.fun ?? 0.3, social = ctx.social ?? 0.3, day = hour >= 7 && hour < 20;
   const R = routineAt(kind, hour), s = {};
@@ -92,13 +94,18 @@ export function chooseActivity(ctx, random = Math.random) {
   const near = (d) => (d < 8 ? 1.2 : d < 25 ? 1 : 0.45);
   const best = (ctx.friends || []).map((f) => ({ ...f, w: likeOf(kind, f.kind) * near(f.dist) })).sort((a, b) => b.w - a.w)[0] || null;
 
+  // 목표(core/goals.js)가 있으면 모자란 만큼 부지런해진다(돈이 넉넉해도 목표가 멀면 계속 일한다). 없으면 예전처럼 지갑 사정대로
+  const g = ctx.goal, gap = g ? g.cost - money : 0;
+  const drive = g && gap > 0 ? 1.8 + 0.8 * Math.min(1, gap / g.cost) : 0;
+  const rush = hour < 11 ? 1.5 : 1; // 게시판 일감은 선착순: 아침 일찍 받으러 간다
   if (day && ctx.jobs && !ctx.guiding) {
-    const need = money < 150 ? 1.5 : money > 600 ? 0.45 : 1;
-    s.work = (ctx.diligence || 0) * need * (1.15 - fun * 0.4);
+    const need = g ? (gap > 0 ? drive : 0.6) : money < 150 ? 1.5 : money > 600 ? 0.45 : 1;
+    s.work = (ctx.diligence || 0) * need * rush * (1.15 - fun * 0.4);
   }
   if (day && ctx.hunter && !ctx.guiding) {
-    if (ctx.hunter.hunt) s.hunt = ctx.hunter.want * (energy > 45 ? 1.1 : 0.3);
-    if (ctx.hunter.exam) s.exam = ctx.hunter.want * 0.7;
+    // 토벌 일감은 보수가 커서, 목표를 모을 때도 자격증이 있으면 풀 뽑기보다 먼저 노린다
+    if (ctx.hunter.hunt) s.hunt = ctx.hunter.want * (energy > 45 ? 1.1 : 0.3) * (drive ? drive * rush * 1.3 : 1);
+    if (ctx.hunter.exam) s.exam = ctx.hunter.want * 0.7 * (ctx.goal && ctx.goal.kind === 'license' ? 4 : 1); // 자격증이 목표면 시험 값이 모이자마자
   }
   if (day && money >= MEAL_PRICE) {
     const meal = (hour >= 11 && hour < 14) || (hour >= 18 && hour < 20);

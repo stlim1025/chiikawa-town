@@ -23,7 +23,7 @@ import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
-import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS } from '../core/friends.js';
+import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg } from './art.js';
 import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
 
@@ -516,25 +516,22 @@ export function createPanels(ui, handlers) {
       }
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
-        const F = FRIENDS[k], hc = hearts(f), full = hc >= MAX_HEARTS, into = f.pts % HEART_PTS;
+        const F = FRIENDS[k], hc = hearts(f);
         const talked = f.talk === today, played = f.play === today;
-        // 오늘 한 일(이야기 · 놀기)은 체크 / 빈 동그라미로, 선물 · 빌린 돈은 짧은 꼬리표로
+        // 오늘 한 일(이야기 · 놀기)은 체크 / 빈 동그라미로, 빌린 돈은 짧은 꼬리표로
         const chips = [
           h('span', { class: 'chip-lab' }, '오늘'),
           chip(talked ? 'check' : 'todo', talked ? 'done' : 'todo', '이야기'),
           F.play ? chip(played ? 'check' : 'todo', played ? 'done' : 'todo', '놀기') : null,
           k === 'kurimanju' ? chip(f.drink === today ? 'check' : 'todo', f.drink === today ? 'done' : 'todo', '건배') : null,
           HOME_VISIT.has(k) && hc >= 2 ? chip(f.home === today ? 'check' : 'todo', f.home === today ? 'done' : 'todo', '집에서') : null,
-          F.gift && FURNITURE[F.gift] ? (f.gift ? chip('check', 'done', `선물 ${FURNITURE[F.gift].name}`) : chip('heart', 'gift', `${GIFT_HEARTS}개면 ${FURNITURE[F.gift].name} 선물`)) : null,
-          f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null
+          f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null // 하트 몇 개면 무슨 선물, 다음 하트까지 몇 같은 건 앱에서 알려 주지 않는다
         ];
         out.push(h('div', { class: `row f-card${f.pts ? '' : ' new'}` }, face(k),
           h('div', {},
             h('div', { class: 't' }, F.name,
               h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
             live.doing[k] ? h('div', { class: 'f-now' }, live.doing[k].svg ? svgSpan('f-now-ico', live.doing[k].svg) : null, live.doing[k].text) : null,
-            h('div', { class: 'f-next' }, full ? '하트가 가득해요!' : f.pts ? `다음 하트까지 ${HEART_PTS - into}` : '아직 친해지지 않았어요',
-              full ? null : h('span', { class: 'q-bar' }, h('i', { style: `width:${Math.round((into / HEART_PTS) * 100)}%` }))),
             h('div', { class: 'mon-chips' }, chips))));
       });
       return out;

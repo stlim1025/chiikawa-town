@@ -10,8 +10,8 @@ const clean = (line, where) => {
   assert.ok(!/[^.…]\.(\s|$)/.test(line), `마침표: ${where}: ${line}`);
   assert.ok(line.length <= 30, `너무 길다(${line.length}): ${where}: ${line}`);
 };
-const TYPES = ['meal', 'chat', 'job', 'hunt', 'examPass', 'examFail', 'sing', 'watch', 'train', 'theft', 'partyHunt'];
-const evs = (who, other) => TYPES.map((type) => ({ type, who: type === 'sing' ? 'hachiware' : type === 'theft' ? 'momonga' : who, with: other, title: '잡초 8개 뽑기', mon: '물방울 슬라임', n: 3 }));
+const TYPES = ['meal', 'chat', 'job', 'hunt', 'examPass', 'examFail', 'sing', 'watch', 'train', 'theft', 'partyHunt', 'buy'];
+const evs = (who, other) => TYPES.map((type) => ({ type, who: type === 'sing' ? 'hachiware' : type === 'theft' ? 'momonga' : who, with: type === 'buy' ? null : other, title: '잡초 8개 뽑기', mon: '물방울 슬라임', n: 3, item: '먼작귀 인형' }));
 
 test('짝 수다 · 잡담은 짧고 말하는 친구가 그 짝이다', () => {
   for (const [key, scripts] of Object.entries(V.PAIR_TALK)) {

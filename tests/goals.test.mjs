@@ -1,0 +1,145 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { GOALS, goalOf, canBuy, buyGoal, npcPower } from '../src/core/goals.js';
+import { chooseActivity } from '../src/core/brain.js';
+import { liveOffscreen } from '../src/core/offscreen.js';
+import { VILLAGERS, MAX_JOBS_PER_DAY, villagerOf, payVillager, villagerSpend, villagerTakesJob, villagerEnergy, isValidVillagers } from '../src/core/villagers.js';
+import { savingLine } from '../src/core/villagetalk.js';
+import { WEAPONS } from '../src/core/combat.js';
+import { FURNITURE } from '../src/core/home.js';
+import { LICENSES } from '../src/core/licenses.js';
+import { HUNTER_PROFILES } from '../src/core/hunters.js';
+import { createState } from '../src/core/state.js';
+
+const fresh = (o = {}) => ({ ...createState({ name: '나', look: {} }), tutorial: 'done', ...o });
+const withMoney = (s, kind, money, extra = {}) => ({ ...s, villagers: { ...(s.villagers || {}), [kind]: { ...villagerOf(s, kind, 1), money, ...extra } } });
+const licensedAs = (s, kind) => ({ ...s, hunters: { ...(s.hunters || {}), [kind]: { license: 1, tries: 1, tryDay: 1, kills: 0, points: 0 } } });
+const seeded = (seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+
+test('친구마다 차례로 이루고 싶은 목표가 있고, 값은 가게 값 그대로다(모몽가는 훔치니까 없다)', () => {
+  for (const kind of Object.keys(VILLAGERS)) {
+    const list = GOALS[kind];
+    if (kind === 'momonga') { assert.deepEqual(list, []); continue; }
+    assert.ok(list.length >= 1, `${kind} 목표`);
+    for (const g of list) {
+      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : FURNITURE[g.item].price;
+      assert.equal(g.cost, want, `${kind} ${g.label}`);
+      assert.ok(g.label && g.id, `${kind} 목표 이름`);
+    }
+  }
+  assert.equal(GOALS.rakko.at(-1).item, 'star', '랏코는 가장 센 반짝 검을 노린다');
+});
+
+test('자격증을 따거나 물건을 사면 다음 목표로 넘어간다', () => {
+  let s = fresh();
+  assert.equal(goalOf(s, 'chiikawa').kind, 'license');
+  assert.ok(!canBuy(withMoney(s, 'chiikawa', 9999), 'chiikawa', 1), '자격증은 가게에서 사지 않고 검정소 시험으로 딴다');
+  s = licensedAs(s, 'chiikawa');
+  const g = goalOf(s, 'chiikawa');
+  assert.notEqual(g.kind, 'license');
+  assert.ok(!canBuy(withMoney(s, 'chiikawa', g.cost - 1), 'chiikawa', 1), '돈이 모자라면 못 산다');
+  s = withMoney(s, 'chiikawa', g.cost + 30);
+  const r = buyGoal(s, 'chiikawa', 1);
+  assert.ok(r.ok);
+  assert.equal(villagerOf(r.state, 'chiikawa', 1).money, 30);
+  assert.notEqual(goalOf(r.state, 'chiikawa').id, g.id, '다음 목표로');
+  assert.equal(r.goal.id, g.id);
+  assert.equal(goalOf(fresh(), 'momonga'), null);
+});
+
+test('무기를 사면 토벌 힘이 그만큼 세진다(원래 힘보다 약한 무기는 그대로)', () => {
+  let s = licensedAs(fresh(), 'chiikawa');
+  assert.equal(npcPower(s, 'chiikawa'), HUNTER_PROFILES.chiikawa.power);
+  s = withMoney(s, 'chiikawa', 0, { bought: GOALS.chiikawa.filter((g) => g.kind !== 'license' && g.item !== 'sword').map((g) => g.id) });
+  const sword = GOALS.chiikawa.find((g) => g.item === 'sword');
+  assert.equal(goalOf(s, 'chiikawa').id, sword.id);
+  s = buyGoal(withMoney(s, 'chiikawa', sword.cost, { bought: villagerOf(s, 'chiikawa', 1).bought }), 'chiikawa', 1).state;
+  assert.equal(npcPower(s, 'chiikawa'), WEAPONS.sword.dmg);
+  assert.equal(npcPower(fresh(), 'rakko'), HUNTER_PROFILES.rakko.power);
+});
+
+test('지갑에 적어 둔 목표 · 무기 · 기운은 일하고 돈을 써도 그대로 남는다', () => {
+  let s = withMoney(fresh(), 'usagi', 200, { bought: ['w-sword'], weapon: 'sword' });
+  s = villagerEnergy(s, 'usagi', -40, 1);
+  s = villagerTakesJob(s, 'usagi', 'weed8', 1).state;
+  s = payVillager(s, 'usagi', 120, 1);
+  s = villagerSpend(s, 'usagi', 80, 1);
+  const v = villagerOf(s, 'usagi', 1);
+  assert.deepEqual(v.bought, ['w-sword']);
+  assert.equal(v.weapon, 'sword');
+  assert.equal(v.energy, 60, '일감을 받아도 기운이 100으로 돌아가지 않는다');
+  assert.equal(v.money, 240);
+  assert.equal(v.jobs, 1);
+});
+
+test('하루에 일감을 셋까지 받고, 목표가 멀면 돈이 넉넉해도 일하며, 아침엔 서둘러 일감을 받으러 간다', () => {
+  assert.ok(MAX_JOBS_PER_DAY >= 3);
+  const ctx = (o) => ({ kind: 'rakko', hour: 14, energy: 80, money: 900, fun: 0.3, social: 0.3, diligence: VILLAGERS.rakko.diligence, appetite: 0.2, jobs: true, hunter: null, friends: [], show: null, player: null, ...o });
+  const tally = (c, n = 600) => { const r = seeded(11); let w = 0; for (let i = 0; i < n; i++) if (chooseActivity(c, r).act === 'work') w++; return w / n; };
+  const lazy = tally(ctx({})), driven = tally(ctx({ goal: { kind: 'weapon', cost: 6000 } }));
+  assert.ok(driven > lazy + 0.2, `목표가 있으면 더 일한다: ${lazy.toFixed(2)} → ${driven.toFixed(2)}`);
+  // 일과(랏코의 새벽 수련 같은 성격)와 따로, 일하고 싶은 정도 자체는 아침에 더 크다
+  const workScore = (hour) => chooseActivity(ctx({ hour, goal: { kind: 'weapon', cost: 6000 } }), () => 0.5).scores.work;
+  assert.ok(workScore(8) > workScore(15), `아침에 더 서두른다: ${workScore(15).toFixed(2)} → ${workScore(8).toFixed(2)}`);
+});
+
+test('자격증이 목표면 시험 볼 돈이 모였을 때 시험을 보러 간다', () => {
+  const c = { kind: 'chiikawa', hour: 10, energy: 80, money: 400, fun: 0.3, social: 0.3, diligence: 0.55, appetite: 0.25, jobs: true, friends: [], show: null, player: null, hunter: { exam: true, hunt: false, want: 0.3 }, goal: { kind: 'license', cost: 300 } };
+  const r = seeded(5); let exam = 0;
+  for (let i = 0; i < 400; i++) if (chooseActivity(c, r).act === 'exam') exam++;
+  assert.ok(exam / 400 > 0.5, `시험 보러 가는 비율 ${(exam / 400).toFixed(2)}`);
+});
+
+test('친구의 목표는 앱이 아니라 대화로 알게 된다: 친구 말투로, 짧고 깔끔하게, 얼마나 모았는지도', () => {
+  for (const [kind, list] of Object.entries(GOALS)) {
+    for (const g of list) {
+      for (const have of [0, Math.floor(g.cost / 2), g.cost - 1]) {
+        const line = savingLine(kind, g, have);
+        assert.ok(typeof line === 'string' && line.length > 0 && line.length <= 30, `${kind} ${g.label}: ${line}`);
+        assert.ok(!/[^.…]\.(\s|$)/.test(line), `마침표: ${line}`);
+        if (kind !== 'usagi') assert.ok(line.includes(g.kind === 'license' ? '자격증' : g.label) || line.includes('시험'), `무엇을 모으는지 말한다: ${line}`);
+      }
+    }
+  }
+  assert.notEqual(savingLine('chiikawa', GOALS.chiikawa[1], 0), savingLine('chiikawa', GOALS.chiikawa[1], GOALS.chiikawa[1].cost - 1), '모은 만큼 말이 달라진다');
+  assert.equal(savingLine('momonga', null, 0), null);
+});
+
+test('목표 값을 모으는 중이면 지쳐도 라멘(80원) 대신 집에서 낮잠으로 아낀다', () => {
+  const c = (o) => ({ kind: 'hachiware', hour: 12, energy: 10, money: 200, fun: 0.3, social: 0.3, diligence: 0.6, appetite: 0.25, jobs: true, hunter: null, friends: [], show: null, player: null, ...o });
+  assert.equal(chooseActivity(c({ goal: { kind: 'weapon', cost: 1200 } }), () => 0.5).act, 'nap');
+  assert.equal(chooseActivity(c({ goal: { kind: 'furniture', cost: 90 } }), () => 0.5).act, 'eat', '목표 값이 이미 모였으면 사 먹는다');
+  assert.equal(chooseActivity(c({}), () => 0.5).act, 'eat', '목표가 없으면 예전처럼');
+});
+
+test('목표가 있어도 토벌 자격증이 있으면 보수가 큰 토벌 일감을 마다하지 않는다', () => {
+  const c = { kind: 'rakko', hour: 10, energy: 80, money: 400, fun: 0.3, social: 0.3, diligence: VILLAGERS.rakko.diligence, appetite: 0.2, jobs: true, friends: [], show: null, player: null,
+    hunter: { exam: false, hunt: true, want: HUNTER_PROFILES.rakko.want }, goal: { kind: 'weapon', cost: 6000 } };
+  const r = seeded(9); let hunt = 0, work = 0;
+  for (let i = 0; i < 400; i++) { const a = chooseActivity(c, r).act; if (a === 'hunt') hunt++; if (a === 'work') work++; }
+  assert.ok(hunt > work, `토벌 ${hunt} · 풀 뽑기 ${work}`);
+});
+
+test('지갑의 목표 · 무기 칸: 예전 저장(칸 없음)도, 새 저장도 불러올 수 있고 이상한 값은 막는다', () => {
+  assert.ok(isValidVillagers({ chiikawa: { money: 10, jobs: 0, day: 1 } }));
+  assert.ok(isValidVillagers({ chiikawa: { money: 10, jobs: 0, day: 1, bought: ['license', 'w-fork'], weapon: 'fork' } }));
+  assert.ok(isValidVillagers({ rakko: { money: 10, jobs: 0, day: 1, weapon: null } }));
+  assert.ok(!isValidVillagers({ chiikawa: { money: 10, jobs: 0, day: 1, bought: 'w-fork' } }));
+  assert.ok(!isValidVillagers({ chiikawa: { money: 10, jobs: 0, day: 1, weapon: 3 } }));
+});
+
+test('내가 자는 동안에도 목표 값이 모이면 가게에서 산다', () => {
+  let bought = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    let s = fresh();
+    s = withMoney(s, 'kurimanju', GOALS.kurimanju[0].cost - 40);
+    const r = liveOffscreen(s, {}, { day: 1, fromHour: 9, random: seeded(seed) });
+    const buys = r.events.filter((e) => e.type === 'buy');
+    for (const b of buys) assert.ok(VILLAGERS[b.who] && b.item, '산 물건');
+    if (buys.some((b) => b.who === 'kurimanju')) {
+      bought++;
+      assert.notEqual(goalOf(r.state, 'kurimanju').id, GOALS.kurimanju[0].id);
+    }
+  }
+  assert.ok(bought >= 10, `쿠리만쥬가 산 날 ${bought}/20`);
+});

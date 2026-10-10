@@ -10,7 +10,7 @@ import { JOB_TYPES } from './jobs.js';
  * state.theftDay = 모몽가가 마지막으로 소매치기를 노린 날
  */
 export const DAILY_JOBS = {
-  weed8: 4, clover6: 3, sticker10: 3, berry6: 3, // 5급
+  weed8: 5, clover6: 4, sticker10: 4, berry6: 4, // 5급(친구들도 목표를 위해 부지런히 받아 가니 넉넉히)
   foxtail6: 2, vine4: 2, // 4급
   thorny3: 2, reed5: 2, // 3급
   rockmoss4: 2, moon3: 1, // 2급
@@ -27,7 +27,7 @@ export const VILLAGERS = {
   rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8'], eat: 0.2 },
   momonga: { start: 30, diligence: 0, jobs: [], eat: 0.3, thief: true }
 };
-export const MAX_JOBS_PER_DAY = 2;
+export const MAX_JOBS_PER_DAY = 3;
 /** 기운: 이보다 적으면 밥(돈이 있으면) 아니면 낮잠. 라멘 한 그릇 · 낮잠 · 밤잠으로 차는 양. */
 export const TIRED = 25;
 export const MEAL_ENERGY = 45;
@@ -60,12 +60,14 @@ export function returnToBoard(state, id, day) {
   return withLeft(state, day, id, 1);
 }
 
-/** 친구의 지갑과 오늘 받은 일감 수. */
+/** 친구의 지갑과 오늘 받은 일감 수(그 밖에 적어 둔 것 — 이룬 목표 bought · 산 무기 weapon — 도 그대로). */
 export function villagerOf(state, kind, day) {
   const v = state.villagers && state.villagers[kind];
-  return { money: v ? v.money : VILLAGERS[kind].start, jobs: v && v.day === day ? v.jobs : 0, day, energy: v && typeof v.energy === 'number' ? v.energy : 100 };
+  return { ...(v || {}), money: v ? v.money : VILLAGERS[kind].start, jobs: v && v.day === day ? v.jobs : 0, day, energy: v && typeof v.energy === 'number' ? v.energy : 100 };
 }
 const setVillager = (state, kind, v) => ({ ...state, villagers: { ...(state.villagers || {}), [kind]: v } });
+/** 친구 지갑의 몇 칸을 바꾼다(core/goals.js 의 목표 · 무기). */
+export const updateVillager = (state, kind, day, patch) => setVillager(state, kind, { ...villagerOf(state, kind, day), ...patch });
 
 /** 친구의 기운을 바꾼다(0..100). */
 export function villagerEnergy(state, kind, delta, day) {
@@ -100,7 +102,7 @@ export function villagerTakesJob(state, kind, id, day) {
   const r = takeFromBoard(state, id, day);
   if (!r.ok) return r;
   const v = villagerOf(r.state, kind, day);
-  return { ok: true, state: setVillager(r.state, kind, { money: v.money, jobs: v.jobs + 1, day }) };
+  return { ok: true, state: setVillager(r.state, kind, { ...v, jobs: v.jobs + 1, day }) };
 }
 /** 친구가 보수를 받는다. */
 export function payVillager(state, kind, amount, day) {
@@ -148,5 +150,7 @@ export function isValidBoard(b) {
 /** 저장된 친구 지갑 모양이 맞는지. */
 export function isValidVillagers(vs) {
   if (!vs || typeof vs !== 'object' || Array.isArray(vs)) return false;
-  return Object.entries(vs).every(([kind, v]) => VILLAGERS[kind] && v && num(v.money) && v.money >= 0 && num(v.jobs) && num(v.day));
+  return Object.entries(vs).every(([kind, v]) => VILLAGERS[kind] && v && num(v.money) && v.money >= 0 && num(v.jobs) && num(v.day)
+    && (v.bought === undefined || (Array.isArray(v.bought) && v.bought.every((id) => typeof id === 'string')))
+    && (v.weapon === undefined || v.weapon === null || typeof v.weapon === 'string'));
 }

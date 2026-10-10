@@ -65,9 +65,10 @@ import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engra
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen } from './core/offscreen.js';
+import { goalOf, canBuy, buyGoal, npcPower } from './core/goals.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
-  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED
+  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
 } from './core/villagetalk.js';
 import { DOING_ICONS } from './ui/doingicons.js';
 import { charSvg } from './ui/art.js';
@@ -979,7 +980,11 @@ function boot() {
       else if (k === 'chat') {
         // 오늘 있었던 일 · 들은 소문 · 내 큰일 이야기가 있으면 먼저(한 번 한 이야기는 다시 안 한다)
         const st = VILLAGERS[n.kind] ? untold(n.kind) : null;
+        // 돈 모으는 목표는 친구 앱에 없고 이야기로만 알게 된다(하루 한 번쯤, 모은 만큼 말이 달라진다)
+        const m = VILLAGERS[n.kind] ? mindOf(n.kind) : null, g = m && m.savedDay !== state.clock.day ? goalOf(state, n.kind) : null;
+        const saving = g && savingLine(n.kind, g, villagerOf(state, n.kind, state.clock.day).money);
         if (st && Math.random() < 0.7) { mindOf(n.kind).told.add(st.ev); minds[n.kind] = satisfy(mindOf(n.kind), 'greet'); sayAs(n, [st.line], () => reward(n, 'talk')); }
+        else if (saving && Math.random() < 0.6) { m.savedDay = state.clock.day; sayAs(n, [saving], () => reward(n, 'talk')); }
         else sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       }
       else if (k === 'party') askParty(n);
@@ -1634,10 +1639,12 @@ function boot() {
   }
   /**
    * 라멘 가게까지 가서 빈자리에 앉는 일정 단계. 자리가 다 찼으면 뒤에 줄을 서서(하는 일 '라멘 줄 서는 중') 빈자리가 나기를 기다린다.
-   * 이어지는 먹기 단계에도 ramen: true 를 붙여야 먹는 동안 자리를 지킨다. 너무 오래 기다리면 그만두고 잠깐 쉰다.
+   * 이어지는 먹기 단계에도 ramen: true 를 붙여야 먹는 동안 자리를 지킨다(act 는 시작할 때 일정에서 빠지므로, 마지막 먹기 뒤의
+   * 단계까지 붙여야 다 먹을 때까지 자리가 비지 않는다). 너무 오래 기다리면 그만두고 잠깐 쉰다(giveUp: 그때 더 할 일).
    */
-  function ramenSeatSteps(n) {
+  function ramenSeatSteps(n, giveUp = null) {
     const sitDown = () => { const p = ramenAt(RAMEN_SEATS)[n.ramenSeat]; n.plan.unshift({ do: 'walk', x: p.x, z: p.z, near: 0.45, ramen: true }); };
+    n.ramenSeat = null; // 지난번 자리는 잊는다(새 일정이 자리를 고르기 전부터 그 자리를 막지 않게)
     return [{
       do: 'call', ramen: true,
       fn: () => {
@@ -1647,7 +1654,7 @@ function boot() {
         setDoing(n.kind, 'bowl', '라멘 줄 서는 중');
         n.plan.unshift(
           { do: 'walk', slots: ramenAt(RAMEN_QUEUE), near: 0.5, ramen: true },
-          { do: 'until', ramen: true, face: ramenFace(), max: RAMEN_WAIT, test: () => !!takeSeat(n), onGiveUp: () => { n.ramenSeat = null; restHere(n.kind, 6 + Math.random() * 6); } },
+          { do: 'until', ramen: true, face: ramenFace(), max: RAMEN_WAIT, test: () => !!takeSeat(n), onGiveUp: () => { n.ramenSeat = null; restHere(n.kind, 6 + Math.random() * 6); giveUp?.(); } },
           { do: 'call', ramen: true, fn: () => { mindOf(n.kind).doing = doing; sitDown(); } }
         );
       }
@@ -1971,7 +1978,10 @@ function boot() {
     const T = JOB_TYPES[typeId], bench = village.spots.factory, benchMid = { x: bench.x, z: bench.z - 1.7 };
     const job = { day: 0, done: 0 };
     setDoing(n.kind, T.kind === 'sticker' ? 'star' : 'leaf', T.title);
-    const steps = [{ do: 'walk', slots: SLOTS.board(), near: 0.45 }, {
+    // 게시판 일감은 선착순: 아침이거나 할 수 있는 일감이 얼마 안 남았으면 뛰어간다
+    const left = boardOf(state, state.clock.day).left, open = VILLAGERS[n.kind].jobs.reduce((a, id) => a + (left[id] || 0), 0);
+    const hurry = hourOf(state.clock) < 10 || open <= 2;
+    const steps = [{ do: 'walk', slots: SLOTS.board(), near: 0.45, run: hurry }, {
       do: 'call',
       fn: () => {
         const r = villagerTakesJob(state, n.kind, typeId, state.clock.day);
@@ -2005,7 +2015,7 @@ function boot() {
           if (job.day === state.clock.day) commit(returnToBoard(state, typeId, job.day), false); // 그날 일감이면 다시 건다
           npcs.say(n, lineOf(n.kind, 'jobFail'));
         }
-        restHere(n.kind, 12 + Math.random() * 20);
+        restHere(n.kind, goalOf(state, n.kind) ? 4 + Math.random() * 5 : 12 + Math.random() * 20); // 모으는 목표가 있으면 숨만 돌리고 다음 일감으로
       }
     });
     npcs.plan(n, steps);
@@ -2046,7 +2056,7 @@ function boot() {
    * 몬스터는 친구를 쫓지 않는다(나만 노린다). 다 못 잡고 오래 헤매면 그만두고 일감을 돌려놓는다.
    */
   function npcHunt(n, typeId) {
-    const T = JOB_TYPES[typeId], power = HUNTER_PROFILES[n.kind].power, job = { day: 0, done: 0 }, deadline = lifeClock + 110; // 3시간 반쯤 헤매면 돌아온다
+    const T = JOB_TYPES[typeId], power = npcPower(state, n.kind), job = { day: 0, done: 0 }, deadline = lifeClock + 110; // 3시간 반쯤 헤매면 돌아온다
     setDoing(n.kind, 'sword', `${MONSTERS[T.kind] ? MONSTERS[T.kind].name : '몬스터'} 토벌`);
     npcs.plan(n, [
       { do: 'walk', slots: SLOTS.board(), near: 0.45 },
@@ -2125,7 +2135,7 @@ function boot() {
   }
   /** 친구가 따라나선다: 내 둘레 8칸 안 몬스터를 친구 힘(power)만큼 친다. */
   function startParty(n) {
-    const kind = n.kind, power = HUNTER_PROFILES[kind].power;
+    const kind = n.kind, power = npcPower(state, kind);
     npcs.party(kind, {
       range: 8, every: 1.05,
       find: () => monsters.nearest(player.position.x, player.position.z, 8, (m) => !m.exam && m.species !== 'dummy'),
@@ -2175,11 +2185,11 @@ function boot() {
     const r = village.spots.ramen;
     setDoing(n.kind, 'bowl', '라멘 먹기');
     npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'drink', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat'), ramen: true }, {
-      do: 'call',
+      do: 'call', ramen: true,
       fn: () => {
         commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
         happen({ type: 'meal', who: n.kind });
-        restHere(n.kind, 12 + Math.random() * 20);
+        restHere(n.kind, 8 + Math.random() * 10);
       }
     }]);
   }
@@ -2240,9 +2250,12 @@ function boot() {
     const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0) : [];
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
+    // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
+    if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
+    const goal = goalOf(state, kind);
     const ctx = {
       kind, hour, energy: v.energy, money: v.money, fun: m.fun, social: m.social, diligence: spec.diligence, appetite: spec.eat,
-      jobs: jobs.length > 0, guiding: tutorialActive(state.tutorial),
+      jobs: jobs.length > 0, guiding: tutorialActive(state.tutorial), goal: goal && { kind: goal.kind, cost: goal.cost },
       hunter: H && hour >= 7 && hour < 17 ? { exam: canTryExam(state, kind, day) && v.money >= LICENSES.hunter.fee, hunt: hunts.length > 0, want: H.want } : null,
       friends: otherVillagers(kind).filter(isFree).map((f) => ({ kind: f.kind, dist: Math.hypot(f.x - n.x, f.z - n.z) })),
       show: show && lifeClock < show.until ? { by: show.by, dist: Math.hypot(show.x - n.x, show.z - n.z) } : null,
@@ -2265,6 +2278,22 @@ function boot() {
       default: restHere(kind, 8 + Math.random() * 14);
     }
     return c.act;
+  }
+
+  /** 모은 돈으로 목표(무기는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
+  const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
+  function npcShop(n) {
+    const g = goalOf(state, n.kind), door = g && (g.kind === 'weapon' ? village.spots.tools : village.spots.furniture);
+    if (!door) { restHere(n.kind, 5); return; }
+    setDoing(n.kind, 'star', `${g.kind === 'weapon' ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
+    npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: 'cheer', time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
+      do: 'call',
+      fn: () => {
+        const r = buyGoal(state, n.kind, state.clock.day); // 오는 사이 돈을 써 버렸으면 못 산다
+        if (r.ok) { commit(r.state, false); happen({ type: 'buy', who: n.kind, item: r.goal.label, cost: r.goal.cost }); }
+        restHere(n.kind, 10 + Math.random() * 12);
+      }
+    }]);
   }
 
   /** 두 친구가 만날 자리: 가운데(또는 at)에서 왼쪽 · 오른쪽으로 서서 마주 본다(카메라에서 둘 다 보이게). */
@@ -2327,14 +2356,14 @@ function boot() {
       if (n === a) s.push({ do: 'walk', x: b.x + (a.x > b.x ? 1 : -1), z: b.z, near: 1.4 }, { do: 'act', anim: 'talk', face: { x: b.x, z: b.z }, time: 2.6, say: fillLine(MEAL_INVITE[a.kind] || '{w} 라멘 먹자', { w: nameOf(b.kind) }), quick: true });
       else s.push({ do: 'sync', group: invite, face: { x: a.x, z: a.z }, max: 30 }, { do: 'act', anim: 'cheer', time: 1.4, say: pickLine(SMALLTALK.reply[n.kind] || ['응!']), quick: true });
       if (n === a) s.push({ do: 'sync', group: invite, max: 30 });
-      s.push(...ramenSeatSteps(n), { do: 'sync', group, face, max: RAMEN_WAIT + 15, ramen: true }); // 짝이 줄 서 있으면 앉아서 기다려 준다
+      s.push(...ramenSeatSteps(n, () => { group.cancel = true; }), { do: 'sync', group, face, max: RAMEN_WAIT + 15, ramen: true }); // 짝이 줄 서 있으면 앉아서 기다려 준다
       if (n === a) s.push({ do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) });
       s.push({ do: 'act', anim: 'drink', face, time: 4.5, say: lineOf(n.kind, 'eat'), quick: true, ramen: true });
       for (const [who, text] of conv.lines) {
         const t = npcs.lineTime(text) + 0.25;
         s.push(who === n.kind ? { do: 'act', anim: 'talk', face, time: t, say: text, quick: true, ramen: true } : { do: 'act', anim: 'drink', face, time: t, quick: true, ramen: true });
       }
-      s.push({ do: 'call', fn: () => end(n) });
+      s.push({ do: 'call', ramen: true, fn: () => end(n) });
       return s;
     };
     const invite = { need: 2, here: new Set() };
@@ -2584,8 +2613,9 @@ function boot() {
   function staffLunch(n) {
     const r = village.spots.ramen, face = { x: r.x, z: r.z - 1.5 };
     setDoing(n.kind, 'bowl', '점심 라멘');
-    npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) },
-      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true, ramen: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true, ramen: true }, ...backToPost(n)]);
+    npcs.plan(n, [...ramenSeatSteps(n, () => npcs.plan(n, backToPost(n))), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) },
+      { do: 'act', anim: 'drink', face, time: 5, say: staffLine(n.kind, 'lunch'), quick: true, ramen: true }, { do: 'act', anim: 'drink', face, time: 3, quick: true, ramen: true },
+      { do: 'call', ramen: true, fn: () => {} }, ...backToPost(n)]); // 빈 call: 두 번째 그릇을 다 비울 때까지 자리를 지킨다
   }
   /** 대장 갑옷 씨 순찰: 광장과 문 몇 곳을 돌며 둘러본다. */
   function patrol(n) {

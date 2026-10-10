@@ -44,7 +44,7 @@ test('낮에 잠들면 친구들은 밤 9시까지 일하고 먹고 수다를 �
   }
 });
 
-test('번 돈 · 쓴 돈이 지갑과 맞고, 일감은 하루 두 개까지, 모몽가는 일하지 않는다', () => {
+test('번 돈 · 쓴 돈이 지갑과 맞고, 일감은 하루 셋까지, 모몽가는 일하지 않는다', () => {
   for (let seed = 1; seed <= 20; seed++) {
     const s = fresh();
     const r = liveOffscreen(s, {}, { day: 1, fromHour: 8, random: seeded(seed) });
@@ -53,10 +53,11 @@ test('번 돈 · 쓴 돈이 지갑과 맞고, 일감은 하루 두 개까지, �
       const jobs = r.events.filter((e) => e.type === 'job' && e.who === k);
       const meals = r.events.filter((e) => e.type === 'meal' && (e.who === k || e.with === k)).length;
       const earned = jobs.reduce((a, e) => a + payOf(e.title), 0);
+      const spent = r.events.filter((e) => e.type === 'buy' && e.who === k).reduce((a, e) => a + e.cost, 0); // 목표를 산 값
       assert.ok(jobs.length <= MAX_JOBS_PER_DAY, `${k} 일감 ${jobs.length}개`);
       assert.equal(after.jobs, before.jobs + jobs.length);
-      assert.ok(after.money >= 0 && after.money <= before.money + earned);
-      assert.ok(after.money >= before.money + earned - meals * MEAL_PRICE, `${k} 지갑이 맞다`);
+      assert.ok(after.money >= 0 && after.money <= before.money + earned - spent);
+      assert.ok(after.money >= before.money + earned - spent - meals * MEAL_PRICE, `${k} 지갑이 맞다`);
       assert.ok(after.energy >= 0 && after.energy <= 100);
     }
     assert.ok(!r.events.some((e) => e.type === 'job' && e.who === 'momonga'));

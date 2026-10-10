@@ -103,6 +103,7 @@ const OWN = {
   sing: { hachiware: '오늘 광장에서 노래했어! {n}명이나 들어 줬어~' },
   watch: { chiikawa: '…하치와레 노래 들었어…♪ 좋았어…', usagi: '(노래 흉내) 야하~', kurimanju: '하아~ 하치와레 노래 좋더라', rakko: '…하치와레의 노래 나쁘지 않았다', momonga: '하치와레 노래? 내가 더 잘해!' },
   train: { rakko: '…{w}와 수련했다', usagi: '(칼 휘두르는 흉내) 우라!' },
+  buy: { chiikawa: '…나 {item} 샀어…! 헤헤…', hachiware: '나 {item} 샀다~! 모은 보람이 있어!', usagi: '(새 물건을 번쩍 들어 보인다) 야하!!', kurimanju: '하아~ {item} 하나 들였지', rakko: '…드디어 {item}이다 훗', momonga: '{item} 샀어! 부럽지? 흥!' },
   partyHunt: { chiikawa: '…같이 토벌해서… 든든했어…!', hachiware: '같이 토벌해서 재밌었다~!', usagi: '(같이 휘두르는 흉내) 우라!', kurimanju: '하아~ 같이 토벌하니 좋더라', rakko: '…같이 싸우니 나쁘지 않더군' }
 };
 /** 소문: '{who}가 ~했' 까지(끝맺음은 친구 말투로). */
@@ -116,6 +117,7 @@ const STEM = {
   sing: () => '하치와레가 광장에서 노래했',
   train: (e, N) => (e.with ? `${josa(N(e.who), '이/가')} ${josa(N(e.with), '이랑/랑')} 수련했` : `${josa(N(e.who), '이/가')} 수련했`),
   theft: () => '모몽가가 또 소매치기했',
+  buy: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '새 물건'} 샀`,
   partyHunt: (e, N) => `${josa(N(e.who), '이/가')} ${josa(N('me'), '이랑/랑')} 같이 토벌했`,
   playerBoss: (e, N) => `${josa(N('me'), '이/가')} 왕버섯을 쓰러뜨렸`,
   playerRanker: (e, N) => `${josa(N('me'), '이/가')} 토벌 랭커가 됐`,
@@ -153,7 +155,7 @@ export function storyLine(kind, ev, me = '나', random = Math.random) {
     const own = OWN[type] && OWN[type][kind];
     if (!own) return null;
     if (/\{w\}/.test(own) && !w) return null; // 같이 한 친구 없이 혼자 한 일은 '{w}랑' 대사를 못 쓴다
-    return fill(own, { w: w ? N(w) : '', title: ev.title || '일', mon: ev.mon || '몬스터', n: ev.n || 0 });
+    return fill(own, { w: w ? N(w) : '', title: ev.title || '일', mon: ev.mon || '몬스터', n: ev.n || 0, item: ev.item || '새 물건' });
   }
   const st = STEM[ev.type] && STEM[ev.type](ev, N);
   return st && GOSSIP[kind] ? GOSSIP[kind](st) : null;
@@ -237,6 +239,32 @@ export const MEAL_INVITE = {
 };
 /** 축하 · 위로 · 기절했을 때 달려와서 · 모몽가 소매치기를 봤을 때. */
 export const CONGRATS = { chiikawa: '…축하해…!!', hachiware: '축하해~! 대단해!', usagi: '우라~!!', kurimanju: '하아~ 축하주다!', rakko: '…잘했다', momonga: '흥 축하해 줄게' };
+/**
+ * 돈 모으는 목표(core/goals.js) 이야기: 친구 앱에 띄우지 않고 '이야기하자'로 알게 된다. 모은 만큼(시작 · 절반 · 거의) 말이 달라진다.
+ * 자격증은 사는 게 아니라 시험 볼 돈을 모은다. 우사기는 말 대신 그림 · 몸짓으로.
+ */
+const SAVING = {
+  chiikawa: { start: '…{item} 사고 싶어서… 돈 모으는 중…!', half: '…{item}… 반쯤 모았어…!', almost: '…{item}… 거의 다 모았어…!!' },
+  hachiware: { start: '요즘 {item} 사려고 열심히 일해~', half: '{item} 돈이 반쯤 모였어~!', almost: '{item}까지 조금만 더! 어떻게든 될 거야~' },
+  usagi: { start: '({item} 그림을 그려 보인다) 야하!', half: '({item} 그림에 반만 색칠한다) 우라!', almost: '({item} 그림을 흔든다) 야하!!' },
+  kurimanju: { start: '하아~ {item} 들이려고 모으는 중이야', half: '하아~ {item} 돈이 반은 모였지', almost: '하아~ {item} 거의 다 모았어~' },
+  rakko: { start: '…{item} 손에 넣을 때까지 모은다', half: '…{item}까지 아직 절반이다', almost: '…{item}도 머지않았다 훗' }
+};
+const SAVING_LICENSE = {
+  chiikawa: { start: '…토벌 자격증 시험 볼 돈… 모으는 중…!', half: '…시험 볼 돈… 반쯤 모았어…!', almost: '…시험 볼 돈… 거의 다 모았어…!!' },
+  hachiware: { start: '토벌 자격증 시험 볼 돈 모으는 중이야~', half: '시험 볼 돈이 반쯤 모였어~!', almost: '곧 토벌 자격증 시험 보러 갈 거야~!' },
+  usagi: { start: '(자격증 흉내를 낸다) 우라!', half: '(자격증 흉내를 내며 반만 웃는다) 야하', almost: '(검정소 쪽을 가리킨다) 야하!!' },
+  kurimanju: { start: '하아~ 자격증 시험 볼 돈 모으는 중이야', half: '하아~ 시험 볼 돈이 반은 모였지', almost: '하아~ 곧 자격증 시험 보러 가야지' }
+};
+/** 그 친구가 지금 모으는 목표 이야기 한 줄(목표가 없으면 null). have: 지금 가진 돈. */
+export function savingLine(kind, goal, have) {
+  if (!goal) return null;
+  const T = (goal.kind === 'license' ? SAVING_LICENSE : SAVING)[kind];
+  if (!T) return null;
+  const p = have / goal.cost;
+  return fill(p < 0.34 ? T.start : p < 0.8 ? T.half : T.almost, { item: goal.label });
+}
+
 export const THANKS = { chiikawa: '…고마워…!', hachiware: '고마워~!', usagi: '야하!', kurimanju: '하아~ 고마워', rakko: '…훗', momonga: '흥! 당연하지' };
 export const COMFORT = { chiikawa: '…괜찮아… 다음엔…!', hachiware: '괜찮아~ 다음엔 꼭 붙을 거야!', usagi: '(토닥토닥)', kurimanju: '하아~ 한 잔 하고 잊자', rakko: '…다시 하면 된다', momonga: '흥 울지 마!' };
 export const COMFORTED = { chiikawa: '…응… 고마워…', hachiware: '고마워~ 힘낼게!', usagi: '…야하', kurimanju: '하아~ 고맙네', rakko: '…훗', momonga: '…흥' };
@@ -259,6 +287,7 @@ export function newsLine(ev, me = '나') {
     comfort: () => `${josa(A, '이/가')} ${josa(B, '을/를')} 달래 줬어요`,
     congrats: () => `${josa(A, '이/가')} ${josa(B, '을/를')} 축하해 줬어요`,
     theft: () => '모몽가가 또 소매치기를 했어요',
+    buy: () => `${josa(A, '이/가')} 돈을 모아 ${josa(ev.item || '새 물건', '을/를')} 샀어요`,
     partyHunt: () => `${josa(A, '이/가')} ${josa(N('me'), '과/와')} 같이 토벌했어요`,
     playerBoss: () => `${josa(N('me'), '이/가')} 왕버섯을 쓰러뜨렸어요`,
     playerRanker: () => `${josa(N('me'), '이/가')} 토벌 랭커가 됐어요`,
