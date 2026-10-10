@@ -981,17 +981,20 @@ export function createPanels(ui, handlers) {
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
       ];
     },
-    // 마을폰 '설정' 앱: 효과음 · 배경음악 켜고 끄기, 저장 안내
+    // 마을폰 '설정' 앱: 효과음 · 배경음악 켜고 끄기, 절전 모드, 저장 안내
     options(s, extra) {
       const snd = handlers.getSound();
-      const toggle = (kind, label, desc) => h('div', { class: 'row opt-row' },
+      const sw = (label, desc, on, flip) => h('div', { class: 'row opt-row' },
         h('div', {}, h('div', { class: 't' }, label), h('div', { class: 'd' }, desc)),
-        h('button', { class: `switch${snd[kind] ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(!!snd[kind]), 'aria-label': label, onClick: after(() => handlers.toggleSound(kind)) },
-          h('i', { 'aria-hidden': 'true' }), h('span', {}, snd[kind] ? '켜짐' : '꺼짐')));
+        h('button', { class: `switch${on ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(on), 'aria-label': label, onClick: after(flip) },
+          h('i', { 'aria-hidden': 'true' }), h('span', {}, on ? '켜짐' : '꺼짐')));
+      const toggle = (kind, label, desc) => sw(label, desc, !!snd[kind], () => handlers.toggleSound(kind));
       return [appBar('설정'),
         h('h3', { class: 'shop-sec' }, '소리'),
         toggle('sfx', '효과음', '버튼, 풀 뽑기, 몬스터 소리'),
         toggle('music', '배경음악', '오르골 느낌의 마을 음악'),
+        h('h3', { class: 'shop-sec' }, '화면'),
+        sw('절전 모드', '초당 30번만 그려서 휴대폰이 덜 뜨거워져요', !!handlers.getPowerSave(), () => handlers.togglePowerSave()),
         h('h3', { class: 'shop-sec' }, '저장'),
         h('p', { class: 'phone-note' }, extra.storage == null || extra.storage ? '진행은 이 브라우저에 자동 저장돼요' : '저장이 꺼져 있어서 창을 닫으면 진행이 사라져요')];
     }

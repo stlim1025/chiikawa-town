@@ -49,11 +49,12 @@ export function createScene(canvas) {
   }
 
   // 화면이 버벅이면(느린 프레임이 3초 넘게 쌓이면) 해상도를 0.25 씩 낮춘다(1 까지). 다시 올리지는 않는다: 오르내림을 되풀이하지 않게
-  const SLOW_FRAME_MS = 24, SLOW_BUDGET_MS = 3000;
+  // 느림 기준은 기대 간격의 1.45 배(60fps 면 24ms, 절전 30fps 면 48ms): 절전으로 일부러 늦춘 간격을 버벅임으로 보지 않게
+  const SLOW_FACTOR = 1.45, SLOW_BUDGET_MS = 3000;
   let ratio = pixelRatio, slow = 0;
-  function adapt(frameMs) {
+  function adapt(frameMs, targetMs = 1000 / 60) {
     if (!(frameMs > 0) || frameMs > 250) return; // 탭을 오갔을 때처럼 튄 값은 빼고
-    slow = frameMs > SLOW_FRAME_MS ? slow + frameMs : Math.max(0, slow - frameMs * 0.5);
+    slow = frameMs > targetMs * SLOW_FACTOR ? slow + frameMs : Math.max(0, slow - frameMs * 0.5);
     if (slow < SLOW_BUDGET_MS || ratio <= 1) return;
     slow = 0;
     ratio = Math.max(1, ratio - 0.25);

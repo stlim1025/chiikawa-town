@@ -15,6 +15,8 @@
  */
 import * as THREE from 'three';
 import { createScene } from './render/scene.js';
+import { createPerf } from './render/perf.js';
+import { createLod } from './render/lod.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
@@ -166,6 +168,11 @@ function boot() {
   const input = createInput(ui, canvas);
   const hud = createHud(ui, input);
   const store = createStore(safeStorage());
+  // 휴대폰 발열 줄이기: 절전(초당 30번) · 창이 화면을 덮으면 뒤 3D 는 천천히 · 먼 외곽선은 그리지 않기
+  const perf = createPerf({ storage: safeStorage(), coarse: gfx.coarse });
+  const lod = createLod(gfx.scene);
+  const covered = () => !!ui.querySelector('.backdrop:not(.side):not([hidden]), .notice-wrap, .raffle-wrap'); // 옷장(side)은 내 모습을 봐야 해서 뺀다
+  let drawNow = true;
   // 소리: 브라우저는 첫 누름 전까지 소리를 막으므로 누를 때마다 깨운다. 버튼을 누르면 딸깍.
   const sound = createSound(safeStorage());
   document.addEventListener('pointerdown', () => sound.unlock(), true);
@@ -258,6 +265,8 @@ function boot() {
       club() { if (!usagiClub.active) usagiClub.play({ id: null, again: true, done: () => hud.toast('테스트: 클럽 끝', 2400) }); }
     },
     toggleSound: (kind) => sound.toggle(kind),
+    getPowerSave: () => perf.powerSave,
+    togglePowerSave: () => perf.setPowerSave(!perf.powerSave),
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
     onClose: () => input.setEnabled(true),
     acceptJob(typeId) {
@@ -3704,12 +3713,14 @@ function boot() {
   const titlePos = new THREE.Vector3(), titleLook = new THREE.Vector3(0, 0, 1);
   function frame(now) {
     requestAnimationFrame(frame);
+    if (!perf.due(now)) return; // 절전: 초당 30번만 돌고 그린다(휴대폰 발열)
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
-    gfx.adapt(now - last); // 버벅이면 해상도를 낮춘다
+    gfx.adapt(now - last, perf.frameMs); // 버벅이면 해상도를 낮춘다
     last = now;
     if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
+    drawNow = perf.drawDue(dt, covered()); // 창이 화면을 덮고 있으면 뒤 3D 는 초당 10번만
     try {
       tick(dt);
     } catch (e) {
@@ -3734,7 +3745,7 @@ function boot() {
       player: () => player && { ...player.position },
       teleport(x, z) { player.setPosition(x, z); cam.snap(player.position); },
       // 지금 장면을 한 번 그린다(느린 확인 환경에서 찍기 직전에)
-      draw() { const keep = skipRender; skipRender = false; try { tick(1e-4); } finally { skipRender = keep; } },
+      draw() { const keep = skipRender; skipRender = false; drawNow = true; try { tick(1e-4); } finally { skipRender = keep; } },
       weeds: () => weeds.list.map((w) => ({ kind: w.kind, area: w.area, x: w.x, z: w.z, stage: w.stage, hidden: !!w.hidden, visible: w.mesh.visible })),
       weedCounts: () => weeds.counts(),
       camPos: () => cam.camera.position.toArray(),
@@ -3837,7 +3848,7 @@ function boot() {
       rooms.update(dt, t, !!talking);
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
-      if (!skipRender) gfx.renderer.render(rooms.scene, rooms.camera);
+      if (!skipRender && drawNow) gfx.renderer.render(rooms.scene, rooms.camera);
       // 놀이 자리 표시(오늘 아직 안 했으면 ✨), 가까이 가면 행동 안내
       const act = rooms.actSpot(), vLabels = [];
       if (act && !drill && (!homeTarget || homeTarget.type !== 'act') && (visit.kind === 'momonga' || !doneToday(visit.kind))) vLabels.push({ id: 'vact', x: act.x, y: 1.9, z: act.z, text: '✨ ' + act.label, kind: 'mark' });
@@ -3857,7 +3868,7 @@ function boot() {
       usagiClub.tickClub(dt);
       setCelLight(club.light);
       lights.update('off', player.position, player.yaw, 0);
-      if (!skipRender) gfx.renderer.render(club.scene, club.camera);
+      if (!skipRender && drawNow) gfx.renderer.render(club.scene, club.camera);
       hud.placeLabels([], club.camera);
       return;
     }
@@ -3878,7 +3889,7 @@ function boot() {
       interior.update(dt, t);
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
-      if (!skipRender) gfx.renderer.render(interior.scene, interior.camera);
+      if (!skipRender && drawNow) gfx.renderer.render(interior.scene, interior.camera);
       hud.placeLabels(homeTarget ? [{ id: 'prompt:h' + homeTarget.type, x: homeTarget.x, y: homeTarget.type === 'wardrobe' ? 2.3 : 1.2, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' }] : [], interior.camera);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
@@ -3998,7 +4009,10 @@ function boot() {
     }
     starfall.update(dt, cam.camera);
     gfx.followSun(focus.x, focus.z);
-    if (!skipRender) gfx.render(cam.camera);
+    if (!skipRender && drawNow) {
+      lod.update(cam.camera, performance.now(), mode !== 'title'); // 타이틀은 마을을 멀리서 내려다봐서 외곽선을 다 남긴다
+      gfx.render(cam.camera);
+    }
     if (homeSign && state) {
       const tx = housingOf(state).own ? '내 집' : isEvicted(state) ? '빈집' : '빌린 집';
       if (homeSign.text !== tx) { homeSign.text = tx; homeSign.html = signHtml(tx, homeSign.key); }
