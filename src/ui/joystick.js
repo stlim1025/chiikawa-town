@@ -5,7 +5,7 @@ const KEYS = { KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
  * 가상 조이스틱(화면 왼쪽 절반, 터치만)과 키보드(WASD/방향키, 스페이스 · E)를 하나로 묶는다.
  * vector() 는 길이 1 이하, y 는 화면 위쪽이 + 이다.
  * 입력 방식: 마지막으로 쓴 것이 터치면 'touch'(조이스틱 · 행동 버튼을 보인다), 키보드 · 마우스면 'desk'(숨긴다).
- * <html data-input="touch | desk"> 로 CSS 가 나눠 그린다. 두 손가락으로 벌리고 오므리면 확대 · 축소.
+ * <html data-input="touch | desk"> 로 CSS 가 나눠 그린다. 두 손가락으로 벌리고 오므리면 확대 · 축소. 마우스 오른쪽 버튼은 막는다.
  */
 export function createInput(ui, canvas) {
   const root = document.documentElement;
@@ -110,6 +110,10 @@ export function createInput(ui, canvas) {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
+  // 마우스 오른쪽 버튼은 게임에서 쓰지 않는다: 브라우저 메뉴를 띄우지 않고, 누름도 게임(꾸미기 · 행동 버튼 · 붓기 등)에 전하지 않는다.
+  // 이름 칸만은 붙여넣기 메뉴를 그대로 둔다.
+  window.addEventListener('contextmenu', (e) => { if (!typing(e)) e.preventDefault(); });
+  window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button === 2) e.stopPropagation(); }, true);
 
   return {
     /** 이동 방향. */
