@@ -4,7 +4,7 @@ import { POCHETTES } from '../core/pochette.js';
 
 const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', MOUTH = '#5a2b33';
 const NAVY = '#6f94bb', USAGI = '#f6e8b6', EAR_PINK = '#f4b6c2'; // 하치와레 무늬는 원작처럼 연한 파랑
-const MOMO_BLUE = '#bfe0f5', KURI_TOP = '#b8743d', KURI_BOT = '#f4dcab', RAKKO = '#9b7455', RAKKO_FACE = '#efe1c9';
+const MOMO_BLUE = '#bfe0f5', KURI_TOP = '#b8743d', KURI_BOT = '#f4dcab', RAKKO = '#fbe7c2', RAKKO_PAW = '#4a3a34', STAR_SCAR = '#bfae8c', INK = '#3a2a28';
 const SHISA = '#f7cf5e', SHISA_MANE = '#e8833a', KANI = '#fbd1d8', KANI_DARK = '#f297a6', CLAW = '#ef6f7f';
 
 /** 내 캐릭터 선택지. */
@@ -54,12 +54,26 @@ function partPattern(dark, light) {
 }
 // 앞(얼굴)이 트인 머리카락 껍질: theta 는 정수리에서 아래로 내려오는 정도
 const CAP_OPEN = 1.9; // 앞쪽으로 트인 폭(라디안)
+const CAPE_OPEN = 2.9; // 망토 앞이 트인 폭(팔은 망토 밖으로 나온다)
 const hairCaps = {
   cap: new THREE.SphereGeometry(1, 36, 20, Math.PI / 2 + CAP_OPEN / 2, Math.PI * 2 - CAP_OPEN, 0, Math.PI * 0.62),
   top: new THREE.SphereGeometry(1, 36, 14, 0, Math.PI * 2, 0, Math.PI * 0.32),
   ring: new THREE.TorusGeometry(1, 0.14, 8, 28),
   // 사스마타 갈래: 반지름 1 의 둥근 U(반원보다 조금 더 감겨 끝이 안쪽으로 휜다). 꼭대기(자루와 붙는 곳)가 −z, 열린 쪽이 +z, 바닥에 눕힌 모양
-  forkArc: new THREE.TorusGeometry(1, 0.13, 8, 30, Math.PI * 1.16).rotateZ(-Math.PI * 0.08).rotateX(-Math.PI / 2)
+  forkArc: new THREE.TorusGeometry(1, 0.13, 8, 30, Math.PI * 1.16).rotateZ(-Math.PI * 0.08).rotateX(-Math.PI / 2),
+  // 랏코의 흰 망토: 머리 밑(어깨)에서 발치까지 아래로 퍼지며 늘어진 원뿔대, 앞(배 · 팔)은 트여 있다
+  cape: new THREE.CylinderGeometry(0.68, 1, 1, 32, 1, true, CAPE_OPEN / 2, Math.PI * 2 - CAPE_OPEN),
+  // 망토 아랫단의 선(트인 껍질은 바깥선이 아랫단에 안 생겨서 따로 긋는다). 앞은 망토처럼 트여 있다
+  capeHem: new THREE.TorusGeometry(1, 0.026, 6, 48, Math.PI * 2 - CAPE_OPEN).rotateZ(Math.PI / 2 + CAPE_OPEN / 2),
+  // 랏코의 두툼한 목도리
+  scarf: new THREE.TorusGeometry(1, 0.25, 12, 36),
+  // 네 갈래 별(랏코 이마의 흉터): 앞뒤 두께 1, 가운데가 원점
+  star4: (() => {
+    const s = new THREE.Shape(), tips = [[1, 0], [0, -1], [-1, 0], [0, 1]], bend = [[0.14, 0.14], [0.14, -0.14], [-0.14, -0.14], [-0.14, 0.14]];
+    s.moveTo(0, 1);
+    tips.forEach(([x, y], i) => s.quadraticCurveTo(bend[i][0], bend[i][1], x, y));
+    return new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -0.5);
+  })()
 };
 
 function geometryFor(m) {
@@ -73,9 +87,12 @@ function geometryFor(m) {
     case 'hairTop': return hairCaps.top;
     case 'ring': return hairCaps.ring;
     case 'forkArc': return hairCaps.forkArc;
+    case 'cape': return hairCaps.cape;
+    case 'capeHem': return hairCaps.capeHem;
+    case 'scarf': return hairCaps.scarf;
+    case 'star4': return hairCaps.star4;
     case 'hachi': return patternGeometry('hachi', partPattern(NAVY, WHITE));
     case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.12 + Math.sin(x * 5) * 0.04 ? KURI_TOP : KURI_BOT));
-    case 'rakko': return patternGeometry('rakko', (x, y, z) => (z > 0.5 && y < 0.3 ? RAKKO_FACE : RAKKO));
     case 'kani': return patternGeometry('kani', (x, y, z) => (y > 0.32 && z > 0.15 ? KANI_DARK : KANI));
     default:
       if (m.startsWith('part:')) { const [, dark, light] = m.split(':'); return patternGeometry(m, partPattern(dark, light)); }
@@ -106,7 +123,11 @@ function face(parts, hc, hr, o) {
     });
   });
   const mo = onHead(hc, hr, 0, o.mouthY);
-  parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: o.mouth, n: 'head', o: false });
+  if (o.cat) [-0.027, -0.009, 0.009, 0.027].forEach((x, i) => { // ω 입
+    const q = onHead(hc, hr, x, o.mouthY + 0.004, 0.002);
+    parts.push({ m: 'dot', c: MOUTH, p: q.p, r: [q.r[0], q.r[1], i % 2 ? 0.6 : -0.6], s: [0.012, 0.006, 0.006], n: 'head', o: false });
+  });
+  else parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: o.mouth, n: 'head', o: false });
   if (o.nose) {
     const no = onHead(hc, hr, 0, o.mouthY + 0.045, 0.004);
     parts.push({ m: 'dot', c: o.nose, p: no.p, r: no.r, s: [0.035, 0.022, 0.014], n: 'head', o: false });
@@ -207,19 +228,33 @@ const DEFS = {
     return { label: '쿠리만쥬', parts, neck: [0, 0.5, 0], height: 1.1, radius: 0.46 };
   },
   rakko() {
-    const parts = [], hc = [0, 0.74, 0], hr = [0.42, 0.36, 0.38];
-    parts.push({ m: 'sphere', c: RAKKO, p: [0, 0.34, 0], s: [0.33, 0.32, 0.3], n: 'body' });
-    parts.push({ m: 'dot', c: RAKKO_FACE, p: [0, 0.32, 0.25], s: [0.21, 0.21, 0.08], n: 'body', o: false });
-    parts.push({ m: 'sphere', c: RAKKO, p: [0, 0.16, -0.3], r: [0.9, 0, 0], s: [0.08, 0.08, 0.18], n: 'body' });
+    // 원작처럼: 북슬북슬한 크림색 털 공에 작은 까만 귀 · 손발, 이마에 별 모양 흉터, ω 입.
+    // 목에는 두툼한 흰 목도리, 그 아래로 등 뒤에 흰 망토가 발치까지 늘어지고, 등에 멘 갈색 칼집의 흰 손잡이가 어깨 옆으로 비죽
+    const parts = [], hc = [0, 0.76, 0], hr = [0.44, 0.39, 0.4];
+    parts.push({ m: 'sphere', c: RAKKO, p: [0, 0.34, 0], s: [0.34, 0.33, 0.31], n: 'body' });
+    limbs(parts, RAKKO_PAW, 0.36, 0.31);
+    parts.push({ m: 'cape', c: WHITE, p: [0, 0.275, -0.02], s: [0.47, 0.41, 0.44], n: 'body', ds: true });
+    parts.push({ m: 'capeHem', c: INK, p: [0, 0.07, -0.02], r: [Math.PI / 2, 0, 0], s: [0.47, 0.44, 0.47], n: 'body', o: false });
+    parts.push({ m: 'scarf', c: WHITE, p: [0, 0.44, 0], r: [Math.PI / 2, 0, 0], s: [0.325, 0.31, 0.32], n: 'body' });
     // 등에 멘 칼: 수련할 때 손에 뽑아 들면 숨는다(tag 'sheathed', buildNpc 에서 처음엔 보이게)
-    parts.push({ m: 'box', c: '#dfe4ea', p: [0.1, 0.62, -0.34], r: [0, 0, 0.6], s: [0.05, 0.56, 0.02], n: 'body', tag: 'sheathed' });
-    parts.push({ m: 'box', c: '#c9a24a', p: [-0.055, 0.847, -0.34], r: [0, 0, 0.6], s: [0.17, 0.035, 0.05], n: 'body', tag: 'sheathed' });
-    parts.push({ m: 'box', c: '#7a5236', p: [-0.1, 0.91, -0.34], r: [0, 0, 0.6], s: [0.045, 0.15, 0.045], n: 'body', tag: 'sheathed' });
-    limbs(parts, RAKKO, 0.36, 0.3);
-    parts.push({ m: 'rakko', c: '#ffffff', p: hc, s: hr, n: 'head' });
-    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: RAKKO, p: [sd * 0.31, 0.98, -0.02], s: [0.075, 0.065, 0.05], n: 'head' }));
-    face(parts, hc, hr, { eyeX: 0.14, eyeY: 0.04, eye: [0.036, 0.05, 0.018], cheekX: 0.26, cheekY: -0.06, mouthY: -0.12, mouth: [0.03, 0.012, 0.01], nose: '#4a3434' });
-    return { label: '랏코', parts, neck: [0, 0.5, 0], height: 1.1, radius: 0.45 };
+    const SW = 1.05, dir = [-Math.sin(SW), Math.cos(SW)], at = (d) => [-0.42 + dir[0] * d, 0.62 + dir[1] * d, -0.43];
+    parts.push({ m: 'box', c: '#9a7552', p: [-0.056, 0.411, -0.43], r: [0, 0, SW], s: [0.1, 0.84, 0.035], n: 'body', tag: 'sheathed' });
+    parts.push({ m: 'box', c: '#e9e4d8', p: at(0), r: [0, 0, SW], s: [0.2, 0.045, 0.07], n: 'body', tag: 'sheathed' });
+    parts.push({ m: 'box', c: '#f4f0e8', p: at(0.12), r: [0, 0, SW], s: [0.055, 0.2, 0.055], n: 'body', tag: 'sheathed' });
+    [0.07, 0.12, 0.17].forEach((d) => parts.push({ m: 'box', c: INK, p: at(d), r: [0, 0, SW], s: [0.062, 0.012, 0.062], n: 'body', tag: 'sheathed', o: false }));
+    parts.push({ m: 'sphere', c: RAKKO, p: hc, s: hr, n: 'head' });
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: RAKKO_PAW, p: [sd * 0.41, 0.9, -0.03], s: [0.065, 0.075, 0.055], n: 'head' }));
+    face(parts, hc, hr, { eyeX: 0.14, eyeY: 0.03, eye: [0.05, 0.042, 0.02], shine: 1.5, cheekX: 0.27, cheekY: -0.06, mouthY: -0.115, cat: true, nose: INK });
+    // 코 옆 수염 점
+    [-1, 1].forEach((sd) => [[0.055, -0.088], [0.072, -0.108]].forEach(([x, y]) => {
+      const w = onHead(hc, hr, sd * x, y, 0.002);
+      parts.push({ m: 'dot', c: INK, p: w.p, r: w.r, s: [0.006, 0.006, 0.004], n: 'head', o: false });
+    }));
+    // 이마(보는 쪽 왼쪽)의 별 모양 흉터: 진한 테두리 별 위에 카키색 별
+    const st = onHead(hc, hr, -0.17, 0.16, 0.002), sf = onHead(hc, hr, -0.17, 0.16, 0.006);
+    parts.push({ m: 'star4', c: INK, p: st.p, r: [st.r[0], st.r[1], 0.25], s: [0.088, 0.088, 0.012], n: 'head', o: false });
+    parts.push({ m: 'star4', c: STAR_SCAR, p: sf.p, r: [sf.r[0], sf.r[1], 0.25], s: [0.066, 0.066, 0.012], n: 'head', o: false });
+    return { label: '랏코', parts, neck: [0, 0.5, 0], height: 1.15, radius: 0.47 };
   },
   shisa() {
     const parts = [], hc = [0, 0.74, 0], hr = [0.42, 0.37, 0.38];
@@ -696,7 +731,7 @@ function buildFromDef(def) {
   def.parts.forEach((pt) => {
     const holder = getPivot(pt.n, pt.par);
     const pv = pivotOf(def, pt.n, pt.p);
-    const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'rakko' || pt.m === 'kani' || pt.m.startsWith('part:');
+    const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'kani' || pt.m.startsWith('part:');
     // 2D 손그림처럼: 단색 칠(얼굴 부품은 그늘도 없이) + 붓펜 같은 외곽선
     const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned, doubleSide: !!pt.ds, flat: pt.o === false });
     const mesh = new THREE.Mesh(geometryFor(pt.m), material);

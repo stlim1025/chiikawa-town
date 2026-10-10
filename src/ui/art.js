@@ -189,16 +189,25 @@ const ART = {
   },
 
   rakko() {
-    const BR = '#9b7455', FACE_C = '#efe1c9';
-    // 해달: 갈색 몸에 작은 둥근 귀, 얼굴 아래쪽은 크림색. 진지한 눈매(눈썹), 등 뒤로 칼자루가 비죽
-    const body = bodyPath('mochi', { r: 'down', l: 'down' },
-      { p1: [52, 51.28], p2: [76, 39.48], left: 'A13.4 13.4 0 0 1 76 39.48', right: 'A13.4 13.4 0 0 1 148 51.28' });
-    const stroke = (d, c, w) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
-    const hilt = stroke('M150 40L172 14', LINE, 11) + stroke('M150 40L172 14', '#7a5236', 6) + stroke('M139 47L161 33', LINE, 9) + stroke('M139 47L161 33', '#c9a24a', 4.5);
-    const muzzle = E(100, 124, 46, 32, FACE_C, 0);
-    const brows = P('M66 92L88 98', null, 3.4) + P('M134 92L112 98', null, 3.4);
-    return hilt + P(body, BR) + muzzle + P(body, null) + brows + eyes(108, 23, 5.2, 6.2) +
-      E(100, 117, 7, 4.6, LINE, 0) + mouth(127, 6) + cheeks(125, 44, 11, 7, false);
+    const FUR = '#fbe7c2', PAW = '#4a3a34';
+    // 원작처럼: 북슬북슬한 크림색 털 공(윤곽 밖으로 짧은 털 선), 양옆에 작은 까만 귀, 이마(보는 쪽 왼쪽)에 네 갈래 별 흉터,
+    // 목에 두툼한 흰 목도리를 까만 손으로 쥐고, 등 뒤로 흰 망토 자락, 왼쪽 어깨 옆으로 흰 칼 손잡이가 비죽
+    const body = bodyPath('mochi', { r: 'down', l: 'down' });
+    const fuzz = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = Math.PI * (0.92 + i * 0.07), c = Math.cos(t), sn = Math.sin(t);
+      fuzz.push(`M${(100 + 81 * c).toFixed(1)} ${(104 + 73 * sn).toFixed(1)}L${(100 + 88 * c).toFixed(1)} ${(104 + 80 * sn).toFixed(1)}`);
+    }
+    const ticks = `<path d="${fuzz.join('')}" fill="none" stroke="${LINE}" stroke-width="3.2" stroke-linecap="round"/>`;
+    const hilt = tube('M32 116L6 96', '#f4f0e8', 9) + P('M11 95L16 103M18 100L23 108', null, 2.6) + tube('M21 103L32 121', '#e9e4d8', 4);
+    const cape = P('M138 150L186 146Q194 172 182 198Q162 190 144 194Z', WHITE);
+    const ears = E(30, 92, 8, 10, PAW, 3, -10) + E(170, 80, 8, 10, PAW, 3, 15);
+    const scarf = P('M34 136Q100 164 166 136L169 154Q100 186 31 154Z', WHITE, 3.6);
+    const paws = E(89, 166, 10, 7.5, PAW, 3) + E(111, 166, 10, 7.5, PAW, 3);
+    const star = P('M68 70Q71 82 82 85Q71 88 68 100Q65 88 54 85Q65 82 68 70Z', '#bfae8c', 3);
+    const dots = [[84, 121], [80, 127], [116, 121], [120, 127]].map(([x, y]) => E(x, y, 1.6, 1.6, LINE, 0)).join('');
+    return cape + hilt + P(body, FUR) + ticks + ears + scarf + paws + star + eyes(108, 23, 6, 5.4) +
+      E(100, 117, 5, 3.6, LINE, 0) + mouth(123, 6) + dots + cheeks(124, 46, 12, 8);
   }
 };
 
