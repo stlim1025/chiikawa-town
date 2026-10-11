@@ -182,7 +182,7 @@ function boot() {
   const hud = createHud(ui, input);
   const store = createStore(safeStorage());
   // 휴대폰 발열 줄이기: 절전(초당 30번) · 창이 화면을 덮으면 뒤 3D 는 천천히 · 먼 외곽선은 그리지 않기
-  const perf = createPerf({ storage: safeStorage(), coarse: gfx.coarse });
+  const perf = createPerf({ storage: safeStorage() }); // 절전 모드는 휴대폰도 꺼진 채로 시작(초당 60번)
   const lod = createLod(gfx.scene);
   const covered = () => !!ui.querySelector('.backdrop:not(.side):not([hidden]), .notice-wrap, .raffle-wrap'); // 옷장(side)은 내 모습을 봐야 해서 뺀다
   let drawNow = true;

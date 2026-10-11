@@ -17,12 +17,12 @@ const KEY = 'chiikawa-town:powersave';
 const JITTER_MS = 4; // 화면 새로 고침 간격이 조금씩 흔들려도 초당 30번을 지키게
 
 /**
- * storage: getItem/setItem 이 있는 저장소(막혀 있어도 동작). coarse: 휴대폰 · 태블릿(손가락)이면 절전이 기본.
+ * storage: getItem/setItem 이 있는 저장소(막혀 있어도 동작). 절전은 휴대폰도 꺼진 채로 시작한다(초당 60번) — 마을폰 설정에서 켜면 저장해 다음에도 쓴다.
  */
-export function createPerf({ storage = null, coarse = false } = {}) {
+export function createPerf({ storage = null } = {}) {
   let saved = null;
   try { saved = storage ? storage.getItem(KEY) : null; } catch { /* 저장소가 막혀 있다 */ }
-  let powerSave = saved == null ? !!coarse : saved === '1';
+  let powerSave = saved === '1';
   let lastTick = -Infinity, sinceDraw = Infinity;
   return {
     get powerSave() { return powerSave; },
