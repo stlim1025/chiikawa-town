@@ -998,9 +998,11 @@ function boot() {
 
   // ---------- 하치와레의 첫날 안내 ----------
   const GOALS = { house: '하치와레 따라가기', board: '노동 접수에서 일감 받기', pull: '풀 뽑기', report: '보수 받기' };
-  const GOAL_HINTS = { house: '하얀 동그란 내 집까지', board: '게시판 앞에서 버튼 누르기', pull: '꾹 눌렀다 초록 칸에서 떼기', report: '노동 접수로 돌아가기' };
+  // 할 일 카드 밑줄: 설명서 말투 말고 하치와레가 옆에서 말하듯
+  const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '게시판에 가서 보수 받자!' };
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
+  const boardLead = { x: village.spots.board.x + 1.4, z: village.spots.board.z + 0.2 }; // 노동 접수 게시판 옆(내가 서는 게시판 앞자리는 비워 둔다)
   const nearHome = () => !!player && Math.hypot(player.position.x - village.spots.home.x, player.position.z - village.spots.home.z) < 2.6;
   const boardSign = village.labels.find((l) => l.text === '노동 접수'); // '여기!' 는 게시판 간판 바로 위에
   const benchSign = village.labels.find((l) => l.text === '스티커 작업대');
@@ -1017,8 +1019,8 @@ function boot() {
     save();
     npcs.setFollow('hachiware', tutorialActive(step));
     guide.setGoal(GOALS[step] || null, { hold: true }); // 할 일 쪽지는 말이 끝나고 가운데 카드가 날아와 꽂힐 때 나타난다(announceGoal)
-    // 집 안내 중에는 하치와레가 앞장서서 현관 옆에서 기다린다
-    npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : null);
+    // 집 · 노동 접수 안내 중에는 하치와레가 앞장서서 그 앞(현관 옆 · 게시판 옆)에서 기다린다. 풀 뽑기는 뒤를 졸졸 따라다닌다
+    npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : step === 'board' || step === 'report' ? boardLead : null);
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
     else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => { enterTutorial('done', 'tips'); hud.toast('안내 끝!', 2400); });
