@@ -1,5 +1,5 @@
 import { JOB_TYPES, availableJobs, isComplete, payout } from '../core/jobs.js';
-import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam } from '../core/license.js';
+import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
 import { FURNITURE, homeOf } from '../core/home.js';
@@ -376,7 +376,7 @@ export function createPanels(ui, handlers) {
       });
       check.replaceChildren(
         h('div', { class: 't' }, `${g.profile.name} · ${g.clock.day}일째`),
-        h('div', { class: 'd' }, `${won(g.money)} · 제초 ${g.license.grade}급`),
+        h('div', { class: 'd' }, `${won(g.money)} · 제초 ${gradeName(g.license.grade)}`),
         h('p', { class: 'note warn' }, '지금 이 기기의 진행은 이 코드의 진행으로 바뀌어요'),
         yes);
       check.hidden = false;
@@ -476,9 +476,10 @@ export function createPanels(ui, handlers) {
       else if (canTakeExam(lic)) { const fee = EXAM_FEE[lic.grade]; side = h('button', { class: 'btn pink', type: 'button', disabled: s.money < fee, onClick: after(handlers.startExam) }, s.money < fee ? `${won(fee)} 부족` : `${lic.grade - 1}급 시험 보기 ${won(fee)}`); }
       else if (lic.grade <= 1) side = h('span', { class: 'lic-badge done' }, ico('star'), '최고 급수');
       const xpNeed = XP_TO_EXAM[lic.grade];
-      out.push(card(EMBLEM.weed, `제초 검정 ${lic.grade}급`, side, [
+      // 견습(자격 없음)이면 이름 대신 '견습', 첫 시험(견습 → 5급)은 잡초로
+      out.push(card(EMBLEM.weed, `제초 검정 ${gradeName(lic.grade)}`, side, [
         ['coin', `보수 ${mult}배`],
-        lic.grade > 1 ? ['up', `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
+        lic.grade > 1 ? ['up', lic.grade >= NOVICE ? `5급 시험 잡초 연속 ${EXAM_STREAK[lic.grade]}번` : `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
         lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
       ]));
       // 술 자격 · 슈퍼 알바이터 · 토벌: 필기 · 실기 · 준비를 한 줄씩
@@ -1023,7 +1024,7 @@ export function createPanels(ui, handlers) {
         h('p', { class: 'sub' }, '여러 기능을 빨리 시험해 보는 도구예요.'),
         row('돈', `지금 ${won(s.money)}`, b('+1만', () => handlers.dev.money(10000), 'btn primary'), b('+10만', () => handlers.dev.money(100000), 'btn primary')),
         row('기운', `지금 ${s.stamina} / ${MAX_STAMINA}`, b('가득', () => handlers.dev.stamina())),
-        row('제초 검정', `지금 ${s.license.grade}급`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
+        row('제초 검정', `지금 ${gradeName(s.license.grade)}`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
         row('별똥별맨', '바로 보기(미리 보기라 소원은 안 이뤄져요)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.starfall(); } }, '보기')),
         row('우사기의 집', '바로 시작(밤 9시 광장 · 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
@@ -1050,10 +1051,10 @@ export function createPanels(ui, handlers) {
       const log = s.weedLog || {}, grade = s.license.grade;
       const found = WEED_ORDER.filter((k) => log[k] > 0).length;
       const out = [appBar('풀 도감', `${found} / ${WEED_ORDER.length}종`),
-        h('p', { class: 'sub' }, `지금 ${grade}급`)];
-      for (const g of [5, 4, 3, 2, 1]) {
+        h('p', { class: 'sub' }, `지금 ${gradeName(grade)}`)];
+      for (const g of [NOVICE, 5, 4, 3, 2, 1]) {
         const open = grade <= g;
-        out.push(h('div', { class: `weed-grade${open ? '' : ' locked'}` }, h('b', {}, `${g}급 풀`), open ? null : h('span', {}, `${g}급부터`)));
+        out.push(h('div', { class: `weed-grade${open ? '' : ' locked'}` }, h('b', {}, g >= NOVICE ? '누구나 뽑는 풀' : `${g}급 풀`), open ? null : h('span', {}, `${g}급부터`)));
         for (const k of kindsOfGrade(g)) {
           const W = WEED_KINDS[k], n = log[k] || 0;
           // 자라는 곳 · 뽑는 요령은 꼬리표로(긴 설명 대신)

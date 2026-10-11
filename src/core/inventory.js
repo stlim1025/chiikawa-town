@@ -14,7 +14,7 @@ export const ITEMS = {
 export function itemInfo(id) {
   if (ITEMS[id]) return ITEMS[id];
   const W = WEED_KINDS[id];
-  if (W) return { name: W.name, kind: 'herb', note: `${W.where}에서 뽑은 풀. ${W.grade}급부터 뽑을 수 있다.` };
+  if (W) return { name: W.name, kind: 'herb', note: `${W.where}에서 뽑은 풀. ${W.grade >= 6 ? '자격 없이도' : `${W.grade}급부터`} 뽑을 수 있다.` };
   return null;
 }
 /** 4단계 · 5단계에서 물건을 늘린다. */

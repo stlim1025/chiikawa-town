@@ -29,7 +29,7 @@ export function isValidState(s) {
   if (!s || typeof s !== 'object') return false;
   if (!s.profile || typeof s.profile.name !== 'string' || !s.profile.look || typeof s.profile.look !== 'object') return false;
   if (!num(s.money) || s.money < 0 || !num(s.stamina)) return false;
-  if (!s.license || ![1, 2, 3, 4, 5].includes(s.license.grade) || !num(s.license.xp)) return false;
+  if (!s.license || ![1, 2, 3, 4, 5, 6].includes(s.license.grade) || !num(s.license.xp)) return false;
   if (!s.clock || !num(s.clock.day) || !num(s.clock.t)) return false;
   if (!s.player || !num(s.player.x) || !num(s.player.z)) return false;
   if (!s.stats || !num(s.stats.pulled) || !num(s.stats.clean) || !Array.isArray(s.seenTips)) return false;

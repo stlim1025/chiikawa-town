@@ -8,12 +8,17 @@ const V = await import(G + 'villagers.js');
 const S = await import(G + 'save.js');
 const St = await import(G + 'state.js');
 
-test('10 kinds, 2 per grade, all have where/tip', () => {
+test('10 kinds: 견습(6)은 잡초 하나, 5급은 토끼풀 하나, 4~1급은 둘씩, all have where/tip', () => {
   assert.equal(W.WEED_ORDER.length, 10);
-  for (const g of [5, 4, 3, 2, 1]) assert.equal(W.kindsOfGrade(g).length, 2, 'grade ' + g);
+  assert.deepEqual(W.kindsOfGrade(6), ['weed']);
+  assert.deepEqual(W.kindsOfGrade(5), ['clover']);
+  for (const g of [4, 3, 2, 1]) assert.equal(W.kindsOfGrade(g).length, 2, 'grade ' + g);
   for (const k of W.WEED_ORDER) { assert.ok(W.WEED_KINDS[k].where && W.WEED_KINDS[k].tip, k); }
 });
 test('grade gating', () => {
+  assert.ok(W.canPullKind(6, 'weed'), '견습도 잡초는 뽑는다');
+  assert.ok(!W.canPullKind(6, 'clover'), '토끼풀은 5급부터');
+  assert.ok(W.canPullKind(5, 'clover'));
   assert.ok(W.canPullKind(5, 'weed'));
   assert.ok(!W.canPullKind(5, 'foxtail'));
   assert.ok(W.canPullKind(4, 'foxtail'));
@@ -67,6 +72,7 @@ test('jobs per grade; every weed kind has a job; old ids kept', () => {
   for (const id of ['weed8', 'sticker10', 'berry6', 'thorny3']) assert.ok(J.JOB_TYPES[id]);
   for (const k of W.WEED_ORDER) assert.ok(Object.values(J.JOB_TYPES).some((j) => j.kind === k), k);
   for (const j of Object.values(J.JOB_TYPES)) if (W.WEED_KINDS[j.kind]) assert.equal(j.needGrade, W.WEED_KINDS[j.kind].grade, j.id);
+  assert.deepEqual(J.availableJobs(6).map((j) => j.id).sort(), ['berry6', 'sticker10', 'weed8'], '견습: 토끼풀 일감은 아직');
   assert.deepEqual(J.availableJobs(5).map((j) => j.id).sort(), ['berry6', 'clover6', 'sticker10', 'weed8']);
   assert.equal(J.availableJobs(1).length, Object.values(J.JOB_TYPES).filter((j) => !j.needLicense).length);
   assert.equal(J.availableJobs(1, { hunter: { day: 1 } }).length, Object.keys(J.JOB_TYPES).length);
@@ -83,6 +89,26 @@ test('xp scales with weed grade and stages', () => {
   assert.equal(Lc.gainXp(lic, 'clean', 'rockmoss').xp, 10); // 2 * 2.5 * 2
   assert.equal(Lc.gainXp(lic, 'clean').xp, 2);
   assert.equal(Lc.gainXp({ grade: 5, xp: 29 }, 'clean', 'weed').xp, 30); // capped
+});
+test('처음엔 제초 견습(급수 6): 잡초로 경험치를 채워 5급 시험(잡초 연속) → 합격하면 5급', () => {
+  const s = St.createState({ name: '나', look: {} });
+  assert.equal(s.license.grade, 6);
+  assert.equal(Lc.gradeName(6), '견습');
+  assert.equal(Lc.gradeName(5), '5급');
+  assert.ok(S.isValidState(s), '견습 저장도 맞는 모양');
+  let lic = s.license;
+  for (let i = 0; i < 40; i++) lic = Lc.gainXp(lic, 'clean', 'weed');
+  assert.equal(lic.xp, Lc.XP_TO_EXAM[6], '경험치는 시험 볼 만큼에서 멈춘다');
+  assert.ok(Lc.canTakeExam(lic));
+  assert.ok(Lc.EXAM_FEE[6] > 0 && Lc.EXAM_FEE[6] < Lc.EXAM_FEE[5]);
+  let e = Lc.startExam(6);
+  assert.equal(e.need, Lc.EXAM_STREAK[6]);
+  assert.ok(Lc.examCounts(e, 'weed') && !Lc.examCounts(e, 'clover'));
+  assert.ok(Lc.examCounts(Lc.startExam(5), 'clover') && !Lc.examCounts(Lc.startExam(5), 'weed'), '5급 → 4급 시험은 토끼풀로');
+  for (let i = 0; i < e.need; i++) e = Lc.examStep(e, 'clean');
+  assert.ok(e.passed);
+  assert.equal(Lc.promote(lic).grade, 5);
+  assert.equal(J.payout({ typeId: 'weed8', count: 8, clean: 8 }, 6), J.payout({ typeId: 'weed8', count: 8, clean: 8 }, 5), '견습도 보수는 5급과 같다');
 });
 test('exam uses current-grade weeds and per-grade streak', () => {
   let e = Lc.startExam(3);

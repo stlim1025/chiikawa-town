@@ -2,15 +2,15 @@ import { PAY_MULT } from './license.js';
 import { WEED_KINDS } from './weeding.js';
 
 /**
- * 노동 접수 일감 종류. needGrade 이하 급수(숫자)부터 받을 수 있다(풀 일감은 그 풀을 뽑을 수 있는 급수와 같다).
+ * 노동 접수 일감 종류. needGrade 이하 급수(숫자)부터 받을 수 있다(풀 일감은 그 풀을 뽑을 수 있는 급수와 같다, 6 = 견습도).
  * kind 는 어떤 작업 결과가 이 일감에 세어지는지: 풀 종류(core/weeding.js 의 WEED_KINDS), sticker(스티커 작업대), berry(열매 덤불).
  * where 는 어디서 하는지(안내 문구용).
  */
 export const JOB_TYPES = {
-  weed8: { id: 'weed8', title: '잡초 8개 뽑기', kind: 'weed', target: 8, base: 120, cleanBonus: 5, needGrade: 5, where: '마을 곳곳의 풀' },
+  weed8: { id: 'weed8', title: '잡초 8개 뽑기', kind: 'weed', target: 8, base: 120, cleanBonus: 5, needGrade: 6, where: '마을 곳곳의 풀' },
   clover6: { id: 'clover6', title: '토끼풀 6개 뽑기', kind: 'clover', target: 6, base: 110, cleanBonus: 5, needGrade: 5, where: '마을, 들판, 강가' },
-  sticker10: { id: 'sticker10', title: '과일 스티커 10장 붙이기', kind: 'sticker', target: 10, base: 110, cleanBonus: 4, needGrade: 5, where: '게시판 옆 스티커 작업대' },
-  berry6: { id: 'berry6', title: '빨간 열매 6개 따기', kind: 'berry', target: 6, base: 100, cleanBonus: 4, needGrade: 5, where: '마을 가장자리 열매 덤불' },
+  sticker10: { id: 'sticker10', title: '과일 스티커 10장 붙이기', kind: 'sticker', target: 10, base: 110, cleanBonus: 4, needGrade: 6, where: '게시판 옆 스티커 작업대' },
+  berry6: { id: 'berry6', title: '빨간 열매 6개 따기', kind: 'berry', target: 6, base: 100, cleanBonus: 4, needGrade: 6, where: '마을 가장자리 열매 덤불' },
   foxtail6: { id: 'foxtail6', title: '강아지풀 6개 뽑기', kind: 'foxtail', target: 6, base: 170, cleanBonus: 8, needGrade: 4, where: '동쪽 들판' },
   vine4: { id: 'vine4', title: '덩굴풀 4개 뽑기', kind: 'vine', target: 4, base: 190, cleanBonus: 10, needGrade: 4, where: '서쪽 숲' },
   thorny3: { id: 'thorny3', title: '위험한 풀 3개 뽑기', kind: 'thorny', target: 3, base: 150, cleanBonus: 10, needGrade: 3, where: '마을 울타리 가, 숲' },

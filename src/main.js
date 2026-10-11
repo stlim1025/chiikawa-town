@@ -34,7 +34,7 @@ import { createState, addMoney, useStamina, restoreStamina, sleepStamina, MAX_ST
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
-import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, payExamFee } from './core/license.js';
+import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, EXAM_STREAK, payExamFee, NOVICE, gradeName } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { encodeSave, decodeSave } from './core/savecode.js';
@@ -228,7 +228,7 @@ function boot() {
     dev: {
       money(n) { commit(addMoney(state, n)); sound.play('coin'); hud.toast(`테스트: ${won(n)}을 넣었어요`); },
       stamina() { commit({ ...state, stamina: MAX_STAMINA }); },
-      grade(up) { const g = Math.min(5, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0, day: state.clock.day, look: myLook() }, exam: null }); hud.toast(`제초 검정 ${g}급`); },
+      grade(up) { const g = Math.min(NOVICE, Math.max(1, state.license.grade - up)); commit({ ...state, license: { grade: g, xp: 0, day: state.clock.day, look: myLook() }, exam: null }); hud.toast(`제초 검정 ${gradeName(g)}`); },
       hour(h) { commit({ ...state, clock: { day: state.clock.day, t: (((h - 6) % 24) + 24) % 24 / 24 } }); },
       license(id, on) { commit(on ? grant(state, id, state.clock.day, myLook()) : revoke(state, id)); hud.toast(`테스트: ${LICENSES[id].name} ${on ? '땄어요' : '없앴어요'}`); },
       /** 별똥별맨 미리 보기: 밤 · 별똥별 밤을 기다리지 않고 바로(하늘만 잠깐 밤으로, 소원은 안 이뤄진다). */
@@ -973,6 +973,7 @@ function boot() {
           const unlocked = kindsOfGrade(next.license.grade);
           showLicenseCard('weed', `제초 검정 ${next.license.grade}급 합격!`, next, unlocked.length ? { sub: '이제 이 풀도 뽑을 수 있어요', chips: unlocked.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })) } : null);
           staffSay('captain', 'pass', 16, player.position);
+          if (state.license.grade >= NOVICE) cheerGrade5(); // 첫 자격(견습 → 5급): 안내해 준 하치와레가 축하
           player.cheerTime = 2;
         } else {
           next = { ...next, exam: null };
@@ -987,7 +988,7 @@ function boot() {
       markSeen('bag-herb');
       hud.toast('뽑은 풀은 주머니로', 2600);
     }
-    if (canTakeExam(state.license) && !state.exam && !seen('exam-' + state.license.grade)) {
+    if (canTakeExam(state.license) && !state.exam && state.license.grade < NOVICE && !seen('exam-' + state.license.grade)) { // 견습 → 5급은 하치와레가 알려 준다(updateGrade5Guide)
       markSeen('exam-' + state.license.grade);
       hud.toast('승급 시험을 볼 수 있어요!', 3600);
     }
@@ -1033,6 +1034,63 @@ function boot() {
     sound.play('job');
     hud.announce({ kicker: '할 일!', title: GOALS[step], sub: GOAL_HINTS[step], target: guide.goalEl, look: 'goal' });
   }
+  // ---------- 제초 5급 안내: 견습이 5급 시험을 볼 수 있게 되면 하치와레가 달려와 알려 주고 검정소로 앞장선다 ----------
+  const examSign = village.labels.find((l) => l.text === '검정소');
+  const examLead = { x: village.spots.exam.x + 1.3, z: village.spots.exam.z + 0.8 }; // 하치와레가 서서 기다리는 검정소 문 옆
+  const GRADE5_GOAL = '검정소에서 제초 5급 시험';
+  let grade5Call = null; // 하치와레가 달려오는 중 { t }
+  let grade5Shown = false; // 할 일 쪽지 · 검정소 위 '여기!' 를 띄우는 중
+  /** 견습이 5급 시험을 볼 수 있고, 아직 시험 중이 아니며, 첫날 안내도 끝났는지. */
+  const grade5Due = () => !!state && state.license.grade >= NOVICE && canTakeExam(state.license) && !state.exam && !tutorialActive(state.tutorial);
+  /** 하치와레가 지금 달려올 수 있는지(집 안 · 잠 · 같이 토벌 · 다른 안내 중이면 기다린다). */
+  const hachiFree = (n) => !!n && !n.away && !n.party && !n.lead && !n.follow && !buddies.has('hachiware') && !isSleepHour(hourOf(state.clock));
+  function updateGrade5Guide(dt) {
+    if (!grade5Due()) {
+      if (grade5Call) { grade5Call = null; npcs.setFollow('hachiware', false); }
+      if (grade5Shown) { grade5Shown = false; guide.setGoal(null); npcs.lead('hachiware', null); }
+      return;
+    }
+    // 이미 알려 줬으면(저장을 불러와도) 할 일 쪽지만 계속
+    if (seen('guide-grade5')) { if (!grade5Shown && !grade5Call) { grade5Shown = true; guide.setGoal(GRADE5_GOAL); } return; }
+    const n = npcs.byKind('hachiware');
+    if (grade5Call) {
+      // 달려오는 중: 가까이 오면(또는 오래 걸리면) 말을 건다. 그새 바빠지면 기다렸다가
+      grade5Call.t += dt;
+      const near = n && player && Math.hypot(n.x - player.position.x, n.z - player.position.z) < 2.4;
+      if ((near || grade5Call.t > 9) && mode === 'play' && !guide.open && !panels.isOpen() && !sleeping && !funBusy() && !pulling) callGrade5(n);
+      return;
+    }
+    if (mode !== 'play' || guide.open || panels.isOpen() || sleeping || funBusy() || fainting || pulling || questScene || !hachiFree(n)) return;
+    grade5Call = { t: 0 };
+    npcs.setFollow('hachiware', true); // 내 쪽으로 달려온다
+  }
+  function callGrade5(n) {
+    grade5Call = null;
+    markSeen('guide-grade5');
+    npcs.setFollow('hachiware', false);
+    if (n) beginTalk(n);
+    sayGuide([
+      '{name}~! 잠깐잠깐!',
+      '잡초 뽑는 솜씨가 엄청 늘었다~!',
+      '이제 제초 5급 시험을 볼 수 있어!',
+      `검정소에서 잡초를 깔끔하게 연속 ${EXAM_STREAK[NOVICE]}번 뽑으면 합격이야~`,
+      `시험 값은 ${won(EXAM_FEE[NOVICE])}! 5급이 되면 토끼풀도 뽑을 수 있어~`,
+      '같이 가자! 따라와~!'
+    ].map(fillName), () => {
+      if (n) { endTalk(); npcs.lead('hachiware', examLead); } // 검정소 문 옆까지 앞장서서 기다린다
+      if (!grade5Due()) return;
+      grade5Shown = true;
+      guide.setGoal(GRADE5_GOAL, { hold: true });
+      sound.play('job');
+      hud.announce({ kicker: '할 일!', title: '제초 5급 따기', sub: `검정소에서 잡초 연속 ${EXAM_STREAK[NOVICE]}번`, target: guide.goalEl, look: 'goal' });
+    });
+  }
+  /** 첫 자격(견습 → 5급)을 따면 곁의 하치와레가 축하한다. */
+  function cheerGrade5() {
+    const n = npcs.byKind('hachiware');
+    if (!n || n.away || !player || Math.hypot(n.x - player.position.x, n.z - player.position.z) > 14) return;
+    setTimeout(() => npcs.say(n, '축하해~! 이제 토끼풀도 뽑을 수 있어!'), 900);
+  }
   /** 가야 할 곳 위에 '여기!' 표시. */
   function tutorialMarker() {
     const step = state && state.tutorial;
@@ -1041,6 +1099,7 @@ function boot() {
     // 집 안내(첫날, 또는 하치와레에게 집을 물었을 때): 내 집 간판 위에
     if (step === 'house' || escort) return { id: 'guide', x: homeLabel.x, y: homeLabel.y + 0.9, z: homeLabel.z, text: '여기!', kind: 'mark' };
     if (step === 'board' || step === 'report' || jobDone) return { id: 'guide', x: boardSign.x, y: boardSign.y + 0.9, z: boardSign.z, text: '여기!', kind: 'mark' };
+    if (grade5Shown) return { id: 'guide', x: examSign.x, y: examSign.y + 0.9, z: examSign.z, text: '여기!', kind: 'mark' }; // 제초 5급 시험 보러
     // 다른 작업 일감 중이면 어디서 하는지 표시: 스티커는 작업대, 열매는 가장 가까운 열린 덤불
     const kind = state && state.job && JOB_TYPES[state.job.typeId].kind;
     if (kind === 'sticker') return { id: 'guide', x: benchSign.x, y: benchSign.y + 0.9, z: benchSign.z, text: '여기!', kind: 'mark' };
@@ -1680,11 +1739,12 @@ function boot() {
    */
   function licenseCardData(id, s = state) {
     const name = s.profile.name;
-    const own = id === 'weed' ? { day: s.license.day || 1, look: s.license.look } : licensesOf(s)[id];
-    const title = id === 'weed' ? `제초 검정 ${s.license.grade}급` : LICENSES[id].name;
+    const novice = id === 'weed' && s.license.grade >= NOVICE; // 견습은 제초 자격이 아직 없다(검정소에서 5급부터)
+    const own = id === 'weed' ? (novice ? null : { day: s.license.day || 1, look: s.license.look }) : licensesOf(s)[id];
+    const title = id === 'weed' ? `제초 검정 ${novice ? 5 : s.license.grade}급` : LICENSES[id].name;
     // 카드에 크게 쓰는 두 줄(원작 '草むしり / 3級' 처럼): 제초는 '풀 뽑기 / N급', 나머지는 자격 이름 / 합격
-    const big = id === 'weed' ? ['풀 뽑기', `${s.license.grade}급`] : [LICENSES[id].name, own ? '합격' : '아직 없어요'];
-    if (!own) return { id, title, big, none: true, hint: `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
+    const big = id === 'weed' ? ['풀 뽑기', novice ? '아직 없어요' : `${s.license.grade}급`] : [LICENSES[id].name, own ? '합격' : '아직 없어요'];
+    if (!own) return { id, title, big, none: true, hint: novice ? `잡초를 뽑아 경험치를 채우면 검정소에서 시험 · ${won(EXAM_FEE[NOVICE])}` : `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
     // 사진은 딴 그때 모습(예전에 딴 자격증은 기본 모습)
     return { id, title, big, name, photo: playerPortrait(own.look || s.profile.look), fields: [['이름', name], ['발급', cardDate(s, own.day)], ['번호', licenseNumber(name, id, own.day)]] };
   }
@@ -4217,6 +4277,7 @@ function boot() {
         // 말이 다른 대화에 끊겨 할 일 카드를 못 띄웠으면(쪽지가 숨은 채로 남았으면) 지금 띄운다
         else if (guide.goalEl.classList.contains('incoming') && performance.now() - goalCardAt > 4000) announceGoal(state.tutorial);
       }
+      updateGrade5Guide(dt);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
     }

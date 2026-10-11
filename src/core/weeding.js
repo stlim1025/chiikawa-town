@@ -1,12 +1,12 @@
 /**
  * 풀 종류(10종)와 뽑기 규칙. 제초 검정 급수(5급 → 1급)가 오를수록 뽑을 수 있는 풀이 늘어난다.
- * grade: 이 급수부터 뽑을 수 있다. chargeTime: 게이지가 끝까지 차는 시간(초). width: 초록 구간 폭(게이지 비율).
+ * grade: 이 급수부터 뽑을 수 있다(6 = 견습, 자격 없이도 · core/license.js 의 NOVICE). chargeTime: 게이지가 끝까지 차는 시간(초). width: 초록 구간 폭(게이지 비율).
  * stages: 몇 번에 나눠 뽑는지(덩굴 · 이끼 · 왕잡초는 한 번에 안 뽑힌다). drift: 누르는 동안 초록 구간이 흔들리는 폭과 빠르기.
  * poison: 끊기면(snapped) 독이 튀어 기운이 더 든다. night: 밤에만 모습을 드러낸다.
  * where: 자라는 곳(도감 · 안내 문구), tip: 뽑는 요령(도감).
  */
 export const WEED_KINDS = {
-  weed: { name: '잡초', grade: 5, chargeTime: 1.1, width: 0.24, where: '마을, 들판', tip: '가장 흔한 풀. 초록 칸에서 손을 떼요.' },
+  weed: { name: '잡초', grade: 6, chargeTime: 1.1, width: 0.24, where: '마을, 들판', tip: '가장 흔한 풀. 초록 칸에서 손을 떼요.' },
   clover: { name: '토끼풀', grade: 5, chargeTime: 1.35, width: 0.2, where: '마을, 들판, 강가', tip: '뿌리가 옆으로 퍼져 있어 게이지가 천천히 차요.' },
   foxtail: { name: '강아지풀', grade: 4, chargeTime: 0.95, width: 0.18, drift: { amp: 0.07, speed: 3.2 }, where: '들판, 마을 울타리 가', tip: '바람에 살랑살랑. 초록 칸도 같이 흔들려요.' },
   vine: { name: '덩굴풀', grade: 4, chargeTime: 1.0, width: 0.2, stages: 2, where: '숲', tip: '줄기가 길어서 두 번에 나눠 뽑아요.' },

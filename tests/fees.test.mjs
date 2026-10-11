@@ -9,13 +9,15 @@ import { asleepSpans } from '../src/core/offscreen.js';
 const fresh = (o = {}) => ({ ...createState({ name: '나', look: {} }), ...o });
 
 test('제초 승급 시험도 공짜가 아니다: 급수가 오를수록 비싸고, 돈이 모자라면 못 본다', () => {
-  for (const g of [5, 4, 3, 2]) assert.ok(EXAM_FEE[g] > 0, `${g}급 시험 값`);
-  assert.ok(EXAM_FEE[5] < EXAM_FEE[4] && EXAM_FEE[4] < EXAM_FEE[3] && EXAM_FEE[3] < EXAM_FEE[2]);
-  const s = fresh({ money: EXAM_FEE[5] + 50 });
+  for (const g of [6, 5, 4, 3, 2]) assert.ok(EXAM_FEE[g] > 0, `${g}급 시험 값`);
+  assert.ok(EXAM_FEE[6] < EXAM_FEE[5] && EXAM_FEE[5] < EXAM_FEE[4] && EXAM_FEE[4] < EXAM_FEE[3] && EXAM_FEE[3] < EXAM_FEE[2], '견습 → 5급이 가장 싸다');
+  const g5 = { license: { grade: 5, xp: 0 } };
+  const s = fresh({ ...g5, money: EXAM_FEE[5] + 50 });
   const r = payExamFee(s);
   assert.ok(r.ok);
   assert.equal(r.state.money, 50);
-  assert.ok(!payExamFee(fresh({ money: EXAM_FEE[5] - 1 })).ok);
+  assert.ok(!payExamFee(fresh({ ...g5, money: EXAM_FEE[5] - 1 })).ok);
+  assert.equal(payExamFee(fresh({ money: EXAM_FEE[6] })).state.money, 0, '새 게임(견습)은 5급 시험 값');
 });
 
 test('술 자격 · 슈퍼 알바이터 시험은 예전보다 비싸다', () => {

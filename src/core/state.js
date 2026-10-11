@@ -11,7 +11,7 @@ export function createState(profile) {
     profile: { name: profile.name, look: { ...profile.look } },
     money: 0,
     stamina: MAX_STAMINA,
-    license: { grade: 5, xp: 0 },
+    license: { grade: 6, xp: 0 }, // 처음엔 제초 견습(자격 없이 잡초만 · core/license.js 의 NOVICE), 검정소에서 5급부터
     job: null,
     exam: null,
     clock: createClock(1, 8), // 새 게임은 맑은 아침 08:00 에 시작한다

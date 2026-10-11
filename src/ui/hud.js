@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { JOB_TYPES, isComplete } from '../core/jobs.js';
 import { MAX_STAMINA } from '../core/state.js';
+import { gradeName } from '../core/license.js';
 import { hourOf, phaseOf } from '../core/clock.js';
 import { dateLabel, todayISO } from '../core/calendar.js';
 
@@ -226,7 +227,7 @@ export function createHud(ui, input) {
     },
     /** 상태와 일감, 시계를 그린다. */
     render(state) {
-      setText('grade', gradeEl, `제초 ${state.license.grade}급`);
+      setText('grade', gradeEl, `제초 ${gradeName(state.license.grade)}`); // 처음엔 '제초 견습'
       // 랏코와 수련한 날: 공격 +1 꼬리표
       const trained = !!(state.friends && state.friends.rakko && state.friends.rakko.home === state.clock.day);
       if (shown.buff !== trained) { shown.buff = trained; buffEl.hidden = !trained; }
