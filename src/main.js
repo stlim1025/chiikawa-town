@@ -1037,7 +1037,8 @@ function boot() {
   // ---------- 제초 5급 안내: 견습이 5급 시험을 볼 수 있게 되면 하치와레가 달려와 알려 주고 검정소로 앞장선다 ----------
   const examSign = village.labels.find((l) => l.text === '검정소');
   const examLead = { x: village.spots.exam.x + 1.3, z: village.spots.exam.z + 0.8 }; // 하치와레가 서서 기다리는 검정소 문 옆
-  const GRADE5_GOAL = '검정소에서 제초 5급 시험';
+  const GRADE5_GOAL = '검정소 가서 5급 시험 보기';
+  const TIMES = ['', '한', '두', '세', '네', '다섯']; // 말로 할 때 '3번' 대신 '세 번'
   let grade5Call = null; // 하치와레가 달려오는 중 { t }
   let grade5Shown = false; // 할 일 쪽지 · 검정소 위 '여기!' 를 띄우는 중
   /** 견습이 5급 시험을 볼 수 있고, 아직 시험 중이 아니며, 첫날 안내도 끝났는지. */
@@ -1073,7 +1074,7 @@ function boot() {
       '{name}~! 잠깐잠깐!',
       '잡초 뽑는 솜씨가 엄청 늘었다~!',
       '이제 제초 5급 시험을 볼 수 있어!',
-      `검정소에서 잡초를 깔끔하게 연속 ${EXAM_STREAK[NOVICE]}번 뽑으면 합격이야~`,
+      `잡초를 ${TIMES[EXAM_STREAK[NOVICE]]} 번 연달아 깔끔하게 뽑으면 합격이야~`,
       `시험 값은 ${won(EXAM_FEE[NOVICE])}! 5급이 되면 토끼풀도 뽑을 수 있어~`,
       '같이 가자! 따라와~!'
     ].map(fillName), () => {
@@ -1082,7 +1083,7 @@ function boot() {
       grade5Shown = true;
       guide.setGoal(GRADE5_GOAL, { hold: true });
       sound.play('job');
-      hud.announce({ kicker: '할 일!', title: '제초 5급 따기', sub: `검정소에서 잡초 연속 ${EXAM_STREAK[NOVICE]}번`, target: guide.goalEl, look: 'goal' });
+      hud.announce({ kicker: '할 일!', title: '제초 5급 따기', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
     });
   }
   /** 첫 자격(견습 → 5급)을 따면 곁의 하치와레가 축하한다. */

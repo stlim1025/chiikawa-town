@@ -479,7 +479,7 @@ export function createPanels(ui, handlers) {
       // 견습(자격 없음)이면 이름 대신 '견습', 첫 시험(견습 → 5급)은 잡초로
       out.push(card(EMBLEM.weed, `제초 검정 ${gradeName(lic.grade)}`, side, [
         ['coin', `보수 ${mult}배`],
-        lic.grade > 1 ? ['up', lic.grade >= NOVICE ? `5급 시험 잡초 연속 ${EXAM_STREAK[lic.grade]}번` : `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
+        lic.grade > 1 ? ['up', lic.grade >= NOVICE ? `잡초를 ${EXAM_STREAK[lic.grade]}번 연달아 깔끔하게` : `승급 연속 ${EXAM_STREAK[lic.grade]}번`] : ['star', '모든 풀'],
         lic.grade > 1 && !s.exam && !canTakeExam(lic) ? ['star', `경험치 ${lic.xp} / ${xpNeed}`, h('i', { class: 'xp-bar' }, h('i', { style: `width:${Math.min(100, Math.round((lic.xp / xpNeed) * 100))}%` }))] : null
       ]));
       // 술 자격 · 슈퍼 알바이터 · 토벌: 필기 · 실기 · 준비를 한 줄씩
