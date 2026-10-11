@@ -55,10 +55,23 @@ export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };
  * 남쪽은 강 건너 남서쪽 끝 호수와 바다 사이 — 선착장(PIER)에서 20 넘게, 절벽(CLIFF)에서는 반대쪽.
  */
 export const BOSS_LAIRS = {
-  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭' },
-  elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터' },
-  bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭' }
+  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭', door: { x: 50, z: -2 } },
+  elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터', door: { x: -67, z: -6 } },
+  bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭', door: { x: -4, z: 58 } }
 };
+/** 이야기 속 왕버섯 굴: 바위산 오솔길이 끝나는 곳(북쪽 절벽 바위에 끼지 않게 조금 남쪽). 입구는 오솔길 쪽. */
+export const KING_LAIR = { x: -24, z: -58, r: 7, door: { x: -10, z: -48 } };
+/**
+ * 보스 마당(world/lairs.js 가 둘레에 벽을 두르고 door 쪽으로 입구 하나를 튼다): 구역 보스 셋 + 왕버섯 굴.
+ * 일반 몬스터는 안으로 못 들어오고 근처에 생기지도 않으며, 보스 · 부하는 밖으로 못 나간다(world/monsters.js).
+ */
+export const ARENAS = [...Object.entries(BOSS_LAIRS).map(([id, L]) => ({ id, ...L })), { id: 'kingcap', ...KING_LAIR }];
+/** 벽이 마당 가장자리에서 떨어진 거리 · 입구 폭의 절반. */
+export const ARENA_WALL = 0.9, ARENA_DOOR = 1.7;
+/** (x, z) 가 들어 있는 보스 마당 | null. pad: 가장자리 여유(+ 넓게 · − 좁게). */
+export const arenaAt = (x, z, pad = 0) => ARENAS.find((A) => Math.hypot(x - A.x, z - A.z) < A.r + pad) || null;
+/** 마당 입구가 바라보는 방향(라디안, atan2(dx, dz)). */
+export const doorAngle = (A) => Math.atan2(A.door.x - A.x, A.door.z - A.z);
 
 export const riverZ = (x) => RIVER.z + RIVER.amp * Math.sin(x * RIVER.freq);
 

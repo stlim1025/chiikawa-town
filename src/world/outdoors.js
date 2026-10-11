@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, doorAngle, riverZ, roadDist, shoreDist } from '../core/layout.js';
 import { buildLairs } from './lairs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -39,6 +39,12 @@ export function buildOutdoors(ctx) {
 
   const ELDER = BOSS_LAIRS.elder;
   const inLair = (x, z, pad = 0) => Object.values(BOSS_LAIRS).some((L) => Math.hypot(x - L.x, z - L.z) < L.r + pad);
+  /** 보스 마당 자리(벽 둘레까지)와 입구 앞마당: 나무 · 바위를 비운다. */
+  const arenaClear = (x, z) => ARENAS.some((A) => {
+    if (Math.hypot(x - A.x, z - A.z) < A.r + ARENA_WALL + 1.2) return true;
+    const a = doorAngle(A), d = A.r + ARENA_WALL + 1.8;
+    return Math.hypot(x - (A.x + Math.sin(a) * d), z - (A.z + Math.cos(a) * d)) < 2.8;
+  });
   // ---------- 서쪽 숲: 빽빽한 나무와 빈터, 길가는 반투명해지는 나무, 서쪽 끝은 빈틈없이 ----------
   for (let x = -WORLD_HALF + 1; x < -VILLAGE_R - 2; x += 3.2) {
     for (let z = -WORLD_HALF + 1; z < WORLD_HALF - 1; z += 3.2) {
@@ -48,8 +54,8 @@ export function buildOutdoors(ctx) {
       const rd = roadDist(px, pz);
       if (rd < 2.2 || (!edge && rand() < 0.22)) continue; // 길과 숲속 빈터
       const s = 0.95 + rand() * 0.45, leaf = rand() < 0.5 ? '#5fb36e' : '#6cc77e';
-      if (rd < 5) tree(px, pz, s, leaf, zones.groupAt(px, pz));
-      else if (Math.hypot(px - ELDER.x, pz - ELDER.z) < ELDER.r + 1) rand(); // 고목 거인 빈터: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
+      if (arenaClear(px, pz)) rand(); // 고목 거인 마당 · 입구 앞: 나무는 빼되 난수(나무 방향 — tree · forestTree 둘 다 한 번)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
+      else if (rd < 5) tree(px, pz, s, leaf, zones.groupAt(px, pz));
       // 빈터 남쪽(카메라 쪽) 나무는 싸움을 가리면 반투명해지는 나무로(이것도 난수를 한 번 쓴다)
       else if (pz > ELDER.z && pz < ELDER.z + ELDER.r + 8 && Math.abs(px - ELDER.x) < ELDER.r + 3) tree(px, pz, s, leaf, zones.groupAt(px, pz));
       else forestTree(px, pz, s, leaf);
@@ -61,8 +67,9 @@ export function buildOutdoors(ctx) {
   for (let k = 0; k < 900; k++) {
     const x = (rand() - 0.5) * 152, z = -VILLAGE_R - 4 - rand() * 40;
     if (rand() < 0.75 || Math.abs(x) > Math.abs(z) + 4 || roadDist(x, z) < 2 || Math.hypot(x - CAVE.x, z - CAVE.z) < 8) continue;
-    const s = 0.5 + rand() * 1.2;
-    addInstance('rock' + (k % 3), GEO.sphereMid, ROCK[k % 3], { outline: 0.045, receive: true }, x, z, m4(x, 0, z, s * (1 + rand() * 0.4), s * (0.6 + rand() * 0.3), s, rand() * 6));
+    const s = 0.5 + rand() * 1.2, mat = m4(x, 0, z, s * (1 + rand() * 0.4), s * (0.6 + rand() * 0.3), s, rand() * 6);
+    if (arenaClear(x, z)) continue; // 왕버섯 굴 마당 · 입구 앞(난수는 위에서 다 썼다 — 뒤 바위 자리가 바뀌지 않게)
+    addInstance('rock' + (k % 3), GEO.sphereMid, ROCK[k % 3], { outline: 0.045, receive: true }, x, z, mat);
     obstacles.push({ x, z, r: s * 1.05 });
   }
   // 북쪽 끝 절벽: 큰 바위를 이어 붙인다

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
 import { MONSTERS, inSwing } from '../core/combat.js';
-import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE } from '../core/layout.js';
+import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, ARENA_WALL } from '../core/layout.js';
 
 /**
  * 마을 밖 몬스터(4단계): 이 게임만의 오리지널 생물. 모양은 부품을 쌓아 한 덩어리로 합치고(몸 + 외곽선, 얼굴),
@@ -582,7 +582,7 @@ export function createMonsters(scene, village, random = Math.random) {
     const A = AREAS[area], [x0, x1, z0, z1] = A.box;
     for (let i = 0; i < 60; i++) {
       const x = x0 + random() * (x1 - x0), z = z0 + random() * (z1 - z0);
-      if (!A.ok(x, z) || Math.hypot(x, z) < VILLAGE_R + 7 || !village.isFree(x, z, size)) continue;
+      if (!A.ok(x, z) || Math.hypot(x, z) < VILLAGE_R + 7 || !village.isFree(x, z, size) || arenaAt(x, z, ARENA_WALL + 4)) continue; // 보스 마당 둘레에는 안 생긴다
       if (avoid && Math.hypot(x - avoid.x, z - avoid.z) < 22) continue;
       if (list.some((m) => Math.hypot(m.x - x, m.z - z) < 3)) continue;
       return { x, z };
@@ -600,7 +600,7 @@ export function createMonsters(scene, village, random = Math.random) {
       id: nextId++, species, M, x, z, yaw, hp: M.hp, home: { x, z }, state: 'wander', timer: random() * 2, goal: null,
       cool: random() * 1.2, wind: 0, windMax: 1, stun: 0, flash: 0, kx: 0, kz: 0, alert: 0, engaged: false, hitPlayer: false, dead: false, deadT: 0,
       phase: random() * 10, mesh, born: 0, airY: 0, diveY: 0, rec: 0, act: null, atk: null, under: false, pinch: 0, popT: 0,
-      strafe: random() < 0.5 ? -1 : 1, ...extra
+      strafe: random() < 0.5 ? -1 : 1, arena: arenaAt(x, z, 0.5), ...extra // arena: 이 몬스터가 딸린 보스 마당(보스 · 부하만, 나머지는 null)
     };
     list.push(m);
     return m;
@@ -731,10 +731,20 @@ export function createMonsters(scene, village, random = Math.random) {
   const inVillage = (x, z, pad = 1) => Math.hypot(x, z) < VILLAGE_R + pad;
 
   /** 장애물을 피해 미끄러지듯 움직인다. 마을 울타리 쪽은 막힌다. → 바라던 만큼 움직인 비율(0..1, 막히면 작다) */
+  /**
+   * 보스 마당 규칙(core/layout.js 의 ARENAS): 마당에 딸린 몬스터(보스 · 부하)는 마당 안에서만, 나머지는 벽 밖(입구 앞도)에서만 움직인다.
+   * 잘못 들어가 있거나 나가 있으면 제자리 쪽으로 가는 걸음만 된다(갇혀 꼼짝 못 하지 않게).
+   */
+  function zoneOk(m, x, z, r) {
+    const A = m.arena || arenaAt(x, z, ARENA_WALL + 0.8 + r);
+    if (!A) return true;
+    const d = Math.hypot(x - A.x, z - A.z), now = Math.hypot(m.x - A.x, m.z - A.z);
+    return m.arena ? d < A.r - r * 0.4 || d < now : d > now;
+  }
   function moveBy(m, dx, dz) {
     const r = m.M.size * 0.8, fly = m.species === 'moth';
     const ox = m.x, oz = m.z, nx = m.x + dx, nz = m.z + dz;
-    const ok = (x, z) => (m.exam || Math.hypot(x, z) > FENCE) && (fly ? Math.max(Math.abs(x), Math.abs(z)) < 76 : village.isFree(x, z, r));
+    const ok = (x, z) => (m.exam || Math.hypot(x, z) > FENCE) && (fly ? Math.max(Math.abs(x), Math.abs(z)) < 76 : village.isFree(x, z, r)) && zoneOk(m, x, z, r);
     if (ok(nx, m.z)) m.x = nx;
     if (ok(m.x, nz)) m.z = nz;
     const want = Math.hypot(dx, dz);
@@ -816,6 +826,7 @@ export function createMonsters(scene, village, random = Math.random) {
     if (d > far) { x = m.x + (dx / d) * far; z = m.z + (dz / d) * far; }
     const o = Math.hypot(x, z);
     if (!m.exam && o < FENCE + 0.5) { x *= (FENCE + 0.5) / o; z *= (FENCE + 0.5) / o; }
+    if (m.arena) { const ax = x - m.arena.x, az = z - m.arena.z, ad = Math.hypot(ax, az), max = m.arena.r - m.M.size * 0.6; if (ad > max) { x = m.arena.x + (ax / ad) * max; z = m.arena.z + (az / ad) * max; } } // 마당 밖으로는 안 뛴다
     for (let i = 0; i < 12 && !village.isFree(x, z, m.M.size * 0.8); i++) { x += (m.x - x) * 0.2; z += (m.z - z) * 0.2; }
     m.aim.x = x; m.aim.z = z;
   }
@@ -828,7 +839,7 @@ export function createMonsters(scene, village, random = Math.random) {
     for (let k = 0; k < Math.min([2, 2, 3][r], [4, 5, 6][r] - minions); k++) {
       const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * (m.M.size + 1.2), sz = m.z + Math.cos(a) * (m.M.size + 1.2);
       if (!village.isFree(sx, sz, 0.4)) continue;
-      const f = add(kit ? kit.minion(r, k) : 'fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
+      const f = add(kit ? kit.minion(r, k) : 'fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8, arena: m.arena });
       f.born = 0.01; f.mesh.root.scale.setScalar(0.01);
       poof(sx, 0.3, sz, 0.3);
     }
@@ -902,7 +913,7 @@ export function createMonsters(scene, village, random = Math.random) {
 
   /** 쫓기: 공격 방식마다 알맞은 거리까지 다가가고(멀리서 쏘는 몬스터는 거리를 지킨다), 닿으면 예고를 시작한다. */
   function chase(m, dt, dp, canSee) {
-    if (!canSee) { m.state = 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; }
+    if (!canSee) { m.state = m.M.boss ? 'return' : 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; } // 보스는 제자리로 돌아가 체력을 채운다
     if (m.stun > 0) return false;
     const M = m.M, A = attackOf(m, dp), kind = A.kind;
     turnTo(m, P.x, P.z, dt, 9);
@@ -1350,7 +1361,8 @@ export function createMonsters(scene, village, random = Math.random) {
         if (ally) { P = ally; curFoe = ally; }
         if (M.speed > 0) {
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
-          const canSee = ctx.active && !safeFrom(m) && !m.dormant && pd < (m.engaged ? M.aggro * 1.7 : M.aggro);
+          const tArena = arenaAt(P.x, P.z, 0.2); // 노리는 상대가 들어가 있는 보스 마당: 마당 안팎이 갈리면 서로 못 본다(바깥 몬스터는 마당 안의 나를 쫓지 않는다)
+          const canSee = ctx.active && !safeFrom(m) && !m.dormant && (m.arena ? tArena === m.arena : !tArena) && pd < (m.engaged ? M.aggro * 1.7 : M.aggro);
           if ((m.state === 'wander' || m.state === 'chase') && fromHome > LEASH) { m.state = 'return'; hideTele(m); }
           if (m.state === 'wander') {
             if (canSee) {

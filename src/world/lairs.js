@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
-import { BOSS_LAIRS } from '../core/layout.js';
+import { ARENAS, ARENA_WALL, ARENA_DOOR, doorAngle } from '../core/layout.js';
 
 /**
- * 구역 보스(core/bosses.js)의 자리 꾸미기: 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙) + 둘레 소품 몇 개 + 뒤쪽 가장자리에 뜬 이름표.
+ * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 둘레에 벽(들판 풀 둔덕 · 숲 덤불 · 강가 · 바위산 바위)을 두르고 길 쪽(door)으로 입구 하나.
+ * 구역 보스 자리는 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙) + 소품 몇 개 + 뒤쪽 가장자리에 뜬 이름표도. 벽은 낮게(남쪽에서 보는 카메라에 싸움을 가리지 않게).
  * 난수를 쓰지 않고 정해진 각도에 놓는다(앞서 지은 숲 · 들판의 난수 순서를 흐트러뜨리지 않게). 부품은 마을 정적 배칭(batchStatic)이 한 덩어리로 묶는다.
  * ctx: { zones, obstacles, labels }
  */
@@ -23,15 +24,9 @@ const DECOR = {
       g.add(toonMesh(GEO.cylinder, '#3e2a1d', { position: [x, 0.2, z], scale: [0.2, 0.06, 0.2], outline: false, shadow: false }));
     });
   },
-  // 고목 빈터: 이끼 낀 바닥, 가장자리에 이끼 바위 다섯과 보라 버섯 무리
-  elder(g, r, obstacles, L) {
+  // 고목 빈터: 이끼 낀 바닥과 보라 버섯 무리
+  elder(g, r) {
     floor(g, '#86b562', r);
-    around(5, 0.6).forEach((a, i) => {
-      const x = Math.sin(a) * (r - 0.5), z = Math.cos(a) * (r - 0.5), s = i % 2 ? 0.6 : 0.75;
-      g.add(toonMesh(GEO.sphere, '#8f8174', { position: [x, 0, z], scale: [s, s * 0.7, s * 0.9], outline: 0.04, receive: true }));
-      g.add(toonMesh(GEO.sphere, '#86b85e', { position: [x, s * 0.58, z], scale: [s * 0.7, s * 0.2, s * 0.62], outline: 0.025 }));
-      obstacles.push({ x: L.x + x, z: L.z + z, r: s * 0.85 });
-    });
     [[-2.6, 2.2], [-2.2, 2.7], [-3.0, 2.8]].forEach(([x, z], i) => {
       g.add(toonMesh(GEO.cylinder, '#f3e6cf', { position: [x, 0, z], scale: [0.06, 0.24 - i * 0.04, 0.06], outline: 0.015, shadow: false }));
       g.add(toonMesh(GEO.sphere, '#9a6ad0', { position: [x, 0.26 - i * 0.04, z], scale: [0.17, 0.1, 0.17], outline: 0.015, shadow: false }));
@@ -51,13 +46,33 @@ const DECOR = {
   }
 };
 
+/** 마당 벽 생김새: 색 둘(번갈아) · 조각 크기 · 높이. */
+const WALL = {
+  bigmole: { colors: ['#95d488', '#aee08f'], scale: [0.85, 0.7, 0.85], y: -0.15 }, // 풀 둔덕
+  elder: { colors: ['#4f9f58', '#5fb36e'], scale: [0.85, 0.8, 0.85], y: 0 }, // 덤불
+  bigcrab: { colors: ['#a39a8f', '#b9b2a6'], scale: [0.8, 0.6, 0.75], y: 0 }, // 강가 바위
+  kingcap: { colors: ['#8f8174', '#a39486'], scale: [0.95, 0.8, 0.9], y: 0 } // 바위산 바위
+};
+/** 둘레 벽: 마당 가장자리 밖 ARENA_WALL 에 조각을 촘촘히(사이로 못 지나가게), 입구(door 쪽 폭 ARENA_DOOR × 2)만 비우고 양옆은 큰 기둥. */
+function walls(g, A, obstacles) {
+  const W = WALL[A.id], R = A.r + ARENA_WALL, door = doorAngle(A), half = Math.asin(Math.min(1, ARENA_DOOR / R)), step = 1.0 / R;
+  const from = door + half, to = door + Math.PI * 2 - half;
+  const n = Math.max(2, Math.round((to - from) / step));
+  for (let i = 0; i <= n; i++) {
+    const a = from + ((to - from) * i) / n, x = Math.sin(a) * R, z = Math.cos(a) * R, k = i === 0 || i === n ? 1.25 : 1 + (i % 3) * 0.08;
+    g.add(toonMesh(GEO.sphere, W.colors[i % 2], { position: [x, W.y, z], scale: W.scale.map((v) => v * k), outline: 0.035, receive: true }));
+    obstacles.push({ x: A.x + x, z: A.z + z, r: 0.78 * k });
+  }
+}
+
 export function buildLairs({ zones, obstacles, labels }) {
-  for (const [id, L] of Object.entries(BOSS_LAIRS)) {
+  for (const A of ARENAS) {
     const g = new THREE.Group();
-    g.position.set(L.x, 0, L.z);
-    DECOR[id](g, L.r, obstacles, L);
-    // 이름표(팻말 없이): 마당 뒤쪽(북쪽) 가장자리 위 — 남쪽에서 보는 카메라에 싸움을 가리지 않고 보이고, 마을폰 지도에도 뜬다
-    labels.push({ x: L.x, y: 1.6, z: L.z - L.r, text: L.place });
-    zones.add(g, L.x, L.z);
+    g.position.set(A.x, 0, A.z);
+    walls(g, A, obstacles);
+    if (DECOR[A.id]) DECOR[A.id](g, A.r);
+    // 이름표(팻말 없이): 마당 뒤쪽(북쪽) 가장자리 위 — 남쪽에서 보는 카메라에 싸움을 가리지 않고 보이고, 마을폰 지도에도 뜬다. 왕버섯 굴은 이야기 속 비밀이라 없다
+    if (A.place) labels.push({ x: A.x, y: 1.6, z: A.z - A.r, text: A.place });
+    zones.add(g, A.x, A.z);
   }
 }

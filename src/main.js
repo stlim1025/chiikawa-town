@@ -90,7 +90,7 @@ import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/too
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
-import { LAIR_BOSSES, BOSS_LAIRS, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
+import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
@@ -1575,7 +1575,7 @@ function boot() {
   /** 퀘스트에 나오는 곳의 월드 자리. */
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
-  const lairSpot = village.nearestFree(-24, -61, 1.5);
+  const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
   let questT = 0, bossM = null, questHint = false;
   /**
    * 구역 보스(core/bosses.js): 오늘 쓰러뜨리지 않았으면 제 굴 · 빈터에 한 마리씩 있다(내 눈앞에서 솟아나지 않게 멀리 있을 때 놓는다).

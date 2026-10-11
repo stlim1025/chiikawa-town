@@ -1,6 +1,6 @@
-import { BOSS_LAIRS } from './layout.js';
+import { BOSS_LAIRS, KING_LAIR } from './layout.js';
 
-export { BOSS_LAIRS };
+export { BOSS_LAIRS, KING_LAIR };
 
 /**
  * 구역 보스: 동쪽 들판 대왕 두더지 · 서쪽 숲 고목 거인 · 남쪽 강가 왕집게가 저마다 정해진 자리(layout.js 의 BOSS_LAIRS)에 한 마리씩 산다.

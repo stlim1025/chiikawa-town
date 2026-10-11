@@ -31,6 +31,24 @@ test('구역 보스: 동쪽 들판 · 서쪽 숲 · 남쪽 강가에 한 마리�
   assert.equal(MONSTERS.kingcap.region, 'boss');
 });
 
+test('보스 마당 넷(구역 보스 셋 + 왕버섯 굴): 서로 · 마을과 떨어져 있고, 입구는 길 쪽', () => {
+  assert.deepEqual(Lay.ARENAS.map((A) => A.id).sort(), ['bigcrab', 'bigmole', 'elder', 'kingcap']);
+  const wallR = (A) => A.r + Lay.ARENA_WALL + 0.8;
+  for (const A of Lay.ARENAS) {
+    assert.ok(Math.hypot(A.x, A.z) - wallR(A) > Lay.VILLAGE_R + 10, `${A.id}: 마을에서 멀리`);
+    for (const B of Lay.ARENAS) if (A !== B) assert.ok(Math.hypot(A.x - B.x, A.z - B.z) > wallR(A) + wallR(B) + 10, `${A.id} · ${B.id} 떨어져 있다`);
+    // 입구 방향 = door 쪽
+    const a = Lay.doorAngle(A), want = Math.atan2(A.door.x - A.x, A.door.z - A.z);
+    assert.ok(Math.abs(a - want) < 1e-9);
+    assert.equal(Lay.arenaAt(A.x, A.z), A, `${A.id}: 가운데는 그 마당`);
+    assert.equal(Lay.arenaAt(A.x + A.r + 0.5, A.z), null, `${A.id}: 가장자리 밖은 마당이 아니다`);
+  }
+  const K = Lay.KING_LAIR;
+  assert.equal(Lay.regionAt(K.x, K.z), 'mountain', '왕버섯 굴은 바위산');
+  const a = Lay.doorAngle(K), R = K.r + Lay.ARENA_WALL;
+  assert.ok(Lay.roadDist(K.x + Math.sin(a) * R, K.z + Math.cos(a) * R) < 1.5, '왕버섯 굴 입구는 오솔길 위');
+});
+
 test('남쪽 보스 자리는 선착장 · 절벽과 겹치지 않는다', () => {
   const L = Lay.BOSS_LAIRS.bigcrab;
   const pier = { x: Lay.PIER.x, z: Lay.SOUTH_SHORE };
