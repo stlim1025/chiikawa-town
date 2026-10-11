@@ -257,6 +257,10 @@ export function buildVillage(scene) {
     [-0.85, 0.85].forEach((px) => place(g, toonMesh(GEO.box, wood, { position: [px, 1.25, -0.42], scale: [0.07, 1.0, 0.07], shell: true })));
     place(g, toonMesh(ROOF, '#f7b6cc', { position: [0, 1.72, -0.05], scale: [1.95, 0.42, 1.1], shell: true }));
     ['#f7a8c4', '#bfe0f5', '#fff1a8', '#d9ccff', '#ffd6e2'].forEach((c, i) => place(g, toonMesh(GEO.box, c, { position: [-0.6 + i * 0.3, 0.9, 0.05], scale: [0.2, 0.16, 0.09], shell: true, shadow: false })));
+    // 판매대 뒤쪽 작업 자리: 바늘꽂이 · 실패 둘 · 접힌 천(포셰트 갑옷 씨가 판매대 뒤에서 바느질한다)
+    place(g, toonMesh(GEO.sphere, '#e8667a', { position: [-0.6, 0.87, -0.24], scale: [0.08, 0.06, 0.08], outline: 0.012, shadow: false }));
+    [['#9fd0f2', -0.42], ['#ffd27a', -0.31]].forEach(([c, px]) => place(g, toonMesh(GEO.cylinder, c, { position: [px, 0.81, -0.27], scale: [0.04, 0.08, 0.04], outline: 0.01, shadow: false })));
+    [['#d9ccff', 0.83, 0], ['#bfe0f5', 0.87, 0.2]].forEach(([c, py, ry]) => place(g, toonMesh(GEO.box, c, { position: [0.62, py, -0.25], rotation: [0, ry, 0], scale: [0.22, 0.04, 0.16], outline: 0.012, shadow: false })));
     world.add(g);
     obstacles.push({ x, z, r: lotRadius(lot), soft: true });
     solid(g, g.children, true);

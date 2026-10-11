@@ -3304,7 +3304,7 @@ function boot() {
     } else if (kind === 'pochette') {
       const st = S.pochette, v = freeVillager();
       opts = [
-        [3, () => atPost(n, 'read', 'sew', 'needle', '바느질', 3)],
+        [3, () => atPost(n, 'read', 'sew', 'needle', '바느질', 3, { x: st.x + 0.3, z: st.z + 4 })], // 판매대 뒤에서 손님 쪽을 보고, 판매대 위로 천 · 바늘(models.js 'sewing')
         [1.5, () => goAndDo(n, { x: st.x + (Math.random() - 0.5) * 2.4, z: st.z + 1 }, 'talk', 'display', 'dots', '손님 부르기', 3.5, south(st))],
         [v ? 1.7 : 0, () => together(n, v, [['pochette', staffLine('pochette', 'compliment')], [v.kind, PRAISED[v.kind] || '헤헤']], { icon: 'heart', text: (o) => (o === 'pochette' ? '칭찬 듣기' : `${nameOf(o)} 칭찬`) })],
         [hour >= 10 && hour < 18 ? 1 : 0.2, () => goAndDo(n, { x: S.plaza.x + (Math.random() - 0.5) * 4, z: S.plaza.z + 2 }, 'pose', 'show', 'heart', '신상 자랑', 5, south(S.plaza))]

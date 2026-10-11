@@ -331,7 +331,7 @@ export const NPC_KINDS = Object.keys(DEFS);
  * 손에 쥔 소품을 적는 오른팔 자세. animateChibi 의 그 몸짓과 맞춘다.
  * 수련(train)만은 팔을 살짝 든 자세에서 칼끝이 앞을 보게 적어서, 팔을 내리면 칼끝이 조금 숙이고 내지르면 위로 선다.
  */
-const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0] };
+const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0], read: [-1.0, 0, -0.35] };
 
 /**
  * 손에 쥔 소품 부품을 팔 마디에 단다. 부품은 pose 자세일 때 손끝에서 잰 위치 · 방향(p · r)으로 적고,
@@ -394,6 +394,11 @@ const PROP_PARTS = {
     { m: 'box', c: '#fffaf0', p: [0, 0.375, 0.397], r: [-0.7, 0, 0], s: [0.46, 0.03, 0.22], n: 'body', o: false },
     { m: 'box', c: '#b9ab9a', p: [0, 0.388, 0.387], r: [-0.7, 0, 0], s: [0.01, 0.004, 0.2], n: 'body', o: false }
   ],
+  // 바느질(포셰트 갑옷 씨): 두 손을 모은 사이에 분홍 천 조각 · 반짝이는 바늘(판매대 위로 손을 내밀고 꿰맨다)
+  sewing: (def) => held(def, 'armR', HOLD.read, [
+    { m: 'box', c: '#f7b6cc', p: [-0.11, 0.02, 0.06], r: [0.5, 0, 0.15], s: [0.2, 0.015, 0.15] },
+    { m: 'box', c: '#dfe4ea', p: [-0.06, 0.06, 0.08], r: [0.9, 0.3, 0], s: [0.008, 0.008, 0.12] }
+  ]),
   // 빗자루: 손에서 앞아래로 비스듬히 내려 끝(짚)이 땅에 닿는다
   broom: (def) => {
     const k = 0.95, along = (d) => [0, -Math.sin(k) * d, Math.cos(k) * d];
@@ -476,7 +481,7 @@ const WEAPON_PARTS = {
  * 'drink' 는 라멘 로우에서 라멘을 먹을 때도 쓰니 그릇을 들고, 쿠리만쥬만 맥주잔을 든다.
  */
 export const PROP_FOR = {
-  kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, // 노동 갑옷 씨: 게시판 앞 정리
+  kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, pochette: { read: 'sewing' }, // 노동 갑옷 씨: 게시판 앞 정리 · 포셰트 갑옷 씨: 바느질
   rakko: { train: 'sword', drink: 'bowl' }, usagi: { train: 'stick', drink: 'bowl' },
   hachiware: { dance: 'mic', drink: 'bowl', train: 'fork' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };

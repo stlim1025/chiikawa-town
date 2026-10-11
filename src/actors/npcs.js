@@ -1,6 +1,6 @@
 import { buildNpc, animateChibi, propFor } from './models.js';
 import { EAT_ANIMS } from './eatmotion.js';
-import { VILLAGE_R, groundY } from '../core/layout.js';
+import { VILLAGE_R, groundY, lotById } from '../core/layout.js';
 
 /** 말 걸면 하는 대사. */
 const TALK = {
@@ -50,6 +50,7 @@ const VIEW_Z = 7; // 카메라는 늘 내 캐릭터 뒤(+z)에서 본다(render/
 export function createNpcs(scene, village, weeds, berries) {
   const s = village.spots;
   const kuri = (village.homes && village.homes.kurimanju) || s.plaza;
+  const PS = lotById('pochette') || { x: s.pochette.x, z: s.pochette.z - 1.8 }; // 포셰트 판매대 한가운데(s.pochette 는 손님이 서는 앞자리)
   const POSTS = [
     ['chiikawa', -2.2, 2.6, false], ['hachiware', 2.4, 2.2, false], ['usagi', 0.8, 4.6, false],
     ['momonga', -3.6, 4.2, false], ['kurimanju', kuri.x + 0.8, kuri.z + 0.6, false], ['rakko', s.dojo.x - 1.2, s.dojo.z + 0.4, false],
@@ -57,7 +58,8 @@ export function createNpcs(scene, village, weeds, berries) {
     ['captain', s.exam.x - 0.9, s.exam.z + 0.5, true], ['kani', s.books.x + 1.0, s.books.z + 0.3, true],
     // 라멘 가게: 손님 자리(의자 · 줄 · 오가는 길)는 비워 둔다 — 라멘 아저씨는 카운터 바로 앞, 시사는 가게 오른쪽 옆에서만
     ['shisa', s.ramen.x + 2.4, s.ramen.z - 0.6, true, 0.9], ['ramen', s.ramen.x, s.ramen.z - 0.8, true, 0.6],
-    ['pochette', s.pochette.x + 0.6, s.pochette.z + 0.4, true], ['labor', s.board.x, s.board.z - 2.15, true]
+    // 포셰트 갑옷 씨는 판매대 뒤에서 손님 쪽(남쪽)을 보고 선다(6번째: 쉴 때 바라보는 곳 — 전에는 판매대 앞 모서리에서 아무 데나 보고 바느질했다)
+    ['pochette', PS.x + 0.3, PS.z - 0.95, true, 0.35, { x: PS.x + 0.3, z: PS.z + 6 }], ['labor', s.board.x, s.board.z - 2.15, true]
   ];
 
   const nearFree = (x, z) => {
@@ -69,12 +71,12 @@ export function createNpcs(scene, village, weeds, berries) {
     return { x, z };
   };
 
-  const list = POSTS.map(([kind, x, z, fixed, roam = POST_ROAM]) => {
+  const list = POSTS.map(([kind, x, z, fixed, roam = POST_ROAM, face = null]) => {
     const p = nearFree(x, z);
     const chibi = buildNpc(kind);
     scene.add(chibi.root);
     return {
-      kind, chibi, fixed, roam, home: { ...p }, x: p.x, z: p.z, yaw: Math.random() * 6, phase: Math.random() * 6,
+      kind, chibi, fixed, roam, face, home: { ...p }, x: p.x, z: p.z, yaw: Math.random() * 6, phase: Math.random() * 6,
       state: 'idle', timer: 0.5 + Math.random() * 2, tx: p.x, tz: p.z, talk: 0, bubble: null,
       speed: chibi.height > 1.8 ? 0.8 : fixed ? 0.95 : 1.15 // 마을 친구들은 할 일이 많아 조금 더 빨리 걷는다
     };
@@ -275,6 +277,7 @@ export function createNpcs(scene, village, weeds, berries) {
       return true;
     }
     n.task = { type: 'act', anim: job.anims ? pick(job.anims) : job.anim, time: job.time * (0.8 + Math.random() * 0.4) }; // 쉬는 몸짓도 그때그때 여러 가지
+    if (n.face && Math.hypot(n.x - n.home.x, n.z - n.home.z) < 0.8) n.yaw = Math.atan2(n.face.x - n.x, n.face.z - n.z); // 가게 자리에서는 손님 쪽을 본다
     n.state = 'work';
     n.workT = 0;
     if (Math.random() < 0.55) say(n, pick(job.lines));
