@@ -298,7 +298,7 @@ export function createUsagiClub(ctx) {
     get inClub() { return !!S && S.kind === 'club'; },
     /** 연출 중인 퀘스트 · 지금 할 일(화면 왼쪽 위 쪽지). */
     get questId() { return S ? S.id : null; },
-    get goal() { return S ? { meet: '우사기를 몰래 따라가기', follow: '우사기를 몰래 따라가기 · 돌아보면 멈추기!', burrow: '큰 나무 구멍으로 따라 들어가기', club: '우사기 클럽에서 춤추기' }[S.kind] || null : null; },
+    get goal() { return S ? { meet: '우사기를 몰래 따라가자!', follow: '몰래 따라가자! 돌아보면 얼음!', burrow: '큰 나무 구멍으로 따라 들어가자!', club: '우사기 클럽에서 신나게 춤추자!' }[S.kind] || null : null; },
     /** 지금 단계(디버그 · 테스트용). */
     get phase() { return S ? S.kind : null; },
     /** 0.3초마다(한가할 때): 목격 장면을 열 때인지. */

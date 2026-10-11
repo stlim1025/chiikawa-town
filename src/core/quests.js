@@ -4,7 +4,7 @@ import { hasLicense } from './licenses.js';
 import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from './wardrobe.js';
 import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
-import { WEED_KINDS } from './weeding.js';
+import { WEED_KINDS, josa } from './weeding.js';
 import { hourOf } from './clock.js';
 import { VILLAGERS, villagerOf } from './villagers.js';
 
@@ -77,14 +77,14 @@ export const QUESTS = {
     ask: '무슨 일이에요?',
     offer: ['흠흠. {name}, 잠깐 이야기 좀 하지.', '요즘 마을 밖 몬스터가 부쩍 늘었다. 특히 북쪽 바위산 쪽이다.', '마을을 지키려면 토벌할 줄 아는 사람이 필요해.', '검정소에서 토벌 자격증을 따 와라. 토벌 안내서부터 읽고, 무기는 도구점에서.'],
     steps: [
-      { type: 'license', id: 'hunter', goal: '검정소에서 토벌 자격증 따기', say: ['흠! 합격했군. 역시 내 눈은 틀리지 않았다.', '그럼 첫 임무다. 바위산의 이끼 거북을 3마리 줄여 줘라.'] },
-      { type: 'hunt', species: 'turtle', n: 3, goal: '북쪽 바위산 이끼 거북 3마리 토벌', say: ['수고했다. 그런데… 이상하군.', '쓰러뜨려도 쓰러뜨려도 바위산 쪽에서 계속 나타난다고 한다.', '랏코라면 뭔가 알지도 모른다. 랏코 수련장에 가 봐라.'] },
-      { type: 'talk', to: 'rakko', goal: '랏코에게 바위산 이야기 묻기', say: ['…대장이 보냈나.', '바위산 깊은 곳에서 이상한 기척이 난다. 몬스터들이 거기서 깨어나는 것 같다.', '옛날 이야기라면 카니가 잘 알 거다. 헌책방에 가 봐라.'] },
-      { type: 'talk', to: 'kani', goal: '카니 헌책방에서 옛이야기 듣기', say: ['…바위산 이야기?', '(낡은 그림책을 펼친다)', '…"바위산 깊은 곳, 길이 끝나는 곳에 커다란 버섯이 산다. 포자를 뿌려 풀과 몬스터를 깨운다"…', '…그림책 이야기인 줄 알았는데…', '…바위산 오솔길 끝이야. 조심해. 딱.'] },
-      { type: 'visit', place: 'lair', goal: '바위산 오솔길 끝(깊은 곳) 살펴보기', speaker: null, say: ['(땅이 쿵, 쿵 울린다…)', '(바위 그늘에서 커다란 버섯이 몸을 일으켰다!)', '…저게 그림책 속 왕버섯이야! 일단 마을에 알리자.'] },
-      { type: 'talk', goal: '대장 갑옷 씨에게 왕버섯 알리기', say: ['…왕버섯이라고?!', '그 녀석이 포자로 몬스터들을 깨우고 있었던 거군.', '기운을 가득 채우고, 좋은 무기를 들고 가라. 가까이 가면 풀뭉치를 불러낸다니 조심하고.', '마을의 운명이 너에게 달렸다, {name}!'] },
-      { type: 'boss', goal: '바위산 깊은 곳의 왕버섯 쓰러뜨리기', speaker: null, say: ['(왕버섯이 털썩 쓰러지며 포자가 흩어졌다…)', '(바위산에 조용한 바람이 분다)', '해냈다! 대장 갑옷 씨에게 알리자.'] },
-      { type: 'talk', goal: '대장 갑옷 씨에게 알리기', say: ['…해냈군, {name}!', '이제 바위산도 조용해질 거다. 마을 모두를 대신해서… 고맙다.', '이건 마을이 너에게 주는 선물이다. 흠흠, 잘 어울리겠군.'] }
+      { type: 'license', id: 'hunter', goal: '검정소에서 토벌 자격증을 따자!', say: ['흠! 합격했군. 역시 내 눈은 틀리지 않았다.', '그럼 첫 임무다. 바위산의 이끼 거북을 3마리 줄여 줘라.'] },
+      { type: 'hunt', species: 'turtle', n: 3, goal: '북쪽 바위산의 이끼 거북 세 마리를 잡자!', say: ['수고했다. 그런데… 이상하군.', '쓰러뜨려도 쓰러뜨려도 바위산 쪽에서 계속 나타난다고 한다.', '랏코라면 뭔가 알지도 모른다. 랏코 수련장에 가 봐라.'] },
+      { type: 'talk', to: 'rakko', goal: '랏코에게 바위산 이야기를 물어보자!', say: ['…대장이 보냈나.', '바위산 깊은 곳에서 이상한 기척이 난다. 몬스터들이 거기서 깨어나는 것 같다.', '옛날 이야기라면 카니가 잘 알 거다. 헌책방에 가 봐라.'] },
+      { type: 'talk', to: 'kani', goal: '카니 헌책방에서 옛이야기를 들어 보자!', say: ['…바위산 이야기?', '(낡은 그림책을 펼친다)', '…"바위산 깊은 곳, 길이 끝나는 곳에 커다란 버섯이 산다. 포자를 뿌려 풀과 몬스터를 깨운다"…', '…그림책 이야기인 줄 알았는데…', '…바위산 오솔길 끝이야. 조심해. 딱.'] },
+      { type: 'visit', place: 'lair', goal: '바위산 오솔길 끝을 살펴보자! (깊은 곳)', speaker: null, say: ['(땅이 쿵, 쿵 울린다…)', '(바위 그늘에서 커다란 버섯이 몸을 일으켰다!)', '…저게 그림책 속 왕버섯이야! 일단 마을에 알리자.'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 왕버섯 이야기를 하자!', say: ['…왕버섯이라고?!', '그 녀석이 포자로 몬스터들을 깨우고 있었던 거군.', '기운을 가득 채우고, 좋은 무기를 들고 가라. 가까이 가면 풀뭉치를 불러낸다니 조심하고.', '마을의 운명이 너에게 달렸다, {name}!'] },
+      { type: 'boss', goal: '바위산 깊은 곳의 왕버섯을 쓰러뜨리자!', speaker: null, say: ['(왕버섯이 털썩 쓰러지며 포자가 흩어졌다…)', '(바위산에 조용한 바람이 분다)', '해냈다! 대장 갑옷 씨에게 알리자.'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 알려 주자!', say: ['…해냈군, {name}!', '이제 바위산도 조용해질 거다. 마을 모두를 대신해서… 고맙다.', '이건 마을이 너에게 주는 선물이다. 흠흠, 잘 어울리겠군.'] }
     ],
     reward: { money: 5000, bond: 6, accessory: 'crown', village: 3 }
   },
@@ -92,33 +92,33 @@ export const QUESTS = {
   pillow: {
     title: '치이카와의 베개', giver: 'chiikawa', needHearts: 1, ask: '무슨 고민 있어?',
     offer: ['…있잖아…', '요즘 밤마다… 무서운 꿈을 꿔…', '들판의 풀뭉치가… 데굴데굴 쫓아오는 꿈…', '…보송보송한 베개가 있으면… 괜찮을 것 같아…', '풀뭉치 솜털… 3개만… 구해 줄 수 있어…?'],
-    steps: [{ type: 'bring', items: { fluffdown: 3 }, goal: '보송 솜털 3개를 치이카와에게 (동쪽 들판 풀뭉치)', say: ['…! 보송보송해…!', '이걸로 베개 만들면… 무서운 꿈… 안 꿀 거야…', '…고마워…♪ 이거… 내가 좋아하는 꽃 핀…'] }],
+    steps: [{ type: 'bring', items: { fluffdown: 3 }, goal: '보송 솜털 세 개를 치이카와에게 갖다주자! (동쪽 들판 풀뭉치)', say: ['…! 보송보송해…!', '이걸로 베개 만들면… 무서운 꿈… 안 꿀 거야…', '…고마워…♪ 이거… 내가 좋아하는 꽃 핀…'] }],
     reward: { money: 300, bond: 3, accessory: 'flower' }
   },
   picnic: {
     title: '우사기의 소풍 자리', giver: 'usagi', needHearts: 1, ask: '무슨 일 있어?',
     offer: ['우라!', '(들판 쪽을 가리키며 펄쩍펄쩍 뛴다)', '하아?! (데굴데굴 굴러가는 시늉을 한다)', '(돗자리를 펼치는 시늉을 하고는 고개를 젓는다)', '(들판의 풀뭉치 때문에 소풍을 못 가는 것 같다…!)'],
-    steps: [{ type: 'hunt', species: 'fluff', n: 4, goal: '동쪽 들판 풀뭉치 4마리 쫓아내고 우사기에게 알리기', say: ['우라~!!', '(돗자리를 활짝 펼치고 커다란 주먹밥을 건넨다)', '야하! 야하!'] }],
+    steps: [{ type: 'hunt', species: 'fluff', n: 4, goal: '동쪽 들판의 풀뭉치 네 마리를 쫓아내 주자!', say: ['우라~!!', '(돗자리를 활짝 펼치고 커다란 주먹밥을 건넨다)', '야하! 야하!'] }],
     reward: { money: 400, bond: 3, items: { riceball: 3 } }
   },
   treasure: {
     title: '모몽가의 보물 상자', giver: 'momonga', needHearts: 1, ask: '뭐 원하는 거 있어?',
     offer: ['야, {name}. 나 반짝이는 게 필요해.', '숲 뿔벌레 뿔이랑, 밤에 나는 나방 날개 가루.', '…가져오면 당분간 네 지갑은 봐줄게. 흥!'],
-    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 2개와 달빛 가루 1개를 모몽가에게', say: ['…흥, 생각보다 빨랐네.', '(보물 상자에 넣으며 몰래 흐뭇해한다)', '약속은 약속이야. 사흘은 봐줄게. 이 리본도 가져. 흥!'] }],
+    steps: [{ type: 'bring', items: { horn: 2, moondust: 1 }, goal: '반짝 뿔 두 개랑 달빛 가루 하나를 모몽가에게 갖다주자!', say: ['…흥, 생각보다 빨랐네.', '(보물 상자에 넣으며 몰래 흐뭇해한다)', '약속은 약속이야. 사흘은 봐줄게. 이 리본도 가져. 흥!'] }],
     reward: { bond: 3, accessory: 'ribbon', truce: 3 }
   },
   snack: {
     title: '쿠리만쥬의 새 안주', giver: 'kurimanju', needHearts: 2, ask: '오늘은 뭐 만들어?',
     offer: ['하아~ 이번에 새 안주를 만들어 보려고.', '말랑말랑한 젤리를 구우면… 겉은 바삭, 속은 쫀득하지 않을까?', '강가 슬라임이 떨어뜨리는 말랑 젤리 3개랑 빨간 열매 4개만 있으면 돼~', '하아~ 부탁해도 될까?'],
-    steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 3개와 빨간 열매 4개를 쿠리만쥬에게', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
+    steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 세 개랑 빨간 열매 네 개를 쿠리만쥬에게 갖다주자!', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
     reward: { money: 500, bond: 3, items: { jellybake: 2 } }
   },
   cheers: {
     title: '쿠리만쥬와 맥주 한 잔', giver: 'kurimanju', needHearts: 2, needLicense: 'liquor', ask: '요즘 맥주는 어때?',
     offer: ['하아~ {name}, 술 자격증 땄다며?', '마을 동쪽 맥주집 알지? 거기 생맥주가 아주 끝내주거든~', '근데 맥주엔 안주가 있어야지. 빨간 열매 5개만 따다 줄래? 새콤달콤하게 절여 볼게.', '그리고… 저녁에 맥주집에서 같이 한 잔 하자. 하아~'],
     steps: [
-      { type: 'bring', items: { berry: 5 }, goal: '빨간 열매 5개를 쿠리만쥬에게 (마을 가장자리 열매 덤불)', say: ['오~ 잘 익었네!', '(열매를 새콤달콤하게 절인다…)', '좋아, 안주 준비 끝! 저녁(5시 ~ 9시)에 맥주집에서 기다릴게~'] },
-      { type: 'visit', place: 'pub', evening: true, goal: '저녁(17 ~ 21시)에 맥주집에서 쿠리만쥬 만나기', speaker: 'kurimanju', say: ['왔구나~ 자, 한 잔 받아!', '건배~! (짠—!)', '…캬~ 같이 마시니까 훨씬 맛있다. 하아~', '저녁에 여기 오면 언제든 한 잔 하자. 같이 건배하면 더 친해질 거야~'] }
+      { type: 'bring', items: { berry: 5 }, goal: '빨간 열매 다섯 개를 쿠리만쥬에게 갖다주자! (마을 가장자리 열매 덤불)', say: ['오~ 잘 익었네!', '(열매를 새콤달콤하게 절인다…)', '좋아, 안주 준비 끝! 저녁(5시 ~ 9시)에 맥주집에서 기다릴게~'] },
+      { type: 'visit', place: 'pub', evening: true, goal: '저녁에 맥주집에서 쿠리만쥬를 만나자! (오후 5시 ~ 9시)', speaker: 'kurimanju', say: ['왔구나~ 자, 한 잔 받아!', '건배~! (짠—!)', '…캬~ 같이 마시니까 훨씬 맛있다. 하아~', '저녁에 여기 오면 언제든 한 잔 하자. 같이 건배하면 더 친해질 거야~'] }
     ],
     reward: { money: 600, bond: 4, items: { bottlebeer: 3 } }
   },
@@ -126,8 +126,8 @@ export const QUESTS = {
     title: '하치와레의 동굴 무대', giver: 'hachiware', needHearts: 2, ask: '요즘 노래 연습은 어때?',
     offer: ['있잖아, {name}.', '나 동굴에서 혼자 노래 연습하는데… 너무 어두워서 조금 무서워.', '그림자 나방 날개 가루가 밤에 반짝반짝 빛난대!', '달빛 가루 2개만 구해 줄래? 동굴을 반짝이는 무대로 꾸미고 싶어~'],
     steps: [
-      { type: 'bring', items: { moondust: 2 }, goal: '달빛 가루 2개를 하치와레에게 (밤에 나오는 그림자 나방)', say: ['우와~ 진짜 반짝거린다!', '오늘 밤에 동굴로 와 줄래? 첫 번째 관객이 되어 줘!'] },
-      { type: 'visit', place: 'cave', night: true, goal: '밤(19시 ~ 새벽 5시)에 바위산 하치와레 동굴로 가기', speaker: 'hachiware', say: ['(동굴 안이 달빛 가루로 반짝반짝 빛난다…)', '♪ 라라~ 랄라~ 반짝이는 밤에~ ♪', '…헤헤, 어땠어? 들어 줘서 고마워, {name}!', '이제 사람들 앞에서도 부를 수 있을 것 같아~'] }
+      { type: 'bring', items: { moondust: 2 }, goal: '달빛 가루 두 개를 하치와레에게 갖다주자! (밤에 나오는 그림자 나방)', say: ['우와~ 진짜 반짝거린다!', '오늘 밤에 동굴로 와 줄래? 첫 번째 관객이 되어 줘!'] },
+      { type: 'visit', place: 'cave', night: true, goal: '밤에 바위산 하치와레 동굴로 가 보자! (밤 7시 ~ 새벽 5시)', speaker: 'hachiware', say: ['(동굴 안이 달빛 가루로 반짝반짝 빛난다…)', '♪ 라라~ 랄라~ 반짝이는 밤에~ ♪', '…헤헤, 어땠어? 들어 줘서 고마워, {name}!', '이제 사람들 앞에서도 부를 수 있을 것 같아~'] }
     ],
     reward: { money: 600, bond: 6, furniture: 'lamp' }
   },
@@ -135,13 +135,13 @@ export const QUESTS = {
     title: '랏코의 수련', giver: 'rakko', needHearts: 2, needLicense: 'hunter', ask: '수련 상대가 필요해?',
     // 갓 자격증을 딴 때라 가장 쉬운 동쪽 들판 풀뭉치로(바위산 몬스터는 처음엔 버겁다)
     offer: ['…{name}. 토벌 자격증을 땄다지.', '약속대로 가르쳐 주지. 하지만 먼저 실력을 봐야겠다.', '동쪽 들판 풀뭉치 3마리. 가볍다고 얕보지 마라.', '들이받기 전에 움츠린다. 그때 비켰다가, 부딪친 뒤를 노려라.'],
-    steps: [{ type: 'hunt', species: 'fluff', n: 3, goal: '동쪽 들판 풀뭉치 3마리 토벌하고 랏코에게 알리기', say: ['…훗. 해냈군.', '좋은 눈을 가졌다. 이걸 받아라.', '네 손에 맞게 다듬어 둔 무기다. …수련을 게을리하지 마라.'] }],
+    steps: [{ type: 'hunt', species: 'fluff', n: 3, goal: '동쪽 들판의 풀뭉치 세 마리를 잡아 보자!', say: ['…훗. 해냈군.', '좋은 눈을 가졌다. 이걸 받아라.', '네 손에 맞게 다듬어 둔 무기다. …수련을 게을리하지 마라.'] }],
     reward: { money: 300, bond: 3, weapon: 'hammer' }
   },
   noodles: {
     title: '시사의 면 삶기 특훈', giver: 'shisa', needHearts: 1, ask: '요즘 연습은 잘 돼?',
     offer: ['{name} 님! 저 면 삶기 특훈 중인데요…', '사부님이 그러셨어요. 좋은 라멘은 좋은 재료부터라고!', '강가 물가 갈대를 5개만 뽑아다 주실 수 있어요? 국물 거를 때 쓰려고요!'],
-    steps: [{ type: 'pull', kind: 'reed', n: 5, goal: '물가 갈대 5개 뽑고 시사에게 알리기 (3급부터)', say: ['와아! 고마워요, {name} 님!', '이걸로 국물을 거르면 훨씬 맑아질 거예요!', '감사의 뜻으로… 사부님 몰래 드리는 거예요! 쉿!'] }],
+    steps: [{ type: 'pull', kind: 'reed', n: 5, goal: '물가 갈대 다섯 개를 뽑아 주자! (3급부터)', say: ['와아! 고마워요, {name} 님!', '이걸로 국물을 거르면 훨씬 맑아질 거예요!', '감사의 뜻으로… 사부님 몰래 드리는 거예요! 쉿!'] }],
     reward: { money: 700, bond: 3 }
   },
   // ---------- 사이드스토리: 원작 에피소드(머리 위에 이야기 표시) ----------
@@ -156,7 +156,7 @@ export const QUESTS = {
     ],
     steps: [{
       type: 'visit', place: 'plaza', hours: [20, 24], scene: 'usagiClub', speaker: 'hachiware',
-      goal: '밤에 광장에서 치이카와 · 하치와레와 만나기 (밤 8시 ~ 12시)',
+      goal: '밤에 광장에서 치이카와랑 하치와레를 만나자! (밤 8시 ~ 12시)',
       say: ['…결국 우사기 집이 어딘지는 하나도 모르겠네~', { who: 'chiikawa', text: '…그래도… 재밌었다…♪' }, '헤헤, 그치? 우사기는 정말 수수께끼야~']
     }],
     reward: { bond: 3, friends: { usagi: 3, chiikawa: 2 }, furniture: 'djbooth' }
@@ -165,7 +165,7 @@ export const QUESTS = {
     title: '우사기의 피자호빵', giver: 'usagi', side: true, needStory: 'pizzaNews', sameDay: true, hours: [9, 20], needHearts: 1, ask: '우라?',
     offer: ['(라멘 로우 쪽을 가리키며 킁킁…)', '우라…? (침을 꿀꺽)', '(새로 나온 피자호빵이 몹시 궁금한 것 같다…!)'],
     steps: [{
-      type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사서 우사기에게 (라멘 로우 · 60원)',
+      type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사다 주자! (라멘 로우 · 60원)',
       // cue: 그 줄에서 연출(한 입 → 얼굴 클로즈업 · 굳기 · 진짜로 울기 · 활짝 웃으며 카메라가 빠진다)
       say: ['(우사기가 피자호빵을 반으로 갈랐다… 치즈가 쭈욱~)', { text: '(한 입 베어 물더니…)', cue: 'pizzaBite' }, '……', { text: '(그대로 굳어 버렸다…?)', cue: 'pizzaFreeze' },
         { text: '…우…우라…(눈물이 주르륵)', cue: 'pizzaCry' }, { who: 'hachiware', text: '우사기가… 울어?! 그렇게 맛있어?!' }, { who: 'chiikawa', text: '…(꿀꺽)' },
@@ -182,9 +182,9 @@ export const QUESTS = {
       '저 혼자서는 자신이 없어서요… 공부 좀 도와주실 수 있어요?'
     ],
     steps: [
-      { type: 'talk', hours: [17, 22], fx: 'shisaQuiz', goal: '저녁에 라멘 로우 앞에서 시사 공부 도와주기 (오후 5시 ~ 10시)',
+      { type: 'talk', hours: [17, 22], fx: 'shisaQuiz', goal: '저녁에 라멘 로우 앞에서 시사 공부를 도와주자! (오후 5시 ~ 10시)',
         say: ['헤헤… {name} 님 덕분에 조금 자신이 생겼어요!', '시험은 내일이에요! 내일 낮에 같이 검정소까지 가 주실 거죠…?'] },
-      { type: 'visit', place: 'exam', hours: [9, 17], with: true, scene: 'shisaExam', speaker: 'shisa', goal: '시험 날! 시사와 같이 검정소에 가기 (오전 9시 ~ 오후 5시)',
+      { type: 'visit', place: 'exam', hours: [9, 17], with: true, scene: 'shisaExam', speaker: 'shisa', goal: '시험 날! 시사랑 같이 검정소에 가자! (오전 9시 ~ 오후 5시)',
         say: ['{name} 님, 정말 고마워요!', '오늘부터 사부님 곁에서 열심히 할게요! 시사 특제 라멘, 꼭 먹으러 와 주세요~!'] }
     ],
     reward: { bond: 4, friends: { ramen: 2 }, money: 300, story: 'shisaPass' }
@@ -194,7 +194,7 @@ export const QUESTS = {
     title: '하치와레가 구덩이에!', giver: 'hachiware', side: true, noOffer: true, needHearts: 2, ask: '',
     offer: ['(숲 속 구덩이에서 하치와레를 찾았다)'],
     steps: [{
-      type: 'bring', items: { vine: 3 }, goal: '덩굴풀 3개로 밧줄 엮어 구덩이의 하치와레 끌어올리기 (숲 · 4급부터)', speaker: 'hachiware',
+      type: 'bring', items: { vine: 3 }, goal: '덩굴풀 세 개로 밧줄을 엮어 하치와레를 꺼내 주자! (숲 · 4급부터)', speaker: 'hachiware',
       say: ['영차~ 하고 끌어올려 줘서 고마워, {name}!', '구덩이 속에서 하늘만 보고 있으니까 조금 무서웠어~', '이제 발밑 조심할게! 헤헤.']
     }],
     reward: { bond: 4, friends: { chiikawa: 2 }, money: 300 }
@@ -205,7 +205,7 @@ export const QUESTS = {
     offer: ['어서 오세요~! 아, {name} 님!', '새로 만든 잠옷이 있는데요… 귀 달린 후드까지 있는 폭신폭신한 잠옷이에요!', '치이카와 님이랑 하치와레 님 것도 만들었어요. 다 같이 입으면 귀여울 것 같아서~', '오늘 밤에 입고 셋이서 놀아 보는 건 어때요?'],
     start: { accessory: 'pajama' },
     steps: [{
-      type: 'visit', place: 'home', hours: [20, 24], scene: 'pajamaNight', speaker: 'hachiware', goal: '밤에 잠옷 입고 내 집 앞으로 (밤 8시 ~ 12시)',
+      type: 'visit', place: 'home', hours: [20, 24], scene: 'pajamaNight', speaker: 'hachiware', goal: '밤에 잠옷 입고 내 집 앞으로 가자! (밤 8시 ~ 12시)',
       say: ['헤헤… 밖에서 자 버렸네~', '잠옷 입고 밤에 노는 거 진짜 재밌었다!', '또 하자, {name}! 다음엔 간식도 챙겨 오자~']
     }],
     reward: { bond: 2, friends: { chiikawa: 3, hachiware: 3 } }
@@ -222,7 +222,7 @@ export const QUESTS = {
     ],
     steps: [{
       type: 'visit', place: 'pier', hours: [6, 11], scene: 'islandCamp', speaker: 'hachiware',
-      goal: '아침에 남쪽 바닷가 선착장으로 (아침 6시 ~ 11시) · 섬 합숙 출발!',
+      goal: '아침에 남쪽 바닷가 선착장으로 가자! (아침 6시 ~ 11시)',
       say: ['{name}~ 우리 다 새카맣게 탔다~!', '(셋이서 서로 등에 벗겨진 껍질을 뜯어 준다… 뿌직, 뿌직)', '보수 100배는… 결국 음식이었지만~',
         '그래도 엄청난 여름이었다! 시마지로 씨 카레, 집에서도 먹자~', { who: 'chiikawa', text: '…(바다 쪽을 한 번 돌아본다)' }, '(…어디선가, 노랫소리 같은 웃음소리가 들린 것 같았다)']
     }],
@@ -236,7 +236,7 @@ export const QUESTS = {
       '글쎄 그 잠옷을 입고 아이돌을 한대요! 이름하여 『파자마 파티즈』!', '오늘 밤 광장에서 첫 공연이래요. 근데… 손님이 하나도 안 오면 어쩌죠…?',
       { who: 'hachiware', text: '아이돌!? 우리가 보러 가자~! 첫 손님 해 주자!' }, { who: 'chiikawa', text: '…!! (두근두근)' }],
     steps: [{
-      type: 'visit', place: 'plaza', hours: [19, 24], scene: 'pajamaParty', speaker: 'pochette', goal: '밤에 광장 무대로 · 파자마 파티즈 첫 공연 (밤 7시 ~ 12시)',
+      type: 'visit', place: 'plaza', hours: [19, 24], scene: 'pajamaParty', speaker: 'pochette', goal: '밤에 광장 무대로 첫 공연 보러 가자! (밤 7시 ~ 12시)',
       say: ['공연 봤어요!? 제가 만든 잠옷이 무대 위에서 반짝반짝…!', '파·자·마·파·티~♪ …어라, 저도 모르게 흥얼거리네요. 귀에서 안 떠나요~!']
     }],
     reward: { bond: 2, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, story: 'pajamaParty' }
@@ -245,50 +245,50 @@ export const QUESTS = {
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
     offer: ['…저기… {name}…', '라멘 로우 라멘… 먹고 싶은데…', '혼자 가면… 좀 떨려서…', '…같이… 먹으러 가 줄래…?'],
-    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '치이카와랑 라멘 로우에서 라멘 먹기', say: ['…후루룩…! 맛있어…!', '같이 먹으니까… 훨씬 맛있다…', '…또 같이 오자…♪'] }],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '치이카와랑 라멘 로우에서 라멘 먹자!', say: ['…후루룩…! 맛있어…!', '같이 먹으니까… 훨씬 맛있다…', '…또 같이 오자…♪'] }],
     reward: { bond: 2 }
   },
   weedChii: {
     title: '치이카와랑 풀 뽑기', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [8, 16], need: 'broke', chance: 0.25 }, needHearts: 0, ask: '풀 뽑으러 가?',
     offer: ['…{name}…', '오늘 풀 뽑기… 하려고 하는데…', '혼자 하면… 조금 무서워서…', '히잉… 같이 해 줄래…?'],
-    steps: [{ type: 'together', act: 'weed', n: 4, goal: '치이카와랑 같이 풀 4개 뽑기', say: ['…다 뽑았다…!', '같이 하니까… 금방이었어…', '…이거… 아까 찾은 거… 너 줄게…'] }],
+    steps: [{ type: 'together', act: 'weed', n: 4, goal: '치이카와랑 같이 풀 네 개를 뽑자!', say: ['…다 뽑았다…!', '같이 하니까… 금방이었어…', '…이거… 아까 찾은 거… 너 줄게…'] }],
     reward: { bond: 2, items: { clover: 1 } }
   },
   weedPal: {
     title: '하치와레랑 풀 뽑기', giver: 'hachiware', daily: true, again: 2, wish: { hours: [8, 16], need: 'broke', chance: 0.3 }, needHearts: 0, ask: '오늘 뭐 해?',
     offer: ['있잖아, {name}! 오늘 풀 뽑기 같이 할래?', '둘이 하면 금방 끝나고, 수다도 떨 수 있잖아~', '어떻게든 될 거야!'],
-    steps: [{ type: 'together', act: 'weed', n: 5, goal: '하치와레랑 같이 풀 5개 뽑기', say: ['우와~ 벌써 다 했다!', '같이 하니까 하나도 안 힘들었어!', '이거 아까 주운 동전이야. 반씩 나누자!'] }],
+    steps: [{ type: 'together', act: 'weed', n: 5, goal: '하치와레랑 같이 풀 다섯 개를 뽑자!', say: ['우와~ 벌써 다 했다!', '같이 하니까 하나도 안 힘들었어!', '이거 아까 주운 동전이야. 반씩 나누자!'] }],
     reward: { money: 120, bond: 2 }
   },
   berryPal: {
     title: '우사기랑 열매 따기', giver: 'usagi', daily: true, again: 2, wish: { hours: [10, 17], chance: 0.22 }, needHearts: 0, ask: '우라?',
     offer: ['우라!', '(빨간 열매 덤불 쪽을 가리키며 펄쩍펄쩍 뛴다)', '(바구니를 내밀며 같이 가자고 손짓한다)'],
-    steps: [{ type: 'together', act: 'berry', n: 4, goal: '우사기랑 빨간 열매 4개 따기 (마을 가장자리 열매 덤불)', say: ['야하~!', '(열매를 하나 입에 쏙 넣고는 행복한 얼굴을 한다)', '(바구니에서 열매를 한 줌 나눠 준다)'] }],
+    steps: [{ type: 'together', act: 'berry', n: 4, goal: '우사기랑 빨간 열매 네 개를 따자! (마을 가장자리 열매 덤불)', say: ['야하~!', '(열매를 하나 입에 쏙 넣고는 행복한 얼굴을 한다)', '(바구니에서 열매를 한 줌 나눠 준다)'] }],
     reward: { bond: 2, items: { berry: 2 } }
   },
   hangover: {
     title: '쿠리만쥬의 해장 라멘', giver: 'kurimanju', daily: true, again: 3, wish: { hours: [7, 11], chance: 0.3 }, needHearts: 0, ask: '오늘 기분은 어때?',
     offer: ['하아~ 어젯밤에 조금 많이 마셨나 봐…', '이럴 땐 뜨끈한 라멘 국물이 최고지~', '같이 한 그릇 할래? 혼자 먹으면 심심하잖아~'],
-    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '쿠리만쥬랑 라멘 로우에서 라멘 먹기', say: ['후루룩… 하아~ 살 것 같다~', '역시 라멘은 같이 먹어야 맛있어~', '다음엔 내가 한 잔 살게~'] }],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '쿠리만쥬랑 라멘 로우에서 라멘 먹자!', say: ['후루룩… 하아~ 살 것 같다~', '역시 라멘은 같이 먹어야 맛있어~', '다음엔 내가 한 잔 살게~'] }],
     reward: { bond: 2 }
   },
   walkRiver: {
     title: '모몽가랑 강가 산책', giver: 'momonga', daily: true, again: 3, wish: { hours: [14, 19], chance: 0.22 }, needHearts: 1, ask: '심심해?',
     offer: ['야, {name}.', '…강가 다리에서 물 구경하고 싶은데, 혼자 가긴 좀 그렇잖아.', '너도 같이 와. 싫다고 하면 지갑 털 거야. 흥!'],
-    steps: [{ type: 'visit', place: 'bridge', with: true, goal: '모몽가랑 남쪽 강가 다리까지 같이 걷기', speaker: 'momonga', say: ['(다리 아래로 강물이 졸졸 흐른다…)', '…뭐야, 생각보다 좋잖아.', '…가끔 또 데려와. 흥!'] }],
+    steps: [{ type: 'visit', place: 'bridge', with: true, goal: '모몽가랑 남쪽 강가 다리까지 걸어가자!', speaker: 'momonga', say: ['(다리 아래로 강물이 졸졸 흐른다…)', '…뭐야, 생각보다 좋잖아.', '…가끔 또 데려와. 흥!'] }],
     reward: { bond: 2 }
   },
   restDay: {
     title: '랏코의 쉬는 날', giver: 'rakko', daily: true, again: 4, wish: { hours: [11, 19], need: 'tired', chance: 0.4 }, needHearts: 1, ask: '오늘도 수련이야?',
     offer: ['…{name}.', '수련만 한다고 강해지는 건 아니다. 가끔은 쉬는 것도 수련이지.', '…라멘이나 먹으러 가지. 같이.'],
-    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '랏코랑 라멘 로우에서 라멘 먹기', say: ['…훗. 국물이 좋군.', '…이런 날도 나쁘지 않다.', '…또 가자.'] }],
+    steps: [{ type: 'together', act: 'ramen', n: 1, goal: '랏코랑 라멘 로우에서 라멘 먹자!', say: ['…훗. 국물이 좋군.', '…이런 날도 나쁘지 않다.', '…또 가자.'] }],
     reward: { bond: 2 }
   },
   // 우사기의 집을 본 뒤로는 가끔 저녁에 우사기가 또 클럽에 가자고 한다(사이드스토리 되풀이)
   clubNight: {
     title: '우사기랑 클럽', giver: 'usagi', side: true, daily: true, again: 3, after: 'usagiHome', wish: { hours: [19, 21], chance: 0.3 }, needHearts: 0, ask: '우라?',
     offer: ['우라!', '(숲 쪽을 가리키며 들썩들썩 춤을 춘다)', '(오늘 밤에 또 클럽에 가자는 것 같다…!)'],
-    steps: [{ type: 'scene', scene: 'clubNight', speaker: 'usagi', goal: '우사기를 따라 클럽 가기', say: ['야하~!!', '(실컷 춤추고 나왔다)'] }],
+    steps: [{ type: 'scene', scene: 'clubNight', speaker: 'usagi', goal: '우사기를 따라 클럽에 가자!', say: ['야하~!!', '(실컷 춤추고 나왔다)'] }],
     reward: { bond: 2 }
   }
 };
@@ -538,12 +538,14 @@ export const doneQuests = (state) => QUEST_ORDER.filter((id) => isDone(state, id
 
 /**
  * 대화 상자용 지금 단계 목표: 한 문장(text)과 괄호 속 안내(hint, 어디서 · 몇 급부터 같은 것).
- * 몇 개 모았는지는 글에 붙이지 않고 shortGoal 의 parts 그림 꼬리표로 따로 보여 준다. 알리기만 남았으면 '○○에게 알리기'.
+ * 몇 개 모았는지는 글에 붙이지 않고 shortGoal 의 parts 그림 꼬리표로 따로 보여 준다. 알리기만 남았으면 '○○에게 알려 주자!'.
+ * 안내 글은 단어만 이어 붙이지 말고 친구가 옆에서 말하듯(…하자! · …주자!).
  */
+const readyLine = (id, step) => `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '갖다주자!' : '알려 주자!'}`;
 export function goalText(state, id) {
   const step = stepOf(state, id);
   if (!step) return { text: '', hint: '' };
-  if (stepReady(state, id) && step.type !== 'talk') return { text: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, hint: '' };
+  if (stepReady(state, id) && step.type !== 'talk') return { text: readyLine(id, step), hint: '' };
   return { text: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), hint: (step.goal.match(/\(([^)]*)\)/) || [])[1] || '' };
 }
 
@@ -556,17 +558,17 @@ const REGION_AT = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남�
 export function shortGoal(state, id) {
   const step = stepOf(state, id);
   if (!step) return { goal: '', n: '', parts: [] };
-  if (stepReady(state, id) && step.type !== 'talk') return { goal: `${FRIENDS[reportTo(id, step)].name}에게 ${step.type === 'bring' ? '건네주기' : '알리기'}`, n: '', parts: [] };
+  if (stepReady(state, id) && step.type !== 'talk') return { goal: readyLine(id, step), n: '', parts: [] };
   if (step.type === 'bring') {
     const b = bagOf(state).items;
-    return { goal: `${FRIENDS[reportTo(id, step)].name}에게 건네주기`, n: '', parts: Object.entries(step.items).map(([it, n]) => ({ kind: 'item', id: it, have: Math.min(n, b[it] || 0), need: n })) };
+    return { goal: `${FRIENDS[reportTo(id, step)].name}에게 갖다주자!`, n: '', parts: Object.entries(step.items).map(([it, n]) => ({ kind: 'item', id: it, have: Math.min(n, b[it] || 0), need: n })) };
   }
   const p = progressOf(state, id);
   if (step.type === 'hunt') {
     const M = MONSTERS[step.species];
-    return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '에서 ' : ''}${M.name} 토벌`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
+    return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '의 ' : ''}${josa(M.name, '을/를')} 잡자!`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
   }
-  if (step.type === 'pull') return { goal: `${WEED_KINDS[step.kind].name} 뽑기`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
+  if (step.type === 'pull') return { goal: `${josa(WEED_KINDS[step.kind].name, '을/를')} 뽑자!`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
   return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n: p ? `${p.have} / ${p.need}` : '', parts: [] };
 }
 

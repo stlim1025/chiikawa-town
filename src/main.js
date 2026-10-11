@@ -997,9 +997,9 @@ function boot() {
   }
 
   // ---------- 하치와레의 첫날 안내 ----------
-  const GOALS = { house: '하치와레 따라가기', board: '노동 접수에서 일감 받기', pull: '풀 뽑기', report: '보수 받기' };
+  const GOALS = { house: '하치와레를 따라가자!', board: '노동 접수에서 일감을 받자!', pull: '풀을 뽑아 보자!', report: '보수를 받으러 가자!' };
   // 할 일 카드 밑줄: 설명서 말투 말고 하치와레가 옆에서 말하듯
-  const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '게시판에 가서 보수 받자!' };
+  const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '하치와레가 게시판에서 기다려!' };
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
   const boardLead = { x: village.spots.board.x + 1.4, z: village.spots.board.z + 0.2 }; // 노동 접수 게시판 옆(내가 서는 게시판 앞자리는 비워 둔다)
@@ -1039,7 +1039,7 @@ function boot() {
   // ---------- 제초 5급 안내: 견습이 5급 시험을 볼 수 있게 되면 하치와레가 달려와 알려 주고 검정소로 앞장선다 ----------
   const examSign = village.labels.find((l) => l.text === '검정소');
   const examLead = { x: village.spots.exam.x + 1.3, z: village.spots.exam.z + 0.8 }; // 하치와레가 서서 기다리는 검정소 문 옆
-  const GRADE5_GOAL = '검정소 가서 5급 시험 보기';
+  const GRADE5_GOAL = '검정소에서 5급 시험을 보자!';
   const TIMES = ['', '한', '두', '세', '네', '다섯']; // 말로 할 때 '3번' 대신 '세 번'
   let grade5Call = null; // 하치와레가 달려오는 중 { t }
   let grade5Shown = false; // 할 일 쪽지 · 검정소 위 '여기!' 를 띄우는 중
@@ -1085,7 +1085,7 @@ function boot() {
       grade5Shown = true;
       guide.setGoal(GRADE5_GOAL, { hold: true });
       sound.play('job');
-      hud.announce({ kicker: '할 일!', title: '제초 5급 따기', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
+      hud.announce({ kicker: '할 일!', title: '제초 5급을 따자!', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
     });
   }
   /** 첫 자격(견습 → 5급)을 따면 곁의 하치와레가 축하한다. */
@@ -1650,7 +1650,7 @@ function boot() {
     // 처음으로 부탁할 친구가 생기면 한 번 알려 준다
     if (!questHint && !seen('quest-intro') && !tutorialActive(state.tutorial) && free) {
       const any = npcs.list.some((m) => markOf(state, m.kind) === '!');
-      if (any) { questHint = true; markSeen('quest-intro'); hud.toast('! 가 뜬 친구에게 말 걸기', 3200); }
+      if (any) { questHint = true; markSeen('quest-intro'); hud.toast('! 가 뜬 친구에게 말을 걸어 봐요', 3200); }
     }
   }
   const STORY_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.8 5 7 4.6 3.5 5v12.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5z" fill="#fff" stroke="#7b4b8f" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 6.5V19" stroke="#7b4b8f" stroke-width="1.8"/><path d="M6 9h3.5M6 12h3.5M14.5 9H18M14.5 12H18" stroke="#c9a0d8" stroke-width="1.4" stroke-linecap="round"/></svg>';

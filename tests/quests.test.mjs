@@ -35,7 +35,8 @@ test('bring quest: progress, report, reward', () => {
   s = I.addItem(s, 'fluffdown', 5).state;
   assert.ok(Q.stepReady(s, 'pillow'));
   assert.equal(Q.markOf(s, 'chiikawa'), '?');
-  assert.match(Q.goalText(s, 'pillow').text, /치이카와에게 건네주기/);
+  assert.equal(Q.goalText(s, 'pillow').text, '치이카와에게 갖다주자!');
+  assert.equal(Q.shortGoal(s, 'pillow').goal, '치이카와에게 갖다주자!');
   const r = Q.completeStep(s, 'pillow', 3);
   assert.ok(r.finished);
   assert.equal(I.countOf(r.state, 'fluffdown'), 2);
@@ -45,6 +46,23 @@ test('bring quest: progress, report, reward', () => {
   assert.ok(Q.isDone(r.state, 'pillow'));
   assert.equal(r.state.questTrack, null);
   assert.ok(S.isValidState(r.state));
+});
+test('퀘스트 안내는 말하듯(…하자! · …주자!): 단어만 이어 붙인 \'…하기\' · \'토벌\' · 가운뎃점(·)으로 이은 말이 없다', () => {
+  const spoken = (text, where) => {
+    assert.match(text, /[!~♪]$/, `말하듯 끝나야: ${where}: ${text}`);
+    assert.ok(!/ · /.test(text), `가운뎃점으로 이은 말: ${where}: ${text}`);
+    assert.ok(!/(토벌|건네주기|알리기|뽑기|가기|먹기|만나기)$/.test(text.replace(/[!~♪]+$/, '')), `'…하기' 말투: ${where}: ${text}`);
+  };
+  // 단계마다 적어 둔 목표(괄호 속은 어디서 · 언제 꼬리표라 뺀다)
+  for (const [id, QQ] of Object.entries(Q.QUESTS)) QQ.steps.forEach((st, i) => spoken(st.goal.replace(/\s*\([^)]*\)/g, '').trim(), `${id}[${i}]`));
+  // 화면 쪽지 · 가운데 카드 · '부탁 다시 듣기'(토벌 · 풀 · 건네주기는 그 자리에서 만든 글)
+  for (const id of Q.QUEST_ORDER) {
+    const s = Q.startQuest(withHearts(fresh(), Q.QUESTS[id].giver, 5), id);
+    spoken(Q.shortGoal(s, id).goal, `${id} shortGoal`);
+    spoken(Q.goalText(s, id).text, `${id} goalText`);
+  }
+  const hunt = Q.QUEST_ORDER.find((id) => Q.QUESTS[id].steps[0].type === 'hunt');
+  assert.match(Q.shortGoal(Q.startQuest(fresh(), hunt), hunt).goal, /(을|를) 잡자!$/);
 });
 test('hunt counts only after accepting', () => {
   let s = withHearts(fresh(), 'usagi', 1);
