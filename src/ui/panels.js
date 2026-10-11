@@ -561,7 +561,7 @@ export function createPanels(ui, handlers) {
       const rule = (art, title, sub) => h('div', { class: 'rule-card' }, svgSpan('rule-ico', RULE_ART[art]), h('div', {}, h('b', {}, title), h('span', {}, sub)));
       return [head('토벌 안내서'),
         h('div', { class: 'rule-grid' },
-          rule('faint', '기운 0이면 기절', '마을 입구에서 깨고 돈을 조금 잃어요'),
+          rule('faint', '기운 0이면 기절', '세 시간 뒤 집 앞에서 깨고 돈을 조금 잃어요'),
           rule('safe', '마을 안은 안전', ''),
           rule('dodge', '빨간 표시는 피하기', ''),
           rule('shop', '무기는 도구점', '토벌 자격증이 있어야 사요 · 전리품은 노동 접수에서 팔아요')),
