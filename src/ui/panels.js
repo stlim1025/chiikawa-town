@@ -301,7 +301,7 @@ export function createPanels(ui, handlers) {
     empty: '저장 코드를 붙여 넣어 주세요',
     corrupt: '코드가 잘렸거나 다른 글이에요. 처음부터 끝까지 다시 복사해 주세요',
     version: '더 새로운 게임에서 만든 코드예요. 이 게임을 새로 고친 뒤 다시 해 주세요',
-    unsupported: '이 브라우저는 이 코드를 풀 수 없어요. 사파리나 크롬에서 해 주세요'
+    unsupported: '코드를 푸는 도구를 받지 못했어요. 인터넷 연결을 확인하고 다시 해 주세요'
   };
   /** 칸의 글을 복사한다. 클립보드가 막혀 있으면(오래된 사파리 · 끼워 넣은 창) 칸을 골라 execCommand 로. */
   async function copyText(area) {
@@ -328,7 +328,7 @@ export function createPanels(ui, handlers) {
       area.value = code;
       copy.disabled = file.disabled = false;
       saveMsg(msg, `${s.profile.name} · ${s.clock.day}일째 진행이에요`);
-    }, () => saveMsg(msg, '코드를 만들지 못했어요', true));
+    }, () => saveMsg(msg, '코드를 만들지 못했어요. 인터넷 연결을 확인하고 다시 열어 주세요', true));
     return [appBar('저장 내보내기', null, 'options'),
       h('p', { class: 'sub' }, '이 코드를 다른 기기(PC · 휴대폰 · 홈 화면 앱)의 마을폰 설정 → 불러오기에 붙여 넣으면 진행이 그대로 옮겨져요.'),
       area, msg,
