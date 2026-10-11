@@ -4074,7 +4074,8 @@ function boot() {
       weeds.setHint(examWeeds);
       if (state.exam && !hunterExam && !tag) {
         const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
-        hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}` }]);
+        // 세로 휴대폰은 좁아서 풀은 그림만 · 숫자(●○ 와 같은 뜻)는 뺀다(narrow)
+        hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name, narrow: 'icon' })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}`, narrow: 'hide' }]);
         examPill = true;
       } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
       // 별똥별이 쏟아지는 밤: 처음 한 번 알리고, 화면 위쪽에 별똥별이 가끔 지나간다(소원을 빌면 하늘을 올려다본다)

@@ -105,7 +105,8 @@ export function createHud(ui, input) {
     if (target.dataset.k === key) return;
     target.dataset.k = key;
     target.replaceChildren(...list.map((p) => {
-      const s = el('span', typeof p === 'string' ? 'part' : 'part pill');
+      // narrow: 좁은 세로 화면에서 'icon' 은 그림만 · 'hide' 는 통째로 뺀다(index.html 세로 휴대폰 칸)
+      const s = el('span', typeof p === 'string' ? 'part' : 'part pill' + (p.narrow ? ' n-' + p.narrow : ''));
       if (typeof p === 'string') { s.textContent = p; return s; }
       if (p.icon) s.innerHTML = p.icon === 'coin' ? COIN : p.icon === 'energy' ? HEART : p.icon;
       const em = document.createElement('em');
