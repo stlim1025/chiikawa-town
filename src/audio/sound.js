@@ -35,6 +35,19 @@ export const BOSS_BARS = [
   { root: 33, tones: [61, 64, 69], mel: [81, 0, 0, 0, 0, 0, 73, 76] } // A → 처음으로
 ];
 
+/**
+ * 무기마다 휘두르는 소리 · 맞히는 소리(main.js 가 play('swing', 무기) · play('hit', 무기)).
+ * whoosh: 바람 가르는 잡음 — from → to Hz 로 쓸려 가며 rise 초 동안 부풀었다가 dur 까지 잦아든다(단번에 탁 터지면 찰싹처럼 들려서 천천히 부풀린다).
+ * body: 밑에 깔리는 음(묵직한 무게 · 앞으로 미는 힘) · glint: 끝에 반짝이는 높은 음 · hit: 맞혔을 때 소리(나무 딱 · 밀어내는 퍽 · 돌 쿵 · 반짝 챙).
+ */
+export const WEAPON_SOUNDS = {
+  stick: { whoosh: { from: 650, to: 1250, dur: 0.17, rise: 0.06, vol: 0.12, q: 1.1 }, hit: 'wood' }, // 가볍게 휙
+  sword: { whoosh: { from: 480, to: 1500, dur: 0.24, rise: 0.09, vol: 0.15, q: 0.8 }, hit: 'wood' }, // 길게 휘익
+  fork: { whoosh: { from: 1500, to: 800, dur: 0.15, rise: 0.04, vol: 0.12, q: 0.9 }, body: { freq: 260, to: 360, type: 'triangle', vol: 0.05 }, hit: 'poke' }, // 앞으로 슉 찌르기
+  hammer: { whoosh: { from: 260, to: 620, dur: 0.38, rise: 0.17, vol: 0.2, q: 0.7 }, body: { freq: 95, to: 70, type: 'sine', vol: 0.09 }, hit: 'stone' }, // 무겁게 후웅
+  star: { whoosh: { from: 700, to: 2100, dur: 0.24, rise: 0.08, vol: 0.13, q: 0.8 }, glint: [1568, 2093, 2637], hit: 'star' } // 슈잉 + 반짝
+};
+
 /** 친구마다 말소리 높이(Hz). */
 const VOICE = { chiikawa: 820, hachiware: 700, usagi: 980, momonga: 900, kurimanju: 420, rakko: 520, shisa: 760, kani: 640, pochette: 600, labor: 330, ramen: 380, captain: 300,
   hitoha: 860, futaba: 900, islander: 880, jiro: 280, siren: 560, // 수상한 섬 사람들
@@ -49,6 +62,7 @@ export function createSound(storage) {
 
   let ctx = null, master = null, sfxBus = null, musicBus = null, noiseBuf = null;
   let musicOn = false, nextTime = 0, step = 0, ducked = false, boss = false, bossStep = 0;
+  let bossBus = null; // 보스 곡만 따로 지나가는 통로(끝날 때 이것째로 줄여, 미리 걸어 둔 음까지 한꺼번에 거둔다)
   let charge = null; // { osc, gain }
 
   function ensure() {
@@ -94,7 +108,7 @@ export function createSound(storage) {
   }
 
   /** 걸러 낸 잡음(뽑히는 소리, 후루룩, 쿵). */
-  function noise({ start = 0, dur = 0.15, vol = 0.2, freq = 1500, q = 1, type = 'bandpass', sweepTo = 0, bus = sfxBus }) {
+  function noise({ start = 0, dur = 0.15, vol = 0.2, freq = 1500, q = 1, type = 'bandpass', sweepTo = 0, attack = 0.01, bus = sfxBus }) {
     const t0 = ctx.currentTime + start, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = noiseBuf;
     f.type = type;
@@ -102,7 +116,7 @@ export function createSound(storage) {
     f.frequency.setValueAtTime(freq, t0);
     if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     src.connect(f);
     f.connect(g);
@@ -110,6 +124,40 @@ export function createSound(storage) {
     src.start(t0, Math.random() * 0.5);
     src.stop(t0 + dur + 0.05);
   }
+
+  /** 무기로 맞혔을 때(WEAPON_SOUNDS 의 hit). basic: 무기를 모를 때(연습 · 예전 소리). */
+  const HITS = {
+    basic: () => {
+      noise({ dur: 0.08, vol: 0.32, freq: 420, type: 'lowpass' });
+      tone({ freq: 260, slideTo: 120, type: 'square', dur: 0.1, vol: 0.09 });
+      tone({ freq: 1320, type: 'triangle', start: 0.02, dur: 0.07, vol: 0.07 });
+    },
+    // 나무: 딱(마른 나무 부딪는 높은 음) + 퍽
+    wood: () => {
+      noise({ dur: 0.06, vol: 0.24, freq: 900, type: 'lowpass' });
+      tone({ freq: 560, slideTo: 330, type: 'triangle', dur: 0.07, vol: 0.11 });
+      tone({ freq: 180, slideTo: 110, type: 'sine', dur: 0.1, vol: 0.13 });
+    },
+    // 사스마타: 퍽 밀어내고 쇠 갈래가 팅
+    poke: () => {
+      noise({ dur: 0.09, vol: 0.28, freq: 500, type: 'lowpass' });
+      tone({ freq: 210, slideTo: 90, type: 'sine', dur: 0.14, vol: 0.16 });
+      tone({ freq: 1250, type: 'square', start: 0.01, dur: 0.05, vol: 0.02 });
+    },
+    // 돌 망치: 쿵 + 바위 갈라지는 짧은 잡음
+    stone: () => {
+      noise({ dur: 0.16, vol: 0.34, freq: 260, type: 'lowpass' });
+      tone({ freq: 120, slideTo: 45, type: 'sine', dur: 0.26, vol: 0.28 });
+      noise({ start: 0.01, dur: 0.05, vol: 0.08, freq: 1400, q: 1 });
+    },
+    // 반짝 검: 챙 + 반짝
+    star: () => {
+      noise({ dur: 0.06, vol: 0.12, freq: 3000, type: 'highpass' });
+      tone({ freq: 200, slideTo: 110, type: 'sine', dur: 0.08, vol: 0.12 });
+      tone({ freq: 1760, type: 'triangle', dur: 0.18, vol: 0.07 });
+      tone({ freq: 2637, type: 'triangle', start: 0.03, dur: 0.2, vol: 0.05 });
+    }
+  };
 
   const SFX = {
     click: () => tone({ freq: 620, slideTo: 900, type: 'triangle', dur: 0.08, vol: 0.14 }),
@@ -164,12 +212,14 @@ export function createSound(storage) {
     heart: () => [988, 1319].forEach((f, i) => tone({ freq: f, type: 'sine', start: i * 0.09, dur: 0.22, vol: 0.12 })),
     heartUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone({ freq: f, type: i % 2 ? 'triangle' : 'sine', start: i * 0.08, dur: i === 4 ? 0.6 : 0.2, vol: 0.11 })),
     // 토벌(4단계): 휘두르기(휙), 맞히기(퍽), 맞기(아얏), 쓰러뜨리기(뿅), 기절, 몬스터가 노릴 때(으르릉)
-    swing: () => noise({ dur: 0.16, vol: 0.22, freq: 900, sweepTo: 3200, q: 1.4 }),
-    hit: () => {
-      noise({ dur: 0.08, vol: 0.32, freq: 420, type: 'lowpass' });
-      tone({ freq: 260, slideTo: 120, type: 'square', dur: 0.1, vol: 0.09 });
-      tone({ freq: 1320, type: 'triangle', start: 0.02, dur: 0.07, vol: 0.07 });
+    // 휘두르기 · 맞히기: 무기마다 다르게(WEAPON_SOUNDS). 무기를 모르면 가벼운 막대기 소리 · 예전 맞히는 소리
+    swing: (id) => {
+      const S = WEAPON_SOUNDS[id] || WEAPON_SOUNDS.stick, w = S.whoosh;
+      noise({ dur: w.dur, vol: w.vol, freq: w.from, sweepTo: w.to, q: w.q, attack: w.rise });
+      if (S.body) tone({ freq: S.body.freq, slideTo: S.body.to, type: S.body.type, dur: w.dur, vol: S.body.vol, attack: w.rise });
+      (S.glint || []).forEach((f, i) => tone({ freq: f, type: 'sine', start: w.rise + i * 0.045, dur: 0.16, vol: 0.035 }));
     },
+    hit: (id) => (HITS[WEAPON_SOUNDS[id]?.hit] || HITS.basic)(),
     hurt: () => {
       noise({ dur: 0.1, vol: 0.28, freq: 300, type: 'lowpass' });
       tone({ freq: 880, slideTo: 440, type: 'triangle', start: 0.03, dur: 0.22, vol: 0.14 });
@@ -214,8 +264,12 @@ export function createSound(storage) {
 
   // ---------- 배경음악 ----------
   /** 보스전 곡 한 칸(8분음표): 북 · 베이스 · 현 · 금관 찌르기 · 선율(데이터는 BOSS_BARS). */
+  function bossOut() {
+    if (!bossBus) { bossBus = ctx.createGain(); bossBus.connect(musicBus); }
+    return bossBus;
+  }
   function bossNote(at, eighth) {
-    const bar = BOSS_BARS[Math.floor(bossStep / 8)], j = bossStep % 8, bus = musicBus, k32 = bossStep % 32;
+    const bar = BOSS_BARS[Math.floor(bossStep / 8)], j = bossStep % 8, bus = bossOut(), k32 = bossStep % 32;
     // 북: 킥(1 · 4 · 5) · 스네어(3 · 7) · 하이햇, 4 · 8마디 끝 두 칸은 탐탐 몰아치기
     if (j === 0 || j === 3 || j === 4) { tone({ freq: 120, slideTo: 42, type: 'sine', start: at, dur: 0.22, vol: 0.5, bus }); noise({ start: at, dur: 0.03, vol: 0.06, freq: 2600, q: 0.7, bus }); }
     if (j === 2 || j === 6) { noise({ start: at, dur: 0.14, vol: 0.2, freq: 1900, q: 0.7, bus }); tone({ freq: 220, slideTo: 150, type: 'triangle', start: at, dur: 0.08, vol: 0.12, bus }); }
@@ -316,27 +370,34 @@ export function createSound(storage) {
     /** 마을 배경음악을 잠깐 쉰다(on) · 다시 튼다(off): 우사기 클럽처럼 따로 비트가 울리는 동안. */
     duck(on) { ducked = !!on; },
     /**
-     * 보스전 곡으로 바꾼다(on) · 마을 곡으로 돌아간다(off). 바뀔 때 음악을 잠깐 줄였다 키우고, 보스 곡은 쾅 하는 첫 박부터.
+     * 보스전 곡으로 바꾼다(on) · 마을 곡으로 돌아간다(off). 보스 곡은 쾅 하는 첫 박부터, 마을 곡은 처음부터.
+     * 끝날 때는 보스 곡을 스르르 줄이고, cut 이면(기절 · 보스를 쓰러뜨림) 뚝 끊고 잠깐 쉬었다가 마을 곡.
      * 배경음악 켜기를 따른다(꺼져 있으면 아무 소리도 안 난다).
      */
-    bossMusic(on) {
+    bossMusic(on, cut = false) {
       on = !!on;
       if (boss === on) return;
       boss = on;
       if (!ctx) return;
-      const t = ctx.currentTime, full = prefs.music ? MUSIC_VOL : 0;
-      musicBus.gain.cancelScheduledValues(t);
-      musicBus.gain.setValueAtTime(musicBus.gain.value, t);
-      musicBus.gain.linearRampToValueAtTime(full * 0.15, t + 0.15);
-      musicBus.gain.linearRampToValueAtTime(full, t + 0.6);
-      nextTime = t + 0.18; // 다음 곡을 처음부터
+      const t = ctx.currentTime;
       if (on) {
         bossStep = 0;
+        nextTime = t + 0.18;
         if (prefs.music) { // 시작 쾅: 낮은 북 + 심벌처럼 퍼지는 잡음
-          tone({ freq: 90, slideTo: 38, type: 'sine', start: 0.16, dur: 0.6, vol: 0.55, bus: musicBus });
-          noise({ start: 0.16, dur: 1.1, vol: 0.12, freq: 6000, q: 0.5, type: 'highpass', bus: musicBus });
+          tone({ freq: 90, slideTo: 38, type: 'sine', start: 0.16, dur: 0.6, vol: 0.55, bus: bossOut() });
+          noise({ start: 0.16, dur: 1.1, vol: 0.12, freq: 6000, q: 0.5, type: 'highpass', bus: bossOut() });
         }
-      } else step = 0;
+        return;
+      }
+      const old = bossBus;
+      bossBus = null; // 다음 보스전은 새 통로로
+      if (old) {
+        old.gain.setValueAtTime(1, t);
+        old.gain.linearRampToValueAtTime(0.0001, t + (cut ? 0.04 : 0.5));
+        setTimeout(() => { try { old.disconnect(); } catch { /* 이미 끊김 */ } }, 3000);
+      }
+      step = 0;
+      nextTime = t + (cut ? 0.7 : 0.3);
     },
     /** 지금 보스전 곡인지. */
     get bossOn() { return boss; },

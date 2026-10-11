@@ -50,5 +50,34 @@ test('보스전 곡: 라단조 8마디 · 마을 곡보다 빠르고, 켜면 북
     sound.bossMusic(false);
     assert.equal(sound.bossOn, false);
     run(1);
+    // 기절 · 보스를 쓰러뜨림: 뚝 끊는다(cut) — 다시 켜도 새 통로로 문제없이
+    sound.bossMusic(true);
+    run(1);
+    sound.bossMusic(false, true);
+    assert.equal(sound.bossOn, false);
+    run(1);
   } finally { globalThis.setInterval = realSet; }
+});
+
+test('무기마다 휘두르는 소리 · 맞히는 소리가 다르고, 단번에 탁 터지지 않게 부풀어 오른다', async () => {
+  const made = fakeAudio();
+  const { createSound, WEAPON_SOUNDS } = await import('../src/audio/sound.js');
+  const { WEAPONS } = await import('../src/core/combat.js');
+  for (const id of Object.keys(WEAPONS)) {
+    const S = WEAPON_SOUNDS[id];
+    assert.ok(S, `${id} 소리가 있다`);
+    assert.ok(S.whoosh.rise >= 0.03 && S.whoosh.rise < S.whoosh.dur, `${id}: 찰싹 대신 휘익(천천히 부푼다)`);
+  }
+  const keys = Object.values(WEAPON_SOUNDS).map((S) => JSON.stringify(S.whoosh));
+  assert.equal(new Set(keys).size, keys.length, '휘두르는 소리가 무기마다 다르다');
+  assert.ok(WEAPON_SOUNDS.hammer.whoosh.dur > WEAPON_SOUNDS.stick.whoosh.dur, '망치는 무겁고 길게');
+
+  const sound = createSound({ getItem: () => null, setItem() {} });
+  sound.unlock();
+  for (const id of [...Object.keys(WEAPONS), undefined]) { // undefined: 별똥별맨 · 이야기 속 휘두르기
+    const before = made.osc + made.noise;
+    sound.play('swing', id);
+    sound.play('hit', id);
+    assert.ok(made.osc + made.noise > before, `${id} 소리가 난다`);
+  }
 });

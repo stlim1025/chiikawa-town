@@ -571,8 +571,7 @@ function boot() {
     /** 메인(타이틀)으로 나간다. 진행은 저장되고, 타이틀에서 이어하기·새로 시작하기를 고른다. */
     toTitle() {
       cancelPull();
-      bossBgmHold = 0;
-      sound.bossMusic(false); // 보스전 곡도 멈춘다
+      cutBossMusic(); // 보스전 곡도 멈춘다
       resetFun();
       endHunterExam();
       if (bossM) { monsters.clear((m) => m === bossM || m.summoned); bossM = null; }
@@ -1840,13 +1839,13 @@ function boot() {
     player.swing(SWING_TIME, W.thrust ? 'thrust' : 'swing');
     swingCool = W.cool;
     swingHit = { t: HIT_DELAY, id };
-    sound.play('swing');
+    sound.play('swing', id); // 무기마다 다른 바람 소리
   }
   function resolveSwing(id) {
     const W = WEAPONS[id], p = player.position;
     const hits = monsters.strike({ x: p.x, z: p.z, yaw: player.yaw, range: W.range, dmg: W.dmg + trainBonus(), knock: W.knock || 1, arc: W.arc }); // 랏코와 수련한 날은 +1
     if (!hits.length) return;
-    sound.play('hit');
+    sound.play('hit', id);
     for (const { m, killed } of hits) {
       hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${W.dmg}`, kind: 'dmg' });
       if (killed) onKill(m);
@@ -1855,6 +1854,7 @@ function boot() {
   /** 몬스터를 쓰러뜨렸다: 전리품은 가방에, 토벌 일감이면 센다(한 번도 안 맞고 잡으면 깔끔하게). */
   function onKill(m) {
     sound.play('poof');
+    if (m.M.boss) cutBossMusic(); // 보스를 쓰러뜨리면 보스 곡은 바로 뚝
     if (m.exam) { examDummyDown(); return; }
     // 토벌 점수(랭킹): 같이 토벌 중이면 나와 데려간 친구들이 똑같이 나눠 갖는다
     const crew = ['me', ...npcs.partyKinds()];
@@ -1918,6 +1918,7 @@ function boot() {
     input.setEnabled(false);
     hud.setAction(null);
     sound.play('faint');
+    cutBossMusic(); // 쓰러지면 보스 곡은 바로 뚝
     hud.curtain(true, '눈앞이 깜깜해졌다…');
     setTimeout(() => {
       if (!state) { fainting = false; hud.curtain(false); return; }
@@ -4100,9 +4101,14 @@ function boot() {
   let bossBgmHold = 0; // 보스가 곁에 있다가 사라진 뒤 남은 초(대왕 두더지가 땅속에 숨어 잠깐 안 보여도 곡이 끊기지 않게)
   function updateBossMusic(dt) {
     const p = player && player.position;
-    const fighting = mode === 'play' && p && monsters.nearest(p.x, p.z, sound.bossOn ? 26 : 15, (m) => m.M.boss && (m.engaged || m.hp < m.M.hp));
+    const fighting = mode === 'play' && !fainting && p && monsters.nearest(p.x, p.z, sound.bossOn ? 26 : 15, (m) => m.M.boss && (m.engaged || m.hp < m.M.hp));
     bossBgmHold = fighting ? 4 : Math.max(0, bossBgmHold - dt);
     sound.bossMusic(bossBgmHold > 0);
+  }
+  /** 보스전 곡을 바로 끊는다(기절 · 보스를 쓰러뜨림 · 타이틀로): 남은 몇 초를 기다리지 않는다. */
+  function cutBossMusic() {
+    bossBgmHold = 0;
+    sound.bossMusic(false, true);
   }
 
   /** 시간이 흘러 날이 바뀌었으면(밤새 깨어 있다가 06:00 이 지나면) 집세 · 청약을 처리한다. 자는 중에는 doSleep 이 처리한다. */
