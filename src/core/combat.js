@@ -22,7 +22,7 @@ export const WEAPONS = {
 export const WEAPON_ORDER = ['fork', 'sword', 'hammer', 'star'];
 
 /**
- * 몬스터 종류(구역마다 셋 + 밤 나방 + 이야기 속 왕버섯). region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든).
+ * 몬스터 종류(구역마다 셋 + 구역 보스 + 밤 나방 + 이야기 속 왕버섯). region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든).
  * hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다), dmg: 내 기운을 깎는 양, speed: 쫓아오는 빠르기, aggro: 이만큼 가까우면 쫓아온다,
  * drop: 전리품 id, size: 크기, attack: 공격 방식(world/monsters.js 의 ATK), atk: 안내서에 적는 짧은 공격 이름.
  */
@@ -40,11 +40,15 @@ export const MONSTERS = {
   pebble: { name: '데굴 돌멩이', region: 'mountain', hp: 6, dmg: 11, speed: 2.0, aggro: 7, drop: 'ore', size: 0.48, attack: 'roll', atk: '굴러오기', note: '바위산을 굴러다니는 돌멩이. 멀리서 데굴데굴 굴러와 튕긴다.' },
   ram: { name: '구름 산양', region: 'mountain', hp: 5, dmg: 12, speed: 2.6, aggro: 7, drop: 'wool', size: 0.52, attack: 'stomp', atk: '높이 뛰어 짓밟기', note: '구름 같은 털에 말린 뿔. 높이 뛰어올라 넓게 짓밟는다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 3, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
-  kingcap: { name: '바위산 왕버섯', region: 'boss', hp: 72, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 72, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  // 구역 보스(동 · 서 · 남): 저마다 굴 · 빈터에 한 마리씩 산다. 쓰러뜨리면 다음 날 다시 나타난다(core/bosses.js).
+  bigmole: { name: '대왕 두더지', short: '대왕 두더지', region: 'fields', hp: 54, dmg: 14, speed: 1.7, aggro: 9, drop: 'goldclaw', size: 1.1, boss: true, attack: 'boss', atk: '할퀴기, 땅속 기습, 흙덩이 비, 부하 부르기', note: '동쪽 들판 굴밭의 주인. 땅속으로 숨었다가 발밑에서 솟구친다.' },
+  elder: { name: '고목 거인', short: '고목 거인', region: 'forest', hp: 60, dmg: 15, speed: 1.4, aggro: 9, drop: 'bigacorn', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 도토리 고리, 뿌리 솟구치기, 부하 부르기', note: '서쪽 숲 깊은 빈터의 오래된 나무. 땅속 뿌리를 일직선으로 솟구치게 한다.' },
+  bigcrab: { name: '강가 왕집게', short: '왕집게', region: 'river', hp: 56, dmg: 14, speed: 2.0, aggro: 9, drop: 'bigclaw', size: 1.15, boss: true, attack: 'boss', atk: '집게 연타, 옆걸음 돌진, 물방울 고리, 부하 부르기', note: '강가 진흙밭의 커다란 게. 붙으면 집게로 연달아 꼬집고, 멀면 옆걸음으로 돌진한다.' },
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
-/** 도감 · 안내서 순서(구역별로 셋씩). */
-export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'beetle', 'shroom', 'stump', 'slime', 'frog', 'crab', 'turtle', 'pebble', 'ram', 'moth', 'kingcap'];
+/** 도감 · 안내서 순서(구역별로 셋씩, 그 구역 보스가 끝에). */
+export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'moth', 'kingcap'];
 /** 구역 순서(안내서 묶음). */
 export const MONSTER_REGIONS = ['fields', 'forest', 'river', 'mountain', 'night', 'boss'];
 /** 전리품: 가방(core/inventory.js 의 registerItems)과 노동 접수 매입가. */
@@ -62,7 +66,10 @@ export const DROPS = {
   ore: { name: '반짝 원석', kind: 'drop', price: 70, note: '데굴 돌멩이 속에서 나온 반짝이는 돌.' },
   wool: { name: '구름 양털', kind: 'drop', price: 65, note: '구름 산양에게서 얻은 폭신한 털.' },
   moondust: { name: '달빛 가루', kind: 'drop', price: 60, note: '그림자 나방의 날개에서 모은 반짝이는 가루.' },
-  kingcap: { name: '왕버섯 갓', kind: 'drop', price: 1500, note: '바위산 왕버섯의 커다란 갓 조각. 귀한 물건이다.' }
+  kingcap: { name: '왕버섯 갓', kind: 'drop', price: 1500, note: '바위산 왕버섯의 커다란 갓 조각. 귀한 물건이다.' },
+  goldclaw: { name: '황금 발톱', kind: 'drop', price: 900, note: '대왕 두더지의 커다란 황금빛 발톱. 귀한 물건이다.' },
+  bigacorn: { name: '고목 왕도토리', kind: 'drop', price: 900, note: '고목 거인이 떨어뜨린 주먹만 한 도토리. 귀한 물건이다.' },
+  bigclaw: { name: '왕집게발', kind: 'drop', price: 900, note: '강가 왕집게의 단단한 집게발. 귀한 물건이다.' }
 };
 registerItems(DROPS);
 /** 맞은 뒤 다시 맞지 않는 시간(초) · 밀려나는 거리. */

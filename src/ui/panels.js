@@ -23,6 +23,7 @@ import { sellPrice, sellableIds } from '../core/market.js';
 import { canGift } from '../core/gifts.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
+import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
@@ -118,8 +119,8 @@ const myWeaponArt = (s, id) => weaponSvg(id, engravedOf(s).includes(id) ? (s.pro
 
 /** 노동 접수 창에서 고른 탭(마을 일 · 토벌 · 전리품). 창을 다시 열어도 그대로. */
 let boardTab = 'work';
-let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
 let sellSel = null; // 노동 접수 '팔기'에서 고른 물건 id
+let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
@@ -128,13 +129,13 @@ const jobArt = (type) => (type.hunt ? monsterSvg(type.kind) : type.kind === 'sti
 
 /**
  * 몬스터 카드(토벌 안내서 · 몬스터 도감): 구역마다 머리글 아래 셋씩. 카드에는 얼굴 · 이름 · 공격 방식 · 단단함 · 공격 · 전리품.
- * withCount 면 잡은 수(못 잡았으면 흐리게)와 한 줄 설명. 이야기 속 왕버섯은 만나기 전에는 '???' 로 감춘다.
+ * withCount 면 잡은 수(못 잡았으면 흐리게)와 한 줄 설명. 보스(이야기 속 왕버섯 · 구역 보스)는 마주치기 전에는 '???' 로 감춘다.
  */
 function monsterCards(s, withCount) {
   const hunted = s.hunted || {};
   const card = (k) => {
     const M = MONSTERS[k], n = hunted[k] || 0, D = DROPS[M.drop];
-    const hidden = M.boss && !n && !(s.story && s.story.bossSeen);
+    const hidden = M.boss && !n && !bossSeen(s, k); // 보스는 마주치기 전까지 '???'
     if (hidden) {
       return h('div', { class: 'row mon-card unseen' }, svgSpan('mon-ico mystery', '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="34" r="20" fill="#e6d8b8"/><text x="32" y="44" text-anchor="middle" font-size="28" font-weight="700" fill="#b9a37a">?</text></svg>'),
         h('div', {}, h('div', { class: 't' }, '???'), h('div', { class: 'mon-chips' }, chip(null, 'muted', '커다란 무언가가 산다는 소문…'))));
@@ -815,12 +816,12 @@ export function createPanels(ui, handlers) {
         Object.entries(ACCESSORY_ITEMS).forEach(([id, A]) => {
           const own = wd.owned.includes(id);
           if (A.gift && !own) return; // 선물로만 받는 것(귀 달린 잠옷)은 가졌을 때만 보인다
-          out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
           // 재료로 만드는 것(별 조각 머리핀): 값 대신 재료 꼬리표(가진 수 / 필요한 수)와 '만들기'
           const need = A.craft ? Object.entries(A.craft) : null, enough = need && need.every(([it, k]) => countOf(s, it) >= k);
           const btn = own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
             : need ? h('button', { class: 'btn pink', type: 'button', disabled: !enough, onClick: after(() => handlers.craftAccessory(id)) }, '만들기')
               : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)));
+          out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
             h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note),
               need && !own ? h('div', { class: 'mon-chips' }, need.map(([it, k]) => chip(svgSpan('ico', itemSvg(it)), countOf(s, it) >= k ? '' : 'muted', `${itemInfo(it).name} ${Math.min(countOf(s, it), k)} / ${k}`))) : null),
             btn));
@@ -1153,9 +1154,9 @@ export function createPanels(ui, handlers) {
     openPochette: () => show('pochette'),
     openPub: () => show('pub'),
     openBag: () => show('bag'),
-    openWardrobe: () => show('wardrobe'),
     /** 친구에게 줄 물건 고르기(주머니를 선물 모드로): giftTo = { kind, name }. 고르면 handlers.giveGift(id). */
     openGift: (giftTo) => show('bag', { giftTo }),
+    openWardrobe: () => show('wardrobe'),
     openBooks: () => show('books'),
     openTools: () => show('tools'),
     openRaffle: () => show('raffle'),

@@ -76,11 +76,39 @@ const ATK = {
   // 뛰어 덮치기: 내가 있던 자리로 쿵(멀리 떨어져 있어도 쫓아온다)
   bossLeap: { range: 8.5, wind: 0.85, lock: 0.65, air: 0.95, radius: 2.3, height: 1.6, cool: 1.8, rec: 0.8, kind: 'stomp' },
   // 포자 비: 내 자리와 둘레 몇 곳에 빨간 표시 → 잠시 뒤 포자가 쏟아진다(멈춰 있으면 맞는다)
-  bossRain: { range: 9.5, wind: 0.7, n: 5, spread: 3.4, radius: 1.35, warn: 1.15, dmgK: 0.8, cool: 2.2, rec: 0.6, kind: 'rain' }
+  bossRain: { range: 9.5, wind: 0.7, n: 5, spread: 3.4, radius: 1.35, warn: 1.15, dmgK: 0.8, cool: 2.2, rec: 0.6, kind: 'rain' },
+  // 대왕 두더지: 가까우면 발톱으로 둘레를 할퀴고, 멀면 땅속으로 파고들어 발밑에서 솟구치거나 흙덩이를 흩뿌린다(…2 는 화났을 때)
+  moleSwipe: { range: 2.8, wind: 0.75, radius: 2.5, cool: 1.4, rec: 0.8, kind: 'slam' },
+  moleSwipe2: { range: 99, wind: 0.45, radius: 3.2, cool: 1.4, rec: 0.9, kind: 'slam' },
+  moleBurrow: { range: 9.5, wind: 0.6, travel: 5.4, maxT: 2.4, warn: 0.75, radius: 2.3, cool: 1.8, rec: 1.0, kind: 'burrow' },
+  moleRain: { range: 9.5, wind: 0.7, n: 4, spread: 3.2, radius: 1.3, warn: 1.1, dmgK: 0.8, cool: 2.0, rec: 0.6, kind: 'rain' },
+  moleRain2: { range: 9.5, wind: 0.6, n: 7, spread: 3.8, radius: 1.3, warn: 1.0, dmgK: 0.8, cool: 2.0, rec: 0.5, kind: 'rain' },
+  // 고목 거인: 가까우면 쿵 내려찍기, 멀면 도토리 고리를 쏘거나 내 쪽으로 뿌리를 일직선으로 솟구치게 한다
+  elderSlam: { range: 3.0, wind: 0.95, radius: 2.8, cool: 1.5, rec: 0.9, kind: 'slam' },
+  elderSlam2: { range: 99, wind: 0.5, radius: 3.6, cool: 1.5, rec: 0.9, kind: 'slam' },
+  elderAcorn: { range: 10, wind: 0.85, n: 9, spread: (Math.PI * 2) / 9, ring: true, speed: 4.0, r: 0.3, life: 2.6, color: '#b5793e', dmgK: 0.7, cool: 1.7, rec: 0.6, kind: 'shoot' },
+  elderAcorn2: { range: 10, wind: 0.75, n: 12, spread: (Math.PI * 2) / 12, ring: true, twice: 0.45, speed: 4.4, r: 0.28, life: 2.6, color: '#b5793e', dmgK: 0.7, cool: 1.6, rec: 0.5, kind: 'shoot' },
+  elderRoots: { range: 9, wind: 0.9, lock: 0.7, len: 9, width: 1.3, cool: 1.8, rec: 0.8, kind: 'roots' },
+  // 강가 왕집게: 가까우면 집게로 세 번, 멀면 옆걸음으로 돌진하거나 물방울을 사방으로(화나면 더 길게 · 벽에 한 번 튕기며 / 두 겹)
+  crabPinch: { range: 2.1, wind: 0.45, n: 3, gap: 0.3, reach: 1.3, cool: 1.4, rec: 0.75, kind: 'combo' },
+  crabCharge: { range: 8, wind: 0.75, lock: 0.65, speed: 9.5, len: 8, width: 1.5, cool: 1.8, rec: 0.9, kind: 'charge' },
+  crabCharge2: { range: 9, wind: 0.6, lock: 0.6, speed: 11, len: 11, width: 1.5, bounce: 1, cool: 1.8, rec: 0.9, kind: 'charge' },
+  crabBubble: { range: 10, wind: 0.8, n: 8, spread: (Math.PI * 2) / 8, ring: true, speed: 3.8, r: 0.38, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.7, rec: 0.6, kind: 'shoot' },
+  crabBubble2: { range: 10, wind: 0.7, n: 11, spread: (Math.PI * 2) / 11, ring: true, twice: 0.45, speed: 4.2, r: 0.36, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.6, rec: 0.5, kind: 'shoot' }
 };
 Object.entries(ATK).forEach(([k, a]) => { if (!a.kind) a.kind = k; });
+/**
+ * 보스 공격 꾸러미: near 가까우면 쓰는 공격, again 화났을 때 near 뒤에 곧바로 한 번 더(없으면 null),
+ * pick(화남 0..2, 0..1 굴림) 멀 때 쓸 공격(한 번 골라 두고 다 쓸 때까지 그대로), minion(화남, 몇 번째) 부르는 부하 종류.
+ */
+const KITS = {
+  kingcap: { near: ATK.bossSlam, again: ATK.bossSlam2, pick: (r, roll) => (r >= 1 && roll < 0.38 ? ATK.bossRain : roll < 0.68 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'fluff') },
+  bigmole: { near: ATK.moleSwipe, again: ATK.moleSwipe2, pick: (r, roll) => (roll < 0.5 ? ATK.moleBurrow : r >= 1 ? ATK.moleRain2 : ATK.moleRain), minion: (r, k) => (r >= 2 && k === 0 ? 'mole' : 'fluff') },
+  elder: { near: ATK.elderSlam, again: ATK.elderSlam2, pick: (r, roll) => (roll < 0.45 ? ATK.elderRoots : r >= 1 ? ATK.elderAcorn2 : ATK.elderAcorn), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'beetle') },
+  bigcrab: { near: ATK.crabPinch, again: null, pick: (r, roll) => (roll < 0.5 ? (r >= 1 ? ATK.crabCharge2 : ATK.crabCharge) : r >= 1 ? ATK.crabBubble2 : ATK.crabBubble), minion: (r, k) => (r >= 2 && k === 0 ? 'crab' : 'slime') }
+};
 /** 맞아도 움츠리기를 멈추지 않는 단단한 몬스터. */
-const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true };
+const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true };
 
 // ---------- 모양 ----------
 const EYE = '#2b2224', SHINE = '#ffffff', BLUSH = '#ff9fb4';
@@ -208,6 +236,79 @@ const BUILD = {
     part(g, GEO.dot, '#6b2b2b', { position: [0, 0.48, 0.565], scale: [0.18, 0.08, 0.03], flat: true });
     [-0.08, 0.08].forEach((x) => part(g, GEO.box, SHINE, { position: [x, 0.53, 0.6], scale: [0.06, 0.04, 0.01], flat: true }));
     return { height: 2.25 };
+  },
+  // 대왕 두더지(동쪽 들판 보스): 흙더미에 올라앉은 커다란 회갈색 두더지, 분홍 코 · 수염, 양손에 황금 발톱 셋씩, 머리털 세 가닥에 화난 눈
+  bigmole(g) {
+    part(g, GEO.sphere, '#9a7552', { position: [0, 0.05, 0], scale: [1.3, 0.18, 1.3] });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.4;
+      part(g, GEO.sphere, '#8a6646', { position: [Math.sin(a) * 1.15, 0.1, Math.cos(a) * 1.15], scale: [0.26, 0.16, 0.24] });
+    }
+    part(g, GEO.sphere, '#7d5f52', { position: [0, 0.82, 0], scale: [0.92, 0.86, 0.88] });
+    part(g, GEO.sphere, '#c9a68a', { position: [0, 0.7, 0.4], scale: [0.62, 0.56, 0.55] });
+    part(g, GEO.sphere, '#ff9fb4', { position: [0, 0.78, 0.95], scale: [0.2, 0.15, 0.15] });
+    [-1, 1].forEach((sd) => {
+      part(g, GEO.sphere, '#f3e2cf', { position: [sd * 0.82, 0.5, 0.5], rotation: [0, sd * 0.4, 0], scale: [0.32, 0.14, 0.34] });
+      [-0.14, 0, 0.14].forEach((o) => part(g, GEO.cone, '#f3d27a', { position: [sd * 0.86 + o, 0.5, 0.82], rotation: [Math.PI / 2, 0, 0], scale: [0.065, 0.28, 0.065] }));
+      part(g, GEO.dot, BLUSH, { position: [sd * 0.4, 0.86, 0.8], scale: [0.09, 0.045, 0.02], flat: true });
+      [0.12, -0.12].forEach((r) => part(g, GEO.box, EYE, { position: [sd * 0.36, 0.76 + r * 0.3, 0.92], rotation: [0, 0, sd * r], scale: [0.22, 0.014, 0.01], flat: true }));
+    });
+    [-0.16, 0, 0.16].forEach((x) => part(g, GEO.cone, '#6a4f44', { position: [x, 1.66, -0.04], rotation: [0, 0, -x * 2.5], scale: [0.07, 0.2, 0.07] }));
+    face(g, { y: 1.04, z: 0.88, dx: 0.24, r: 0.075, brow: 0.6, browY: 0.13, browLen: 0.13 });
+    return { height: 2.05 };
+  },
+  // 고목 거인(서쪽 숲 보스): 껍질 줄무늬가 난 굵은 줄기 몸, 뿌리 발, 잎 달린 가지 팔, 뒤로 젖힌 무성한 잎 머리에 도토리, 이끼 수염과 부리부리한 눈
+  elder(g) {
+    part(g, GEO.cylinder, '#8f6038', { position: [0, 0, 0], scale: [0.75, 1.55, 0.75] });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.5;
+      part(g, GEO.box, '#6e4628', { position: [Math.sin(a) * 0.74, 0.8, Math.cos(a) * 0.74], rotation: [0, a, 0], scale: [0.06, 1.0, 0.03] });
+      part(g, GEO.sphere, '#6e4628', { position: [Math.sin(a) * 0.78, 0.08, Math.cos(a) * 0.78], rotation: [0, a, 0], scale: [0.2, 0.14, 0.36] });
+    }
+    [-1, 1].forEach((sd) => {
+      part(g, GEO.cylinder, '#7a5136', { position: [sd * 0.7, 0.95, 0.1], rotation: [0, 0, -sd * 1.05], scale: [0.1, 0.62, 0.1] });
+      part(g, GEO.sphere, '#6cc77e', { position: [sd * 1.27, 1.3, 0.1], scale: [0.24, 0.18, 0.24] });
+    });
+    const crown = new THREE.Group();
+    crown.position.set(0, 1.85, -0.25);
+    crown.rotation.x = -0.3;
+    g.add(crown);
+    [[0, 0.25, 0, 0.92, '#4f9f58'], [0.62, 0, 0.1, 0.6, '#5fb36e'], [-0.62, 0.04, 0.05, 0.62, '#5fb36e'], [0, 0.05, -0.55, 0.62, '#5fb36e'], [0.28, 0.6, -0.25, 0.5, '#6cc77e']].forEach(([x, y, z, r, c]) =>
+      part(crown, GEO.sphere, c, { position: [x, y, z], scale: [r, r * 0.85, r] }));
+    [[0.45, -0.3, 0.55], [-0.5, -0.25, 0.5], [0.05, -0.4, 0.75]].forEach(([x, y, z]) => {
+      part(crown, GEO.sphere, '#b5793e', { position: [x, y, z], scale: [0.11, 0.13, 0.11] });
+      part(crown, GEO.sphere, '#7a5136', { position: [x, y + 0.1, z], scale: [0.12, 0.05, 0.12] });
+    });
+    part(g, GEO.sphere, '#93c46a', { position: [0, 0.55, 0.66], scale: [0.4, 0.24, 0.14] });
+    face(g, { y: 1.08, z: 0.77, dx: 0.23, r: 0.078, brow: 0.6, browY: 0.13, browLen: 0.14 });
+    part(g, GEO.dot, '#3e2a1d', { position: [0, 0.82, 0.77], scale: [0.15, 0.07, 0.02], flat: true });
+    return { height: 3.0 };
+  },
+  // 강가 왕집게(남쪽 강가 보스): 주홍 몸에 이끼 낀 조약돌 등딱지, 눈자루 위 화난 눈, 오른쪽이 더 큰 집게 둘, 다리 셋씩
+  bigcrab(g) {
+    part(g, GEO.sphere, '#e8714a', { position: [0, 0.55, 0], scale: [0.95, 0.42, 0.75] });
+    part(g, GEO.sphere, '#f6a27e', { position: [0, 0.42, 0.25], scale: [0.75, 0.25, 0.5] });
+    part(g, GEO.sphere, '#b9b2a6', { position: [0, 0.9, -0.22], scale: [0.75, 0.46, 0.6] });
+    part(g, GEO.sphere, '#86b85e', { position: [-0.1, 1.3, -0.26], scale: [0.42, 0.1, 0.34] });
+    part(g, GEO.sphere, '#a39a8f', { position: [0.34, 1.18, -0.1], scale: [0.18, 0.1, 0.16] });
+    part(g, GEO.sphere, '#cfc8bc', { position: [-0.36, 1.12, 0.02], scale: [0.14, 0.08, 0.12] });
+    part(g, GEO.dot, '#ffb6c9', { position: [0.18, 1.36, -0.32], scale: [0.09, 0.06, 0.09] });
+    [-1, 1].forEach((sd) => {
+      const big = sd > 0 ? 1.25 : 1;
+      part(g, GEO.cylinder, '#e0764a', { position: [sd * 0.26, 0.75, 0.45], scale: [0.06, 0.42, 0.06] });
+      part(g, GEO.sphere, '#ffffff', { position: [sd * 0.26, 1.22, 0.47], scale: [0.16, 0.16, 0.15] });
+      part(g, GEO.dot, EYE, { position: [sd * 0.26, 1.22, 0.62], scale: [0.07, 0.09, 0.02], flat: true });
+      part(g, GEO.dot, SHINE, { position: [sd * 0.26 - 0.025, 1.26, 0.64], scale: [0.025, 0.025, 0.01], flat: true });
+      part(g, GEO.box, EYE, { position: [sd * 0.26, 1.42, 0.55], rotation: [0, 0, sd * 0.5], scale: [0.16, 0.035, 0.02], flat: true });
+      part(g, GEO.cylinder, '#e0764a', { position: [sd * 0.7, 0.45, 0.35], rotation: [0, 0, -sd * 1.2], scale: [0.08, 0.38, 0.08] });
+      part(g, GEO.sphere, '#f08a5d', { position: [sd * 1.08, 0.62, 0.62], scale: [0.36 * big, 0.28 * big, 0.32 * big] });
+      part(g, GEO.cone, '#f6a27e', { position: [sd * 1.08, 0.74 * big, 0.62 + 0.3 * big], rotation: [1.25, 0, 0], scale: [0.12 * big, 0.38 * big, 0.12 * big] });
+      part(g, GEO.cone, '#f6a27e', { position: [sd * 1.08, 0.5, 0.6 + 0.26 * big], rotation: [1.75, 0, 0], scale: [0.09 * big, 0.28 * big, 0.09 * big] });
+      [-0.35, -0.05, 0.25].forEach((z) => part(g, GEO.cylinder, '#e0764a', { position: [sd * 0.8, 0.35, z], rotation: [0, 0, -sd * 2.2], scale: [0.06, 0.55, 0.06] }));
+      part(g, GEO.dot, BLUSH, { position: [sd * 0.45, 0.6, 0.67], scale: [0.09, 0.045, 0.02], flat: true });
+    });
+    part(g, GEO.box, EYE, { position: [0, 0.48, 0.76], scale: [0.18, 0.025, 0.01], flat: true });
+    return { height: 1.95 };
   },
   // 연습용 허수아비: 나무 기둥 + 가로대, 짚 자루 몸에 과녁, 바느질 눈
   dummy(g) {
@@ -414,7 +515,7 @@ export function monsterMesh(species) {
   root.add(inner);
   const body = new THREE.Mesh(M.body, bodyMat);
   body.castShadow = true;
-  addOutline(body, species === 'kingcap' ? 0.04 : 0.025);
+  addOutline(body, MONSTERS[species].boss ? 0.04 : 0.025);
   inner.add(body);
   const ghost = overlay(M.body, ghostMat, 5);
   inner.add(overlay(M.body, markMat, 4), ghost);
@@ -455,6 +556,7 @@ const D_RECT = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0).rotateX(Math.P
 const SHADOW_MAT = new THREE.MeshBasicMaterial({ color: 0x2b2224, transparent: true, opacity: 0.18, depthWrite: false });
 const tongueMat = toonMaterial('#f28fb0');
 const moundMat = toonMaterial('#9a7552');
+const rootMat = toonMaterial('#7a5136');
 const shotMats = new Map();
 function shotMat(c) {
   if (!shotMats.has(c)) {
@@ -664,20 +766,18 @@ export function createMonsters(scene, village, random = Math.random) {
     C?.onImpact?.(m, x, z);
     if (Math.hypot(P.x - x, P.z - z) < r + ME) hurt(m, dmg, x, z);
   }
-  /** 왕버섯이 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
+  /** 보스가 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
   const rage = (m) => (!m.M.boss ? 0 : m.hp <= m.M.hp * 0.3 ? 2 : m.hp <= m.M.hp * 0.6 ? 1 : 0);
   /**
-   * 지금 쓸 공격. 왕버섯: 가까우면 내려찍기, 아니면 뛰어 덮치기 · 포자 고리(화나면 포자 비 · 두 겹 고리)를 한 번 골라 둔다
+   * 지금 쓸 공격. 보스(KITS): 가까우면 near, 아니면 멀 때 쓸 공격을 한 번 골라 둔다
    * (매 프레임 다시 고르면 다가갈 거리가 흔들린다). 이어 치기(nextAtk)가 있으면 그것부터.
    */
   function attackOf(m, dp) {
-    if (m.M.attack === 'boss') {
+    const kit = m.M.attack === 'boss' && KITS[m.species];
+    if (kit) {
       if (m.nextAtk) return m.nextAtk;
-      if (dp < ATK.bossSlam.range + 0.6) return ATK.bossSlam;
-      if (!m.bossPick) {
-        const r = rage(m), roll = random();
-        m.bossPick = r >= 1 && roll < 0.38 ? ATK.bossRain : roll < 0.68 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot;
-      }
+      if (dp < kit.near.range + 0.6) return kit.near;
+      if (!m.bossPick) m.bossPick = kit.pick(rage(m), random());
       return m.bossPick;
     }
     return ATK[m.M.attack] || ATK.bump;
@@ -720,15 +820,15 @@ export function createMonsters(scene, village, random = Math.random) {
     m.aim.x = x; m.aim.z = z;
   }
 
-  /** 왕버섯 부하 부르기: 화남 0 · 1 · 2 → 9 · 7 · 5초마다, 살아 있는 부하 4 · 5 · 6 까지, 한 번에 2 · 2 · 3(가장 화나면 독버섯 섞기). */
+  /** 보스 부하 부르기: 화남 0 · 1 · 2 → 9 · 7 · 5초마다, 살아 있는 부하 4 · 5 · 6 까지, 한 번에 2 · 2 · 3(가장 화나면 센 부하 섞기 — KITS.minion). */
   function summon(m) {
-    const r = rage(m);
+    const r = rage(m), kit = KITS[m.species];
     m.summonT = [9, 7, 5][r];
     const minions = list.filter((o) => o.summoned && !o.dead).length;
     for (let k = 0; k < Math.min([2, 2, 3][r], [4, 5, 6][r] - minions); k++) {
-      const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * 2.4, sz = m.z + Math.cos(a) * 2.4;
+      const a = random() * Math.PI * 2, sx = m.x + Math.sin(a) * (m.M.size + 1.2), sz = m.z + Math.cos(a) * (m.M.size + 1.2);
       if (!village.isFree(sx, sz, 0.4)) continue;
-      const f = add(r >= 2 && k === 0 ? 'shroom' : 'fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
+      const f = add(kit ? kit.minion(r, k) : 'fluff', sx, sz, { summoned: true, state: 'chase', engaged: true, alert: 0.8 });
       f.born = 0.01; f.mesh.root.scale.setScalar(0.01);
       poof(sx, 0.3, sz, 0.3);
     }
@@ -767,6 +867,36 @@ export function createMonsters(scene, village, random = Math.random) {
       impact(h.owner, h.x, h.z, h.r, h.dmg);
       scene.remove(h.g);
       hazards.splice(i, 1);
+    }
+  }
+
+  // ---------- 뿌리 솟구치기(고목 거인): 겨눈 쪽 일직선으로 뿌리 가시가 차례로 솟았다가 들어간다. 그 띠 안에 있으면 맞는다 ----------
+  const sprouts = [];
+  function roots(m, A, dir) {
+    const fx = Math.sin(dir), fz = Math.cos(dir);
+    for (let d = m.M.size * 0.6, i = 0; d <= A.len; d += 1.1, i++) {
+      const x = m.x + fx * d, z = m.z + fz * d;
+      if (!m.exam && Math.hypot(x, z) < FENCE) break; // 울타리 안으로는 뻗지 않는다
+      const s = new THREE.Mesh(GEO.cone, rootMat);
+      addOutline(s, 0.02);
+      s.position.set(x + (random() - 0.5) * 0.3, 0, z + (random() - 0.5) * 0.3);
+      s.rotation.set((random() - 0.5) * 0.5, random() * 6, (random() - 0.5) * 0.5);
+      s.scale.set(0.22, 0.01, 0.22);
+      scene.add(s);
+      sprouts.push({ s, t: -i * 0.04, h: 0.9 + random() * 0.4 });
+      if (i % 3 === 1) poof(x, 0.15, z, 0.12, 5);
+    }
+    C?.onImpact?.(m, m.x + fx * A.len * 0.5, m.z + fz * A.len * 0.5);
+    const rx = P.x - m.x, rz = P.z - m.z, along = rx * fx + rz * fz, side = Math.abs(rx * fz - rz * fx);
+    if (along > 0 && along < A.len + ME && side < A.width / 2 + ME) hurt(m, m.M.dmg, m.x + fx * along, m.z + fz * along);
+  }
+  function sproutStep(dt) {
+    for (let i = sprouts.length - 1; i >= 0; i--) {
+      const r = sprouts[i];
+      r.t += dt;
+      const k = Math.max(0, r.t) / 0.7;
+      r.s.scale.y = Math.max(0.01, Math.sin(Math.min(1, k) * Math.PI) * r.h);
+      if (k >= 1) { scene.remove(r.s); sprouts.splice(i, 1); }
     }
   }
 
@@ -815,7 +945,7 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (kind !== 'tongue') turnTo(m, m.aim.x, m.aim.z, dt, 10);
     if (kind === 'leap' || kind === 'stomp') { if (m.locked) showCircle(m, m.aim.x, m.aim.z, A.radius, k); else hideTele(m); }
     else if (kind === 'slam') showCircle(m, m.x, m.z, A.radius, k);
-    else if (kind === 'charge' || kind === 'roll' || kind === 'dive') showLine(m, m.x, m.z, Math.atan2(m.aim.x - m.x, m.aim.z - m.z), A.len, A.width, k);
+    else if (kind === 'charge' || kind === 'roll' || kind === 'dive' || kind === 'roots') showLine(m, m.x, m.z, Math.atan2(m.aim.x - m.x, m.aim.z - m.z), A.len, A.width, k);
     else if (kind === 'tongue') showLine(m, m.x, m.z, m.yaw, A.len, A.width, k);
     m.wind -= dt;
     if (m.wind <= 0) startAct(m, A);
@@ -853,8 +983,13 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (kind === 'slam') {
       impact(m, m.x, m.z, A.radius, M.dmg);
       endAct(m, A);
-      // 화난 왕버섯은 내려찍은 뒤 곧바로 한 번 더(더 넓게)
-      if (M.boss && A === ATK.bossSlam && rage(m) >= 1) { m.nextAtk = ATK.bossSlam2; m.rec = 0.15; m.cool = 0; }
+      // 화난 보스는 내려찍은 뒤 곧바로 한 번 더(더 넓게)
+      const kit = M.boss && KITS[m.species];
+      if (kit && kit.again && A === kit.near && rage(m) >= 1) { m.nextAtk = kit.again; m.rec = 0.15; m.cool = 0; }
+    } else if (kind === 'roots') {
+      roots(m, A, Math.atan2(m.aim.x - m.x, m.aim.z - m.z));
+      m.lunge = 0.2;
+      endAct(m, A);
     } else if (kind === 'rain') {
       rain(m, A);
       m.lunge = 0.2;
@@ -993,6 +1128,15 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (sp === 'kingcap') {
       rz = Math.sin(ph * (moving ? 4 : 1)) * (moving ? 0.07 : 0.025);
       y += moving ? Math.abs(Math.sin(ph * 4)) * 0.06 : 0;
+    } else if (sp === 'bigmole') {
+      rz = Math.sin(ph * (moving ? 6 : 1.5)) * (moving ? 0.06 : 0.02);
+      y += moving ? Math.abs(Math.sin(ph * 6)) * 0.05 : 0;
+    } else if (sp === 'elder') {
+      rz = Math.sin(ph * (moving ? 3.5 : 0.8)) * (moving ? 0.06 : 0.015);
+      y += moving ? Math.abs(Math.sin(ph * 3.5)) * 0.05 : 0;
+    } else if (sp === 'bigcrab') {
+      ry = Math.sin(ph * (moving ? 10 : 1.2)) * (moving ? 0.18 : 0.06);
+      y += moving ? Math.abs(Math.sin(ph * 10)) * 0.04 : 0;
     } else if (sp === 'dummy') {
       rz = Math.sin(m.wobble * 16) * Math.max(0, m.wobble) * 0.9;
       m.wobble = Math.max(0, (m.wobble || 0) - dt * 1.2);
@@ -1009,6 +1153,7 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (m.state === 'act') {
       if (kind === 'spin') { ry = m.spinA || 0; sy *= 0.82; sx *= 1.06; }
       else if (kind === 'roll') rx = m.rollA || 0;
+      else if (kind === 'charge' && sp === 'bigcrab') ry = Math.PI / 2; // 왕집게는 옆걸음으로 돌진한다
       else if (kind === 'charge') rx = 0.28;
       else if (kind === 'dive') { y += m.diveY || 0; rx = 0.55; }
       else if (kind === 'leap' || kind === 'stomp') { sy *= 1.12; sx *= 0.92; }
@@ -1268,13 +1413,14 @@ export function createMonsters(scene, village, random = Math.random) {
         animate(m, dt, t, moving);
         // 땅속을 파고드는 동안 흙더미가 따라 움직인다(튀어나오기 직전에는 들썩인다)
         if (m.under) {
-          const md = mound(m), warn = m.act && m.act.phase === 'warn', sh = warn ? Math.sin(t * 50) * 0.05 : 0;
+          const md = mound(m), warn = m.act && m.act.phase === 'warn', sh = warn ? Math.sin(t * 50) * 0.05 : 0, k = M.size / 0.48; // 대왕 두더지는 흙더미도 크게
           md.visible = true;
           md.position.set(m.x + sh, 0, m.z);
-          md.scale.set(0.42, warn ? 0.2 : 0.13, 0.42);
+          md.scale.set(0.42 * k, (warn ? 0.2 : 0.13) * k, 0.42 * k);
         } else if (m.mound) m.mound.visible = false;
       }
       hazardStep(dt);
+      sproutStep(dt);
       // 탄: 곧게 날아가다 나에게 닿거나 울타리에 닿거나 시간이 다 되면 톡 터진다
       for (let i = shots.length - 1; i >= 0; i--) {
         const s = shots[i];

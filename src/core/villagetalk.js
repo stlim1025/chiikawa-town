@@ -119,7 +119,7 @@ const STEM = {
   theft: () => '모몽가가 또 소매치기했',
   buy: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '새 물건'} 샀`,
   partyHunt: (e, N) => `${josa(N(e.who), '이/가')} ${josa(N('me'), '이랑/랑')} 같이 토벌했`,
-  playerBoss: (e, N) => `${josa(N('me'), '이/가')} 왕버섯을 쓰러뜨렸`,
+  playerBoss: (e, N) => `${josa(N('me'), '이/가')} ${josa(e.boss || '왕버섯', '을/를')} 쓰러뜨렸`, // boss: 쓰러뜨린 보스 짧은 이름(없으면 이야기 속 왕버섯)
   playerRanker: (e, N) => `${josa(N('me'), '이/가')} 토벌 랭커가 됐`,
   playerLicense: (e, N) => `${josa(N('me'), '이/가')} ${e.lic || '자격증'} 땄`
 };
@@ -134,7 +134,7 @@ const GOSSIP = {
 };
 /** 내가 한 큰일을 친구가 알고 먼저 말해 준다(2인칭). */
 const PRAISE = {
-  playerBoss: { chiikawa: '…왕버섯 잡았다며…!! 대단해…!', hachiware: '{me}! 왕버섯 잡았다며?! 대단해~!', usagi: '(박수를 친다) 우라!!', kurimanju: '하아~ 왕버섯 잡았다며? 한 잔 해야지', rakko: '…왕버섯을 쓰러뜨렸다고 들었다 훗', momonga: '왕버섯? 흥! 나도 할 수 있거든!' },
+  playerBoss: { chiikawa: '…{boss} 잡았다며…!! 대단해…!', hachiware: '{me}! {boss} 잡았다며?! 대단해~!', usagi: '(박수를 친다) 우라!!', kurimanju: '하아~ {boss} 잡았다며? 한 잔 해야지', rakko: '…{boss} 쓰러뜨렸다고 들었다 훗', momonga: '{boss}? 흥! 나도 할 수 있거든!' },
   playerRanker: { chiikawa: '…랭커…! 멋있어…!', hachiware: '랭커가 됐다며? 역시 {me}!', usagi: '(박수를 친다) 우라!!', kurimanju: '하아~ 랭커라니 대단하네', rakko: '…랭커가 됐군 기대하겠다', momonga: '랭커? 흥 운이 좋았네!' },
   playerLicense: { chiikawa: '…{lic} 땄다며…! 축하해…!', hachiware: '{lic} 땄다며? 축하해~!', usagi: '(박수를 친다) 야하!!', kurimanju: '하아~ {lic} 축하해', rakko: '…{lic}인가 잘했다', momonga: '{lic}? 흥 별거 아니네!' }
 };
@@ -163,7 +163,7 @@ export function storyLine(kind, ev, me = '나', random = Math.random) {
 /** 내가 한 큰일(playerBoss 등)을 친구가 나에게 말해 줄 때. */
 export function praiseLine(kind, ev, me = '나') {
   const P = PRAISE[ev.type] && PRAISE[ev.type][kind];
-  return P ? fill(P, { me, lic: ev.lic || '자격증' }) : null;
+  return P ? fill(P, { me, lic: ev.lic || '자격증', boss: ev.boss || '왕버섯' }) : null;
 }
 /** 사건을 내 쪽에서 본 소문(친구가 내 이야기를 다른 친구에게 할 때). */
 export function gossipLine(kind, ev, me = '나') {

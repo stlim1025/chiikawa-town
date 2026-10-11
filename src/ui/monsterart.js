@@ -115,6 +115,35 @@ const MON = {
     <path d="M4 30Q4 6 32 6t28 24q-28 8-56 0z" fill="#c0473c" ${S}/>
     <ellipse cx="32" cy="12" rx="5" ry="2.4" fill="#fff3dc"/><ellipse cx="16" cy="20" rx="4" ry="2" fill="#fff3dc"/><ellipse cx="47" cy="18" rx="4.4" ry="2.2" fill="#fff3dc"/><ellipse cx="28" cy="24" rx="3" ry="1.5" fill="#fff3dc"/>
     ${eyes(32, 40, 6.5, 2.6, 0.9)}<path d="M26 49q6-4 12 0q-6 4-12 0z" fill="#6b2b2b"/><path d="M30 48v2M34 48v2" stroke="#fff" stroke-width="1.6"/>`,
+  // 구역 보스: 대왕 두더지(흙더미 위 회갈색 두더지 · 황금 발톱) · 고목 거인(줄기 몸 · 잎 머리) · 강가 왕집게(조약돌 등딱지 · 오른쪽 큰 집게)
+  bigmole: () => `${shadow(26)}
+    <path d="M4 57q4-11 28-11t28 11z" fill="#9a7552" ${S}/>
+    <path d="M12 50q-6-30 20-36q26 6 20 36z" fill="#7d5f52" ${S}/>
+    <path d="M25 14l-2-7M32 12v-7M39 14l2-7" stroke="#6a4f44" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="32" cy="38" rx="13" ry="10.5" fill="#c9a68a" ${S}/>
+    <ellipse cx="32" cy="36" rx="4.6" ry="3.4" fill="#ff9fb4" ${S} stroke-width="1.8"/>
+    <path d="M18 36h7M18 40l7-2M46 36h-7M46 40l-7-2" stroke="${L}" stroke-width="1.4" stroke-linecap="round"/>
+    ${[11, 53].map((x) => `<ellipse cx="${x}" cy="45" rx="6.4" ry="4.6" fill="#f3e2cf" ${S}/><path d="M${x - 4} 48l-2 7M${x} 49v7M${x + 4} 48l2 7" stroke="${L}" stroke-width="4.6" stroke-linecap="round"/><path d="M${x - 4} 48l-2 7M${x} 49v7M${x + 4} 48l2 7" stroke="#f3d27a" stroke-width="2.4" stroke-linecap="round"/>`).join('')}
+    ${eyes(32, 27, 7, 2.6, 0.9)}`,
+  elder: () => `${shadow(22)}
+    <path d="M13 57q3-7 7-7M51 57q-3-7-7-7M24 58q2-5 5-6M40 58q-2-5-5-6" stroke="#6e4628" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+    <path d="M18 57V30h28v27z" fill="#8f6038" ${S}/><path d="M23 34v19M41 34v19" stroke="#6e4628" stroke-width="2" stroke-linecap="round"/>
+    <path d="M18 38q-8-2-11-10M46 38q8-2 11-10" stroke="${L}" stroke-width="6.4" stroke-linecap="round" fill="none"/><path d="M18 38q-8-2-11-10M46 38q8-2 11-10" stroke="#7a5136" stroke-width="3.6" stroke-linecap="round" fill="none"/>
+    <circle cx="6" cy="26" r="4.4" fill="#6cc77e" ${S} stroke-width="2"/><circle cx="58" cy="26" r="4.4" fill="#6cc77e" ${S} stroke-width="2"/>
+    <path d="M9 29q-7-10 3-17q2-10 14-9q6-6 14 0q12-1 14 9q10 7 3 17q-24 6-48 0z" fill="#5fb36e" ${S}/>
+    ${[[20, 22], [44, 21], [32, 25]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="2.6" ry="3" fill="#b5793e" ${S} stroke-width="1.4"/><path d="M${x - 2.8} ${y - 2}h5.6" stroke="#7a5136" stroke-width="2.2" stroke-linecap="round"/>`).join('')}
+    <path d="M24 50q8 7 16 0q-2 5-8 6q-6-1-8-6z" fill="#93c46a" ${S} stroke-width="1.8"/>
+    ${eyes(32, 39, 7, 2.6, 0.9)}<ellipse cx="32" cy="47" rx="3.6" ry="1.8" fill="#3e2a1d"/>`,
+  bigcrab: () => `${shadow(26)}
+    ${[18, 24, 40, 46].map((x) => `<path d="M${x} 50l${x < 32 ? -6 : 6} 7" stroke="#e0764a" stroke-width="3.4" stroke-linecap="round"/>`).join('')}
+    <path d="M16 42q-6-2-8-8M48 42q6-2 9-9" stroke="${L}" stroke-width="5.6" stroke-linecap="round" fill="none"/><path d="M16 42q-6-2-8-8M48 42q6-2 9-9" stroke="#e0764a" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <path d="M2 30q0-10 8-11q8 1 8 9l-5 1q0-4-3-4q-3 1-2 6q1 4 5 4l4 1q-2 6-8 6q-7-2-7-12z" fill="#f08a5d" ${S}/>
+    <path d="M44 28q0-13 10-14q10 1 10 11l-6 1q0-5-4-5q-4 1-3 7q1 5 6 5l5 1q-2 8-10 8q-8-2-8-14z" fill="#f08a5d" ${S}/>
+    <ellipse cx="32" cy="46" rx="20" ry="10.5" fill="#e8714a" ${S}/>
+    <path d="M15 42q2-15 17-16q15 1 17 16q-17 6-34 0z" fill="#b9b2a6" ${S}/><ellipse cx="29" cy="31" rx="7" ry="2.6" fill="#86b85e"/><circle cx="38" cy="33" r="1.8" fill="#ffb6c9"/>
+    <path d="M26 30V19M38 30V19" stroke="${L}" stroke-width="4.4" stroke-linecap="round"/><path d="M26 30V19M38 30V19" stroke="#e0764a" stroke-width="2.2" stroke-linecap="round"/>
+    ${[26, 38].map((x, i) => `<circle cx="${x}" cy="16" r="5.2" fill="#fff" ${S} stroke-width="2"/><ellipse cx="${x}" cy="16.5" rx="2.2" ry="2.8" fill="#2b2224"/><circle cx="${x - 0.8}" cy="15.2" r="0.9" fill="#fff"/><path d="M${x - 4} ${i ? 8 : 10}L${x + 4} ${i ? 10 : 8}" stroke="${L}" stroke-width="2" stroke-linecap="round"/>`).join('')}
+    <path d="M28 50h8" stroke="${L}" stroke-width="2" stroke-linecap="round"/><ellipse cx="19" cy="48" rx="3" ry="1.6" fill="#ff9fb4"/><ellipse cx="45" cy="48" rx="3" ry="1.6" fill="#ff9fb4"/>`,
   dummy: () => `${shadow(14)}<path d="M32 30v26" stroke="#9a6a3c" stroke-width="5" stroke-linecap="round"/>
     <path d="M10 32h44" stroke="#9a6a3c" stroke-width="4.5" stroke-linecap="round"/><path d="M8 32l-5-3v6zM56 32l5-3v6z" fill="#e8c36a" ${S}/>
     <ellipse cx="32" cy="36" rx="12" ry="13" fill="#e8c97a" ${S}/><circle cx="32" cy="37" r="6" fill="#e2574c"/><circle cx="32" cy="37" r="3.6" fill="#fff"/><circle cx="32" cy="37" r="1.6" fill="#e2574c"/>
@@ -140,7 +169,10 @@ const DROP = {
   pearl: `${shadow(16)}<path d="M8 42q24-24 48 0q-24 14-48 0z" fill="#f6c2a8" ${S}/><path d="M20 34l4 6M32 30v8M44 34l-4 6" stroke="#e8a588" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="34" r="9" fill="#fbf7ff" ${S}/><circle cx="29" cy="31" r="3" fill="#fff"/><path d="M50 12l1.2 2.6 2.6 1.2-2.6 1.2L50 20l-1.2-2.8-2.6-1.2 2.6-1.2z" fill="#ffd94a"/>`,
   ore: `${shadow(16)}<path d="M12 44l6-18 14-8 16 6 4 18-16 10z" fill="#9da3ab" ${S}/><path d="M24 30l6-12 6 10-4 10zM38 32l8-10 4 12-6 6z" fill="#8fe3f0" ${S} stroke-width="1.8"/><path d="M28 22l2-3" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`,
   wool: `${shadow(18)}<path d="M14 44q-8-2-6-10q2-8 10-6q2-10 12-8q6-6 14 0q10-2 12 8q8 2 6 10q-2 8-10 6q-6 6-14 2q-8 4-14-2q-8 2-10 0z" fill="#fbfaf6" ${S}/><path d="M22 34q4-3 8 0M34 30q4-3 8 0M28 42q4-3 8 0" fill="none" stroke="#e6dfd2" stroke-width="2" stroke-linecap="round"/>`,
-  kingcap: `${shadow(20)}<path d="M6 44Q6 14 32 12t26 32q-26 8-52 0z" fill="#c0473c" ${S}/><path d="M8 44q24 6 48 0v4q-24 6-48 0z" fill="#efd9b5" ${S}/><ellipse cx="32" cy="20" rx="6" ry="3" fill="#fff3dc"/><ellipse cx="18" cy="30" rx="4.6" ry="2.4" fill="#fff3dc"/><ellipse cx="45" cy="28" rx="5" ry="2.6" fill="#fff3dc"/><path d="M14 22q6-8 14-9" fill="none" stroke="#e8786c" stroke-width="2.4" stroke-linecap="round"/>`
+  kingcap: `${shadow(20)}<path d="M6 44Q6 14 32 12t26 32q-26 8-52 0z" fill="#c0473c" ${S}/><path d="M8 44q24 6 48 0v4q-24 6-48 0z" fill="#efd9b5" ${S}/><ellipse cx="32" cy="20" rx="6" ry="3" fill="#fff3dc"/><ellipse cx="18" cy="30" rx="4.6" ry="2.4" fill="#fff3dc"/><ellipse cx="45" cy="28" rx="5" ry="2.6" fill="#fff3dc"/><path d="M14 22q6-8 14-9" fill="none" stroke="#e8786c" stroke-width="2.4" stroke-linecap="round"/>`,
+  goldclaw: `${shadow(14)}<path d="M22 54q-4-24 6-40q8-10 14-8q-10 10-8 24t0 24z" fill="#f3d27a" ${S}/><path d="M27 42q4-1 7 0M26 31q4-1 7 0M29 21q3-1 6 1" fill="none" stroke="#d9a93a" stroke-width="2" stroke-linecap="round"/><path d="M36 10q4-2 6-1" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M48 14l1.2 2.6 2.6 1.2-2.6 1.2L48 22l-1.2-2.8-2.6-1.2 2.6-1.2z" fill="#ffd94a"/>`,
+  bigacorn: `${shadow(16)}<path d="M18 30q0 22 14 26q14-4 14-26z" fill="#b5793e" ${S}/><path d="M24 36q2 8 6 12" stroke="#d9a066" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M13 31q2-15 19-15t19 15q-19 6-38 0z" fill="#7a5136" ${S}/><path d="M20 24l3 3M28 21l2 3M36 21l-2 3M44 24l-3 3" stroke="#5a3b28" stroke-width="1.8" stroke-linecap="round"/><path d="M32 16v-7" stroke="${L}" stroke-width="3" stroke-linecap="round"/>`,
+  bigclaw: `${shadow(18)}<path d="M10 46q-2-22 18-27q-4 8 2 12q10-8 22-3q-5 18-25 23q-12 3-17-5z" fill="#f08a5d" ${S}/><path d="M18 40q4-8 10-9" fill="none" stroke="#f6c2a8" stroke-width="3" stroke-linecap="round"/><path d="M36 34q6-4 12-3" fill="none" stroke="#e0764a" stroke-width="2" stroke-linecap="round"/>`
 };
 export const dropSvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true">${DROP[id] || ''}</svg>`;
 registerItemArt(Object.fromEntries(Object.keys(DROP).map((id) => [id, dropSvg(id)])));

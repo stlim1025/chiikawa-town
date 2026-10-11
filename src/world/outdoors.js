@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { buildLairs } from './lairs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const m4 = (x, y, z, sx, sy, sz, yaw = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
@@ -36,6 +37,8 @@ export function buildOutdoors(ctx) {
     obstacles.push({ x, z, r: 0.6 * s });
   }
 
+  const ELDER = BOSS_LAIRS.elder;
+  const inLair = (x, z, pad = 0) => Object.values(BOSS_LAIRS).some((L) => Math.hypot(x - L.x, z - L.z) < L.r + pad);
   // ---------- 서쪽 숲: 빽빽한 나무와 빈터, 길가는 반투명해지는 나무, 서쪽 끝은 빈틈없이 ----------
   for (let x = -WORLD_HALF + 1; x < -VILLAGE_R - 2; x += 3.2) {
     for (let z = -WORLD_HALF + 1; z < WORLD_HALF - 1; z += 3.2) {
@@ -46,6 +49,9 @@ export function buildOutdoors(ctx) {
       if (rd < 2.2 || (!edge && rand() < 0.22)) continue; // 길과 숲속 빈터
       const s = 0.95 + rand() * 0.45, leaf = rand() < 0.5 ? '#5fb36e' : '#6cc77e';
       if (rd < 5) tree(px, pz, s, leaf, zones.groupAt(px, pz));
+      else if (Math.hypot(px - ELDER.x, pz - ELDER.z) < ELDER.r + 1) rand(); // 고목 거인 빈터: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
+      // 빈터 남쪽(카메라 쪽) 나무는 싸움을 가리면 반투명해지는 나무로(이것도 난수를 한 번 쓴다)
+      else if (pz > ELDER.z && pz < ELDER.z + ELDER.r + 8 && Math.abs(px - ELDER.x) < ELDER.r + 3) tree(px, pz, s, leaf, zones.groupAt(px, pz));
       else forestTree(px, pz, s, leaf);
     }
   }
@@ -104,7 +110,7 @@ export function buildOutdoors(ctx) {
   }
   for (let k = 0; k < 3200; k++) {
     const x = VILLAGE_R + 2 + rand() * (WORLD_HALF - VILLAGE_R - 6), z = (rand() - 0.5) * 150;
-    if (Math.abs(z) > x || roadDist(x, z) < 0.4 || shoreDist(x, z) < 0.6 || obstacles.hits(x, z, 0.05, true)) continue;
+    if (Math.abs(z) > x || roadDist(x, z) < 0.4 || shoreDist(x, z) < 0.6 || obstacles.hits(x, z, 0.05, true) || inLair(x, z)) continue; // 보스 자리 흙바닥에는 꽃이 안 난다
     const c = FLOWER[k % FLOWER.length];
     addInstance('flower' + c, GEO.speck, c, { outline: false, shadow: false }, x, z, m4(x, 0.07, z, 0.09, 0.07, 0.09));
   }
@@ -157,8 +163,13 @@ export function buildOutdoors(ctx) {
     const x = (rand() - 0.5) * 140, z = 42 + rand() * 26;
     if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5) || Math.hypot(x - CLIFF.log.x, z - CLIFF.log.z) < 9 || Math.hypot(x - PIER.x, z - SOUTH_SHORE) < 7) continue; // 절벽 위 · 선착장 앞은 탁 트이게
     made++;
-    tree(x, z, 1.0 + rand() * 0.3, '#6cc77e', zones.groupAt(x, z));
+    const s = 1.0 + rand() * 0.3;
+    if (inLair(x, z, 1.5)) rand(); // 보스 자리 안: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 자리가 바뀌지 않게
+    else tree(x, z, s, '#6cc77e', zones.groupAt(x, z));
   }
+
+  // 구역 보스 자리(난수를 쓰는 짓기가 다 끝난 뒤에: 그 앞 나무 · 꽃 자리가 바뀌지 않게)
+  buildLairs({ zones, obstacles, labels });
 
   // ---------- 모은 인스턴스를 묶음마다 그린다 ----------
   for (const b of batches.values()) for (const [g, list] of b.byZone) g.add(toonInstances(b.geo, b.color, list, b.opts));

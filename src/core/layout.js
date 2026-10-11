@@ -49,6 +49,16 @@ export const ISLE = {
 export const CLIFF = { cove: { x0: 19, x1: 33, z1: 82, y: -3 }, log: { x: 26, z: 70.4, r: 0.3, len: 3.6 } };
 /** 북쪽 바위산의 하치와레 동굴: 바위 덩어리 가운데, 크기, 입구 앞. */
 export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };
+/**
+ * 구역 보스(core/bosses.js)가 사는 자리: 가운데, 싸울 마당 반지름 r(숲은 이만큼 나무를 비운다 · world/lairs.js 가 둘레를 꾸민다), 이름표.
+ * 셋 다 마을 가운데서 60 넘게(왕버섯 굴만큼) 떨어진 구역 끝: 동쪽 들판은 길(z 0 둘레)에서 떨어진 너른 풀밭, 서쪽 숲은 길에서 20 넘게 들어간 숲속,
+ * 남쪽은 강 건너 남서쪽 끝 호수와 바다 사이 — 선착장(PIER)에서 20 넘게, 절벽(CLIFF)에서는 반대쪽.
+ */
+export const BOSS_LAIRS = {
+  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭' },
+  elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터' },
+  bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭' }
+};
 
 export const riverZ = (x) => RIVER.z + RIVER.amp * Math.sin(x * RIVER.freq);
 

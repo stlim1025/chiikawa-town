@@ -90,6 +90,7 @@ import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/too
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
+import { LAIR_BOSSES, BOSS_LAIRS, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
 import { createStarfall } from './world/starfall.js';
@@ -449,7 +450,6 @@ function boot() {
       hud.toast(`${josa(ACCESSORY_ITEMS[id].name, '을/를')} 장착했어요!`, 3400);
       gotTicket(paid);
     },
-    wearAccessory(id) {
     // 재료로 만드는 소품(별 조각 셋 → 별 조각 머리핀): 만들면 바로 단다
     craftAccessory(id) {
       const r = craftAccessory(state, id);
@@ -460,6 +460,7 @@ function boot() {
       player.cheerTime = 1.6;
       hud.banner('새 꾸미기!', ACCESSORY_ITEMS[id].name, 3000);
     },
+    wearAccessory(id) {
       commit(wearAccessory(state, id));
       refreshLook();
       if (mode === 'home') interior.setPlayer(myLook(), true);
@@ -533,7 +534,6 @@ function boot() {
       sound.play('coin');
       hud.toast(`전리품 ${r.sold}개를 팔았어요!`, 3000, { chips: [{ icon: 'coin', text: `+${won(r.earned)}` }] });
     },
-    playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
     // 노동 접수 '팔기': 고른 물건을 n 개(core/market.js)
     sellItem(id, n) {
       const r = sellItem(state, id, n);
@@ -544,6 +544,7 @@ function boot() {
     },
     // 친구에게 선물: 말 걸기 → '선물 줄게' → 주머니에서 고른 물건(주머니는 이미 닫혔다)
     giveGift: (id) => giveGiftTo(id),
+    playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
     mapLabels: () => village.labels.map((l) => ({ x: l.x, z: l.z, text: l.text })),
     // 지도에 마을 친구들 얼굴(집 안에 있으면 빼고)
     mapFriends: () => Object.keys(VILLAGERS).map((k) => npcs.byKind(k)).filter((n) => n && !n.away).map((n) => ({ x: n.x, z: n.z, name: nameOf(n.kind), svg: faceIcon(n.kind) })),
@@ -1204,8 +1205,8 @@ function boot() {
     if (buddies.has(n.kind)) opts.push(['qstop', '오늘은 여기까지 하자']);
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
-    // 토벌하는 친구: 같이 토벌 가자(하트 PARTY_HEARTS 개부터) · 같이 다니는 중이면 헤어지기
     if (Object.keys((state.bag && state.bag.items) || {}).some((id) => countOf(state, id) > 0 && canGift(id))) opts.push(['gift', '선물 줄게']);
+    // 토벌하는 친구: 같이 토벌 가자(하트 PARTY_HEARTS 개부터) · 같이 다니는 중이면 헤어지기
     if (HUNTER_PROFILES[n.kind] && mode === 'play') opts.push(n.party ? ['unparty', '이제 돌아가도 돼'] : ['party', '같이 토벌 가자!']);
     if (f.play && mode !== 'visit') opts.push(['play', '같이 놀자']); // 집 안에서는 뛰어놀 수 없다
     else if (n.kind === 'momonga' && mode !== 'visit') opts.push(['snub', '같이 놀자']); // 까칠해서 안 놀아 준다
@@ -1248,8 +1249,8 @@ function boot() {
         else if (saving && Math.random() < 0.6) { m.savedDay = state.clock.day; sayAs(n, [saving], () => reward(n, 'talk')); }
         else sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       }
-      else if (k === 'party') askParty(n);
       else if (k === 'gift') { giftFor = n; panels.openGift({ kind: n.kind, name: FRIENDS[n.kind].name }); } // 친구는 기다리고(talking), 주머니에서 고른다
+      else if (k === 'party') askParty(n);
       else if (k === 'unparty') sayAs(n, [lineOf(n.kind, 'partyLeave')], () => { endTalk(); partyEnd([n.kind], null); });
       else if (k === 'play') askPlay(n);
       else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거면 몰라도! 흥!'], endTalk);
@@ -1507,6 +1508,25 @@ function boot() {
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(-24, -61, 1.5);
   let questT = 0, bossM = null, questHint = false;
+  /**
+   * 구역 보스(core/bosses.js): 오늘 쓰러뜨리지 않았으면 제 굴 · 빈터에 한 마리씩 있다(내 눈앞에서 솟아나지 않게 멀리 있을 때 놓는다).
+   * 처음 가까이 다가가면 '등장!' 알림과 함께 도감에 드러난다. 이미 쓰러뜨린 날의 저장을 불러왔으면 치운다.
+   */
+  const lairBossM = {};
+  function updateLairBosses(p) {
+    const day = state.clock.day;
+    for (const sp of LAIR_BOSSES) {
+      const L = BOSS_LAIRS[sp], d = Math.hypot(p.x - L.x, p.z - L.z), home = bossHome(state, sp, day);
+      let m = lairBossM[sp];
+      if (m && (m.dead || !home)) { if (!m.dead) monsters.clear((o) => o === m); m = lairBossM[sp] = null; }
+      if (!m && home && d > 26) { const at = village.nearestFree(L.x, L.z, 1.5); m = lairBossM[sp] = monsters.spawnAt(sp, at.x, at.z); }
+      if (m && d < 13 && !bossSeen(state, sp)) {
+        commit(markBossSeen(state, sp));
+        sound.play('warn');
+        hud.toast(`${m.M.name} 등장!`, 3200, { icon: monsterSvg(sp), chips: [{ text: L.place }, { text: '보스' }] });
+      }
+    }
+  }
   /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
   /**
    * 부탁에 필요한 걸 다 모았을 때(물건 · 토벌 · 풀): 그 순간 한 번 '다 모았어요!' 카드가 떠서 퀘스트 쪽지로 날아가 반짝이고, 띠링 소리 · 만세.
@@ -1564,6 +1584,7 @@ function boot() {
       bossM.dormant = !(sStep && sStep.type === 'boss');
       if (!bossTime) { monsters.clear((m) => m === bossM); bossM = null; }
     }
+    updateLairBosses(p);
     // 처음으로 부탁할 친구가 생기면 한 번 알려 준다
     if (!questHint && !seen('quest-intro') && !tutorialActive(state.tutorial) && free) {
       const any = npcs.list.some((m) => markOf(state, m.kind) === '!');
@@ -1770,6 +1791,7 @@ function boot() {
     for (const who of crew) s = addKill(s, who, m.species, crew.length);
     if (crew.length > 1) hud.floatText({ x: m.x, y: m.mesh.height + 0.9, z: m.z, text: `나눠서 +${killPoints(m.species, crew.length)}점`, kind: 'drop' });
     if (m.species === 'kingcap') s = { ...s, story: { ...(s.story || {}), bossSeen: true, bossDown: true } };
+    if (BOSS_LAIRS[m.species]) s = markBossDown(s, m.species, s.clock.day); // 구역 보스: 오늘은 끝, 내일 다시 나타난다
     const before = s.job;
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
     const drop = m.M.drop;
@@ -1785,10 +1807,17 @@ function boot() {
     // 이야기 속 왕버섯을 쓰러뜨렸다
     if (m.species === 'kingcap') {
       bossM = null;
-      happen({ type: 'playerBoss', who: 'me' }); // 온 마을에 소문이 난다
+      happen({ type: 'playerBoss', who: 'me', boss: m.M.short }); // 온 마을에 소문이 난다
       monsters.clear((o) => o.summoned);
       hud.banner('왕버섯을 쓰러뜨렸다!', '', 3000);
       if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
+    }
+    // 구역 보스를 쓰러뜨렸다: 부하는 흩어지고, 소문이 나고, 내일 다시 나타난다
+    if (BOSS_LAIRS[m.species]) {
+      lairBossM[m.species] = null;
+      happen({ type: 'playerBoss', who: 'me', boss: m.M.short });
+      monsters.clear((o) => o.summoned);
+      hud.banner(`${josa(m.M.name, '을/를')} 쓰러뜨렸다!`, '내일 다시 나타나요', 3200);
     }
   }
   /** 몬스터의 들이받기가 닿았다: 기운이 줄고 밀려난다. 잠깐은 다시 안 맞는다. 기운이 0이면 기절. */
@@ -1962,6 +1991,23 @@ function boot() {
   function reward(n, action) {
     const r = befriend(state, n.kind, action, state.clock.day);
     commit(r.state);
+    showBond(n, r);
+  }
+  /** 선물 줄 친구(말 걸기 → '선물 줄게' → 주머니에서 고르는 동안). 고르지 않고 닫으면 onClose 가 대화를 끝낸다. */
+  let giftFor = null;
+  function giveGiftTo(id) {
+    const n = giftFor;
+    giftFor = null;
+    if (!n) return;
+    const r = giveGift(state, n.kind, id, state.clock.day);
+    if (!r.ok) { sayAs(n, [r.reason === 'cap' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
+    commit(r.state);
+    sound.play('job');
+    hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2400, { icon: itemSvg(id) });
+    sayAs(n, [giftLine(n.kind, r.love ? 'love' : 'ok')], () => showBond(n, r));
+  }
+  /** 친밀도가 오른 것을 보여 주고(머리 위 하트 · 선물 가구) 대화를 끝낸다. r: befriend 결과 모양 */
+  function showBond(n, r) {
     if (r.gained > 0) {
       // 친밀도가 오르면 머리 위로 하트(하트가 늘면 크게 터지고 하트 줄 카드)
       const F = FRIENDS[n.kind];
@@ -1991,23 +2037,6 @@ function boot() {
         else askHelp(n, '또 궁금한 거 있어?');
       });
     });
-    showBond(n, r);
-  }
-  /** 선물 줄 친구(말 걸기 → '선물 줄게' → 주머니에서 고르는 동안). 고르지 않고 닫으면 onClose 가 대화를 끝낸다. */
-  let giftFor = null;
-  function giveGiftTo(id) {
-    const n = giftFor;
-    giftFor = null;
-    if (!n) return;
-    const r = giveGift(state, n.kind, id, state.clock.day);
-    if (!r.ok) { sayAs(n, [r.reason === 'cap' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
-    commit(r.state);
-    sound.play('job');
-    hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2400, { icon: itemSvg(id) });
-    sayAs(n, [giftLine(n.kind, r.love ? 'love' : 'ok')], () => showBond(n, r));
-  }
-  /** 친밀도가 오른 것을 보여 주고(머리 위 하트 · 선물 가구) 대화를 끝낸다. r: befriend 결과 모양 */
-  function showBond(n, r) {
   }
 
   // 같이 놀기: 대사는 친구마다 자기 말투로(core/npclines.js 의 playAsk · rps… · tag… · dance…)
@@ -3926,6 +3955,7 @@ function boot() {
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null, party: !!n.party, bubble: n.bubble && n.bubble.text })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기
+      talk: (kind) => talkTo(npcs.byKind(kind)), // 그 친구에게 바로 말 걸기(고를 거리 확인용)
       // 똑똑한 친구들 확인용: 마음 · 하는 일 · 소식 · 공연
       life: () => ({
         minds: Object.fromEntries(Object.entries(minds).map(([k, m]) => [k, { fun: +m.fun.toFixed(2), social: +m.social.toFixed(2), doing: m.doing && m.doing.text, mem: m.mem.length }])),
@@ -3955,7 +3985,6 @@ function boot() {
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
       /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
-      talk: (kind) => talkTo(npcs.byKind(kind)), // 그 친구에게 바로 말 걸기(고를 거리 확인용)
       islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
       pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),
@@ -4098,7 +4127,7 @@ function boot() {
       // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
       onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
       onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },
-      onRage: (m, r) => { sound.play('thud'); hud.toast(r >= 2 ? '왕버섯이 잔뜩 화났어요!' : '왕버섯이 화났어요!', 2600, { icon: monsterSvg('kingcap'), chips: r >= 2 ? [{ text: '부하 더 많이' }, { text: '더 빨라짐' }] : [{ text: '포자 비' }, { text: '두 번 내려찍기' }] }); }
+      onRage: (m, r) => { sound.play('thud'); hud.toast(`${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
     });
     if (state) ground.sync(groundOf(state), groundKind);
     ground.update(dt, focus);

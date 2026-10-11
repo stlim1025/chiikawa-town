@@ -6,6 +6,7 @@ const G = (d) => `<svg viewBox="0 0 20 20" aria-hidden="true">${d}</svg>`;
 const S = 'fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const F = 'fill="#fff"';
 const HOUSE = G(`<path ${S} d="M3.5 9.5 10 4l6.5 5.5"/><path ${S} d="M5.5 8.5V16h9V8.5"/><path ${F} d="M8.6 16v-3.6h2.8V16z"/>`);
+const BOSS_CROWN = G(`<path ${S} d="M4 14.5 3.5 7.5l3.8 2.8L10 5l2.7 5.3 3.8-2.8-.5 7z"/><path ${S} d="M4.5 16.5h11"/>`);
 const ICONS = {
   가구점: ['#7cc4ad', G(`<path ${S} d="M4 11.5V9a2 2 0 0 1 4 0v1.5h4V9a2 2 0 0 1 4 0v2.5"/><path ${S} d="M3.5 11.5h13V15h-13zM5 15v1.5M15 15v1.5"/>`)],
   '카니 헌책방': ['#c49a6c', G(`<path ${S} d="M10 6c-1.8-1.2-4-1.5-6-1.2v10c2-.3 4.2 0 6 1.2 1.8-1.2 4-1.5 6-1.2v-10c-2-.3-4.2 0-6 1.2zM10 6v10"/>`)],
@@ -30,7 +31,11 @@ const ICONS = {
   선착장: ['#4f9bd0', G(`<circle ${S} cx="10" cy="5" r="1.8"/><path ${S} d="M10 6.8V16M6.5 9.5h7M4.5 12.5a5.5 4.5 0 0 0 11 0"/>`)], // 닻(섬 합숙 오리 배가 서는 곳)
   '바위산 가는 길': ['#8d9bab', G(`<path ${S} d="M2.5 16 8 7l3 4.5 2-2.5 4.5 7z"/>`)],
   '숲 가는 길': ['#5fae6a', G(`<path ${S} d="M10 3.5 5 10h3l-3.5 4.5h11L12 10h3zM10 14.5V17"/>`)],
-  '들판 가는 길': ['#8fc350', G(`<path ${S} d="M10 16.5V9M10 9c-1.2-3-4-3.5-5.5-3 0 2.5 2 4 5.5 3zM10 11c1.2-3 4-3.5 5.5-3 0 2.5-2 4-5.5 3z"/>`)]
+  '들판 가는 길': ['#8fc350', G(`<path ${S} d="M10 16.5V9M10 9c-1.2-3-4-3.5-5.5-3 0 2.5 2 4 5.5 3zM10 11c1.2-3 4-3.5 5.5-3 0 2.5-2 4-5.5 3z"/>`)],
+  // 구역 보스 자리(core/layout.js 의 BOSS_LAIRS): 왕관 — 센 몬스터가 산다
+  '두더지 굴밭': ['#c9824a', BOSS_CROWN],
+  '고목 빈터': ['#5f9e56', BOSS_CROWN],
+  '강가 진흙밭': ['#4f9bd0', BOSS_CROWN]
 };
 const DEFAULT = ['#c49a6c', G(`<circle ${F} cx="10" cy="10" r="3"/>`)];
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
