@@ -91,6 +91,7 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
+import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
 import { createStarfall } from './world/starfall.js';
@@ -1262,7 +1263,7 @@ function boot() {
     const qs = questsFor(state, n.kind);
     qs.report.forEach((id) => { const st = stepOf(state, id); opts.push(['qreport:' + id, st.type === 'bring' ? '부탁한 거 가져왔어!' : st.type === 'talk' ? (QUESTS[id].story ? `「${QUESTS[id].title}」 이야기` : '이야기 들으러 왔어') : '다 했어!']); });
     qs.offer.forEach((id) => opts.push(['qoffer:' + id, QUESTS[id].ask || '무슨 고민 있어?']));
-    qs.waiting.forEach((id) => opts.push(isBuddyStep(stepOf(state, id)) && !n.follow ? ['qwith:' + id, '같이 가자!'] : ['qhint:' + id, '부탁 다시 듣기']));
+    qs.waiting.forEach((id) => opts.push(isBuddyStep(stepOf(state, id)) && !n.follow ? ['qwith:' + id, '같이 가자!'] : ['qhint:' + id, '부탁이 뭐였더라?']));
     activeQuests(state).forEach((id) => { const st = stepOf(state, id); if (st.type === 'visit' && st.with && reportTo(id, st) === n.kind && !n.follow) opts.push(['qwith:' + id, '같이 가자!']); });
     if (buddies.has(n.kind)) opts.push(['qstop', '오늘은 여기까지 하자']);
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
@@ -1286,15 +1287,19 @@ function boot() {
     if (VILLAGERS[n.kind]) {
       const debt = debtOf(state, n.kind);
       if (isEvicted(state) && bedtime()) opts.push(['lodge', `하룻밤 재워 줄래? (${won(LODGING_PRICE)})`]);
-      if (debt > 0) opts.push(['repay', `빌린 돈 갚기 (${won(debt)})`]);
+      if (debt > 0) opts.push(['repay', `빌린 돈 갚을게 (${won(debt)})`]);
       else if (canBorrow(state, n.kind, state.clock.day)) opts.push(['borrow', '돈 좀 빌려줄래?']);
     }
     opts.push(['bye', '아무것도 아니야']);
     const poor = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).money < 60;
     const h = hearts(friendOf(state, n.kind)); // 친밀도에 따라 인사 · 이야기가 달라진다
     const sleepy = VILLAGERS[n.kind] && villagerOf(state, n.kind, state.clock.day).energy < TIRED + 10; // 기운이 없으면 피곤한 인사
-    askAs(n, poor ? BROKE[n.kind] : sleepy ? TIRED_SAY[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind), opts.map((o) => o[1]), (i) => {
-      const k = opts[i][0];
+    const greet = poor ? BROKE[n.kind] : sleepy ? TIRED_SAY[n.kind] : greetingFor(n.kind, h) || npcs.greeting(n.kind);
+    // 고를 거리가 많으면 묶음('같이 뭐 하자!' · '볼일이 있는데…')으로 접는다(core/talkmenu.js). 묶음을 고르면 그 안의 것들과 되돌아가기
+    const { top, groups } = talkMenu(opts);
+    const showTop = () => askAs(n, greet, top.map((o) => o[1]), (i) => (groups[top[i][0]] ? showGroup(top[i][0]) : pick(top[i][0])));
+    const showGroup = (g) => askAs(n, subAsk(n.kind, g), [...groups[g].map((o) => o[1]), BACK], (j) => (j === groups[g].length ? showTop() : pick(groups[g][j][0])));
+    const pick = (k) => {
       if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
       else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
       else if (k.startsWith('qwith:')) sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].go : '좋아!'], () => { endTalk(); startBuddy(n); });
@@ -1348,7 +1353,8 @@ function boot() {
         sound.play('coin');
         sayAs(n, LODGE[n.kind], () => { endTalk(); doSleep('lodge'); });
       } else endTalk();
-    });
+    };
+    showTop();
   }
 
   // ---------- 퀘스트(5단계): 친구의 고충 · 마을 이야기 ----------
