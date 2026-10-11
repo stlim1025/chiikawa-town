@@ -41,8 +41,10 @@ body { margin: 0; background: var(--sky); color: var(--ink); font-family: var(--
 #game { position: relative; width: 100%; height: 100%; overflow: hidden; overflow: clip; } /* clip: 포커스 · 스크롤로 화면이 옆으로 밀리지 않게 */
 #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #ui { position: absolute; inset: 0; pointer-events: none; }
-/* 누를 수 없는 표시(왼쪽 위 기둥, 시계, 알림)와 집 안 화면 전체 틀은 화면 누름을 통과시킨다(집 안에서는 바닥을 눌러 가구를 놓는다) */
-#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui) { pointer-events: auto; }
+/* 누를 수 없는 표시(왼쪽 위 기둥, 시계, 알림)와 집 안 화면 전체 틀은 화면 누름을 통과시킨다(집 안에서는 바닥을 눌러 가구를 놓는다).
+   보기만 하는 장식(별똥별 줄무늬 · 완료 카드 · 큰 소식 · 새 일감 쪽지 · 하트 카드 · 마을 이름)도 뺀다: 이 규칙(id)이 그 장식들의 pointer-events: none 을
+   이겨서, 별똥별 밤에는 화면을 덮은 줄무늬가 누름을 다 가로채 조이스틱이 나오지 않았다 */
+#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui):not(.star-streaks):not(.quest-done):not(.hud-banner):not(.task-card):not(.heart-card):not(.village-title) { pointer-events: auto; }
 button { font-family: var(--hand); font-weight: 700; color: var(--ink); cursor: pointer; background: none; border: none; padding: 0; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep); outline-offset: 3px; }
 @keyframes pop { from { scale: 0.7; opacity: 0; } to { scale: 1; opacity: 1; } }

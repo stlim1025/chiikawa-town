@@ -3610,7 +3610,14 @@ function boot() {
     const chip = { rich: { icon: ICO.coin, text: `+${WISH_MONEY}원` }, full: { text: `기운 +${WISH_STAMINA}` }, luck: { icon: TICKET_SVG, text: '추첨권 +1' },
       friends: r.gained.length ? { icon: ICO.heart, text: r.gained.map(nameOf).join(' · ') } : null }[S.wish];
     S.kinds.forEach((kind, i) => { const n = npcs.byKind(kind); if (n) setTimeout(() => npcs.say(n, lineOf(kind, 'starBye')), 500 + i * 450); });
-    guide.say([WISH_GAG[S.wish], { text: '(별똥별맨이 반짝이는 조각을 남기고 갔다)', chips: [{ icon: itemSvg('starshard'), text: '별 조각' }, ...(chip ? [chip] : [])] }], () => endWish(true), meWho());
+    // 다른 사이드스토리처럼 끝나면 가운데에 '이야기 완료!' 보상 카드(전에는 대사 상자 꼬리표로만 보여서 가운데 카드가 없었다)
+    const chips = [{ icon: itemSvg('starshard'), text: '별 조각' }, ...(chip ? [chip] : [])];
+    guide.say([WISH_GAG[S.wish], '(별똥별맨이 반짝이는 조각을 남기고 갔다)'], () => {
+      endWish(true);
+      sound.play('quest');
+      player.cheerTime = 2.4;
+      hud.questDone({ title: '이야기 완료!', sub: '별똥별맨', chips, ms: 5600 });
+    }, meWho());
   }
   function endWish(done = false) {
     const S = starShow;

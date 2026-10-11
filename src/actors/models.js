@@ -476,7 +476,7 @@ const WEAPON_PARTS = {
  * 'drink' 는 라멘 로우에서 라멘을 먹을 때도 쓰니 그릇을 들고, 쿠리만쥬만 맥주잔을 든다.
  */
 export const PROP_FOR = {
-  kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' },
+  kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, // 노동 갑옷 씨: 게시판 앞 정리
   rakko: { train: 'sword', drink: 'bowl' }, usagi: { train: 'stick', drink: 'bowl' },
   hachiware: { dance: 'mic', drink: 'bowl', train: 'fork' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };
