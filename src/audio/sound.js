@@ -18,6 +18,23 @@ const BASS = [48, 45, 41, 43, 48, 45, 41, 48]; // 마디마다 근음(1·3박에
 const TEMPO = 100;
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
+/**
+ * 보스전 곡(보스가 깨어 가까이 있을 때 · main.js 가 bossMusic(true)): 라단조 · 빠른 템포, 8마디 반복.
+ * 마디마다 근음(쿵쿵 몰아치는 8분 베이스) · 화음(길게 까는 현 · 박마다 금관 찌르기) · 선율(8분 8칸, 0 은 쉼 · 뒤 쉼만큼 끈다).
+ * 북: 1 · 4 · 5박 킥, 3 · 7박 스네어, 8분 하이햇, 4 · 8마디 끝은 탐탐 몰아치기.
+ */
+export const BOSS_TEMPO = 138;
+export const BOSS_BARS = [
+  { root: 38, tones: [62, 65, 69], mel: [74, 0, 77, 0, 81, 0, 79, 77] }, // Dm
+  { root: 34, tones: [58, 62, 65], mel: [74, 0, 0, 0, 70, 72, 74, 0] }, // B♭
+  { root: 36, tones: [60, 64, 67], mel: [76, 0, 79, 0, 84, 0, 83, 81] }, // C
+  { root: 33, tones: [61, 64, 69], mel: [81, 0, 0, 0, 76, 0, 73, 0] }, // A
+  { root: 38, tones: [62, 65, 69], mel: [74, 0, 77, 0, 81, 0, 86, 0] }, // Dm
+  { root: 31, tones: [58, 62, 67], mel: [82, 0, 81, 79, 77, 0, 74, 0] }, // Gm
+  { root: 34, tones: [58, 62, 65], mel: [77, 0, 79, 81, 82, 0, 79, 0] }, // B♭
+  { root: 33, tones: [61, 64, 69], mel: [81, 0, 0, 0, 0, 0, 73, 76] } // A → 처음으로
+];
+
 /** 친구마다 말소리 높이(Hz). */
 const VOICE = { chiikawa: 820, hachiware: 700, usagi: 980, momonga: 900, kurimanju: 420, rakko: 520, shisa: 760, kani: 640, pochette: 600, labor: 330, ramen: 380, captain: 300,
   hitoha: 860, futaba: 900, islander: 880, jiro: 280, siren: 560, // 수상한 섬 사람들
@@ -31,7 +48,7 @@ export function createSound(storage) {
   try { Object.assign(prefs, JSON.parse(storage.getItem(PREFS_KEY) || '{}')); } catch { /* 저장소가 막혀도 기본값으로 */ }
 
   let ctx = null, master = null, sfxBus = null, musicBus = null, noiseBuf = null;
-  let musicOn = false, nextTime = 0, step = 0, ducked = false;
+  let musicOn = false, nextTime = 0, step = 0, ducked = false, boss = false, bossStep = 0;
   let charge = null; // { osc, gain }
 
   function ensure() {
@@ -77,7 +94,7 @@ export function createSound(storage) {
   }
 
   /** 걸러 낸 잡음(뽑히는 소리, 후루룩, 쿵). */
-  function noise({ start = 0, dur = 0.15, vol = 0.2, freq = 1500, q = 1, type = 'bandpass', sweepTo = 0 }) {
+  function noise({ start = 0, dur = 0.15, vol = 0.2, freq = 1500, q = 1, type = 'bandpass', sweepTo = 0, bus = sfxBus }) {
     const t0 = ctx.currentTime + start, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = noiseBuf;
     f.type = type;
@@ -89,7 +106,7 @@ export function createSound(storage) {
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     src.connect(f);
     f.connect(g);
-    g.connect(sfxBus);
+    g.connect(bus);
     src.start(t0, Math.random() * 0.5);
     src.stop(t0 + dur + 0.05);
   }
@@ -196,12 +213,40 @@ export function createSound(storage) {
   };
 
   // ---------- 배경음악 ----------
+  /** 보스전 곡 한 칸(8분음표): 북 · 베이스 · 현 · 금관 찌르기 · 선율(데이터는 BOSS_BARS). */
+  function bossNote(at, eighth) {
+    const bar = BOSS_BARS[Math.floor(bossStep / 8)], j = bossStep % 8, bus = musicBus, k32 = bossStep % 32;
+    // 북: 킥(1 · 4 · 5) · 스네어(3 · 7) · 하이햇, 4 · 8마디 끝 두 칸은 탐탐 몰아치기
+    if (j === 0 || j === 3 || j === 4) { tone({ freq: 120, slideTo: 42, type: 'sine', start: at, dur: 0.22, vol: 0.5, bus }); noise({ start: at, dur: 0.03, vol: 0.06, freq: 2600, q: 0.7, bus }); }
+    if (j === 2 || j === 6) { noise({ start: at, dur: 0.14, vol: 0.2, freq: 1900, q: 0.7, bus }); tone({ freq: 220, slideTo: 150, type: 'triangle', start: at, dur: 0.08, vol: 0.12, bus }); }
+    noise({ start: at, dur: 0.035, vol: 0.035, freq: 8600, q: 0.9, type: 'highpass', bus });
+    if (k32 === 14 || k32 === 15 || k32 === 30 || k32 === 31) [0, 0.5].forEach((d, i) => tone({ freq: 170 - (j - 6) * 30 - i * 20, slideTo: 70, type: 'sine', start: at + d * eighth, dur: 0.18, vol: 0.32, bus }));
+    // 베이스: 8분마다 근음을 몰아친다(휴대폰 스피커에서도 들리게 한 옥타브 위를 같이)
+    tone({ freq: midi(bar.root), type: 'triangle', start: at, dur: eighth * 0.85, vol: j % 2 ? 0.16 : 0.22, bus });
+    tone({ freq: midi(bar.root + 12), type: 'square', start: at, dur: eighth * 0.6, vol: 0.035, bus });
+    // 현: 마디 첫 박에 화음을 길게 깔고, 1 · 4박에 금관처럼 짧게 찌른다
+    if (j === 0) bar.tones.forEach((n) => tone({ freq: midi(n - 12), type: 'triangle', start: at, dur: eighth * 7.6, vol: 0.045, attack: 0.08, bus }));
+    if (j === 0 || j === 3) bar.tones.forEach((n) => { tone({ freq: midi(n), type: 'sawtooth', start: at, dur: 0.16, vol: 0.022, bus }); tone({ freq: midi(n) * 1.004, type: 'square', start: at, dur: 0.14, vol: 0.016, bus }); });
+    // 선율: 뒤 쉼표만큼 끈다, 세모 + 살짝 어긋난 네모 + 한 옥타브 아래 톱니로 굵게
+    const n = bar.mel[j];
+    if (n) {
+      let len = 1;
+      while (j + len < 8 && !bar.mel[j + len]) len++;
+      const dur = Math.min(4, len) * eighth * 0.95;
+      tone({ freq: midi(n), type: 'triangle', start: at, dur, vol: 0.13, attack: 0.012, bus });
+      tone({ freq: midi(n) * 1.003, type: 'square', start: at, dur: dur * 0.85, vol: 0.04, attack: 0.012, bus });
+      tone({ freq: midi(n - 12), type: 'sawtooth', start: at, dur: dur * 0.8, vol: 0.02, attack: 0.02, bus });
+    }
+    bossStep = (bossStep + 1) % (BOSS_BARS.length * 8);
+  }
+
   function scheduleMusic() {
     if (!ctx || ctx.state !== 'running') return;
     if (ducked) { nextTime = ctx.currentTime + 0.05; return; } // 클럽 · 연출 동안 마을 음악은 쉰다
-    const eighth = 60 / TEMPO / 2;
+    const eighth = 60 / (boss ? BOSS_TEMPO : TEMPO) / 2;
     if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05; // 쉬었다 돌아오면 밀린 음을 몰아 치지 않게
     while (nextTime < ctx.currentTime + 0.25) {
+      if (boss) { bossNote(nextTime - ctx.currentTime, eighth); nextTime += eighth; continue; } // 보스전: 마을 곡 대신
       const at = nextTime - ctx.currentTime, note = MELODY[step];
       if (note) {
         tone({ freq: midi(note), type: 'sine', start: at, dur: 0.55, vol: 0.22, bus: musicBus });
@@ -270,6 +315,31 @@ export function createSound(storage) {
     },
     /** 마을 배경음악을 잠깐 쉰다(on) · 다시 튼다(off): 우사기 클럽처럼 따로 비트가 울리는 동안. */
     duck(on) { ducked = !!on; },
+    /**
+     * 보스전 곡으로 바꾼다(on) · 마을 곡으로 돌아간다(off). 바뀔 때 음악을 잠깐 줄였다 키우고, 보스 곡은 쾅 하는 첫 박부터.
+     * 배경음악 켜기를 따른다(꺼져 있으면 아무 소리도 안 난다).
+     */
+    bossMusic(on) {
+      on = !!on;
+      if (boss === on) return;
+      boss = on;
+      if (!ctx) return;
+      const t = ctx.currentTime, full = prefs.music ? MUSIC_VOL : 0;
+      musicBus.gain.cancelScheduledValues(t);
+      musicBus.gain.setValueAtTime(musicBus.gain.value, t);
+      musicBus.gain.linearRampToValueAtTime(full * 0.15, t + 0.15);
+      musicBus.gain.linearRampToValueAtTime(full, t + 0.6);
+      nextTime = t + 0.18; // 다음 곡을 처음부터
+      if (on) {
+        bossStep = 0;
+        if (prefs.music) { // 시작 쾅: 낮은 북 + 심벌처럼 퍼지는 잡음
+          tone({ freq: 90, slideTo: 38, type: 'sine', start: 0.16, dur: 0.6, vol: 0.55, bus: musicBus });
+          noise({ start: 0.16, dur: 1.1, vol: 0.12, freq: 6000, q: 0.5, type: 'highpass', bus: musicBus });
+        }
+      } else step = 0;
+    },
+    /** 지금 보스전 곡인지. */
+    get bossOn() { return boss; },
     /**
      * 파자마 파티즈의 노래 한 칸(core/idolsong.js): 8분음표 e(곡 시작부터, 준비 박 포함)의 멜로디 · 화음 · 베이스 · 북.
      * 무대 장면이 박자 화면 시계(rhythm.time)에 맞춰 칸이 바뀔 때마다 부른다. 준비 박에는 똑 · 똑 · 똑 · 띵.

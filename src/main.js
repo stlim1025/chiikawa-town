@@ -571,6 +571,8 @@ function boot() {
     /** 메인(타이틀)으로 나간다. 진행은 저장되고, 타이틀에서 이어하기·새로 시작하기를 고른다. */
     toTitle() {
       cancelPull();
+      bossBgmHold = 0;
+      sound.bossMusic(false); // 보스전 곡도 멈춘다
       resetFun();
       endHunterExam();
       if (bossM) { monsters.clear((m) => m === bossM || m.summoned); bossM = null; }
@@ -4038,6 +4040,7 @@ function boot() {
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기
       talk: (kind) => talkTo(npcs.byKind(kind)), // 그 친구에게 바로 말 걸기(고를 거리 확인용)
       faint: () => startFaint(), // 바로 기절(깨어나는 곳 · 흐른 시간 확인용)
+      bossMusic: () => sound.bossOn, // 지금 보스전 곡인지
       // 똑똑한 친구들 확인용: 마음 · 하는 일 · 소식 · 공연
       life: () => ({
         minds: Object.fromEntries(Object.entries(minds).map(([k, m]) => [k, { fun: +m.fun.toFixed(2), social: +m.social.toFixed(2), doing: m.doing && m.doing.text, mem: m.mem.length }])),
@@ -4093,6 +4096,15 @@ function boot() {
     };
   }
 
+  // ---------- 보스전 배경음악: 깨어난 보스가 나를 알아챘거나 맞았고 가까이 있으면 웅장한 곡으로(audio/sound.js 의 bossMusic) ----------
+  let bossBgmHold = 0; // 보스가 곁에 있다가 사라진 뒤 남은 초(대왕 두더지가 땅속에 숨어 잠깐 안 보여도 곡이 끊기지 않게)
+  function updateBossMusic(dt) {
+    const p = player && player.position;
+    const fighting = mode === 'play' && p && monsters.nearest(p.x, p.z, sound.bossOn ? 26 : 15, (m) => m.M.boss && (m.engaged || m.hp < m.M.hp));
+    bossBgmHold = fighting ? 4 : Math.max(0, bossBgmHold - dt);
+    sound.bossMusic(bossBgmHold > 0);
+  }
+
   /** 시간이 흘러 날이 바뀌었으면(밤새 깨어 있다가 06:00 이 지나면) 집세 · 청약을 처리한다. 자는 중에는 doSleep 이 처리한다. */
   function newDayCheck() {
     if (sleeping || state.clock.day <= knownDay) return;
@@ -4103,6 +4115,7 @@ function boot() {
 
   function tick(dt) {
     t += dt;
+    if (state) updateBossMusic(dt);
     const aspect = gfx.resize();
     if (drumSpin > 0 && village.raffleDrum) { drumSpin -= dt; village.raffleDrum.rotation.x -= dt * 10 * Math.min(1, drumSpin * 1.5); } // 경품 추첨 가라가라
     // 집 안: 마을 대신 집 안 장면을 그린다(시간은 흐르고, 마을 친구들도 계속 지낸다)
