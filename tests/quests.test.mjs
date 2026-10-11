@@ -42,7 +42,7 @@ test('bring quest: progress, report, reward', () => {
   assert.equal(I.countOf(r.state, 'fluffdown'), 2);
   assert.equal(r.state.money, 1300);
   assert.ok(r.state.wardrobe.owned.includes('flower'));
-  assert.equal(F.hearts(F.friendOf(r.state, 'chiikawa')), 2);
+  assert.equal(F.friendOf(r.state, 'chiikawa').pts, F.HEART_PTS + Q.QUESTS.pillow.reward.bond); // 하트 1개 + 부탁 보상 점수
   assert.ok(Q.isDone(r.state, 'pillow'));
   assert.equal(r.state.questTrack, null);
   assert.ok(S.isValidState(r.state));

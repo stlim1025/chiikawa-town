@@ -4,10 +4,13 @@ import { todayISO } from './calendar.js';
 /** 기운 최대치. */
 export const MAX_STAMINA = 100;
 
+/** 상태 모양 버전(state.version). 2: 친밀도 하트 하나가 3점 → 6점(예전 저장은 save.js 가 불러올 때 바꾼다). */
+export const STATE_VERSION = 2;
+
 /** 새 게임 상태. profile = { name, look }. */
 export function createState(profile) {
   return {
-    version: 1,
+    version: STATE_VERSION,
     profile: { name: profile.name, look: { ...profile.look } },
     money: 0,
     stamina: MAX_STAMINA,

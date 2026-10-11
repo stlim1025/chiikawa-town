@@ -1,7 +1,8 @@
 import { JOB_TYPES } from './jobs.js';
 import { isValidHome } from './home.js';
 import { isValidHousing } from './housing.js';
-import { isValidFriends } from './friends.js';
+import { isValidFriends, upgradeFriends } from './friends.js';
+import { STATE_VERSION } from './state.js';
 import { isValidLicenses } from './licenses.js';
 import { isValidBoard, isValidVillagers } from './villagers.js';
 import { isValidPochette } from './pochette.js';
@@ -80,7 +81,13 @@ export function deserialize(text) {
   if (!parsed || typeof parsed !== 'object' || !parsed.data) return { ok: false, reason: 'corrupt' };
   if (parsed.v !== SAVE_VERSION) return { ok: false, reason: 'version' };
   if (!isValidState(parsed.data)) return { ok: false, reason: 'corrupt' };
-  return { ok: true, state: parsed.data };
+  return { ok: true, state: upgradeState(parsed.data) };
+}
+
+/** 예전 모양의 상태를 지금 모양으로(state.version 이 낮으면). 1 → 2: 친밀도 점수를 새 하트 단위로(하트 개수는 그대로). */
+export function upgradeState(s) {
+  if ((s.version || 1) >= STATE_VERSION) return s;
+  return { ...s, version: STATE_VERSION, ...(s.friends ? { friends: upgradeFriends(s.friends) } : {}) };
 }
 
 /** storage(getItem/setItem/removeItem) 위의 저장소. 막힌 storage 에서도 throw 하지 않는다. */

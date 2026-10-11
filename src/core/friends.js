@@ -4,7 +4,7 @@ import { VILLAGERS, villagerOf, villagerSpend, payVillager } from './villagers.j
 /**
  * 마을 친구들: 이름표(대화 상자의 이름과 색), 같이 놀 수 있는지(play), 많이 친해지면 주는 선물 가구(gift).
  * 친밀도는 state.friends[kind] = { pts, talk: 마지막으로 이야기한 날, play: 마지막으로 논 날, gift: 선물을 줬는지 }.
- * 이야기는 하루에 한 번 +1, 놀기는 하루에 한 번 +2. 3점마다 하트 하나(최대 5개), 하트 3개가 되면 선물.
+ * 이야기는 하루에 한 번 +1, 놀기는 하루에 한 번 +2. HEART_PTS(6)점마다 하트 하나(최대 5개), 하트 3개가 되면 선물.
  * 너무 빨리 친해지지 않게, 이런 일상 친밀도는 한 친구와 하루에 DAY_CAP 점까지만 오른다(capDay · capPts 에 그날 쌓은 점수).
  */
 export const FRIENDS = {
@@ -80,7 +80,9 @@ export const CHATS = {
   ]
 };
 
-export const HEART_PTS = 3;
+/** 하트 하나에 드는 점수. 예전엔 3점이었는데 너무 빨리 친해져서 두 배로(예전 저장은 upgradeFriends 로 점수를 바꿔 하트는 그대로). */
+export const HEART_PTS = 6;
+export const OLD_HEART_PTS = 3;
 export const MAX_HEARTS = 5;
 export const GIFT_HEARTS = 3;
 const GAIN = { talk: 1, play: 2, drink: 2, home: 2, hunt: 2, watch: 1 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …), hunt: 같이 토벌해서 몬스터를 잡았다, watch: 하치와레 공연을 끝까지 들었다
@@ -97,6 +99,12 @@ export function friendOf(state, kind) {
 /** 하트 개수(0..5). */
 export function hearts(f) {
   return Math.min(MAX_HEARTS, Math.floor(f.pts / HEART_PTS));
+}
+
+/** 예전 저장(하트 하나에 OLD_HEART_PTS 점이던 때)의 친밀도 점수를 지금 단위로 바꾼다 — 가진 하트 개수는 그대로. */
+export function upgradeFriends(friends) {
+  const k = HEART_PTS / OLD_HEART_PTS;
+  return Object.fromEntries(Object.entries(friends).map(([kind, f]) => [kind, { ...f, pts: f.pts * k }]));
 }
 
 /**
