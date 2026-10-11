@@ -20,7 +20,7 @@ export const WISHES = [
 ];
 
 export const STAR_ITEMS = {
-  starshard: { name: '별 조각', kind: 'misc', note: '별똥별맨이 남기고 간 반짝이는 조각. 밤에 보면 희미하게 빛난다.' }
+  starshard: { name: '별 조각', kind: 'misc', note: '별똥별맨이 남기고 간 반짝이는 조각. 셋을 모아 포셰트 가게에 가면 머리핀으로 만들어 준대요.' }
 };
 registerItems(STAR_ITEMS);
 

@@ -644,6 +644,13 @@ function accessoryParts(parts, hc, hr, look) {
       }
       parts.push({ m: 'sphere', c: '#ffd66b', p: [-0.3, 1.06, 0.16], s: [0.028, 0.028, 0.02], n: 'head' });
       break;
+    case 'starpin': // 별 조각 머리핀(별 조각 셋으로 만든다): 오른쪽 머리 옆에 노란 별 하나(꽃 핀의 반대쪽)
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        parts.push({ m: 'sphere', c: '#ffd84a', p: [0.3 + Math.sin(a) * 0.045, 1.07 + Math.cos(a) * 0.045, 0.14], r: [0, 0, -a], s: [0.024, 0.055, 0.018], n: 'head' });
+      }
+      parts.push({ m: 'sphere', c: '#fff3a0', p: [0.3, 1.07, 0.155], s: [0.03, 0.03, 0.02], n: 'head' });
+      break;
     case 'cap':
       parts.push({ m: 'sphere', c: '#e8706a', p: [0, 1.0, 0], s: [0.33, 0.2, 0.32], n: 'head' });
       parts.push({ m: 'cylinder', c: '#e8706a', p: [0, 0.98, 0.26], s: [0.22, 0.02, 0.16], n: 'head' });

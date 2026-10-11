@@ -33,11 +33,14 @@ export function addItem(state, id, n = 1, clean = 0) {
     added
   };
 }
-/** 가방에서 뺀다(깔끔한 것부터). → { state, taken, clean } */
-export function takeItem(state, id, n = 1) {
+/**
+ * 가방에서 뺀다(일감에 낼 때는 깔끔한 것부터). cleanFirst = false 면 덜 깔끔한 것부터(팔기 · 선물: 깔끔한 풀은 일감 보너스용으로 남긴다).
+ * → { state, taken, clean }
+ */
+export function takeItem(state, id, n = 1, cleanFirst = true) {
   const b = bagOf(state), have = b.items[id] || 0, taken = Math.min(n, have);
   if (!taken) return { state, taken: 0, clean: 0 };
-  const cleanHave = b.clean[id] || 0, clean = Math.min(taken, cleanHave);
+  const cleanHave = b.clean[id] || 0, clean = cleanFirst ? Math.min(taken, cleanHave) : Math.max(0, taken - (have - cleanHave));
   const items = { ...b.items }, cl = { ...b.clean };
   if (have - taken > 0) items[id] = have - taken; else delete items[id];
   if (cleanHave - clean > 0) cl[id] = cleanHave - clean; else delete cl[id];

@@ -26,7 +26,7 @@ export const RAFFLE_ITEMS = {
   fruitbasket: { name: '과일 바구니', kind: 'food', note: '경품 추첨 2등. 반들반들한 과일이 가득. 먹으면 기운이 35 찬다.', eat: 35 },
   cookies: { name: '쿠키 상자', kind: 'food', note: '경품 추첨 3등. 바삭바삭 버터 쿠키. 먹으면 기운이 18 찬다.', eat: 18 },
   candy: { name: '막대 사탕', kind: 'food', note: '경품 추첨 4등. 달콤한 딸기 맛. 먹으면 기운이 6 찬다.', eat: 6 },
-  tissue: { name: '휴지', kind: 'misc', note: '경품 추첨 참가상. 부드러운 휴지 한 팩. …어디에 쓰지?' }
+  tissue: { name: '휴지', kind: 'misc', note: '경품 추첨 참가상. 부드러운 휴지 한 팩. 울보 친구에게 선물하면 좋아할지도?' }
 };
 registerItems(RAFFLE_ITEMS);
 

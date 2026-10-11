@@ -37,6 +37,8 @@ const ACC = {
   pajama: `<circle cx="21" cy="12" r="5.5" fill="#c9b3ef" ${S}/><circle cx="43" cy="12" r="5.5" fill="#c9b3ef" ${S}/><path d="M16 26a16 15 0 0 1 32 0v21a7 7 0 0 1-7 7H23a7 7 0 0 1-7-7z" fill="#c9b3ef" ${S}/><ellipse cx="32" cy="24" rx="10" ry="8.5" fill="#fbfaf5" ${S}/><circle cx="29" cy="23" r="1.4" fill="#5a4431"/><circle cx="35" cy="23" r="1.4" fill="#5a4431"/><circle cx="32" cy="38" r="1.8" fill="#fff" ${S}/><circle cx="32" cy="46" r="1.8" fill="#fff" ${S}/>`,
   crown: `<path d="M10 46L8 18l14 12 10-18 10 18 14-12-2 28z" fill="#f3c84b" ${S}/><path d="M10 46h44" ${S}/><circle cx="32" cy="36" r="5" fill="#e0524f" ${S}/><circle cx="18" cy="38" r="3" fill="#7fb6e2" ${S}/><circle cx="46" cy="38" r="3" fill="#7fb6e2" ${S}/>`
 };
+// 별 조각 머리핀(재료로 만드는 소품): 노란 별 + 핀
+ACC.starpin = `<path d="M18 50L40 30" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/><path d="M38 8l5.4 11.2 12.4 1.7-9 8.7 2.2 12.3L38 36l-11 5.9 2.2-12.3-9-8.7 12.4-1.7z" fill="#ffd84a" ${S}/><circle cx="38" cy="24" r="4" fill="#fff3a0"/>`;
 export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="3.5" fill="#e6d8b8"/>${ACC[id] || ''}</svg>`;
 
 /** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */

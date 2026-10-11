@@ -910,6 +910,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .sell-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .sell-foot .sum { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; color: var(--ink-soft); }
 .sell-foot .sum b { display: inline-flex; align-items: center; gap: 4px; font-weight: inherit; font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* 팔기(core/market.js): 칸을 누르면 고르고(노랗게 떠오름), 왼쪽 위에 하나 값, 밑에 1개 / 모두 팔기 */
+button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: pointer; transition: transform 0.12s; }
+.sell-box .slot.on { background: #fff6cf; box-shadow: inset 0 0 0 3px var(--yellow-deep); transform: translateY(-3px); }
+.sell-box .slot .each { position: absolute; left: 5px; top: 2px; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
+.sell-pick { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; }
+.sell-name b { display: block; font-size: 20px; }
+.sell-name span { font-size: 15px; color: var(--ink-soft); }
+.sell-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.sell-btns .btn { min-height: 42px; padding: 4px 16px 6px; font-size: 18px; }
+.sell-hint { margin: 10px 2px 0; text-align: center; font-size: 15px; color: var(--ink-soft); }
 /* 토벌 랭킹(검정소): 노동 접수와 같은 장부 줄. 위 셋(랭커)은 금색 번호와 별, 내 줄은 노랗게 */
 .rank-row { display: grid; grid-template-columns: 30px 48px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 0; }
 .rank-row + .rank-row { border-top: 2px dashed var(--paper-3); }

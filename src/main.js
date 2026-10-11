@@ -53,7 +53,9 @@ import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
-import { ACCESSORY_ITEMS, buyAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
+import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
+import { sellItem } from './core/market.js';
+import { canGift, giveGift, giftLine } from './core/gifts.js';
 import { openRamenShop } from './ui/ramenshop.js';
 import { itemSvg, accessorySvg } from './ui/itemart.js';
 import { weaponSvg, monsterSvg } from './ui/monsterart.js';
@@ -321,7 +323,7 @@ function boot() {
       return true;
     },
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
-    onClose: () => input.setEnabled(true),
+    onClose: () => { if (giftFor) { giftFor = null; endTalk(); return; } input.setEnabled(true); }, // 선물 고르다 닫으면 대화도 끝
     acceptJob(typeId) {
       // 게시판 일감은 하루에 정해진 수만큼: 친구들이 먼저 받아 가면 마감
       const r = takeFromBoard(state, typeId, state.clock.day);
@@ -448,6 +450,16 @@ function boot() {
       gotTicket(paid);
     },
     wearAccessory(id) {
+    // 재료로 만드는 소품(별 조각 셋 → 별 조각 머리핀): 만들면 바로 단다
+    craftAccessory(id) {
+      const r = craftAccessory(state, id);
+      if (!r.ok) { hud.toast(r.reason === 'items' ? '재료가 모자라요' : '이미 가진 소품이에요'); return; }
+      commit(r.state);
+      refreshLook();
+      sound.play('done');
+      player.cheerTime = 1.6;
+      hud.banner('새 꾸미기!', ACCESSORY_ITEMS[id].name, 3000);
+    },
       commit(wearAccessory(state, id));
       refreshLook();
       if (mode === 'home') interior.setPlayer(myLook(), true);
@@ -522,6 +534,16 @@ function boot() {
       hud.toast(`전리품 ${r.sold}개를 팔았어요!`, 3000, { chips: [{ icon: 'coin', text: `+${won(r.earned)}` }] });
     },
     playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
+    // 노동 접수 '팔기': 고른 물건을 n 개(core/market.js)
+    sellItem(id, n) {
+      const r = sellItem(state, id, n);
+      if (!r.sold) return;
+      commit(r.state);
+      sound.play('coin');
+      hud.toast(`${itemInfo(id).name} ${r.sold}개를 팔았어요`, 2400, { icon: itemSvg(id), chips: [{ icon: 'coin', text: `+${won(r.earned)}` }] });
+    },
+    // 친구에게 선물: 말 걸기 → '선물 줄게' → 주머니에서 고른 물건(주머니는 이미 닫혔다)
+    giveGift: (id) => giveGiftTo(id),
     mapLabels: () => village.labels.map((l) => ({ x: l.x, z: l.z, text: l.text })),
     // 지도에 마을 친구들 얼굴(집 안에 있으면 빼고)
     mapFriends: () => Object.keys(VILLAGERS).map((k) => npcs.byKind(k)).filter((n) => n && !n.away).map((n) => ({ x: n.x, z: n.z, name: nameOf(n.kind), svg: faceIcon(n.kind) })),
@@ -1183,6 +1205,7 @@ function boot() {
     if (n.kind === 'hachiware') opts.push(['help', '궁금한 게 있어']);
     opts.push(['chat', '이야기하자']);
     // 토벌하는 친구: 같이 토벌 가자(하트 PARTY_HEARTS 개부터) · 같이 다니는 중이면 헤어지기
+    if (Object.keys((state.bag && state.bag.items) || {}).some((id) => countOf(state, id) > 0 && canGift(id))) opts.push(['gift', '선물 줄게']);
     if (HUNTER_PROFILES[n.kind] && mode === 'play') opts.push(n.party ? ['unparty', '이제 돌아가도 돼'] : ['party', '같이 토벌 가자!']);
     if (f.play && mode !== 'visit') opts.push(['play', '같이 놀자']); // 집 안에서는 뛰어놀 수 없다
     else if (n.kind === 'momonga' && mode !== 'visit') opts.push(['snub', '같이 놀자']); // 까칠해서 안 놀아 준다
@@ -1226,6 +1249,7 @@ function boot() {
         else sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
       }
       else if (k === 'party') askParty(n);
+      else if (k === 'gift') { giftFor = n; panels.openGift({ kind: n.kind, name: FRIENDS[n.kind].name }); } // 친구는 기다리고(talking), 주머니에서 고른다
       else if (k === 'unparty') sayAs(n, [lineOf(n.kind, 'partyLeave')], () => { endTalk(); partyEnd([n.kind], null); });
       else if (k === 'play') askPlay(n);
       else if (k === 'snub') sayAs(n, ['싫어! 내가 왜 너랑 놀아?', '…귀여워해 주는 거면 몰라도! 흥!'], endTalk);
@@ -1967,6 +1991,23 @@ function boot() {
         else askHelp(n, '또 궁금한 거 있어?');
       });
     });
+    showBond(n, r);
+  }
+  /** 선물 줄 친구(말 걸기 → '선물 줄게' → 주머니에서 고르는 동안). 고르지 않고 닫으면 onClose 가 대화를 끝낸다. */
+  let giftFor = null;
+  function giveGiftTo(id) {
+    const n = giftFor;
+    giftFor = null;
+    if (!n) return;
+    const r = giveGift(state, n.kind, id, state.clock.day);
+    if (!r.ok) { sayAs(n, [r.reason === 'cap' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
+    commit(r.state);
+    sound.play('job');
+    hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2400, { icon: itemSvg(id) });
+    sayAs(n, [giftLine(n.kind, r.love ? 'love' : 'ok')], () => showBond(n, r));
+  }
+  /** 친밀도가 오른 것을 보여 주고(머리 위 하트 · 선물 가구) 대화를 끝낸다. r: befriend 결과 모양 */
+  function showBond(n, r) {
   }
 
   // 같이 놀기: 대사는 친구마다 자기 말투로(core/npclines.js 의 playAsk · rps… · tag… · dance…)
@@ -3626,18 +3667,23 @@ function boot() {
       return;
     }
     const r = makeWish(state, S.wish, S.kinds);
-    if (r.ok) commit(r.state);
+    // 연출하는 사이 별똥별 시각(새벽 2시)이 지나 소원이 안 이뤄졌으면 얻은 게 없다고만(별 조각 카드는 띄우지 않는다)
+    if (!r.ok) { guide.say(['(…별똥별맨은 아무것도 남기지 않고 가 버렸다)'], () => endWish(true), meWho()); return; }
+    commit(r.state);
     sound.play('done');
     const chip = { rich: { icon: ICO.coin, text: `+${WISH_MONEY}원` }, full: { text: `기운 +${WISH_STAMINA}` }, luck: { icon: TICKET_SVG, text: '추첨권 +1' },
       friends: r.gained.length ? { icon: ICO.heart, text: r.gained.map(nameOf).join(' · ') } : null }[S.wish];
     S.kinds.forEach((kind, i) => { const n = npcs.byKind(kind); if (n) setTimeout(() => npcs.say(n, lineOf(kind, 'starBye')), 500 + i * 450); });
-    // 다른 사이드스토리처럼 끝나면 가운데에 '이야기 완료!' 보상 카드(전에는 대사 상자 꼬리표로만 보여서 가운데 카드가 없었다)
-    const chips = [{ icon: itemSvg('starshard'), text: '별 조각' }, ...(chip ? [chip] : [])];
+    // 끝나면 가운데 보상 카드. 별똥별맨은 별똥별 밤마다 또 오니 '이야기 완료'가 아니라 별 조각을 얻은 카드로,
+    // 머리핀(별 조각 셋, 포셰트 가게)을 아직 안 만들었으면 몇 개 모았는지도
+    const shards = countOf(state, 'starshard'), pin = ACCESSORY_ITEMS.starpin, needPin = !wardrobeOf(state).owned.includes('starpin');
+    const chips = [{ icon: itemSvg('starshard'), text: needPin ? `별 조각 ${Math.min(shards, pin.craft.starshard)} / ${pin.craft.starshard}` : `별 조각 ${shards}개` }, ...(chip ? [chip] : [])];
     guide.say([WISH_GAG[S.wish], '(별똥별맨이 반짝이는 조각을 남기고 갔다)'], () => {
       endWish(true);
       sound.play('quest');
       player.cheerTime = 2.4;
-      hud.questDone({ title: '이야기 완료!', sub: '별똥별맨', chips, ms: 5600 });
+      hud.questDone({ title: '별 조각을 얻었어요!', sub: '별똥별이 쏟아지는 밤마다 또 빌 수 있어요', chips, ms: 5600 });
+      if (needPin && shards >= pin.craft.starshard) setTimeout(() => hud.toast('포셰트 가게에서 별 조각 머리핀을 만들 수 있어요', 3600, { icon: accessorySvg('starpin') }), 5800);
     }, meWho());
   }
   function endWish(done = false) {
@@ -3909,6 +3955,7 @@ function boot() {
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
       /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
+      talk: (kind) => talkTo(npcs.byKind(kind)), // 그 친구에게 바로 말 걸기(고를 거리 확인용)
       islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
       pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),

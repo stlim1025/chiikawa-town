@@ -18,7 +18,9 @@ import { createMapView } from './mapapp.js';
 import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core/weeding.js';
 import { weedSvg } from './weedart.js';
 import { pochetteSvg, itemSvg, accessorySvg, TICKET_SVG } from './itemart.js';
-import { bagOf, itemInfo } from '../core/inventory.js';
+import { bagOf, itemInfo, countOf } from '../core/inventory.js';
+import { sellPrice, sellableIds } from '../core/market.js';
+import { canGift } from '../core/gifts.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
@@ -117,6 +119,7 @@ const myWeaponArt = (s, id) => weaponSvg(id, engravedOf(s).includes(id) ? (s.pro
 /** 노동 접수 창에서 고른 탭(마을 일 · 토벌 · 전리품). 창을 다시 열어도 그대로. */
 let boardTab = 'work';
 let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
+let sellSel = null; // 노동 접수 '팔기'에서 고른 물건 id
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
@@ -278,15 +281,29 @@ export function createPanels(ui, handlers) {
       done ? h('button', { class: 'btn primary take', type: 'button', onClick: after(handlers.reportJob) }, '보수 받기', h('small', {}, won(payout(s.job, s.license.grade))))
         : h('button', { class: 'btn take quiet', type: 'button', onClick: after(handlers.quitJob) }, '그만두기'));
   }
-  /** 전리품 팔기: 가방 칸처럼 네모 칸에 그림, 오른쪽 아래 개수. 밑에 모두 판 값과 버튼. */
-  function sellBox(s, drops) {
-    const items = bagOf(s).items, total = drops.reduce((a, id) => a + items[id] * DROPS[id].price, 0);
+  /**
+   * 팔기(core/market.js): 가방 칸처럼 네모 칸에 그림 · 개수 · 하나 값. 칸을 고르면 밑에 1개 / 모두 팔기.
+   * 전리품이 있으면 맨 밑에 '전리품 모두 팔기'(예전처럼 한 번에).
+   */
+  function sellBox(s, ids) {
+    const items = bagOf(s).items;
+    if (!ids.includes(sellSel)) sellSel = null;
+    const sel = sellSel, n = sel ? items[sel] : 0, p = sel ? sellPrice(sel) : 0;
+    const drops = ids.filter((id) => DROPS[id]), dropTotal = drops.reduce((a, id) => a + items[id] * DROPS[id].price, 0);
     return h('div', { class: 'sell-box' },
-      h('div', { class: 'slots' }, drops.map((id) => h('span', { class: 'slot', title: DROPS[id].name, 'aria-label': `${DROPS[id].name} ${items[id]}개` },
-        svgSpan('art', dropSvg(id)), h('em', {}, `×${items[id]}`)))),
-      h('div', { class: 'sell-foot' },
-        h('span', { class: 'sum' }, '모두 팔면', h('b', {}, svgSpan('coin', COIN), won(total))),
-        h('button', { class: 'btn pink take', type: 'button', onClick: after(handlers.sellDrops) }, '모두 팔기')));
+      h('div', { class: 'slots' }, ids.map((id) => h('button', {
+        class: `slot${id === sel ? ' on' : ''}`, type: 'button', title: itemInfo(id).name, 'aria-pressed': String(id === sel),
+        'aria-label': `${itemInfo(id).name} ${items[id]}개, 하나에 ${won(sellPrice(id))}`, onClick: () => { sellSel = id === sellSel ? null : id; render(); }
+      }, svgSpan('art', itemSvg(id)), h('em', {}, `×${items[id]}`), h('small', { class: 'each' }, won(sellPrice(id)))))),
+      sel ? h('div', { class: 'sell-pick' },
+        h('div', { class: 'sell-name' }, h('b', {}, itemInfo(sel).name), h('span', {}, `하나에 ${won(p)} · ${n}개 있어요`)),
+        h('div', { class: 'sell-btns' },
+          h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.sellItem(sel, 1)) }, '1개 팔기'),
+          n > 1 ? h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.sellItem(sel, n)) }, `모두 팔기 ${won(n * p)}`) : null))
+        : h('p', { class: 'sell-hint' }, '팔 물건을 골라요'),
+      drops.length ? h('div', { class: 'sell-foot' },
+        h('span', { class: 'sum' }, '전리품 모두', h('b', {}, svgSpan('coin', COIN), won(dropTotal))),
+        h('button', { class: 'btn pink take', type: 'button', onClick: after(handlers.sellDrops) }, '전리품 모두 팔기')) : null);
   }
   // 마을폰 앱 화면 위 막대: 홈으로(‹, 저장 옮기기는 설정으로) · 앱 이름 · (지도면) 지금 있는 곳
   const appBar = (title, tag, back = 'settings') => h('div', { class: 'phone-bar' },
@@ -404,7 +421,7 @@ export function createPanels(ui, handlers) {
       const mine = tutorial ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s));
       const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
       const mult = PAY_MULT[s.license.grade];
-      const items = bagOf(s).items, drops = Object.keys(DROPS).filter((id) => items[id] > 0);
+      const items = bagOf(s).items, sells = sellableIds(s);
       const out = [head('노동 접수', s.money)];
       // 오늘 남은 일감: 제목 밑 얇은 막대 한 줄(상자 없이)
       if (!tutorial) {
@@ -417,13 +434,13 @@ export function createPanels(ui, handlers) {
       }
       if (s.job) {
         out.push(jobNow(s));
-        if (drops.length) out.push(h('h3', { class: 'shop-sec' }, '전리품 팔기'), sellBox(s, drops));
+        if (sells.length) out.push(h('h3', { class: 'shop-sec' }, '팔기'), sellBox(s, sells));
       } else {
         // 탭(몬스터 헌터 퀘스트 카운터 · 동물의 숲 마일 목록처럼): 마을 일 | 토벌 | 전리품 — 한 번에 한 묶음만
         const tabs = [{ id: 'work', label: '마을 일', list: mine.filter((t) => !t.hunt) }];
         const hunts = mine.filter((t) => t.hunt);
         if (hunts.length) tabs.push({ id: 'hunt', label: '토벌', list: hunts });
-        if (drops.length && !tutorial) tabs.push({ id: 'sell', label: '전리품', n: drops.reduce((a, id) => a + items[id], 0) });
+        if (sells.length && !tutorial) tabs.push({ id: 'sell', label: '팔기', n: sells.reduce((a, id) => a + items[id], 0) });
         if (!tabs.some((t) => t.id === boardTab)) boardTab = 'work';
         if (tabs.length > 1) {
           // 탭 줄은 목록을 내려도 창 위에 붙어 있다(휴대폰에서 다른 탭으로 바로)
@@ -435,7 +452,7 @@ export function createPanels(ui, handlers) {
           }))));
         }
         const tab = tabs.find((t) => t.id === boardTab);
-        if (tab.id === 'sell') out.push(sellBox(s, drops));
+        if (tab.id === 'sell') out.push(sellBox(s, sells));
         else {
           // 마감된 일감은 아래로(받을 수 있는 것부터 보이게, 순서는 그대로)
           const open = (t) => ((left[t.id] ?? 0) > 0 ? 0 : 1);
@@ -799,9 +816,14 @@ export function createPanels(ui, handlers) {
           const own = wd.owned.includes(id);
           if (A.gift && !own) return; // 선물로만 받는 것(귀 달린 잠옷)은 가졌을 때만 보인다
           out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', accessorySvg(id)),
-            h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note)),
-            own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
-              : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)))));
+          // 재료로 만드는 것(별 조각 머리핀): 값 대신 재료 꼬리표(가진 수 / 필요한 수)와 '만들기'
+          const need = A.craft ? Object.entries(A.craft) : null, enough = need && need.every(([it, k]) => countOf(s, it) >= k);
+          const btn = own ? h('span', { class: 'lic-badge done' }, ico('check'), wd.wear === id ? '장착 중' : '가짐')
+            : need ? h('button', { class: 'btn pink', type: 'button', disabled: !enough, onClick: after(() => handlers.craftAccessory(id)) }, '만들기')
+              : priceBtn(A.price, s.money, after(() => handlers.buyAccessory(id)));
+            h('div', {}, h('div', { class: 't' }, A.name), h('div', { class: 'd' }, A.note),
+              need && !own ? h('div', { class: 'mon-chips' }, need.map(([it, k]) => chip(svgSpan('ico', itemSvg(it)), countOf(s, it) >= k ? '' : 'muted', `${itemInfo(it).name} ${Math.min(countOf(s, it), k)} / ${k}`))) : null),
+            btn));
         });
         out.push(h('div', { class: 'actions' }, closeBtn()));
         return out;
@@ -822,8 +844,9 @@ export function createPanels(ui, handlers) {
       return out;
     },
     // 주머니(동물의 숲처럼): 동그란 칸이 줄지어 있고, 칸을 누르면 이름 말풍선과 할 일 메뉴(먹기 · 들기 · 버리기)
-    bag(s) {
-      const b = bagOf(s), wp = weaponOf(s);
+    // 주머니. extra.giftTo = { kind, name } 이면 선물 모드: 고른 물건의 할 일이 '○○에게 주기' 하나(core/gifts.js)
+    bag(s, extra) {
+      const b = bagOf(s), wp = weaponOf(s), giftTo = extra && extra.giftTo;
       const KIND_ORDER = { herb: 0, food: 1, drop: 2, quest: 3 };
       const order = (id) => { const w = WEED_ORDER.indexOf(id); return w >= 0 ? w : 50 + Object.keys(DROPS).indexOf(id); };
       const items = Object.keys(b.items).filter((id) => b.items[id] > 0 && itemInfo(id))
@@ -876,11 +899,17 @@ export function createPanels(ui, handlers) {
         const canDrop = handlers.canDrop ? handlers.canDrop() : true;
         const act = (label, fn, opts = {}) => h('button', { class: `pocket-act${opts.main ? ' main' : ''}`, type: 'button', disabled: !!opts.disabled, onClick: () => { current.sel = null; fn(); if (current) render(); } }, label);
         const acts = [];
-        if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
-        if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('빼기', () => handlers.holdWeapon(null)) : act('장착', () => handlers.holdWeapon(sel.id), { main: true }));
-        if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
-        else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
-        else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
+        if (giftTo) {
+          // 고르면 주머니를 닫고(조용히) 친구가 받는다. 무기 · 퀘스트 물건은 줄 수 없다
+          if (sel.type === 'item' && canGift(sel.id)) acts.push(act(`${giftTo.name}에게 주기`, () => { close(true); handlers.giveGift(sel.id); }, { main: true }));
+          else acts.push(act('줄 수 없어요', () => {}, { disabled: true }));
+        } else {
+          if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
+          if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('빼기', () => handlers.holdWeapon(null)) : act('장착', () => handlers.holdWeapon(sel.id), { main: true }));
+          if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
+          else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
+          else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
+        }
         acts.push(act('그만두기', () => {}));
         // 이름 말풍선 · 메뉴는 직접 잡아 둔다(같은 모양의 마우스 말풍선 hover 가 먼저 들어 있어서 querySelector 로 찾으면 그쪽이 잡힌다)
         const bubble = h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), menu = h('div', { class: 'pocket-menu', role: 'menu' }, acts);
@@ -909,8 +938,8 @@ export function createPanels(ui, handlers) {
           menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
         };
       }
-      return [head('주머니', s.money), wrap,
-        h('div', { class: 'actions' }, h('p', { class: 'hint' }, `${slots.length} / ${SLOTS}칸`), closeBtn())];
+      return [head(giftTo ? `${giftTo.name}에게 줄 선물` : '주머니', s.money), wrap,
+        h('div', { class: 'actions' }, h('p', { class: 'hint' }, giftTo ? '줄 물건을 골라요(좋아하는 걸 주면 더 기뻐해요)' : `${slots.length} / ${SLOTS}칸`), closeBtn())];
     },
     // 집 옷장: 가진 포셰트 · 소품을 골라 바로 바꿔 단다(집 안의 내 캐릭터가 바로 바뀐다)
     wardrobe(s) {
@@ -1125,6 +1154,8 @@ export function createPanels(ui, handlers) {
     openPub: () => show('pub'),
     openBag: () => show('bag'),
     openWardrobe: () => show('wardrobe'),
+    /** 친구에게 줄 물건 고르기(주머니를 선물 모드로): giftTo = { kind, name }. 고르면 handlers.giveGift(id). */
+    openGift: (giftTo) => show('bag', { giftTo }),
     openBooks: () => show('books'),
     openTools: () => show('tools'),
     openRaffle: () => show('raffle'),
