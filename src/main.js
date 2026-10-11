@@ -3995,7 +3995,7 @@ function boot() {
     gfx.adapt(now - last, perf.frameMs); // 버벅이면 해상도를 낮춘다
     last = now;
     if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
-    drawNow = perf.drawDue(dt, covered()); // 창이 화면을 덮고 있으면 뒤 3D 는 초당 10번만
+    drawNow = perf.drawDue(dt, covered()); // 창이 화면을 덮고 있으면 뒤 3D 는 초당 30번만(render/perf.js 의 COVERED_FPS)
     try {
       tick(dt);
     } catch (e) {

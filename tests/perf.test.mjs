@@ -46,10 +46,11 @@ test('버벅임 판단 기준 간격은 절전이면 30fps 한 칸', () => {
   assert.ok(Math.abs(createPerf({ coarse: false }).frameMs - 1000 / 60) < 1e-9);
 });
 
-test('창이 화면을 덮고 있으면 뒤 3D 는 초당 10번만 그린다, 창을 닫으면 바로 다시 매번', () => {
-  const perf = createPerf({ coarse: true });
+test('창이 화면을 덮고 있으면 뒤 3D 는 초당 30번만 그린다, 창을 닫으면 바로 다시 매번', () => {
+  assert.equal(COVERED_FPS, 30);
+  const perf = createPerf({ coarse: false });
   let drawn = 0;
-  for (let i = 0; i < 60; i++) if (perf.drawDue(1 / 30, true)) drawn++; // 2초
+  for (let i = 0; i < 120; i++) if (perf.drawDue(1 / 60, true)) drawn++; // 60fps 로 2초
   assert.ok(Math.abs(drawn - COVERED_FPS * 2) <= 1, `덮인 동안 ${drawn}번`);
   let open = 0;
   for (let i = 0; i < 30; i++) if (perf.drawDue(1 / 30, false)) open++;
