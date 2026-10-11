@@ -55,23 +55,41 @@ export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };
  * 남쪽은 강 건너 남서쪽 끝 호수와 바다 사이 — 선착장(PIER)에서 20 넘게, 절벽(CLIFF)에서는 반대쪽.
  */
 export const BOSS_LAIRS = {
-  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭', door: { x: 50, z: -2 } },
-  elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터', door: { x: -67, z: -6 } },
+  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭', door: { x: 50, z: -2 }, len: 11 },
+  elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터', door: { x: -67, z: -6 }, len: 11 },
   bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭', door: { x: -4, z: 58 } }
 };
 /** 이야기 속 왕버섯 굴: 바위산 오솔길이 끝나는 곳(북쪽 절벽 바위에 끼지 않게 조금 남쪽). 입구는 오솔길 쪽. */
 export const KING_LAIR = { x: -24, z: -58, r: 7, door: { x: -10, z: -48 } };
 /**
- * 보스 마당(world/lairs.js 가 둘레에 벽을 두르고 door 쪽으로 입구 하나를 튼다): 구역 보스 셋 + 왕버섯 굴.
- * 일반 몬스터는 안으로 못 들어오고 근처에 생기지도 않으며, 보스 · 부하는 밖으로 못 나간다(world/monsters.js).
+ * 보스 마당(world/lairs.js): 높은 지형(절벽 · 언덕 · 고목)에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡(길이 len, 기본 CANYON.len) 하나로만 들어간다.
+ * 구역 보스 셋 + 왕버섯 굴. 일반 몬스터는 분지 · 협곡에 못 들어오고 근처에 생기지도 않으며, 보스 · 부하는 분지 밖으로 못 나간다(world/monsters.js).
  */
 export const ARENAS = [...Object.entries(BOSS_LAIRS).map(([id, L]) => ({ id, ...L })), { id: 'kingcap', ...KING_LAIR }];
-/** 벽이 마당 가장자리에서 떨어진 거리 · 입구 폭의 절반. */
-export const ARENA_WALL = 0.9, ARENA_DOOR = 1.7;
+/** 막는 울타리가 마당 가장자리에서 떨어진 거리. */
+export const ARENA_WALL = 0.9;
+/** 마당 입구 협곡: 기본 길이 · 폭의 절반. */
+export const CANYON = { len: 8, half: 1.8 };
+export const canyonLen = (A) => A.len || CANYON.len;
 /** (x, z) 가 들어 있는 보스 마당 | null. pad: 가장자리 여유(+ 넓게 · − 좁게). */
 export const arenaAt = (x, z, pad = 0) => ARENAS.find((A) => Math.hypot(x - A.x, z - A.z) < A.r + pad) || null;
 /** 마당 입구가 바라보는 방향(라디안, atan2(dx, dz)). */
 export const doorAngle = (A) => Math.atan2(A.door.x - A.x, A.door.z - A.z);
+/** 마당 A 의 협곡 좌표: (x, z) 를 협곡 방향 거리(along · 가운데에서) · 옆 거리(side)로. */
+export function canyonCoords(A, x, z) {
+  const a = doorAngle(A), fx = Math.sin(a), fz = Math.cos(a), rx = x - A.x, rz = z - A.z;
+  return { along: rx * fx + rz * fz, side: Math.abs(rx * fz - rz * fx) };
+}
+/** (x, z) 가 들어 있는 협곡의 마당 | null(분지 가장자리 r 부터 협곡 끝까지, 폭 CANYON.half). pad: 여유. */
+export const canyonAt = (x, z, pad = 0) => ARENAS.find((A) => {
+  const { along, side } = canyonCoords(A, x, z);
+  return along > A.r - pad && along < A.r + ARENA_WALL + canyonLen(A) + pad && side < CANYON.half + pad;
+}) || null;
+/** 협곡 바깥 끝(입구) 자리. */
+export function canyonMouth(A, extra = 0) {
+  const a = doorAngle(A), d = A.r + ARENA_WALL + canyonLen(A) + extra;
+  return { x: A.x + Math.sin(a) * d, z: A.z + Math.cos(a) * d };
+}
 
 export const riverZ = (x) => RIVER.z + RIVER.amp * Math.sin(x * RIVER.freq);
 

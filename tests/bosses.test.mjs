@@ -43,6 +43,14 @@ test('보스 마당 넷(구역 보스 셋 + 왕버섯 굴): 서로 · 마을과 
     assert.equal(Lay.arenaAt(A.x, A.z), A, `${A.id}: 가운데는 그 마당`);
     assert.equal(Lay.arenaAt(A.x + A.r + 0.5, A.z), null, `${A.id}: 가장자리 밖은 마당이 아니다`);
   }
+  // 협곡: 분지 가장자리에서 door 쪽으로 뻗고, 입구(바깥 끝)는 길 가까이(마을에서 걸어오기 쉽게)
+  for (const A of Lay.ARENAS) {
+    const m = Lay.canyonMouth(A), a = Lay.doorAngle(A), mid = A.r + Lay.ARENA_WALL + Lay.canyonLen(A) / 2;
+    assert.ok(Lay.roadDist(m.x, m.z) < 6, `${A.id}: 협곡 입구가 길 가까이(${Lay.roadDist(m.x, m.z).toFixed(1)})`);
+    assert.equal(Lay.canyonAt(A.x + Math.sin(a) * mid, A.z + Math.cos(a) * mid), A, `${A.id}: 협곡 가운데`);
+    assert.equal(Lay.canyonAt(A.x, A.z), null, `${A.id}: 분지 가운데는 협곡이 아니다`);
+    assert.equal(Lay.regionAt(m.x, m.z), Lay.regionAt(A.x, A.z), `${A.id}: 협곡 입구도 같은 구역`);
+  }
   const K = Lay.KING_LAIR;
   assert.equal(Lay.regionAt(K.x, K.z), 'mountain', '왕버섯 굴은 바위산');
   const a = Lay.doorAngle(K), R = K.r + Lay.ARENA_WALL;

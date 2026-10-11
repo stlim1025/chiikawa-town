@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, doorAngle, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, CANYON, canyonLen, canyonCoords, riverZ, roadDist, shoreDist } from '../core/layout.js';
 import { buildLairs } from './lairs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -14,7 +14,7 @@ const FLOWER = ['#ffffff', '#ffa8c6', '#ffe36e', '#c9a8ff', '#ff9a9a', '#8fd3ff'
  * ctx: { world, zones, obstacles, rand, tree(x, z, s, leaf, parent), labels, spots } → { glow: 밤에 빛나는 재질 목록 }
  */
 export function buildOutdoors(ctx) {
-  const { world, zones, obstacles, rand, tree, labels, spots } = ctx;
+  const { world, zones, obstacles, rand, tree, labels, spots, fader } = ctx;
   const glow = [];
   const outside = (x, z) => Math.hypot(x, z) > VILLAGE_R + 3;
   // 종류 → { geo, color, opts, byZone: Map(묶음 그룹 → 행렬 목록) }
@@ -39,11 +39,11 @@ export function buildOutdoors(ctx) {
 
   const ELDER = BOSS_LAIRS.elder;
   const inLair = (x, z, pad = 0) => Object.values(BOSS_LAIRS).some((L) => Math.hypot(x - L.x, z - L.z) < L.r + pad);
-  /** 보스 마당 자리(벽 둘레까지)와 입구 앞마당: 나무 · 바위를 비운다. */
+  /** 보스 마당 자리(분지 + 둘레 절벽)와 협곡(+ 양옆 절벽 · 입구 앞): 나무 · 바위를 비운다(world/lairs.js 가 그 자리에 지형을 짓는다). */
   const arenaClear = (x, z) => ARENAS.some((A) => {
-    if (Math.hypot(x - A.x, z - A.z) < A.r + ARENA_WALL + 1.2) return true;
-    const a = doorAngle(A), d = A.r + ARENA_WALL + 1.8;
-    return Math.hypot(x - (A.x + Math.sin(a) * d), z - (A.z + Math.cos(a) * d)) < 2.8;
+    if (Math.hypot(x - A.x, z - A.z) < A.r + ARENA_WALL + 3.6) return true;
+    const { along, side } = canyonCoords(A, x, z);
+    return along > A.r && along < A.r + ARENA_WALL + canyonLen(A) + 2.5 && side < CANYON.half + 3.6;
   });
   // ---------- 서쪽 숲: 빽빽한 나무와 빈터, 길가는 반투명해지는 나무, 서쪽 끝은 빈틈없이 ----------
   for (let x = -WORLD_HALF + 1; x < -VILLAGE_R - 2; x += 3.2) {
@@ -171,12 +171,12 @@ export function buildOutdoors(ctx) {
     if (shoreDist(x, z) < 2 || roadDist(x, z) < 2.5 || obstacles.hits(x, z, 1.5) || Math.hypot(x - CLIFF.log.x, z - CLIFF.log.z) < 9 || Math.hypot(x - PIER.x, z - SOUTH_SHORE) < 7) continue; // 절벽 위 · 선착장 앞은 탁 트이게
     made++;
     const s = 1.0 + rand() * 0.3;
-    if (inLair(x, z, 1.5)) rand(); // 보스 자리 안: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 자리가 바뀌지 않게
+    if (arenaClear(x, z)) rand(); // 보스 마당 · 협곡 자리: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 자리가 바뀌지 않게
     else tree(x, z, s, '#6cc77e', zones.groupAt(x, z));
   }
 
   // 구역 보스 자리(난수를 쓰는 짓기가 다 끝난 뒤에: 그 앞 나무 · 꽃 자리가 바뀌지 않게)
-  buildLairs({ zones, obstacles, labels });
+  buildLairs({ zones, obstacles, labels, fader });
 
   // ---------- 모은 인스턴스를 묶음마다 그린다 ----------
   for (const b of batches.values()) for (const [g, list] of b.byZone) g.add(toonInstances(b.geo, b.color, list, b.opts));

@@ -1,14 +1,18 @@
 import * as THREE from 'three';
-import { toonMesh, GEO } from '../render/toon.js';
-import { ARENAS, ARENA_WALL, ARENA_DOOR, doorAngle } from '../core/layout.js';
+import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
+import { ARENAS, ARENA_WALL, CANYON, canyonLen, doorAngle, canyonMouth } from '../core/layout.js';
 
 /**
- * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 둘레에 벽(들판 풀 둔덕 · 숲 덤불 · 강가 · 바위산 바위)을 두르고 길 쪽(door)으로 입구 하나.
- * 구역 보스 자리는 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙) + 소품 몇 개 + 뒤쪽 가장자리에 뜬 이름표도. 벽은 낮게(남쪽에서 보는 카메라에 싸움을 가리지 않게).
- * 난수를 쓰지 않고 정해진 각도에 놓는다(앞서 지은 숲 · 들판의 난수 순서를 흐트러뜨리지 않게). 부품은 마을 정적 배칭(batchStatic)이 한 덩어리로 묶는다.
- * ctx: { zones, obstacles, labels }
+ * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 높은 지형에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡 하나.
+ *  바위산 · 강가는 절벽 바위, 들판은 풀 언덕, 숲은 고목이 빙 둘러서고, 협곡 양옆도 같은 지형이다. 협곡 바닥엔 흙길(바위산은 원래 오솔길).
+ *  카메라(남쪽) 쪽 덩어리는 셋씩 묶어 집처럼 내 캐릭터를 가리면 반투명해진다(village.js 의 fader). 나머지는 마을 정적 배칭이 한 덩어리로 묶는다.
+ *  덩어리 아래로 촘촘한 울타리(장애물)를 둘러 사이로 못 지나가고, 협곡 끝(입구)에 이름표.
+ * 구역 보스 자리는 분지 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙)과 소품 몇 개도. 공유 난수를 쓰지 않는다(앞서 지은 숲 · 들판 자리가 바뀌지 않게).
+ * ctx: { zones, obstacles, labels, fader }
  */
 const around = (n, from = 0) => Array.from({ length: n }, (_, i) => from + (i / n) * Math.PI * 2);
+/** 정해진 흔들림(0..1): 덩어리마다 크기 · 높이를 조금씩 다르게. */
+const jitter = (i, k = 1) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
 /** 바닥 원판(넓어서 기본 원기둥은 각이 져 보인다 · 셋이 나눠 쓴다). */
 const DISC = new THREE.CylinderGeometry(1, 1, 1, 48).translate(0, 0.5, 0);
 /** 바닥 한 장(그림자를 받는 납작한 원판). */
@@ -46,33 +50,102 @@ const DECOR = {
   }
 };
 
-/** 마당 벽 생김새: 색 둘(번갈아) · 조각 크기 · 높이. */
-const WALL = {
-  bigmole: { colors: ['#95d488', '#aee08f'], scale: [0.85, 0.7, 0.85], y: -0.15 }, // 풀 둔덕
-  elder: { colors: ['#4f9f58', '#5fb36e'], scale: [0.85, 0.8, 0.85], y: 0 }, // 덤불
-  bigcrab: { colors: ['#a39a8f', '#b9b2a6'], scale: [0.8, 0.6, 0.75], y: 0 }, // 강가 바위
-  kingcap: { colors: ['#8f8174', '#a39486'], scale: [0.95, 0.8, 0.9], y: 0 } // 바위산 바위
+/**
+ * 둘러싼 지형: kind(rock 절벽 바위 · hill 풀 언덕 · tree 고목), 색 셋(번갈아), w 덩어리 반지름, h 높이 [낮게, 높게](카메라 쪽은 더 낮게),
+ * cap 꼭대기 이끼(바위), path 협곡 바닥 흙길 색(바위산은 오솔길이 이미 지나간다).
+ */
+const TERRAIN = {
+  kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
+  bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e', path: '#c2a882' },
+  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], w: 2.4, h: [2.4, 3.3], path: '#d2b98c' },
+  elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8], path: '#a89470' }
 };
-/** 둘레 벽: 마당 가장자리 밖 ARENA_WALL 에 조각을 촘촘히(사이로 못 지나가게), 입구(door 쪽 폭 ARENA_DOOR × 2)만 비우고 양옆은 큰 기둥. */
-function walls(g, A, obstacles) {
-  const W = WALL[A.id], R = A.r + ARENA_WALL, door = doorAngle(A), half = Math.asin(Math.min(1, ARENA_DOOR / R)), step = 1.0 / R;
-  const from = door + half, to = door + Math.PI * 2 - half;
-  const n = Math.max(2, Math.round((to - from) / step));
+/** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
+const FADE_GROUP = 3;
+
+/**
+ * 마당 A 의 둘레 · 협곡 양옆 덩어리 자리(마당 가운데 기준): [{ x, z, k(굵기 배율), h(높이), low }].
+ * 분지 남쪽(카메라 쪽) 둘레는 낮게(low — 숲은 고목 대신 덤불): 높으면 반투명해져도 화면을 덮어 싸움이 흐려 보였다. 협곡 양옆과 북 · 동 · 서는 높게(숲 협곡만 덤불).
+ */
+function massSpots(A, T) {
+  const out = [], len = canyonLen(A), door = doorAngle(A), fx = Math.sin(door), fz = Math.cos(door);
+  const height = (i) => T.h[0] + (T.h[1] - T.h[0]) * jitter(i, 2);
+  // 분지 둘레: 협곡 자리만 비운다
+  const R = A.r + ARENA_WALL + T.w * 0.75, gap = Math.asin(Math.min(1, (CANYON.half + T.w * 0.7) / R)), step = (T.w * 1.25) / R;
+  const n = Math.max(3, Math.round((Math.PI * 2 - gap * 2) / step));
   for (let i = 0; i <= n; i++) {
-    const a = from + ((to - from) * i) / n, x = Math.sin(a) * R, z = Math.cos(a) * R, k = i === 0 || i === n ? 1.25 : 1 + (i % 3) * 0.08;
-    g.add(toonMesh(GEO.sphere, W.colors[i % 2], { position: [x, W.y, z], scale: W.scale.map((v) => v * k), outline: 0.035, receive: true }));
-    obstacles.push({ x: A.x + x, z: A.z + z, r: 0.78 * k });
+    const a = door + gap + ((Math.PI * 2 - gap * 2) * i) / n, x = Math.sin(a) * R, z = Math.cos(a) * R;
+    const low = z > A.r * 0.15;
+    out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (low ? (T.kind === 'tree' ? 0.36 : 0.45) : 1), low });
+  }
+  // 협곡 양옆: 분지 가장자리에서 입구까지
+  const side = CANYON.half + T.w * 0.75, from = A.r + ARENA_WALL + T.w * 0.4, to = A.r + ARENA_WALL + len;
+  const m = Math.max(1, Math.round((to - from) / (T.w * 1.25)));
+  for (const sd of [-1, 1]) {
+    for (let j = 0; j <= m; j++) {
+      const along = from + ((to - from) * j) / m, x = fx * along + fz * side * sd, z = fz * along - fx * side * sd, i = 100 + j * 2 + (sd > 0 ? 1 : 0);
+      const low = T.kind === 'tree'; // 숲 협곡은 덤불 길(고목이면 큰 잎이 카메라 바로 앞을 덮는다)
+      out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (low ? 0.36 : j === m ? 0.85 : 1), low });
+    }
+  }
+  return out;
+}
+
+/** 덩어리 하나를 짓는다. mat(색) → 재질(반투명 묶음이면 그 묶음 전용, 아니면 함께 쓰는 재질), add(메시) → 그룹에 넣는다. */
+function buildMass(T, s, i, mat, add) {
+  const c = T.colors[i % T.colors.length], c2 = T.colors[(i + 1) % T.colors.length], w = T.w * s.k;
+  const mesh = (geo, color, opts) => add(toonMesh(geo, null, { ...opts, material: mat(color) }));
+  if (T.kind === 'hill') {
+    mesh(GEO.sphere, c, { position: [s.x, -0.35, s.z], scale: [w * 1.25, s.h + 0.35, w * 1.15], outline: 0.05, receive: true });
+  } else if (T.kind === 'tree' && s.low) {
+    // 남쪽 둘레: 고목 대신 낮은 덤불 둘
+    mesh(GEO.sphere, c, { position: [s.x, s.h * 0.4, s.z], scale: [w * 1.05, s.h * 0.6, w], outline: 0.045 });
+    mesh(GEO.sphere, c2, { position: [s.x + w * 0.6, s.h * 0.3, s.z + 0.3], scale: [w * 0.7, s.h * 0.45, w * 0.65], outline: 0.04 });
+  } else if (T.kind === 'tree') {
+    mesh(GEO.cylinder, T.trunk, { position: [s.x, 0, s.z], scale: [0.5 * s.k, s.h * 0.6, 0.5 * s.k], outline: 0.04 });
+    mesh(GEO.sphere, c, { position: [s.x, s.h * 0.78, s.z], scale: [w, w * 0.85, w], outline: 0.05 });
+    mesh(GEO.sphere, c2, { position: [s.x + w * 0.5, s.h * 0.62, s.z + 0.2], scale: [w * 0.7, w * 0.6, w * 0.7], outline: 0.045 });
+  } else {
+    mesh(GEO.sphereMid, c, { position: [s.x, 0, s.z], rotation: [0, i * 1.7, 0], scale: [w, s.h, w * 0.9], outline: 0.06, receive: true });
+    mesh(GEO.sphereMid, c2, { position: [s.x + w * 0.55, 0, s.z + w * 0.35], rotation: [0, i * 0.9, 0], scale: [w * 0.55, s.h * 0.45, w * 0.5], outline: 0.045, receive: true });
+    if (T.cap) mesh(GEO.sphere, T.cap, { position: [s.x, s.h * 0.92, s.z], scale: [w * 0.62, 0.28, w * 0.55], outline: 0.03 });
   }
 }
 
-export function buildLairs({ zones, obstacles, labels }) {
+/** 울타리(장애물): 덩어리 사이로 지나가지 못하게 분지 가장자리 밖 ARENA_WALL 과 협곡 양옆을 촘촘히 막는다(협곡 자리만 비운다). */
+function fences(A, obstacles) {
+  const R = A.r + ARENA_WALL, door = doorAngle(A), gap = Math.asin(Math.min(1, CANYON.half / R)), push = (x, z) => obstacles.push({ x: A.x + x, z: A.z + z, r: 0.78 });
+  const n = Math.round((Math.PI * 2 - gap * 2) * R);
+  for (let i = 0; i <= n; i++) { const a = door + gap + ((Math.PI * 2 - gap * 2) * i) / n; push(Math.sin(a) * R, Math.cos(a) * R); }
+  const fx = Math.sin(door), fz = Math.cos(door), side = CANYON.half + 0.78, to = R + canyonLen(A);
+  for (let along = R - 0.4; along <= to; along += 1) for (const sd of [-1, 1]) push(fx * along + fz * side * sd, fz * along - fx * side * sd);
+}
+
+export function buildLairs({ zones, obstacles, labels, fader }) {
   for (const A of ARENAS) {
-    const g = new THREE.Group();
+    const T = TERRAIN[A.id], g = new THREE.Group();
     g.position.set(A.x, 0, A.z);
-    walls(g, A, obstacles);
+    fences(A, obstacles);
+    // 둘러싼 지형: 카메라 쪽(남쪽) 덩어리는 FADE_GROUP 개씩 반투명 묶음으로
+    const spots = massSpots(A, T), south = spots.filter((s) => s.z > -A.r * 0.25), groupOf = new Map();
+    for (let i = 0; fader && i < south.length; i += FADE_GROUP) {
+      const part = south.slice(i, i + FADE_GROUP), cx = part.reduce((a, s) => a + s.x, 0) / part.length, cz = part.reduce((a, s) => a + s.z, 0) / part.length;
+      const f = fader(A.x + cx, A.z + cz, Math.max(...part.map((s) => Math.hypot(s.x - cx, s.z - cz))) + T.w);
+      part.forEach((s) => groupOf.set(s, f));
+    }
+    spots.forEach((s, i) => {
+      const f = groupOf.get(s);
+      buildMass(T, s, i, f ? (c) => f.mat(c) : (c) => toonMaterial(c), (mesh) => { g.add(mesh); if (f) f.add(mesh); return mesh; });
+      obstacles.push({ x: A.x + s.x, z: A.z + s.z, r: T.w * s.k * 0.8 });
+    });
+    // 협곡 바닥 흙길(바위산은 오솔길이 이미 지나간다)
+    if (T.path) {
+      const len = canyonLen(A) + ARENA_WALL + 0.6, mid = A.r + len / 2 - 0.3, a = doorAngle(A);
+      g.add(toonMesh(GEO.box, T.path, { position: [Math.sin(a) * mid, 0.008, Math.cos(a) * mid], rotation: [0, a, 0], scale: [CANYON.half * 2 - 0.3, 0.02, len], outline: false, shadow: false, receive: true }));
+    }
     if (DECOR[A.id]) DECOR[A.id](g, A.r);
-    // 이름표(팻말 없이): 마당 뒤쪽(북쪽) 가장자리 위 — 남쪽에서 보는 카메라에 싸움을 가리지 않고 보이고, 마을폰 지도에도 뜬다. 왕버섯 굴은 이야기 속 비밀이라 없다
-    if (A.place) labels.push({ x: A.x, y: 1.6, z: A.z - A.r, text: A.place });
+    // 이름표: 협곡 입구 위(어디로 들어가는지 보이게, 마을폰 지도에도 뜬다). 왕버섯 굴은 이야기 속 비밀이라 없다
+    if (A.place) { const m = canyonMouth(A, 0.6); labels.push({ x: m.x, y: 2.2, z: m.z, text: A.place }); }
     zones.add(g, A.x, A.z);
   }
 }

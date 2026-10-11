@@ -563,7 +563,22 @@ export function buildVillage(scene) {
 
   // ---------- 울타리 밖 네 구역: 월드를 묶음으로 나눠 멀리 있는 묶음은 그리지 않는다 ----------
   const zones = createZones(world, { size: 20, half: WORLD_HALF, view: 56 });
-  const outdoors = buildOutdoors({ world, zones, obstacles, rand, tree, labels, spots });
+  /**
+   * 집처럼 내 캐릭터를 가리면 반투명해지는 바깥 지형 덩어리(보스 마당의 카메라 쪽 절벽 · 언덕 · 고목)를 등록한다.
+   * → { mat(색): 이 덩어리 전용 재질, add(메시) } — add 한 메시는 아래 집 합치기에서 한 덩어리로 합쳐진다.
+   */
+  function fader(x, z, half) {
+    const o = { x, z, half, mats: [], meshes: [], fade: 1 }, byColor = new Map();
+    houses.push(o);
+    return {
+      mat(c) {
+        if (!byColor.has(c)) { const m = toonMaterial(c, { unique: true }); m.transparent = true; byColor.set(c, m); o.mats.push(m); }
+        return byColor.get(c);
+      },
+      add(mesh) { o.meshes.push(mesh); return mesh; }
+    };
+  }
+  const outdoors = buildOutdoors({ world, zones, obstacles, rand, tree, labels, spots, fader });
 
   /** (x, z) 에 반지름 radius 만큼 설 수 있는지. soft 면 지나갈 수 있는 덤불도 피한다(무언가를 놓을 자리 고를 때). */
   function isFree(x, z, radius = 0.35, soft = false) {
