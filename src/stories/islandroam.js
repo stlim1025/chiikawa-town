@@ -1,6 +1,6 @@
 /**
  * 섬에서 직접 걷기(사이드스토리 '수상한 섬 합숙'): 축제 · 밤의 정글 · 동굴 구출 때 내 캐릭터를 조이스틱 · 키보드로 움직인다.
- * 대본(stories/islandscript.js 의 ROAMS)이 정한다: { area('beach' | 'grotto'), me: [x, z, 바라봄], follow(따라오는 친구), goal(목표 글), cam: [높이, 거리], targets, watch }
+ * 대본(stories/islandscript.js 의 ROAMS)이 정한다: { area('beach' | 'grotto'), me: [x, z, 바라봄], follow(따라오는 친구), goal(목표 알약 조각), cam: [높이, 거리], targets, watch }
  *  target: { id, k(그 사람 자리) | at: [x, z](기준 자리 상대), r(가까이 갈 거리), label(행동 이름), lines(처음) · again(다시),
  *            eat('slurp' | 'nibble' | 'dance' — 그동안 그 몸짓), free(덩굴 끊기 — 다 끊으면 끝), ask: { text, choices, end(끝내는 선택지 번호) },
  *            auto(가까이 가면 저절로 · 한 번), end(대사 뒤 끝) }

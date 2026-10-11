@@ -455,13 +455,14 @@ export const BEATS = [
  *  festival: 환영 뒤 섬 축제 — 포장마차 넷에서 먹기 · 춤판 · 친구 · 섬사람들과 이야기. 하치와레에게 '숙소로 가자'를 고르면 끝.
  *  jungle: 밤의 정글 — 치이카와와 함께 카레 냄새를 따라 오두막까지.
  *  rescue: 동굴 구출 — 시마지로가 세이렌을 재우는 동안 덩굴 끊기. 세이렌이 뒤척일 때 움직이면 들킬 뻔한다.
+ *  goal: 위 가운데 알약(hud.setTimer 조각) — 글자는 늘, { text, narrow: 'hide' } 는 좁은 세로 휴대폰에서 숨긴다.
  */
 const talk = (k, lines, again) => ({ id: k, k, r: 1.5, label: '말 걸기', lines, again });
 const free = (k, line) => ({ id: k, k, r: 1.8, label: '덩굴 끊기', free: true, lines: [line] });
 export const ROAMS = {
   festival: {
     area: 'beach', me: [0, 7.0, PI], cam: [8.2, 6.6], // 높이 내려다봐서 환영 아치에 가리지 않게
-    goal: '섬 축제! 먹고 · 이야기하고 · 춤추기 — 다 놀았으면 하치와레에게', tip: '돌아다니며 말을 걸고 포장마차에서 먹어 보자',
+    goal: ['섬 축제를 즐기자!', { text: '다 놀았으면 하치와레에게', narrow: 'hide' }], tip: '돌아다니며 말을 걸고 포장마차에서 먹어 보자',
     targets: [
       { id: 'ramen', at: [-6, 4.05], r: 1.3, label: '라멘 먹기', eat: 'slurp', lines: ['(진한 해물 국물의 섬 한정 라멘! 후루룩…)', ['s', '헤헤, 섬 해초를 듬뿍 넣었대요! 맛있죠?']], again: ['(한 그릇 더… 배가 빵빵하다!)'] },
       { id: 'parfait', at: [-2, 4.05], r: 1.3, label: '파르페 먹기', eat: 'nibble', lines: ['(랏코 뒤에 줄 서서 받은 과일 파르페! 과일이 산처럼 쌓였다)', ['r', '…디저트는 수련에 필요한 영양이다.']], again: ['(또 줄 섰다. 랏코도 또 서 있다…)'] },
@@ -486,7 +487,7 @@ export const ROAMS = {
   },
   jungle: {
     area: 'beach', me: [5.4, 8.6, PI], follow: 'chiikawa', cam: [5.6, 7.4],
-    goal: '카레 냄새를 따라 불빛 쪽으로 (치이카와와 함께)',
+    goal: ['카레 냄새를 따라 불빛 쪽으로', { text: '치이카와와 함께', narrow: 'hide' }],
     targets: [
       { id: 'rustle', at: [3.4, 5.0], r: 1.9, auto: true, lines: [{ do: 'snd', name: 'thud' }, '(덤불이 바스락…!)', { do: 'pose', k: 'chiikawa', mode: 'flail' }, ['c', '…!! (화들짝)'], '(…바람이었다. 치이카와가 {name} 옷자락을 꼭 잡는다)'] },
       { id: 'hut', at: [0, 2.8], r: 2.4, auto: true, end: true, lines: [] }
@@ -494,7 +495,7 @@ export const ROAMS = {
   },
   rescue: {
     area: 'grotto', me: [1.0, 2.2, PI], follow: 'chiikawa', cam: [4.6, 6.6],
-    goal: '세이렌이 잠든 사이 덩굴 끊기 · 뒤척이면(!) 꼼짝 마!', tip: '세이렌이 뒤척일 때 움직이면 들킬 뻔해요',
+    goal: ['덩굴을 끊어 친구들 구하기', { text: '세이렌이 뒤척이면 꼼짝 마!', narrow: 'hide' }], tip: '세이렌이 뒤척일 때 움직이면 들킬 뻔해요',
     watch: {
       every: [8, 12], warn: 1.8, warnText: '세이렌이 뒤척인다…! 멈춰!',
       caught: [{ do: 'siren', state: 'angry' }, { do: 'shake', sec: 0.5 }, { do: 'snd', name: 'growl' }, '(세이렌이 눈을 번쩍…!)', ['j', '…쏴아… 쏴아아…'],
