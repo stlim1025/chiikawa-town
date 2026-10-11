@@ -88,7 +88,7 @@ test('story chain steps & visit', () => {
 test('weapon reward falls back to money', () => {
   let s = withHearts({ ...fresh(), licenses: { hunter: { day: 1 } }, weapon: { owned: ['hammer'], held: 'hammer' } }, 'rakko', 2);
   s = Q.startQuest(s, 'training');
-  s = { ...s, hunted: { turtle: 2 } };
+  s = { ...s, hunted: { fluff: 3 } };
   const r = Q.completeStep(s, 'training', 1);
   assert.equal(r.state.money, 1000 + 300 + Math.round(C.WEAPONS.hammer.price / 2));
 });
