@@ -379,12 +379,14 @@ export function createHud(ui, input) {
     /**
      * 새 일감 · 시험 · 부탁을 받았을 때: 가운데에 쪽지 카드가 톡 떴다가 왼쪽 위로 날아가 꽂히고 그 칸이 반짝인다.
      * to: 'job'(일감 칸, 기본) | 'quest'(퀘스트 쪽지 — 쪽지는 카드가 꽂힐 때 나타나며 별이 튄다)
+     * target: 그 밖의 칸(하치와레 안내의 할 일 쪽지 등). 퀘스트 쪽지처럼 카드가 꽂힐 때까지 숨었다가 반짝인다. look: 카드에 덧붙일 이름표(색).
      * { kicker: '새 일감!', title, sub, to, chips: [{ icon: 'coin' | SVG, text }] } — 덧붙일 것(어디서 · 보수)은 sub 에 잇지 말고 chips 로.
      */
-    announce({ kicker, title, sub, to = 'job', id = null, chips = null }) {
-      const toQuest = to === 'quest';
+    announce({ kicker, title, sub, to = 'job', id = null, chips = null, target = null, look = null }) {
+      const toQuest = to === 'quest' && !target;
       if (toQuest && id) { incoming.set(id, (incoming.get(id) || 0) + 1); notes.get(id)?.el.classList.add('incoming'); }
-      const card = el('div', 'task-card' + (toQuest ? ' quest' : ''));
+      target?.classList.add('incoming');
+      const card = el('div', 'task-card' + (toQuest ? ' quest' : '') + (look ? ' ' + look : ''));
       card.setAttribute('role', 'status');
       card.innerHTML = `<span class="task-ico">${NOTE}</span><div class="task-txt"><i></i><b></b><span></span></div>`;
       card.querySelector('i').textContent = kicker;
@@ -398,6 +400,7 @@ export function createHud(ui, input) {
       }
       ui.appendChild(card);
       const glow = () => {
+        if (target) { target.classList.remove('incoming'); shineQuest(target); return; }
         if (toQuest) {
           const left = (incoming.get(id) || 1) - 1, note = notes.get(id)?.el;
           if (left > 0) incoming.set(id, left); else { incoming.delete(id); note?.classList.remove('incoming'); }
@@ -411,10 +414,10 @@ export function createHud(ui, input) {
       };
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       setTimeout(() => {
-        const target = toQuest ? (notes.get(id)?.el || quests) : job;
-        if (toQuest) target.style.visibility = 'hidden'; // 자리는 재되 아직 보이지 않게
-        const to = target.getBoundingClientRect();
-        if (toQuest) target.style.visibility = '';
+        const dest = target || (toQuest ? (notes.get(id)?.el || quests) : job);
+        if (toQuest) dest.style.visibility = 'hidden'; // 자리는 재되 아직 보이지 않게
+        const to = dest.getBoundingClientRect();
+        if (toQuest) dest.style.visibility = '';
         if (still || !card.animate || !to.width) { card.remove(); glow(); return; }
         // 일감 칸(또는 퀘스트 쪽지) 자리로 줄어들며 날아간다
         const from = card.getBoundingClientRect();

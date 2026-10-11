@@ -974,6 +974,7 @@ function boot() {
 
   // ---------- 하치와레의 첫날 안내 ----------
   const GOALS = { house: '하치와레 따라가기', board: '노동 접수에서 일감 받기', pull: '풀 뽑기', report: '보수 받기' };
+  const GOAL_HINTS = { house: '하얀 동그란 내 집까지', board: '게시판 앞에서 버튼 누르기', pull: '꾹 눌렀다 초록 칸에서 떼기', report: '노동 접수로 돌아가기' };
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
   const nearHome = () => !!player && Math.hypot(player.position.x - village.spots.home.x, player.position.z - village.spots.home.z) < 2.6;
@@ -991,14 +992,23 @@ function boot() {
     state = { ...state, tutorial: step };
     save();
     npcs.setFollow('hachiware', tutorialActive(step));
-    guide.setGoal(GOALS[step] || null);
+    guide.setGoal(GOALS[step] || null, { hold: true }); // 할 일 쪽지는 말이 끝나고 가운데 카드가 날아와 꽂힐 때 나타난다(announceGoal)
     // 집 안내 중에는 하치와레가 앞장서서 현관 옆에서 기다린다
     npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : null);
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
     else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => { enterTutorial('done', 'tips'); hud.toast('안내 끝!', 2400); });
-    else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board);
-    else if (TUTORIAL_LINES[step]) sayGuide(TUTORIAL_LINES[step]);
+    else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board, () => announceGoal(step));
+    else if (TUTORIAL_LINES[step]) sayGuide(TUTORIAL_LINES[step], () => announceGoal(step));
+    else announceGoal(step);
+  }
+  /** 할 일 카드: 부탁을 받을 때처럼 가운데에 톡 떴다가 왼쪽 위 할 일 쪽지로 날아가 꽂힌다. 그새 단계가 바뀌었으면 띄우지 않는다. */
+  let goalCardAt = -1e9;
+  function announceGoal(step) {
+    if (!state || state.tutorial !== step || !GOALS[step]) return;
+    goalCardAt = performance.now();
+    sound.play('job');
+    hud.announce({ kicker: '할 일!', title: GOALS[step], sub: GOAL_HINTS[step], target: guide.goalEl, look: 'goal' });
   }
   /** 가야 할 곳 위에 '여기!' 표시. */
   function tutorialMarker() {
@@ -4128,6 +4138,8 @@ function boot() {
       if (tutorialActive(state.tutorial) && !guide.open && !panels.isOpen() && !pulling) {
         const next = tutorialNext(state.tutorial, state, { nearHome: nearHome() });
         if (next !== state.tutorial) enterTutorial(next, state.tutorial);
+        // 말이 다른 대화에 끊겨 할 일 카드를 못 띄웠으면(쪽지가 숨은 채로 남았으면) 지금 띄운다
+        else if (guide.goalEl.classList.contains('incoming') && performance.now() - goalCardAt > 4000) announceGoal(state.tutorial);
       }
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }

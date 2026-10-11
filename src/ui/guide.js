@@ -164,10 +164,13 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
       choicesEl.scrollTop = 0;
       select(0);
     },
-    /** 할 일 쪽지. null 이면 숨긴다. */
-    setGoal(t) {
+    /** 할 일 쪽지. null 이면 숨긴다. hold: 자리만 두고 숨겨 둔다(가운데 할 일 카드가 날아와 꽂힐 때 hud.announce 가 드러낸다). */
+    setGoal(t, { hold = false } = {}) {
       goal.hidden = !t;
       if (t) goal.textContent = t;
-    }
+      goal.classList.toggle('incoming', !!t && hold);
+    },
+    /** 할 일 쪽지 칸(hud.announce 의 target). */
+    goalEl: goal
   };
 }

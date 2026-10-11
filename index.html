@@ -1278,16 +1278,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .panel .t .power { white-space: nowrap; }
 .hud-quest.got { animation: q-got 1.2s ease-out; }
 /* 새 부탁 쪽지가 날아와 꽂힐 때: 쪽지는 그때까지 숨어 있다가 톡 튀며 반짝(빛이 쓸고 지나가고 별이 튄다) */
-.hud-quest { position: relative; transform-origin: left center; }
-.hud-quest.incoming { visibility: hidden; }
-.hud-quest.shine { animation: q-shine 1.4s ease-out; }
+.hud-quest, .guide-goal { position: relative; transform-origin: left center; }
+.hud-quest.incoming, .guide-goal.incoming { visibility: hidden; }
+.hud-quest.shine, .guide-goal.shine { animation: q-shine 1.4s ease-out; }
 @keyframes q-shine {
   0% { scale: 1.25; background: #fff0a6; box-shadow: 0 0 0 9px rgba(255, 215, 122, 0.75), 0 3px 0 #e8c97a; }
   25% { scale: 0.95; }
   45% { scale: 1.06; background: #fff3c4; box-shadow: 0 0 0 5px rgba(255, 215, 122, 0.45), 0 3px 0 #e8c97a; }
   100% { scale: 1; }
 }
-.hud-quest.shine::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+.hud-quest.shine::after, .guide-goal.shine::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.95) 48%, transparent 62%) no-repeat; background-size: 260% 100%; animation: q-sweep 0.8s 0.12s ease-out both; }
 @keyframes q-sweep { from { background-position: 140% 0; } to { background-position: -70% 0; } }
 .q-star { position: absolute; left: var(--x); top: var(--y); width: 20px; height: 20px; margin: -10px 0 0 -10px; color: var(--c); pointer-events: none; filter: drop-shadow(0 1px 0 rgba(160, 110, 20, 0.45)); animation: q-star 0.95s var(--t) ease-out both; }
@@ -1298,7 +1298,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   100% { transform: translate(calc(var(--dx) * 1.5), calc(var(--dy) * 1.5)) scale(0.3) rotate(140deg); opacity: 0; }
 }
 .task-card.quest .task-txt i { background: #ffd77a; box-shadow: 0 2px 0 #e0b04a; }
-@media (prefers-reduced-motion: reduce) { .hud-quest.shine, .hud-quest.shine::after, .q-star { animation: none; } .q-star { display: none; } }
+/* 하치와레 안내의 할 일 카드: 왼쪽 위 할 일 쪽지의 표(노란 바탕 흰 글씨)처럼 */
+.task-card.goal .task-txt i { background: var(--yellow-deep); color: #fff; box-shadow: 0 2px 0 #c98f2e; }
+@media (prefers-reduced-motion: reduce) { .hud-quest.shine, .hud-quest.shine::after, .guide-goal.shine, .guide-goal.shine::after, .q-star { animation: none; } .q-star { display: none; } }
 @keyframes q-got { 0% { transform: scale(1.08); box-shadow: 0 3px 0 #e8c97a, 0 0 0 6px rgba(255, 215, 122, 0.8); } 100% { transform: none; } }
 .cinematic .hud-quest, .cinematic .hud-job { display: none !important; }
 /* 가방 버튼: 타이틀 · 마을 입장 연출 중에는 숨기고, 집 · 친구 집 안에서는 그대로 */
@@ -1473,7 +1475,8 @@ html.standalone, html.standalone body { height: 100vh; }
   .world-label.mark { padding: 2px 12px 4px; font-size: 17px; }
   .world-label.sign { font-size: 14px; }
   /* 대화 상자 */
-  .guide { min-height: 0; padding: 14px 24px 20px; border-radius: 34px 40px 38px 32px / 40px 34px 40px 36px; }
+  /* 한 줄 대사도 납작하지 않게 늘 두 줄 높이, 아래는 ▼ 자리(글자에 닿지 않게) */
+  .guide { min-height: 92px; padding: 16px 24px 26px; border-radius: 34px 40px 38px 32px / 40px 34px 40px 36px; }
   .guide-name { left: 24px; top: -14px; padding: 1px 14px 3px; font-size: 16px; }
   .guide-text { font-size: 18px; line-height: 1.35; }
   .guide-next { bottom: 3px; width: 26px; height: 18px; margin-left: -13px; }
@@ -1690,7 +1693,7 @@ html.standalone, html.standalone body { height: 100vh; }
   .world-label.sign { font-size: 12px; }
   .world-label.sign .sg-ico { width: 18px; height: 18px; }
   /* 대화 상자 */
-  .guide { bottom: max(6px, env(safe-area-inset-bottom)); padding: 10px 22px 14px; }
+  .guide { bottom: max(6px, env(safe-area-inset-bottom)); min-height: 74px; padding: 12px 22px 20px; }
   .guide-name { left: 22px; top: -12px; padding: 0 12px 2px; font-size: 14px; }
   .guide-text { font-size: 16px; line-height: 1.28; }
   .guide-next { bottom: 1px; width: 20px; height: 14px; margin-left: -10px; }
