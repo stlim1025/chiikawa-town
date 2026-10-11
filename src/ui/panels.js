@@ -173,7 +173,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'dev'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'dev'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -288,11 +288,96 @@ export function createPanels(ui, handlers) {
         h('span', { class: 'sum' }, '모두 팔면', h('b', {}, svgSpan('coin', COIN), won(total))),
         h('button', { class: 'btn pink take', type: 'button', onClick: after(handlers.sellDrops) }, '모두 팔기')));
   }
-  // 마을폰 앱 화면 위 막대: 홈으로(‹) · 앱 이름 · (지도면) 지금 있는 곳
-  const appBar = (title, tag) => h('div', { class: 'phone-bar' },
-    h('button', { class: 'phone-back', type: 'button', 'aria-label': '홈으로', onClick: () => show('settings') }, '‹'),
+  // 마을폰 앱 화면 위 막대: 홈으로(‹, 저장 옮기기는 설정으로) · 앱 이름 · (지도면) 지금 있는 곳
+  const appBar = (title, tag, back = 'settings') => h('div', { class: 'phone-bar' },
+    h('button', { class: 'phone-back', type: 'button', 'aria-label': back === 'settings' ? '홈으로' : '뒤로', onClick: () => show(back) }, '‹'),
     h('h2', {}, title),
     tag ? h('span', { class: 'phone-tag' }, tag) : null);
+
+  // 저장 옮기기(설정 → 내보내기 · 불러오기, 저장 코드는 core/savecode.js). 코드 칸은 다시 그리면 비워지므로 결과는 그 자리에서 글자만 바꾼다
+  let saveMode = 'out';
+  const openSaveIO = (mode) => { saveMode = mode; show('saveio'); };
+  const SAVE_ERR = {
+    empty: '저장 코드를 붙여 넣어 주세요',
+    corrupt: '코드가 잘렸거나 다른 글이에요. 처음부터 끝까지 다시 복사해 주세요',
+    version: '더 새로운 게임에서 만든 코드예요. 이 게임을 새로 고친 뒤 다시 해 주세요',
+    unsupported: '이 브라우저는 이 코드를 풀 수 없어요. 사파리나 크롬에서 해 주세요'
+  };
+  /** 칸의 글을 복사한다. 클립보드가 막혀 있으면(오래된 사파리 · 끼워 넣은 창) 칸을 골라 execCommand 로. */
+  async function copyText(area) {
+    try { await navigator.clipboard.writeText(area.value); return true; } catch { /* 아래 방법으로 */ }
+    try { area.focus(); area.setSelectionRange(0, area.value.length); return document.execCommand('copy'); } catch { return false; }
+  }
+  const saveMsg = (msg, text, warn = false) => { msg.textContent = text; msg.classList.toggle('warn', warn); };
+
+  function saveExport(s) {
+    const area = h('textarea', { class: 'save-code', readonly: true, rows: 5, spellcheck: 'false', 'aria-label': '저장 코드', placeholder: '코드를 만드는 중…' });
+    const msg = h('p', { class: 'save-msg' });
+    const copy = h('button', { class: 'btn primary', type: 'button', disabled: true }, '복사하기');
+    const file = h('button', { class: 'btn', type: 'button', disabled: true }, '파일로 받기');
+    area.addEventListener('click', () => area.setSelectionRange(0, area.value.length)); // 눌러서 전부 고르기(길게 눌러 복사할 때)
+    copy.addEventListener('click', async () => { copy.textContent = (await copyText(area)) ? '복사했어요' : '길게 눌러 복사해 주세요'; });
+    file.addEventListener('click', () => {
+      const a = h('a', { href: URL.createObjectURL(new Blob([area.value], { type: 'text/plain' })), download: `치이카와마을-저장-${s.clock.day}일째.txt` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
+    handlers.exportSave().then((code) => {
+      area.value = code;
+      copy.disabled = file.disabled = false;
+      saveMsg(msg, `${s.profile.name} · ${s.clock.day}일째 진행이에요`);
+    }, () => saveMsg(msg, '코드를 만들지 못했어요', true));
+    return [appBar('저장 내보내기', null, 'options'),
+      h('p', { class: 'sub' }, '이 코드를 다른 기기(PC · 휴대폰 · 홈 화면 앱)의 마을폰 설정 → 불러오기에 붙여 넣으면 진행이 그대로 옮겨져요.'),
+      area, msg,
+      h('div', { class: 'save-io' }, copy, file),
+      h('p', { class: 'note warn' }, '홈 화면 앱을 지우면 그 안의 진행도 같이 지워져요. 지우기 전에 코드를 메모나 메신저에 보관해 두세요.')];
+  }
+
+  function saveImport() {
+    const area = h('textarea', { class: 'save-code', rows: 5, spellcheck: 'false', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', 'aria-label': '저장 코드 붙여 넣기', placeholder: '여기에 저장 코드를 붙여 넣어 주세요' });
+    const pick = h('input', { type: 'file', accept: '.txt,.json,text/plain,application/json', hidden: true });
+    const msg = h('p', { class: 'save-msg' });
+    const check = h('div', { class: 'save-check', hidden: true });
+    const read = h('button', { class: 'btn primary', type: 'button' }, '코드 확인');
+    const fromFile = h('button', { class: 'btn', type: 'button', onClick: () => pick.click() }, '파일에서');
+    async function verify() {
+      check.hidden = true;
+      saveMsg(msg, '읽는 중…');
+      const r = await handlers.readSave(area.value);
+      if (!r.ok) { saveMsg(msg, SAVE_ERR[r.reason] || SAVE_ERR.corrupt, true); return; }
+      saveMsg(msg, '');
+      const g = r.state;
+      const yes = h('button', { class: 'btn pink', type: 'button' }, '이 진행으로 바꾸기');
+      yes.addEventListener('click', () => {
+        if (!handlers.importSave(g)) { saveMsg(msg, '이 브라우저는 저장이 꺼져 있어서 불러올 수 없어요', true); return; }
+        yes.disabled = read.disabled = true;
+        yes.textContent = '불러오는 중…';
+      });
+      check.replaceChildren(
+        h('div', { class: 't' }, `${g.profile.name} · ${g.clock.day}일째`),
+        h('div', { class: 'd' }, `${won(g.money)} · 제초 ${g.license.grade}급`),
+        h('p', { class: 'note warn' }, '지금 이 기기의 진행은 이 코드의 진행으로 바뀌어요'),
+        yes);
+      check.hidden = false;
+    }
+    area.addEventListener('input', () => { check.hidden = true; saveMsg(msg, ''); });
+    read.addEventListener('click', verify);
+    pick.addEventListener('change', async () => {
+      const f = pick.files?.[0];
+      if (!f) return;
+      try { area.value = await f.text(); } catch { saveMsg(msg, '파일을 읽지 못했어요', true); return; }
+      pick.value = '';
+      verify();
+    });
+    return [appBar('저장 불러오기', null, 'options'),
+      h('p', { class: 'sub' }, '다른 기기에서 내보낸 저장 코드를 붙여 넣어 주세요.'),
+      area, pick, msg,
+      h('div', { class: 'save-io' }, read, fromFile),
+      check];
+  }
 
   function render() {
     const s = handlers.getState();
@@ -1004,7 +1089,16 @@ export function createPanels(ui, handlers) {
         h('h3', { class: 'shop-sec' }, '화면'),
         sw('절전 모드', '초당 30번만 그려서 휴대폰이 덜 뜨거워져요', !!handlers.getPowerSave(), () => handlers.togglePowerSave()),
         h('h3', { class: 'shop-sec' }, '저장'),
-        h('p', { class: 'phone-note' }, extra.storage == null || extra.storage ? '진행은 이 브라우저에 자동 저장돼요' : '저장이 꺼져 있어서 창을 닫으면 진행이 사라져요')];
+        h('p', { class: 'phone-note' }, extra.storage == null || extra.storage ? '진행은 이 브라우저에 자동 저장돼요' : '저장이 꺼져 있어서 창을 닫으면 진행이 사라져요'),
+        // PC ↔ 휴대폰 · 홈 화면 앱처럼 저장 공간이 다른 곳으로 옮길 때
+        h('div', { class: 'save-io' },
+          h('button', { class: 'btn', type: 'button', onClick: () => openSaveIO('out') }, '내보내기'),
+          h('button', { class: 'btn', type: 'button', onClick: () => openSaveIO('in') }, '불러오기')),
+        h('p', { class: 'note' }, '다른 기기로 옮기거나 홈 화면 앱을 지우기 전에 내보내기 코드를 받아 두세요')];
+    },
+    // 마을폰 '저장 옮기기': 설정에서 고른 쪽(내보내기 · 불러오기)
+    saveio(s) {
+      return saveMode === 'in' ? saveImport() : saveExport(s);
     }
   };
 

@@ -386,6 +386,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .app:active .app-ico { transform: translateY(2px); box-shadow: 0 2px 0 rgba(84, 62, 38, 0.18); }
 .app-label { font-size: 17px; line-height: 1.15; text-align: center; }
 .phone-note { margin: 4px 2px 0; padding: 6px 12px 8px; border-radius: 16px 18px 16px 14px; background: var(--paper-2); text-align: center; font-size: 15px; line-height: 1.3; color: var(--ink-soft); }
+/* 저장 옮기기(설정 → 내보내기 · 불러오기): 코드 칸은 글을 고르고 붙여 넣을 수 있게(몸은 고르기 · 터치 끌기를 막아 둔다). 16px 아래면 아이폰이 확대한다 */
+.save-io { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 2px; }
+.save-io .btn { min-height: 44px; padding: 4px 10px 6px; font-size: 18px; }
+.save-code { display: block; width: 100%; box-sizing: border-box; height: 116px; margin: 8px 0 2px; padding: 10px 12px; border: 3px dashed #d8c7a6; border-radius: 16px; resize: none; outline: none; background: var(--paper-2); color: var(--ink); font-family: ui-monospace, Consolas, monospace; font-size: 16px; line-height: 1.35; word-break: break-all; -webkit-user-select: text; user-select: text; touch-action: pan-y; }
+.save-code:focus { border-color: var(--mint-deep); }
+.save-msg { min-height: 1.3em; margin: 2px 4px; text-align: center; font-size: 15px; line-height: 1.3; color: var(--ink-soft); }
+.save-msg.warn { color: #a14a32; }
+.save-check { margin-top: 10px; padding: 10px 12px 12px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 3px var(--mint); text-align: center; }
+.save-check .t { font-size: 20px; }
+.save-check .d { font-size: 16px; color: var(--ink-soft); }
+.save-check .note.warn { margin: 8px 0; text-align: left; }
+.save-check .btn { width: 100%; min-height: 46px; }
 /* 지도 앱: 남은 높이를 지도가 채우고, 아래 한 줄 안내 */
 .mapview { position: relative; flex: 1 1 0; min-height: 0; border-radius: 18px; border: 3px solid var(--ink); overflow: hidden; background: var(--paper-2); touch-action: none; }
 .mapview-canvas { display: block; width: 100%; height: 100%; touch-action: none; }

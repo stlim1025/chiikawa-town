@@ -37,6 +37,7 @@ import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from 
 import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, payExamFee } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
+import { encodeSave, decodeSave } from './core/savecode.js';
 import { createSound } from './audio/sound.js';
 import { TUTORIAL_LINES, HELP_TOPICS, tutorialActive, tutorialNext } from './core/tutorial.js';
 import { createGuide } from './ui/guide.js';
@@ -196,7 +197,8 @@ function boot() {
   let target = null;
   let saveTimer = 0;
 
-  const save = () => { if (state && player) store.save({ ...state, player: { x: player.position.x, z: player.position.z } }); };
+  let saveLocked = false; // 저장을 불러온 직후(새로고침 전): 창을 떠나며 지금 진행으로 덮어쓰지 않게
+  const save = () => { if (state && player && !saveLocked) store.save({ ...state, player: { x: player.position.x, z: player.position.z } }); };
   const commit = (next, persist = true) => { state = next; if (persist) save(); };
   const seen = (tip) => state.seenTips.includes(tip);
   const markSeen = (tip) => { state = { ...state, seenTips: [...state.seenTips, tip] }; };
@@ -309,6 +311,15 @@ function boot() {
     toggleSound: (kind) => sound.toggle(kind),
     getPowerSave: () => perf.powerSave,
     togglePowerSave: () => perf.setPowerSave(!perf.powerSave),
+    // 저장 옮기기(마을폰 설정 · core/savecode.js): 지금 진행 → 저장 코드, 코드 → 진행(검사), 확인하면 그 진행으로 바꾸고 새로 시작
+    exportSave: () => (state && player ? encodeSave({ ...state, player: { x: player.position.x, z: player.position.z } }) : Promise.reject(new Error('no game'))),
+    readSave: (code) => decodeSave(code),
+    importSave(next) {
+      saveLocked = true;
+      if (!store.save(next)) { saveLocked = false; return false; } // 이 브라우저는 저장이 꺼져 있다
+      setTimeout(() => location.reload(), 400);
+      return true;
+    },
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
     onClose: () => input.setEnabled(true),
     acceptJob(typeId) {
