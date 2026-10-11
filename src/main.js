@@ -89,7 +89,7 @@ import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
-import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK } from './core/combat.js';
+import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
@@ -1906,7 +1906,10 @@ function boot() {
     if (next <= 0) startFaint();
     else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요!', 2400); }
   }
-  /** 기절: 화면이 어두워졌다가 마을 입구(쓰러진 쪽 문 안)에서 깨어난다. 돈을 조금 잃고, 두 시간이 지나 있다. */
+  /**
+   * 기절: 화면이 어두워졌다가 내 집 앞에서 깨어난다(누가 데려다준 것처럼 · 쫓겨났으면 쓰러진 쪽 마을 입구).
+   * 돈을 조금 잃고(짤랑 소리), FAINT_HOURS 시간이 지나 있다 — 검은 화면에 '(세 시간 뒤…)', 깨면 지금 시각 꼬리표.
+   */
   function startFaint() {
     fainting = true;
     cancelPull();
@@ -1916,23 +1919,32 @@ function boot() {
     hud.curtain(true, '눈앞이 깜깜해졌다…');
     setTimeout(() => {
       if (!state) { fainting = false; hud.curtain(false); return; }
-      const r = faint(state), p = player.position;
-      const gate = Object.values(GATES).reduce((a, g) => (Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? g : a));
-      const k = (VILLAGE_R - 2.5) / VILLAGE_R;
+      const r = faint(state), p = player.position; // 시간도 FAINT_HOURS 만큼 흐른다(core/combat.js)
+      const home = !isEvicted(state);
+      let at;
+      if (home) { const h = village.spots.home; at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5); }
+      else {
+        const gate = Object.values(GATES).reduce((a, g) => (Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? g : a));
+        const k = (VILLAGE_R - 2.5) / VILLAGE_R;
+        at = { x: gate.x * k, z: gate.z * k };
+      }
       player.stopBlink();
-      player.setPosition(gate.x * k, gate.z * k);
+      player.setPosition(at.x, at.z);
       player.face(0, 0);
       cam.snap(player.position);
       iframe = 0;
-      commit({ ...r.state, clock: advance(state.clock, 60) });
+      commit(r.state);
+      hud.curtain(true, `(${TIMES[FAINT_HOURS] || FAINT_HOURS} 시간 뒤…)`);
       setTimeout(() => {
         hud.curtain(false);
         fainting = false;
         if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true);
-        hud.banner('기절했어요…', '마을 입구에서 깼어요', 3600, r.lost ? [{ icon: 'coin', text: `−${won(r.lost)}` }] : null);
+        if (r.lost) sound.play('coinLoss'); // 돈을 잃었다: 동전이 짤랑짤랑 굴러떨어지는 소리
+        hud.banner('기절했어요…', home ? '정신을 차려 보니 내 집 앞이었어요' : '정신을 차려 보니 마을 입구였어요', 3600,
+          [{ icon: ICO.clock, text: timeLabel(state.clock) }, ...(r.lost ? [{ icon: 'coin', text: `−${won(r.lost)}` }] : [])]);
         for (const kind of npcs.partyKinds()) npcs.say(npcs.byKind(kind), lineOf(kind, 'partyFaint')); // 같이 토벌하던 친구들이 옆으로 달려온다
-        rushToMe(); // 아니면 친한 친구가 마을 입구로 달려온다
-      }, 700);
+        rushToMe(); // 아니면 친한 친구가 달려온다
+      }, 1300);
     }, 1500);
   }
   /**
@@ -4025,6 +4037,7 @@ function boot() {
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null, party: !!n.party, bubble: n.bubble && n.bubble.text })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기
       talk: (kind) => talkTo(npcs.byKind(kind)), // 그 친구에게 바로 말 걸기(고를 거리 확인용)
+      faint: () => startFaint(), // 바로 기절(깨어나는 곳 · 흐른 시간 확인용)
       // 똑똑한 친구들 확인용: 마음 · 하는 일 · 소식 · 공연
       life: () => ({
         minds: Object.fromEntries(Object.entries(minds).map(([k, m]) => [k, { fun: +m.fun.toFixed(2), social: +m.social.toFixed(2), doing: m.doing && m.doing.text, mem: m.mem.length }])),

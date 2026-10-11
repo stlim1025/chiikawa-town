@@ -51,6 +51,15 @@ test('faint loses 10% capped', () => {
   assert.equal(C.faint({ ...fresh(), money: 5 }).lost, 0);
   assert.equal(C.faint(fresh()).state.stamina, C.FAINT_STAMINA);
 });
+test('기절하면 몇 시간이 지나 있다(새벽 6시를 넘기면 다음 날)', async () => {
+  const { createClock, hourOf } = await import('../src/core/clock.js');
+  assert.ok(C.FAINT_HOURS >= 3);
+  const noon = C.faint({ ...fresh(), clock: createClock(4, 12) }).state.clock;
+  assert.equal(noon.day, 4);
+  assert.equal(Math.round(hourOf(noon)), 12 + C.FAINT_HOURS);
+  const dawn = C.faint({ ...fresh(), clock: createClock(4, 4) }).state.clock;
+  assert.equal(dawn.day, 5, '새벽 4시에 쓰러지면 깨어날 땐 다음 날');
+});
 test('swing cone', () => {
   assert.ok(C.inSwing(0, 0, 0, 1.4, 0, 1.2, 0.45));
   assert.ok(!C.inSwing(0, 0, 0, 1.4, 0, -1.2, 0.45), 'behind');

@@ -109,6 +109,12 @@ export function createSound(storage) {
     },
     none: () => tone({ freq: 220, slideTo: 180, type: 'sine', dur: 0.12, vol: 0.14 }),
     coin: () => [1319, 1760, 2093, 2637].forEach((f, i) => tone({ freq: f, type: 'square', start: i * 0.07, dur: 0.22, vol: 0.05 })),
+    // 돈을 잃었다(기절): 동전이 짤랑짤랑 굴러떨어지며 음이 내려가고, 끝에 '뿅…' 하고 빠지는 소리
+    coinLoss: () => {
+      [2637, 2093, 1760, 1319, 988].forEach((f, i) => tone({ freq: f, type: 'square', start: i * 0.09, dur: 0.16, vol: 0.045 }));
+      [0.05, 0.17, 0.3].forEach((st) => noise({ start: st, dur: 0.05, vol: 0.06, freq: 5200, q: 3 })); // 짤랑
+      tone({ freq: 392, slideTo: 196, type: 'triangle', start: 0.48, dur: 0.38, vol: 0.12 });
+    },
     eat: () => {
       [0, 0.22, 0.44].forEach((s) => noise({ start: s, dur: 0.18, vol: 0.16, freq: 600, sweepTo: 2600, q: 2 }));
       tone({ freq: 784, slideTo: 1175, type: 'triangle', start: 0.66, dur: 0.18, vol: 0.12 });

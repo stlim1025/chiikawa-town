@@ -2,6 +2,7 @@ import { trySpend } from './state.js';
 import { registerItems, bagOf, takeItem } from './inventory.js';
 import { josa } from './weeding.js';
 import { hasLicense } from './licenses.js';
+import { sleepFor } from './clock.js';
 
 /**
  * 토벌(4단계): 무기 · 몬스터 · 토벌 자격증. 몬스터는 이 게임만의 오리지널 생물이다.
@@ -74,8 +75,8 @@ export const DROPS = {
 registerItems(DROPS);
 /** 맞은 뒤 다시 맞지 않는 시간(초) · 밀려나는 거리. */
 export const PLAYER_IFRAME = 1.0, PLAYER_KNOCK = 1.4;
-/** 기절하면 잃는 돈(가진 돈의 비율, 최대) · 깨어났을 때 기운. */
-export const FAINT_LOSS = 0.1, FAINT_LOSS_MAX = 300, FAINT_STAMINA = 25;
+/** 기절하면 잃는 돈(가진 돈의 비율, 최대) · 깨어났을 때 기운 · 정신을 잃고 지나가는 시간(시). */
+export const FAINT_LOSS = 0.1, FAINT_LOSS_MAX = 300, FAINT_STAMINA = 25, FAINT_HOURS = 3;
 
 export const weaponOf = (state) => state.weapon || { owned: [], held: null };
 export const heldWeapon = (state) => { const w = weaponOf(state); return w.held && WEAPONS[w.held] ? w.held : null; };
@@ -97,10 +98,11 @@ export function holdWeapon(state, id) {
   if (id !== null && !w.owned.includes(id)) return state;
   return { ...state, weapon: { ...w, held: id } };
 }
-/** 기절: 돈을 조금 잃고 기운이 조금 찬 채로. → { state, lost } */
+/** 기절: 돈을 조금 잃고 기운이 조금 찬 채로, FAINT_HOURS 시간이 지나 있다(새벽 6시를 넘기면 다음 날). → { state, lost } */
 export function faint(state) {
   const lost = Math.min(FAINT_LOSS_MAX, Math.floor(state.money * FAINT_LOSS));
-  return { state: { ...state, money: state.money - lost, stamina: FAINT_STAMINA }, lost };
+  const clock = state.clock ? sleepFor(state.clock, FAINT_HOURS) : state.clock;
+  return { state: { ...state, money: state.money - lost, stamina: FAINT_STAMINA, clock }, lost };
 }
 /** 잡은 몬스터 기록. */
 export function recordHunt(state, species) {
