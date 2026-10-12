@@ -1827,7 +1827,9 @@ function boot() {
     const line = id === 'liquor'
       ? (p.have ? `흠. 쿠리만쥬 강의는 ${p.have}강까지 들었군. 필기는 강의에서 나온다. 끝까지 듣고 오는 게 좋을 거다.` : '흠흠. 술 자격 필기는 쿠리만쥬 강의에서 나온다. 강의는 듣고 왔나?')
       : id === 'hunter' ? '흠흠. 토벌 안내서는 읽어 봤나? 필기는 전부 안내서에서 나온다.' : '흠흠. 라멘 로우 레시피 북은 봤나? 필기는 레시피에서 나온다.';
-    const free = () => { if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true); };
+    // 갑옷 씨 말이 끝나면 다시 움직이게. 말 상자 콜백은 상자가 닫히기 전에 불려서 guide.open 을 보면 늘 열려 있다고 나와
+    // 조이스틱이 꺼진 채로 남았다(마을폰을 열었다 닫아야 돌아왔다) → 말 상자는 보지 않는다
+    const free = () => { if (mode === 'play' && !panels.isOpen()) input.setEnabled(true); };
     cancelPull();
     input.setEnabled(false);
     hud.setAction(null);
