@@ -370,6 +370,31 @@ export function buildVillage(scene) {
    */
   let raffleDrum = null;
   const signs = []; // 글씨 그림 간판 재질(밤에는 어둡게: tintSigns)
+  /**
+   * 변신 살롱(돈을 내고 모습을 바꾸는 곳): 둥근 분홍 지붕의 작은 원통 가게 + 노란 방울 꼭지 · 동그란 창 둘 · 보라 문,
+   * 문 옆에 금테 두른 커다란 거울(살롱 표시). 나무 · 꽃 자리를 흐트러뜨리지 않게 rand() 를 쓰지 않는다.
+   */
+  function salon(lot) {
+    const { x, z } = lot, g = new THREE.Group(), wall = '#fff6f9', pink = '#f6a9c4', gold = '#f3c84b';
+    g.position.set(x, 0, z);
+    place(g, toonMesh(GEO.cylinder, wall, { position: [0, 0, 0], scale: [0.95, 1.45, 0.95], outline: 0.022 }));
+    place(g, toonMesh(GEO.cylinder, '#f48fb1', { position: [0, 1.32, 0], scale: [0.99, 0.16, 0.99], outline: 0.016, shadow: false }));
+    place(g, toonMesh(GEO.sphere, pink, { position: [0, 1.45, 0], scale: [1.08, 0.78, 1.08], outline: 0.024 }));
+    place(g, toonMesh(GEO.sphere, '#ffd66b', { position: [0, 2.26, 0], scale: [0.15, 0.15, 0.15], outline: 0.016, shadow: false }));
+    place(g, toonMesh(GEO.box, '#c9a7e8', { position: [0, 0.5, 0.9], scale: [0.5, 1.0, 0.1], shell: true }));
+    place(g, toonMesh(GEO.sphere, '#ffd66b', { position: [0.15, 0.5, 0.97], scale: [0.04, 0.04, 0.03], outline: false, shadow: false }));
+    [-0.55, 0.55].forEach((px) => place(g, toonMesh(GEO.sphere, '#cfe7ff', { position: [px, 0.92, 0.74], rotation: [0, px * 1.1, 0], scale: [0.17, 0.17, 0.05], outline: 0.014, shadow: false })));
+    // 문 옆 거울: 받침대 + 금테 + 하늘색 거울(반짝 빛 한 줄)
+    place(g, toonMesh(GEO.cylinder, '#c98a5a', { position: [0.95, 0, 0.75], scale: [0.05, 0.5, 0.05], outline: 0.012 }));
+    place(g, toonMesh(GEO.sphere, gold, { position: [0.95, 0.95, 0.75], scale: [0.32, 0.44, 0.07], outline: 0.018 }));
+    place(g, toonMesh(GEO.sphere, '#d6f0ff', { position: [0.95, 0.95, 0.8], scale: [0.25, 0.36, 0.04], outline: false, shadow: false }));
+    place(g, toonMesh(GEO.box, '#ffffff', { position: [0.88, 1.02, 0.84], rotation: [0, 0, -0.6], scale: [0.04, 0.22, 0.01], outline: false, shadow: false }));
+    world.add(g);
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children);
+    labels.push({ x, y: 2.5, z: z + 0.6, text: lot.label });
+  }
+
   function raffle(lot) {
     const { x, z } = lot, g = new THREE.Group(), wood = '#c98a4a', red = '#e0524f';
     g.position.set(x, 0, z);
@@ -494,6 +519,7 @@ export function buildVillage(scene) {
     else if (lot.kind === 'dojo') dojo(lot);
     else if (lot.kind === 'pub') pub(lot);
     else if (lot.kind === 'raffle') raffle(lot);
+    else if (lot.kind === 'salon') salon(lot);
     if (lot.home) homes[lot.home] = doorSpot(lot);
     else spots[lot.id] = doorSpot(lot);
   }

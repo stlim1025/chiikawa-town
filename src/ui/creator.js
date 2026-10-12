@@ -40,9 +40,11 @@ const pickRandom = (list) => list[Math.floor(Math.random() * list.length)].value
 /**
  * 캐릭터 만들기 화면. 다 고르면 onDone({ name, look }) 를 부른다.
  * initial 이 있으면 그 모습과 이름에서 시작한다(모습 바꾸기). onCancel 이 있으면 "취소" 버튼을 보인다.
+ * opts.salon: 변신 살롱 — 이름은 그대로(입력칸을 숨긴다), 장식은 옷장에서 바꾸니 고르지 않고, 확인 버튼에 값(opts.price)을 적는다.
  */
-export function openCreator(ui, onDone, initial = null, onCancel = null) {
+export function openCreator(ui, onDone, initial = null, onCancel = null, opts = {}) {
   const look = normalizeLook(initial ? initial.look : {});
+  const TABS_NOW = opts.salon ? TABS.map((t) => ({ ...t, groups: t.groups.filter((g) => g.key !== 'accessory') })) : TABS;
   let tab = TABS[0].id;
   const wrap = document.createElement('div');
   wrap.className = 'creator';
@@ -50,16 +52,16 @@ export function openCreator(ui, onDone, initial = null, onCancel = null) {
     <div class="creator-preview"><canvas aria-label="내 캐릭터 미리보기. 좌우로 끌면 돌아가요"></canvas><p class="preview-hint" aria-hidden="true">↔ 끌어서 돌려 보기</p></div>
     <div class="creator-form card"><form class="creator-scroll" novalidate>
       <div class="creator-head">
-        <h1>${initial ? '모습 바꾸기' : '나만의 먼작귀 만들기'}</h1>
+        <h1>${opts.salon ? '변신 살롱' : initial ? '모습 바꾸기' : '나만의 먼작귀 만들기'}</h1>
         <button class="btn" type="button" data-random>랜덤</button>
       </div>
       <div class="tabs" role="tablist"></div>
       <div class="tab-body"></div>
-      <h2><label for="creator-name">이름</label></h2>
-      <input id="creator-name" class="name-input" maxlength="8" autocomplete="off" placeholder="최대 8자">
+      <h2 ${opts.salon ? 'hidden' : ''}><label for="creator-name">이름</label></h2>
+      <input id="creator-name" class="name-input" maxlength="8" autocomplete="off" placeholder="최대 8자" ${opts.salon ? 'hidden' : ''}>
       <div class="creator-actions">
-        ${onCancel ? '<button class="btn" type="button" data-cancel>취소</button>' : ''}
-        <button class="btn primary" type="submit" disabled>${initial ? '이대로 할래요' : '마을로 가기'}</button>
+        ${onCancel ? `<button class="btn" type="button" data-cancel>${opts.salon ? '그만둘래요' : '취소'}</button>` : ''}
+        <button class="btn primary" type="submit" disabled>${opts.salon ? `이 모습으로 할래요 (${opts.price}원)` : initial ? '이대로 할래요' : '마을로 가기'}</button>
       </div>
     </form></div>`;
   wrap.prepend(createScenery({ friends: false }));
@@ -126,7 +128,7 @@ export function openCreator(ui, onDone, initial = null, onCancel = null) {
   // ---------- 탭과 선택지 ----------
   const tabsEl = wrap.querySelector('.tabs'), bodyEl = wrap.querySelector('.tab-body');
   function renderTabs() {
-    tabsEl.replaceChildren(...TABS.map((t) => {
+    tabsEl.replaceChildren(...TABS_NOW.map((t) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'tab';
@@ -138,7 +140,7 @@ export function openCreator(ui, onDone, initial = null, onCancel = null) {
     }));
   }
   function renderBody() {
-    const current = TABS.find((t) => t.id === tab);
+    const current = TABS_NOW.find((t) => t.id === tab);
     const nodes = [];
     current.groups.forEach((g) => {
       const h = document.createElement('h2');
@@ -166,10 +168,10 @@ export function openCreator(ui, onDone, initial = null, onCancel = null) {
   renderBody();
 
   wrap.querySelector('[data-random]').addEventListener('click', () => {
-    TABS.forEach((t) => t.groups.forEach((g) => { look[g.key] = pickRandom(g.options); }));
-    // 수염과 장식은 너무 자주 붙지 않게 반반
+    TABS_NOW.forEach((t) => t.groups.forEach((g) => { look[g.key] = pickRandom(g.options); }));
+    // 수염과 장식은 너무 자주 붙지 않게 반반(살롱에서는 장식을 고르지 않는다)
     if (Math.random() < 0.5) look.beard = 'none';
-    if (Math.random() < 0.4) look.accessory = 'none';
+    if (!opts.salon && Math.random() < 0.4) look.accessory = 'none';
     rebuild();
     renderBody();
   });

@@ -22,7 +22,7 @@ import { bagOf, itemInfo, countOf } from '../core/inventory.js';
 import { pantryOf } from '../core/pantry.js';
 import { sellPrice, sellableIds } from '../core/market.js';
 import { canGift } from '../core/gifts.js';
-import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
+import { ACCESSORY_ITEMS, wardrobeOf, SALON_PRICE } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
 import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
@@ -967,6 +967,13 @@ export function createPanels(ui, handlers) {
       return out;
     },
     // 카니 헌책방: 마을 지도
+    // 변신 살롱: 귀 · 몸 색 · 무늬 · 얼굴 · 머리를 새로 고른다(이름 · 장식은 그대로, 장식은 집 옷장에서)
+    salon(s) {
+      return [head('변신 살롱', s.money), h('p', { class: 'sub' }, '어머, 어서 와요~ 오늘은 어떤 모습이 되고 싶어요?'),
+        h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '모습 바꾸기'), h('div', { class: 'd' }, '귀 · 몸 색 · 얼굴 · 머리를 새로 골라요 · 마음에 안 들면 그만둬도 돈은 안 받아요')),
+          priceBtn(SALON_PRICE, s.money, () => { close(true); handlers.salon(); }, 'btn pink')),
+        h('div', { class: 'actions' }, closeBtn())];
+    },
     books(s) {
       const own = hasTool(s, 'map'), T = TOOLS.map;
       return [head('카니 헌책방', s.money), h('p', { class: 'sub' }, '…딱딱.'),
@@ -1168,6 +1175,7 @@ export function createPanels(ui, handlers) {
     openGift: (giftTo) => show('bag', { giftTo }),
     openWardrobe: () => show('wardrobe'),
     openBooks: () => show('books'),
+    openSalon: () => show('salon'),
     openTools: () => show('tools'),
     openRaffle: () => show('raffle'),
     openMap: () => show('map'),

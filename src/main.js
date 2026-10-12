@@ -30,7 +30,7 @@ import { createPanels, ICO } from './ui/panels.js';
 import { openCreator } from './ui/creator.js';
 import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
-import { createState, addMoney, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
+import { createState, addMoney, trySpend, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
@@ -53,7 +53,7 @@ import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
-import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf } from './core/wardrobe.js';
+import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf, SALON_PRICE } from './core/wardrobe.js';
 import { sellItem } from './core/market.js';
 import { canGift, giveGift, giftLine } from './core/gifts.js';
 import { openRamenShop } from './ui/ramenshop.js';
@@ -390,6 +390,7 @@ function boot() {
     cheers() { const k = kuriAtPub(); if (k) cheersWith(k); },
     // 검정소 시험 · 라멘 로우 알바
     takeLicense: (id) => takeLicense(id),
+    salon: () => openSalon(),
     // 시험 공부거리(토벌 안내서 · 레시피 북)를 펼쳤다: 펼친 날을 적어 둔다(시험 전 검정관 확인 · 이야기 퀘스트 '안내서 읽기')
     studied: (id) => { const s = markStudy(state, id, state.clock.day); if (s !== state) commit(s); },
     licenseCard: (id) => licenseCardData(id),
@@ -1174,6 +1175,7 @@ function boot() {
     } else if (target.type === 'pochette') panels.openPochette();
     else if (target.type === 'pub') panels.openPub();
     else if (target.type === 'books') panels.openBooks();
+    else if (target.type === 'salon') panels.openSalon();
     else if (target.type === 'tools') panels.openTools();
     else if (target.type === 'raffle') panels.openRaffle();
     else if (target.type === 'wake') wakeAlly(target.npc);
@@ -1794,6 +1796,28 @@ function boot() {
       else guide.say([{ text: '쿠리만쥬에게 「술 공부하고 싶어」라고 말을 걸어 봐라. 흠흠.', chips: [{ icon: ICO.book, text: `${p.have} / ${p.need}강` }] }], free, captain);
     }, captain);
     return true;
+  }
+  /**
+   * 변신 살롱: 지금 모습에서 시작하는 만들기 화면(이름 · 장식은 그대로). '이 모습으로 할래요'를 누를 때 값을 내고(그만두면 안 낸다)
+   * 새 모습으로 바뀐 뒤 두 팔 번쩍. 자격증 사진은 딴 그때 모습 그대로다.
+   */
+  function openSalon() {
+    if (state.money < SALON_PRICE) { hud.toast('돈이 모자라요'); return; }
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    setCinematic(true);
+    const back = () => { setCinematic(false); if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true); };
+    openCreator(ui, ({ look }) => {
+      const paid = trySpend(state, SALON_PRICE);
+      if (!paid.ok) { hud.toast('돈이 모자라요'); back(); return; }
+      commit({ ...paid.state, profile: { ...paid.state.profile, look: { ...look, accessory: state.profile.look.accessory } } });
+      refreshLook();
+      sound.play('coin');
+      player.cheerTime = 1.8;
+      hud.toast('짜잔~ 새로운 모습이 됐어요!', 2800);
+      back();
+    }, { name: state.profile.name, look: { ...state.profile.look } }, back, { salon: true, price: SALON_PRICE });
   }
   /** 검정소 시험: (공부 확인) → 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. sure: 공부 확인을 이미 했다 */
   function takeLicense(id, sure = false) {
@@ -3825,7 +3849,7 @@ function boot() {
   }
 
   // ---------- 상호작용 대상 ----------
-  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업'], ['raffle', '경품 추첨']];
+  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업'], ['raffle', '경품 추첨'], ['salon', '변신 살롱']];
   // 가장 가까운 대상을 고른다. 건물은 거리를 0.6 깎아 조금 우선한다.
   function findTarget() {
     const p = player.position;

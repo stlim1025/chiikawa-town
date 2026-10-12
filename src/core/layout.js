@@ -157,6 +157,7 @@ export const LOTS = [
   { id: 'books', kind: 'house', x: -10, z: -14, s: 0.95, roof: '#c9a77c', label: '카니 헌책방' },
   { id: 'pochette', kind: 'stall', x: -4, z: -13.2, label: '포셰트 가게' },
   { id: 'realty', kind: 'house', x: 5, z: -14, s: 0.95, roof: '#c4b4e8', label: '부동산' },
+  { id: 'salon', kind: 'salon', x: 11.5, z: -5.4, roof: '#f6a9c4', label: '변신 살롱' }, // 돈을 내고 모습을 바꾸는 곳(경품 추첨과 검정소 사이)
   { id: 'tools', kind: 'house', x: 11.5, z: -14, s: 1.0, roof: '#8fb7d9', label: '도구점' },
   { id: 'ramen', kind: 'house', x: 18.5, z: -14, s: 1.1, roof: '#d9675b', label: '라멘 로우' },
   { id: 'exam', kind: 'house', x: 18, z: -4.5, s: 0.85, roof: '#7fa7d9', label: '검정소' },
@@ -173,11 +174,11 @@ export const LOTS = [
   { id: 'pub', kind: 'pub', x: 20.5, z: 3.4, roof: '#e9884f', label: '맥주집' }
 ];
 
-const RADIUS = { house: (l) => 1.716 * l.s, dome: (l) => 1.47 * l.s, stall: () => 1.15, board: () => 1.0, bench: () => 1.0, dojo: () => 2.0, pub: () => 1.3, raffle: () => 1.0 };
+const RADIUS = { house: (l) => 1.716 * l.s, dome: (l) => 1.47 * l.s, stall: () => 1.15, board: () => 1.0, bench: () => 1.0, dojo: () => 2.0, pub: () => 1.3, raffle: () => 1.0, salon: () => 1.2 };
 /** 건물이 차지하는 반지름(장애물 크기와 같다). */
 export const lotRadius = (lot) => RADIUS[lot.kind](lot);
 
-const FRONT = { house: (l) => 1.716 * l.s + 0.65, stall: () => 1.8, board: () => 1.65, bench: () => 1.7, dojo: () => 2.6, pub: () => 2.0, raffle: () => 1.7 };
+const FRONT = { house: (l) => 1.716 * l.s + 0.65, stall: () => 1.8, board: () => 1.65, bench: () => 1.7, dojo: () => 2.6, pub: () => 2.0, raffle: () => 1.7, salon: () => 1.75 };
 /** 건물 앞(문 앞) 지점: 말 걸기 · 들어가기 대상이 되는 자리. 돔은 오른쪽 현관 혹 앞. */
 export function doorSpot(lot) {
   if (lot.kind === 'dome') { const R = 1.4 * lot.s, out = (0.42 * lot.s + 0.8) * Math.SQRT1_2; return { x: lot.x + R * 0.62 + out, z: lot.z + R * 0.62 + out }; } // 현관 혹의 문 바로 앞(문이 대각선으로 바깥을 본다)

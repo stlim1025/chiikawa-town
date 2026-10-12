@@ -26,6 +26,9 @@ export const ACCESSORY_ITEMS = {
   starpin: { name: '별 조각 머리핀', price: 0, craft: { starshard: 3 }, note: '별똥별맨의 별 조각 셋으로 만든 반짝이는 머리핀' }
 };
 
+/** 변신 살롱(마을의 모습 바꾸는 가게)에서 모습을 한 번 바꾸는 값. */
+export const SALON_PRICE = 500;
+
 export function wardrobeOf(state) {
   if (state.wardrobe) return state.wardrobe;
   const a = state.profile && state.profile.look && state.profile.look.accessory;
