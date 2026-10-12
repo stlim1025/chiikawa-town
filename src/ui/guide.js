@@ -46,7 +46,7 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
 
   const text = box.querySelector('.guide-text'), chipsEl = box.querySelector('.guide-chips'), next = box.querySelector('.guide-next'), choicesEl = box.querySelector('.guide-choices');
   const nameEl = box.querySelector('.guide-name'), nmEl = nameEl.querySelector('.nm'), heartsEl = nameEl.querySelector('.hearts'), noteEl = nameEl.querySelector('.note');
-  let lines = [], i = 0, done = null, who = HACHI, baseWho = HACHI, choosing = false, seq = 0;
+  let lines = [], i = 0, done = null, who = HACHI, baseWho = HACHI, choosing = false;
   let sel = 0, pickFn = null; // 선택지: 지금 고른 줄, 골랐을 때 부를 함수
 
   function setWho(w) {
@@ -61,13 +61,15 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
   }
   function open() {
     box.hidden = false;
-    seq++;
   }
-  /** 콜백을 부르고, 그 안에서 새 말을 시작하지 않았으면 상자를 닫는다. */
+  /**
+   * 상자를 닫고 콜백을 부른다(콜백에서 새 말을 시작하면 open 이 바로 다시 연다).
+   * 먼저 닫아야 콜백 안에서 guide.open 이 닫힌 것으로 보인다: 전에는 콜백을 먼저 불러 상자가 열린 채로 보였고,
+   * 말이 끝나면 다시 움직이게 하는 콜백이 '말 상자가 아직 열려 있다'며 조이스틱을 꺼 둔 채로 남겼다.
+   */
   function finish(cb, arg) {
-    const before = seq;
+    box.hidden = true;
     cb?.(arg);
-    if (seq === before) box.hidden = true;
   }
   /** 글 밑 그림 꼬리표(없으면 숨긴다). */
   function setChips(list = []) {
