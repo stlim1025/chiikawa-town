@@ -989,15 +989,11 @@ function boot() {
           if (state.license.grade >= NOVICE) cheerGrade5(); // 첫 자격(견습 → 5급): 안내해 준 하치와레가 축하
           player.cheerTime = 2;
         } else {
-          // 불합격: 작은 알림 한 줄로는 떨어진 줄도 몰랐다 → 자격증 필기처럼 가운데 '불합격' 도장 카드(몇 번까지 했는지, 다시 볼 곳 · 값)
+          // 불합격: 작은 알림 한 줄로는 떨어진 줄도 몰랐다 → 자격증 필기처럼 가운데 '불합격' 도장 카드. 설명은 짧게 한 마디만
           const g = next.license.grade;
           next = { ...next, exam: null };
           sound.play('fail');
-          // "깔끔하게 세 번 연달아 뽑으면 합격인데, 두 번째에서 잡초가 끊어졌어요." (말하듯 한 문장, 숫자는 말로)
-          const ORD = ['', '첫', '두', '세', '네', '다섯'], at = exam.streak + 1;
-          const sub = `깔끔하게 ${TIMES[exam.need] || exam.need} 번 연달아 뽑으면 합격인데, ${ORD[at] || at} 번째에서 ${josa(W.name, '이/가')} 끊어졌어요.`;
-          hud.notice({ kicker: `제초 검정 ${gradeName(g - 1)} 시험`, stamp: '불합격', tone: 'bad', sub,
-            chips: [{ icon: ICO.pin, text: '검정소에서 다시' }, { icon: 'coin', text: won(EXAM_FEE[g]) }], ok: '다시 해 볼게요' });
+          hud.notice({ kicker: `제초 검정 ${gradeName(g - 1)} 시험`, stamp: '불합격', tone: 'bad', sub: '승급 시험에 떨어졌어요', ok: '다시 해 볼게요' });
           staffSay('captain', 'fail', 16, player.position);
         }
       } else next = { ...next, exam };
