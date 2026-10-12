@@ -2,7 +2,7 @@ import { buildChibi, animateChibi } from '../actors/models.js';
 import { groundY } from '../core/layout.js';
 
 /**
- * 같이 놀기: 같은 방 다른 플레이어들의 캐릭터. 받은 위치로 부드럽게 따라가고(10번/초 남짓 오는 위치 사이를 메운다),
+ * 같이 놀기: 같은 방 다른 플레이어들의 캐릭터. 받은 위치로 부드럽게 따라가고(1초에 15번 남짓 오는 위치 사이를 걷는 빠르기로 메운다),
  * 머리 위에 이름표와 한마디 말풍선을 띄운다. 마을에 있을 때만 보인다(집 안 · 다른 장면이면 숨긴다).
  */
 
@@ -12,6 +12,13 @@ const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp'
 const SAY_SEC = 3.5;
 /** 받은 위치와 이만큼 넘게 떨어져 있으면 따라가지 않고 바로 옮긴다(순간 이동 · 다시 접속). */
 const SNAP = 8;
+/**
+ * 늦게 보이지 않게: 걷는 중이면 받은 두 자리 사이의 빠르기로 다음 소식이 올 때까지 앞질러 그린다(LEAD 초까지만,
+ * 소식이 끊기면 거기서 멈춘다). 멈추면('walk' 가 아니면) 바로 받은 자리로. 빠르기는 MAX_V 칸/초까지.
+ */
+const LEAD = 0.15, MAX_V = 8;
+/** 받은 자리로 따라가는 빠르기(클수록 덜 늦고, 작을수록 부드럽다). */
+const FOLLOW = 16;
 
 /**
  * scene: 그릴 장면. area: 이 장면에 보일 사람의 있는 곳('village' 마을과 바깥 · 'home' 마을 주인의 집 안 — 집 안은 바닥 높이 0).
@@ -26,12 +33,21 @@ export function createRemotePlayers(scene, area = 'village') {
     try { chibi = buildChibi(p.look || {}); } catch { chibi = buildChibi({}); } // 모르는 모습이면 기본 모습
     scene.add(chibi.root);
     const m = p.move || {}, x = m.x || 0, z = m.z || 0, yaw = m.yaw || 0;
-    list.set(p.id, { id: p.id, name: p.name, chibi, x, z, yaw, tx: x, tz: z, tyaw: yaw, anim: m.anim || 'idle', area: m.area || 'village', t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
+    list.set(p.id, { id: p.id, name: p.name, chibi, x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
   }
   function move(id, m) {
     const p = list.get(id);
     if (!p) return;
+    const now = performance.now(), gap = p.at ? (now - p.at) / 1000 : 0;
     if (Math.hypot(m.x - p.x, m.z - p.z) > SNAP) { p.x = m.x; p.z = m.z; }
+    // 걷는 중이면 지난 자리에서 온 빠르기를 재 둔다(멈췄거나 소식 사이가 너무 길면 0)
+    if (m.anim === 'walk' && gap > 0.02 && gap < 0.4 && Math.hypot(m.x - p.tx, m.z - p.tz) < SNAP) {
+      p.vx = (m.x - p.tx) / gap;
+      p.vz = (m.z - p.tz) / gap;
+      const v = Math.hypot(p.vx, p.vz);
+      if (v > MAX_V) { p.vx *= MAX_V / v; p.vz *= MAX_V / v; }
+    } else { p.vx = 0; p.vz = 0; }
+    p.at = now;
     if (m.anim !== p.anim) p.animT = 0; // 휘두르기는 시작부터 다시
     p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area;
   }
@@ -47,7 +63,7 @@ export function createRemotePlayers(scene, area = 'village') {
 
   /** 매 프레임. show: 내가 이 장면에 있는지(아니면 모두 숨긴다). 이 장면(area)에 있는 사람만 보인다. */
   function update(dt, show) {
-    const k = 1 - Math.exp(-dt * 10);
+    const k = 1 - Math.exp(-dt * FOLLOW), now = performance.now();
     for (const p of list.values()) {
       const vis = show && p.area === area;
       p.chibi.root.visible = vis;
@@ -55,8 +71,9 @@ export function createRemotePlayers(scene, area = 'village') {
       p.emoteT = Math.max(0, p.emoteT - dt);
       if (!vis) continue;
       const ox = p.x, oz = p.z;
-      p.x += (p.tx - p.x) * k;
-      p.z += (p.tz - p.z) * k;
+      const ahead = p.at ? Math.min(LEAD, (now - p.at) / 1000) : 0; // 마지막 소식 뒤로 흐른 만큼 앞질러
+      p.x += (p.tx + p.vx * ahead - p.x) * k;
+      p.z += (p.tz + p.vz * ahead - p.z) * k;
       let d = p.tyaw - p.yaw;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;

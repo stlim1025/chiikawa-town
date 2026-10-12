@@ -1409,6 +1409,15 @@ export function createMonsters(scene, village, random = Math.random) {
         if (!m) { m = puppet(id, sp, x, z, Number.isFinite(yaw) ? yaw : 0); guest.set(id, m); }
         if (m.dead) continue;
         if (Math.hypot(x - m.x, z - m.z) > 8) { m.x = x; m.z = z; } // 멀리 옮겼으면 바로 그 자리에
+        // 늦게 보이지 않게: 지난 소식에서 온 빠르기를 재 두고 다음 소식까지 앞질러 그린다(guestStep)
+        const now = performance.now(), gap = m.at ? (now - m.at) / 1000 : 0;
+        if (gap > 0.03 && gap < 0.4 && Math.hypot(x - m.tx, z - m.tz) < 8) {
+          m.vx = (x - m.tx) / gap;
+          m.vz = (z - m.tz) / gap;
+          const v = Math.hypot(m.vx, m.vz);
+          if (v > 14) { m.vx *= 14 / v; m.vz *= 14 / v; }
+        } else { m.vx = 0; m.vz = 0; }
+        m.at = now;
         m.tx = x; m.tz = z;
         if (Number.isFinite(yaw)) m.tyaw = yaw;
         if (m.state !== 'wind' && st === 'wind') m.windStart = true;
@@ -1467,7 +1476,7 @@ export function createMonsters(scene, village, random = Math.random) {
     /** 같이 놀기(손님): 매 프레임 주인 마을 몬스터를 받은 자리로 부드럽게 옮기고 몸짓 · 예고 표시를 그린다. onWind(m): 공격 예고를 시작했다. */
     guestStep(dt, t, { onWind } = {}) {
       if (!guest) return;
-      const k = 1 - Math.exp(-dt * 12);
+      const k = 1 - Math.exp(-dt * 16), now = performance.now();
       TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
       for (const [id, m] of guest) {
         const root = m.mesh.root;
@@ -1481,8 +1490,13 @@ export function createMonsters(scene, village, random = Math.random) {
           continue;
         }
         const ox = m.x, oz = m.z;
-        m.x += (m.tx - m.x) * k;
-        m.z += (m.tz - m.z) * k;
+        // 마지막 소식 뒤로 흐른 만큼(0.12초까지 · 0.6칸까지) 그 빠르기로 앞질러 따라간다
+        const ahead = m.at ? Math.min(0.12, (now - m.at) / 1000) : 0;
+        let ax = (m.vx || 0) * ahead, az = (m.vz || 0) * ahead;
+        const al = Math.hypot(ax, az);
+        if (al > 0.6) { ax *= 0.6 / al; az *= 0.6 / al; }
+        m.x += (m.tx + ax - m.x) * k;
+        m.z += (m.tz + az - m.z) * k;
         let d = m.tyaw - m.yaw;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
