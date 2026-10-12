@@ -45,18 +45,28 @@ export function pullDifficulty(stamina, max = 100) {
 }
 
 /**
- * 뽑기 시작. 초록 구간 위치는 뽑을 때마다 무작위로 정해진다(흔들리는 풀은 그 둘레를 오르내린다).
- * opts: { stamina, maxStamina, random } — random 은 0..1 을 돌려주는 함수(테스트에서 고정값을 넣는다).
+ * 급수 익숙함: 내 제초 급수가 그 풀의 급수보다 높을수록(한 급마다) 초록 구간이 넓고 게이지가 느리고 덜 흔들린다(최대 SKILL_MAX 급만큼).
+ * grade 를 모르면(예전 호출) 그대로.
  */
-export function startPull(kind, { stamina = 100, maxStamina = 100, random = Math.random } = {}) {
-  const k = WEED_KINDS[kind], d = pullDifficulty(stamina, maxStamina);
-  const width = k.width * d.widthScale;
-  const amp = k.drift ? k.drift.amp : 0;
+const SKILL_MAX = 4, SKILL_WIDTH = 0.15, SKILL_SLOW = 0.08, SKILL_STEADY = 0.12;
+export function pullSkill(kind, grade) {
+  const gap = grade == null ? 0 : Math.max(0, Math.min(SKILL_MAX, WEED_KINDS[kind].grade - grade));
+  return { gap, widthScale: 1 + SKILL_WIDTH * gap, slowScale: 1 + SKILL_SLOW * gap, driftScale: 1 - SKILL_STEADY * gap };
+}
+
+/**
+ * 뽑기 시작. 초록 구간 위치는 뽑을 때마다 무작위로 정해진다(흔들리는 풀은 그 둘레를 오르내린다).
+ * opts: { stamina, maxStamina, grade(내 제초 급수 — 낮은 급수 풀은 쉬워진다), random } — random 은 0..1 을 돌려주는 함수(테스트에서 고정값을 넣는다).
+ */
+export function startPull(kind, { stamina = 100, maxStamina = 100, grade = null, random = Math.random } = {}) {
+  const k = WEED_KINDS[kind], d = pullDifficulty(stamina, maxStamina), sk = pullSkill(kind, grade);
+  const width = Math.min(0.4, k.width * d.widthScale * sk.widthScale);
+  const amp = k.drift ? k.drift.amp * sk.driftScale : 0;
   // 흔들려도 범위를 벗어나지 않게 가운데 자리를 고른다
   const lo = ZONE_MIN + amp, hi = Math.max(lo, ZONE_MAX - width - amp);
   const base = lo + random() * (hi - lo);
   return {
-    kind, power: 0, t: 0, chargeTime: k.chargeTime / d.speedScale, width, base,
+    kind, power: 0, t: 0, chargeTime: (k.chargeTime / d.speedScale) * sk.slowScale, width, base,
     drift: k.drift ? { amp, speed: k.drift.speed, phase: random() * Math.PI * 2 } : null,
     greenFrom: base, greenTo: base + width
   };

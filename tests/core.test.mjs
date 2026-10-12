@@ -39,6 +39,21 @@ test('tired makes zone narrower and faster', () => {
   const a = W.startPull('reed', { stamina: 100, random: () => 0.5 }), b = W.startPull('reed', { stamina: 10, random: () => 0.5 });
   assert.ok(b.width < a.width && b.chargeTime < a.chargeTime);
 });
+test('제초 급수가 그 풀보다 높을수록 초록 칸이 넓고 게이지가 느리고 덜 흔들린다(지금 급수의 풀이나 급수를 모르면 그대로)', () => {
+  const at = (kind, grade) => W.startPull(kind, { random: () => 0.5, grade });
+  const base = at('weed', null);
+  assert.deepEqual([at('weed', 6).width, at('weed', 6).chargeTime], [base.width, base.chargeTime], '견습이 뽑는 잡초는 그대로');
+  let prev = base;
+  for (const g of [5, 4, 3, 2]) {
+    const p = at('weed', g);
+    assert.ok(p.width > prev.width && p.chargeTime > prev.chargeTime, `${g}급이면 잡초가 더 쉽다`);
+    prev = p;
+  }
+  assert.deepEqual([at('weed', 1).width, at('weed', 1).chargeTime], [prev.width, prev.chargeTime], '네 급 넘게 차이 나도 그만큼까지만');
+  assert.ok(at('reed', 1).drift.amp < at('reed', 3).drift.amp, '흔들리는 풀은 덜 흔들린다');
+  assert.equal(at('poisonweed', 1).width, W.startPull('poisonweed', { random: () => 0.5 }).width, '1급 풀은 1급에게 그대로');
+  for (const k of W.WEED_ORDER) { const p = at(k, 1); assert.ok(p.greenFrom >= 0.3 - 1e-9 && p.greenTo + (p.drift ? p.drift.amp : 0) <= 0.97 + 1e-9, k); }
+});
 test('release results', () => {
   let p = W.startPull('weed', { random: () => 0 });
   assert.equal(W.releasePull(W.chargePull(p, 0.1)), 'none');

@@ -904,7 +904,8 @@ function boot() {
     if (npcs.isWorkingOn(weed)) { hud.toast('친구가 뽑으려는 풀이에요'); return; }
     // 초록 구간은 뽑을 때마다 다른 자리에, 기운이 낮을수록 좁고 빠르게
     const st = stageLabel(weed);
-    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA }), label: [{ icon: itemSvg(weed.kind), text: `${W.name}${st ? ' ' + st : ''}` }] };
+    // 내 제초 급수가 그 풀보다 높을수록 쉬워진다(core/weeding.js 의 pullSkill)
+    pulling = { weed, pull: startPull(weed.kind, { stamina: state.stamina, maxStamina: MAX_STAMINA, grade: state.license.grade }), label: [{ icon: itemSvg(weed.kind), text: `${W.name}${st ? ' ' + st : ''}` }] };
     weed.busy = 'player'; // 친구들이 이 풀을 노리지 않게
     if (state.stamina <= MAX_STAMINA * 0.3 && !seen('tired-pull')) {
       markSeen('tired-pull');
