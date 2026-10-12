@@ -84,8 +84,10 @@ function massSpots(A, T) {
   for (const sd of [-1, 1]) {
     for (let j = 0; j <= m; j++) {
       const along = from + ((to - from) * j) / m, x = fx * along + fz * side * sd, z = fz * along - fx * side * sd, i = 100 + j * 2 + (sd > 0 ? 1 : 0);
-      const low = T.kind === 'tree'; // 숲 협곡은 덤불 길(고목이면 큰 잎이 카메라 바로 앞을 덮는다)
-      out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (low ? 0.36 : j === m ? 0.85 : 1), low });
+      // 숲 협곡은 덤불 길(고목이면 큰 잎이 카메라 바로 앞을 덮는다). 동서로 뻗은 협곡(강가 · 왕버섯 굴)은 남쪽(카메라 쪽) 벽이
+      // 카메라와 내 캐릭터 사이를 막아 들어가기 전부터 화면을 덮었다 → 분지 남쪽 둘레처럼 낮게
+      const camSide = -fx * sd > 0.5, low = T.kind === 'tree' || camSide;
+      out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (T.kind === 'tree' ? 0.36 : camSide ? 0.45 : j === m ? 0.85 : 1), low });
     }
   }
   return out;
