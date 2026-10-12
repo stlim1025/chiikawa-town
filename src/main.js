@@ -591,6 +591,7 @@ function boot() {
       hud.setQuests([]);
       save();
       guide.setGoal(null);
+      examGoal = null; // 다음에 들어오면 승급 시험 쪽지를 다시 띄운다
       npcs.setFollow('hachiware', false);
       hud.setAction(null);
       state = null;
@@ -996,9 +997,9 @@ function boot() {
       markSeen('bag-herb');
       hud.toast('뽑은 풀은 주머니로', 2600);
     }
-    if (canTakeExam(state.license) && !state.exam && state.license.grade < NOVICE && !seen('exam-' + state.license.grade)) { // 견습 → 5급은 하치와레가 알려 준다(updateGrade5Guide)
+    if (examDue() && !seen('exam-' + state.license.grade)) { // 견습 → 5급은 하치와레가 알려 준다(updateGrade5Guide)
       markSeen('exam-' + state.license.grade);
-      hud.toast('승급 시험을 볼 수 있어요!', 3600);
+      announceExam();
     }
     didAct('weed'); // 일상 부탁: 같이 풀 뽑기
     save();
@@ -1096,6 +1097,24 @@ function boot() {
       hud.announce({ kicker: '할 일!', title: '제초 5급을 따자!', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
     });
   }
+  // ---------- 승급 시험 알림(5급 → 4급부터): 위에 뜨는 작은 알림 한 줄은 못 보고 지나치기 쉬웠다. 가운데에 큼직한 카드가 떴다가
+  // 할 일 쪽지로 꽂히고, 시험을 볼 때까지 할 일 쪽지와 검정소 위 '여기!' 가 남는다 ----------
+  let examGoal = null; // 할 일 쪽지에 띄운 승급 시험 글(없으면 null)
+  const examGoalText = () => `검정소에서 ${gradeName(state.license.grade - 1)} 시험을 보자!`;
+  /** 견습이 아닌 급수에서 다음 급수 시험을 볼 수 있고, 아직 시험 중이 아닌지. */
+  const examDue = () => !!state && state.license.grade < NOVICE && canTakeExam(state.license) && !state.exam;
+  function announceExam() {
+    examGoal = examGoalText();
+    guide.setGoal(examGoal, { hold: true }); // 쪽지는 카드가 날아와 꽂힐 때 나타난다
+    sound.play('job');
+    hud.announce({ kicker: '승급 시험!', title: `제초 ${gradeName(state.license.grade - 1)} 시험을 볼 수 있어요!`, sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal',
+      chips: [{ icon: ICO.pin, text: '검정소' }, { icon: 'coin', text: won(EXAM_FEE[state.license.grade]) }] });
+  }
+  /** 시험을 보거나 급수가 오르면 쪽지를 걷고, 불러온 저장에서 이미 알려 준 시험이면 쪽지만 다시 띄운다. */
+  function updateExamGoal() {
+    if (!examDue() || tutorialActive(state.tutorial)) { if (examGoal) { examGoal = null; guide.setGoal(null); } return; }
+    if (!examGoal && seen('exam-' + state.license.grade)) { examGoal = examGoalText(); guide.setGoal(examGoal); }
+  }
   /** 첫 자격(견습 → 5급)을 따면 곁의 하치와레가 축하한다. */
   function cheerGrade5() {
     const n = npcs.byKind('hachiware');
@@ -1110,7 +1129,7 @@ function boot() {
     // 집 안내(첫날, 또는 하치와레에게 집을 물었을 때): 내 집 간판 위에
     if (step === 'house' || escort) return { id: 'guide', x: homeLabel.x, y: homeLabel.y + 0.9, z: homeLabel.z, text: '여기!', kind: 'mark' };
     if (step === 'board' || step === 'report' || jobDone) return { id: 'guide', x: boardSign.x, y: boardSign.y + 0.9, z: boardSign.z, text: '여기!', kind: 'mark' };
-    if (grade5Shown) return { id: 'guide', x: examSign.x, y: examSign.y + 0.9, z: examSign.z, text: '여기!', kind: 'mark' }; // 제초 5급 시험 보러
+    if (grade5Shown || examGoal) return { id: 'guide', x: examSign.x, y: examSign.y + 0.9, z: examSign.z, text: '여기!', kind: 'mark' }; // 제초 승급 시험 보러
     // 다른 작업 일감 중이면 어디서 하는지 표시: 스티커는 작업대, 열매는 가장 가까운 열린 덤불
     const kind = state && state.job && JOB_TYPES[state.job.typeId].kind;
     if (kind === 'sticker') return { id: 'guide', x: benchSign.x, y: benchSign.y + 0.9, z: benchSign.z, text: '여기!', kind: 'mark' };
@@ -4542,6 +4561,7 @@ function boot() {
         else if (guide.goalEl.classList.contains('incoming') && performance.now() - goalCardAt > 4000) announceGoal(state.tutorial);
       }
       updateGrade5Guide(dt);
+      updateExamGoal();
       updateRakkoAdvice(dt);
       saveTimer += dt;
       if (saveTimer > 10) { saveTimer = 0; save(); }
