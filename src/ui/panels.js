@@ -420,7 +420,7 @@ export function createPanels(ui, handlers) {
     current.status.date.textContent = now ? now.date : handlers.dayLabel(s.clock.day);
     // 지도 화면: 지도 칸이 화면에 붙은 뒤에 만든다(칸 크기를 재야 해서)
     const host = p.querySelector('.mapview');
-    if (host) current.view = createMapView(host, { explored: s.explored || '', player: handlers.playerPos(), labels: handlers.mapLabels(), friends: handlers.mapFriends ? handlers.mapFriends() : [] });
+    if (host) current.view = createMapView(host, { explored: s.explored || '', player: handlers.playerPos(), labels: handlers.mapLabels(), friends: handlers.mapFriends ? handlers.mapFriends() : [], mates: handlers.mapMates ? handlers.mapMates() : [] });
   }
 
   const BUILD = {
@@ -1221,6 +1221,11 @@ export function createPanels(ui, handlers) {
       if (!current?.phone || !s) return;
       const t = timeLabel(s.clock);
       if (current.status.time.textContent !== t) current.status.time.textContent = t;
+      // 지도를 보는 동안 같이 놀기 파티원 자리를 0.5초마다 새로
+      if (current.view && current.view.setMates && handlers.mapMates) {
+        const now = performance.now();
+        if (!current.matesAt || now - current.matesAt > 500) { current.matesAt = now; current.view.setMates(handlers.mapMates()); }
+      }
     },
     close: () => close(),
     openBoard: () => show('board'),

@@ -12,7 +12,7 @@ const BTN_ZOOM = 1.35;
 /** 이 배율보다 작으면 이름표를 안 그린다(너무 빽빽하다). */
 const LABEL_MIN_SCALE = 4.5;
 const REGION_COLORS = { village: '#b8e59a', forest: '#7cbf72', mountain: '#c9c1ae', fields: '#d6f0a6', river: '#b8e59a' };
-const WATER = '#86cdee', ROAD = '#f2dca6', INK = '#5a4431', PAPER = '#efe4c6', PINK = '#f06a8f';
+const WATER = '#86cdee', ROAD = '#f2dca6', INK = '#5a4431', PAPER = '#efe4c6', PINK = '#f06a8f', MATE = '#d9487a'; // MATE: 같이 놀기 파티원
 const FONT = '700 12px "Pretendard Variable", "Malgun Gothic", sans-serif';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -73,11 +73,12 @@ function buildFog(explored) {
  * 한 손가락(마우스)으로 끌면 움직이고, 휠 · 두 손가락 벌리기 · +/− 단추로 확대 · 축소, '내 위치' 로 나에게 돌아온다.
  * 바탕(구역 · 물)은 한 번 그려 두고, 길 · 울타리 · 건물 · 동굴 · 이름표 · 내 위치는 그릴 때마다 벡터로 그려 어느 배율에서도 또렷하다.
  * 안 가 본 칸은 종이색 구름으로 덮고, 이름표는 가 본 칸에 있는 것만 배율 4.5 이상에서 서로 겹치지 않게 보인다.
- * host: 빈 div. opts: { explored: 탐험 문자열, player: { x, z, yaw } | null, labels: [{ x, z, text }] }
- * → { recenter(), zoomBy(factor), destroy() }
+ * host: 빈 div. opts: { explored: 탐험 문자열, player: { x, z, yaw } | null, labels: [{ x, z, text }], mates: 같이 놀기 파티원 [{ x, z, name }] }
+ * → { recenter(), zoomBy(factor), setMates(list), destroy() }
  */
 export function createMapView(host, opts = {}) {
   const { explored = '', labels = [], friends = [] } = opts;
+  let mates = Array.isArray(opts.mates) ? opts.mates : [];
   const p = opts.player;
   const player = p && Number.isFinite(p.x) && Number.isFinite(p.z) ? p : null;
 
@@ -291,6 +292,37 @@ export function createMapView(host, opts = {}) {
     }
   }
 
+  /**
+   * 같이 놀기 파티원: 흰 테두리 진분홍 점과 그 위 이름표(가 보지 않은 곳에 있어도 보인다).
+   * 화면 밖에 있으면 가장자리에 붙여 그 쪽을 알려 준다.
+   */
+  function drawMates() {
+    g.font = FONT;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    for (const m of mates) {
+      if (!Number.isFinite(m.x) || !Number.isFinite(m.z)) continue;
+      const x = clamp(sx(m.x), 12, cssW - 12), y = clamp(sy(m.z), 30, cssH - 12);
+      g.beginPath();
+      g.arc(x, y, 7, 0, Math.PI * 2);
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(90, 68, 49, 0.35)';
+      g.stroke();
+      g.beginPath();
+      g.arc(x, y, 5, 0, Math.PI * 2);
+      g.fillStyle = MATE;
+      g.fill();
+      const text = String(m.name || ''), w = g.measureText(text).width + 12, H = 18, top = y - 11 - H;
+      g.fillStyle = MATE;
+      roundRect(g, clamp(x - w / 2, 2, cssW - w - 2), top, w, H, H / 2);
+      g.fill();
+      g.fillStyle = '#ffffff';
+      g.fillText(text, clamp(x, w / 2 + 2, cssW - w / 2 - 2), top + H / 2 + 0.5);
+    }
+  }
+
   /** 내 위치: 흰 테두리 분홍 점, 바라보는 쪽(월드 (sin yaw, cos yaw))으로 작은 분홍 화살표. */
   function drawPlayer() {
     if (!player) return;
@@ -334,6 +366,7 @@ export function createMapView(host, opts = {}) {
     drawFog();
     drawLabels();
     drawFriends();
+    drawMates();
     drawPlayer();
   }
 
@@ -414,6 +447,12 @@ export function createMapView(host, opts = {}) {
   return {
     recenter,
     zoomBy,
+    /** 파티원 자리를 새로 받아 다시 그린다(지도를 보는 동안에도 움직이는 대로). */
+    setMates(list) {
+      if (destroyed) return;
+      mates = Array.isArray(list) ? list : [];
+      draw();
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;

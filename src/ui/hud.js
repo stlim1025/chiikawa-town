@@ -323,9 +323,19 @@ export function createHud(ui, input) {
      */
     setVisitors(info) {
       visitTag.hidden = !info;
-      const party = (info && info.party) || [];
-      const key = info ? info.label + '|' + info.names.join(',') + '|' + party.join(',') : '';
-      if (visitTag.dataset.k === key) return;
+      // 같이 토벌 파티원 [{ name, hp, max }](이름만 오면 기운 막대 없이). 기운만 바뀌면 막대만 고친다
+      const party = ((info && info.party) || []).map((p) => (typeof p === 'string' ? { name: p, hp: null, max: 100 } : p));
+      const key = info ? info.label + '|' + info.names.join(',') + '|' + party.map((p) => p.name).join(',') : '';
+      const bars = () => party.forEach((p, i) => {
+        const box = visitTag.querySelectorAll('.vs-mate')[i];
+        if (!box) return;
+        const known = Number.isFinite(p.hp), k = known ? Math.max(0, Math.min(1, p.hp / (p.max || 100))) : 0;
+        box.querySelector('i').style.width = Math.round(k * 100) + '%';
+        box.querySelector('em').textContent = known ? String(Math.round(p.hp)) : '…';
+        box.classList.toggle('low', known && k <= 0.34);
+        box.classList.toggle('out', known && p.hp <= 0);
+      });
+      if (visitTag.dataset.k === key) { bars(); return; }
       visitTag.dataset.k = key;
       visitTag.replaceChildren();
       if (!info) return;
@@ -344,12 +354,19 @@ export function createHud(ui, input) {
         const lab2 = el('span', 'vs-lab');
         lab2.textContent = '같이 토벌';
         visitTag.appendChild(lab2);
-        for (const name of party) {
+        for (const p of party) {
+          // 이름 알약 + 기운 막대 · 숫자(같이 토벌 중인 친구가 얼마나 버티는지)
+          const box = el('span', 'vs-mate');
           const chip = el('b', 'vs-name vs-party');
-          chip.textContent = name;
-          visitTag.appendChild(chip);
+          chip.textContent = p.name;
+          const bar = el('span', 'vs-hp');
+          bar.appendChild(el('i'));
+          box.append(chip, bar, el('em'));
+          box.setAttribute('aria-label', `${p.name} 기운`);
+          visitTag.appendChild(box);
         }
       }
+      bars();
       visitTag.classList.remove('got'); void visitTag.offsetWidth; visitTag.classList.add('got');
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */

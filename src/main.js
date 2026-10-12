@@ -531,6 +531,11 @@ function boot() {
     }
     if (a.t === 'unparty') { leaveParty(id); return; }
     if (a.t === 'pkill') { mpPartyKill(id, a); return; }
+    if (a.t === 'hp') { // 파티원의 기운(왼쪽 위 '같이 토벌' 막대)
+      const p = mpParty.get(id);
+      if (p && Number.isFinite(a.v) && Number.isFinite(a.m) && a.m > 0) { p.max = Math.min(999, a.m); p.hp = Math.max(0, Math.min(p.max, a.v)); updateVisitTag(); }
+      return;
+    }
     if (!visiting || visiting.arriving || id !== multi.hostId) return; // 아래는 놀러 간 마을 주인만 보낸다
     if (a.t === 'hurt') {
       const dmg = Math.max(1, Math.min(80, Math.round(a.dmg) || 1)), sp = Object.hasOwn(MONSTERS, a.sp) ? a.sp : null;
@@ -613,7 +618,18 @@ function boot() {
 
   // 같이 토벌 파티: 다른 사람에게 말 걸어 '같이 토벌하러 가자!' → 받아 주면 파티. 파티 중에 쓰러뜨린 몬스터는
   // 토벌 일감 · 퀘스트를 파티 모두가 같이 세고(토벌 점수는 나눠 갖는다), 전리품은 가방 대신 그 자리 바닥에 떨어진다(누구든 줍는다)
-  const mpParty = new Map(); // 연결 id → 이름
+  const mpParty = new Map(); // 연결 id → { name, hp: 그 사람 기운(모르면 null), max }
+  let hpSentT = 0, hpSent = null; // 파티원에게 내 기운을 마지막으로 보낸 뒤 흐른 초 · 보낸 값
+  /** 내 기운을 파티원에게 알린다(바뀌면 0.3초마다, 그대로여도 5초마다 한 번). now: 바로 보낸다. */
+  function sendPartyHp(dt, now = false) {
+    if (!mpParty.size || !state) return;
+    hpSentT += dt;
+    const v = downed ? 0 : state.stamina;
+    if (!now && (hpSentT < 0.3 || (v === hpSent && hpSentT < 5))) return;
+    hpSentT = 0;
+    hpSent = v;
+    for (const id of mpParty.keys()) multi.direct(id, { t: 'hp', v, m: MAX_STAMINA });
+  }
   const mpWho = (name) => ({ kind: 'me', name, tag: '#e3f4ec', ink: '#3f7a63' }); // 대화 상자 이름표(다른 사람)
   /** 다른 사람에게 말 걸기: 같이 토벌하러 가자 · 파티 그만하자 · 인사. */
   function talkToPlayer(tg) {
@@ -649,14 +665,15 @@ function boot() {
     }, mpWho(name));
   }
   function joinParty(id, name) {
-    mpParty.set(id, name);
+    mpParty.set(id, { name, hp: null, max: MAX_STAMINA });
+    sendPartyHp(0, true); // 서로의 기운이 바로 보이게
     updateVisitTag();
     sound.play('job');
     hud.toast(`${josa(name, '과/와')} 파티를 맺었어요!`, 3200, { chips: [{ text: '토벌 일감은 같이 세요' }, { text: '전리품은 바닥에' }] });
   }
   /** 파티가 끝났다(그만하자고 했거나 · 상대가 돌아갔다). */
   function leaveParty(id) {
-    const name = mpParty.get(id);
+    const name = mpParty.get(id)?.name;
     if (!mpParty.delete(id)) return;
     updateVisitTag();
     hud.toast(`${josa(name || '친구', '과/와')} 파티가 끝났어요`, 2400);
@@ -786,6 +803,7 @@ function boot() {
       const p = player.position, outside = visiting ? mode === 'play' || mode === 'intro' : mode === 'play';
       multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away' });
     }
+    sendPartyHp(dt); // 같이 토벌 파티원에게 내 기운
     if (multi.status !== 'open' || !multi.count) return;
     worldT -= dt;
     weedsT -= dt;
@@ -1178,7 +1196,19 @@ function boot() {
     playerPos: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }), // 지도에 바라보는 방향 화살표
     mapLabels: () => village.labels.map((l) => ({ x: l.x, z: l.z, text: l.text })),
     // 지도에 마을 친구들 얼굴(집 안에 있으면 빼고)
-    mapFriends: () => Object.keys(VILLAGERS).map((k) => npcs.byKind(k)).filter((n) => n && !n.away).map((n) => ({ x: n.x, z: n.z, name: nameOf(n.kind), svg: faceIcon(n.kind) })),
+    // 마을 친구들 얼굴(친구 마을에 놀러 가 있으면 그 마을 친구들이 보이는 자리)
+    mapFriends: () => Object.keys(VILLAGERS).map((k) => npcs.byKind(k)).filter((n) => n && (visiting ? n.pup && n.chibi.root.visible : !n.away))
+      .map((n) => ({ x: visiting ? n.pup.x : n.x, z: visiting ? n.pup.z : n.z, name: nameOf(n.kind), svg: faceIcon(n.kind) })),
+    /** 같이 놀기 파티원 자리(집 안에 있으면 그 집 앞). */
+    mapMates: () => {
+      const at = new Map(remotes.players().map((p) => [p.id, p]));
+      return [...mpParty].map(([id, m]) => {
+        const p = at.get(id);
+        if (!p || (p.area !== 'village' && p.area !== 'home')) return null;
+        const s = p.area === 'home' ? village.spots.home : p;
+        return { x: s.x, z: s.z, name: m.name };
+      }).filter(Boolean);
+    },
     buyHouse() {
       const r = buyHouse(state);
       if (!r.ok) { hud.toast(r.reason === 'unpaid' ? '밀린 집세부터 내요' : '돈이 부족해요'); return; }

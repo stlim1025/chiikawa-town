@@ -107,6 +107,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-visit.got { animation: party-got 0.6s ease-out; transform-origin: left center; }
 .hud-visit .vs-br { flex-basis: 100%; height: 0; } /* 같이 토벌 파티는 다음 줄에 */
 .hud-visit .vs-party { background: #ee7489; }
+/* 같이 토벌 파티원 기운: 이름 옆 막대(초록 → 주황, 쓰러지면 흐리게)와 숫자 */
+.hud-visit .vs-mate { display: inline-flex; align-items: center; gap: 5px; }
+.hud-visit .vs-hp { display: block; width: 46px; height: 8px; border-radius: 4px; background: rgba(63, 122, 99, 0.18); overflow: hidden; }
+.hud-visit .vs-hp i { display: block; height: 100%; border-radius: 4px; background: #7cc77a; transition: width 0.25s; }
+.hud-visit .vs-mate em { min-width: 20px; font-style: normal; font-size: 13px; color: #3f7a63; }
+.hud-visit .vs-mate.low .vs-hp i { background: #f2a65a; }
+.hud-visit .vs-mate.out { opacity: 0.55; }
 @keyframes party-got { 0% { scale: 1.15; } 50% { scale: 0.97; } 100% { scale: 1; } }
 .hud-job .n { padding: 0 10px 1px; border-radius: 999px; background: #e3f4e8; color: #2f6b45; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-job.done .n { background: #fff; color: #9a5a1a; }
