@@ -7,6 +7,7 @@ const S = await import(G + 'save.js');
 const St = await import(G + 'state.js');
 const F = await import(G + 'friends.js');
 const C = await import(G + 'combat.js');
+const L = await import(G + 'licenses.js');
 
 const fresh = () => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', money: 1000, player: { x: 0, z: 0 } });
 const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: F.ptsForHearts(h), talk: 0, play: 0, gift: true } } });
@@ -79,6 +80,14 @@ test('hunt counts only after accepting', () => {
 });
 test('story chain steps & visit', () => {
   let s = Q.startQuest(fresh(), 'story');
+  // 먼저 검정소 토벌 안내서를 읽고 대장 갑옷 씨에게 알린다
+  assert.equal(Q.stepOf(s, 'story').type, 'study');
+  assert.ok(!Q.stepReady(s, 'story'));
+  assert.equal(Q.shortGoal(s, 'story').n, '', '안내서 읽기는 0 / 1 을 안 보인다');
+  s = L.markStudy(s, 'hunter', 1);
+  assert.ok(Q.stepReady(s, 'story'));
+  assert.deepEqual(Q.questsFor(s, 'captain').report, ['story']);
+  s = Q.completeStep(s, 'story', 1).state;
   assert.equal(Q.stepOf(s, 'story').type, 'license');
   assert.ok(!Q.stepReady(s, 'story'));
   s = { ...s, licenses: { hunter: { day: 1 } } };
@@ -114,4 +123,51 @@ test('save rejects bad quests', () => {
   assert.ok(!S.isValidState({ ...fresh(), quests: { nope: { step: 0, base: 0 } } }));
   assert.ok(!S.isValidState({ ...fresh(), questTrack: 'nope' }));
   assert.ok(S.isValidState({ ...fresh(), quests: { story: { step: 2, base: 0 } }, questTrack: 'story', story: { bossSeen: true }, truce: 4 }));
+});
+
+test('술 공부 부탁(쿠리만쥬): 강의 8강 → 술 자격 시험, 자격이 있으면 부탁하지 않는다', () => {
+  let s = fresh();
+  assert.ok(Q.canOffer(s, 'liquorStudy'), '처음부터(하트 0) 부탁한다');
+  assert.ok(!Q.canOffer({ ...s, tutorial: 'board' }, 'liquorStudy'), '첫날 안내가 끝난 뒤');
+  assert.ok(!Q.canOffer({ ...s, licenses: { liquor: { day: 1 } } }, 'liquorStudy'), '이미 술 자격이 있으면 안 한다');
+  s = Q.startQuest(s, 'liquorStudy');
+  assert.equal(Q.stepOf(s, 'liquorStudy').type, 'study');
+  for (let n = 1; n < L.LIQUOR_LESSONS.length; n++) {
+    s = L.markStudy({ ...s, liquorLesson: n }, 'liquor', n);
+    assert.ok(!Q.stepReady(s, 'liquorStudy'), `${n}강까지`);
+    assert.equal(Q.shortGoal(s, 'liquorStudy').n, `${n} / ${L.LIQUOR_LESSONS.length}`);
+  }
+  s = L.markStudy({ ...s, liquorLesson: 8 }, 'liquor', 8);
+  assert.ok(Q.stepReady(s, 'liquorStudy'));
+  assert.deepEqual(Q.questsFor(s, 'kurimanju').report, ['liquorStudy']);
+  s = Q.completeStep(s, 'liquorStudy', 2).state;
+  assert.equal(Q.stepOf(s, 'liquorStudy').type, 'license');
+  s = { ...s, licenses: { liquor: { day: 2 } } };
+  const r = Q.completeStep(s, 'liquorStudy', 2);
+  assert.ok(r.finished && I.countOf(r.state, 'bottlebeer') === 2);
+  assert.ok(S.isValidState(r.state));
+});
+
+test('공부 기록: 강의는 다 들어야, 안내서 · 레시피 북은 한 번 펼치면 · 예전 저장의 강의 번호도 센다', () => {
+  const s = fresh();
+  for (const id of Object.keys(L.STUDY)) assert.ok(!L.isStudied(s, id), id);
+  assert.ok(L.isStudied(L.markStudy(s, 'hunter', 3), 'hunter'));
+  assert.ok(L.isStudied(L.markStudy(s, 'arbeiter', 3), 'arbeiter'));
+  assert.deepEqual(L.studyProgress({ ...s, liquorLesson: 5 }, 'liquor'), { have: 5, need: 8 });
+  assert.equal(L.markStudy(L.markStudy(s, 'hunter', 3), 'hunter', 9).study.hunter, 3, '처음 펼친 날 그대로');
+  assert.equal(L.markStudy(L.markStudy(s, 'liquor', 6), 'liquor', 2).study.liquor, 6, '들은 강의 수는 줄지 않는다');
+  assert.ok(S.isValidState({ ...s, study: { liquor: 8, hunter: 2 } }));
+  assert.ok(!S.isValidState({ ...s, study: { cooking: 1 } }));
+  assert.ok(!S.isValidState({ ...s, study: { hunter: 'yes' } }));
+});
+
+test('예전 저장(버전 3)의 이야기 퀘스트는 단계 번호를 한 칸 밀어 하던 단계 그대로', () => {
+  const at = (step) => S.deserialize(S.serialize({ ...fresh(), version: 3, quests: { story: { step, base: 0 } } })).state;
+  assert.equal(Q.stepOf(at(0), 'story').type, 'license', '자격증 따기 하던 사람은 그대로 자격증 따기');
+  assert.equal(Q.stepOf(at(1), 'story').type, 'hunt');
+  const done = S.deserialize(S.serialize({ ...fresh(), version: 3, quests: { story: { step: 8, base: 0, done: 20 } } })).state;
+  assert.ok(Q.isDone(done, 'story'));
+  assert.ok(S.isValidState(done));
+  // 지금 버전은 그대로
+  assert.equal(S.deserialize(S.serialize({ ...fresh(), quests: { story: { step: 0, base: 0 } } })).state.quests.story.step, 0);
 });

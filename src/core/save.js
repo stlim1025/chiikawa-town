@@ -3,7 +3,7 @@ import { isValidHome } from './home.js';
 import { isValidHousing } from './housing.js';
 import { isValidFriends, upgradeFriends, curveFriends } from './friends.js';
 import { STATE_VERSION } from './state.js';
-import { isValidLicenses } from './licenses.js';
+import { isValidLicenses, isValidStudy } from './licenses.js';
 import { isValidBoard, isValidVillagers } from './villagers.js';
 import { isValidPochette } from './pochette.js';
 import { isValidExplored } from './explore.js';
@@ -12,7 +12,7 @@ import { isValidWeedLog } from './weeding.js';
 import { isValidBag } from './inventory.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
-import { isValidQuests, isValidStory, isValidActs, QUESTS } from './quests.js';
+import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep } from './quests.js';
 import { isValidRaffle } from './raffle.js';
 import { isValidGround } from './ground.js';
 import { isValidHunters } from './hunters.js';
@@ -44,6 +44,7 @@ export function isValidState(s) {
   if (s.licenses !== undefined && !isValidLicenses(s.licenses)) return false; // 예전 저장에는 없다
   if (s.ramenDay !== undefined && !num(s.ramenDay)) return false;
   if (s.liquorLesson !== undefined && !num(s.liquorLesson)) return false;
+  if (s.study !== undefined && !isValidStudy(s.study)) return false; // 시험 공부(술 강의 · 토벌 안내서 · 레시피 북)
   if (s.board !== undefined && !isValidBoard(s.board)) return false; // 예전 저장에는 없다
   if (s.villagers !== undefined && !isValidVillagers(s.villagers)) return false;
   if (s.theftDay !== undefined && !num(s.theftDay)) return false;
@@ -86,15 +87,17 @@ export function deserialize(text) {
 
 /**
  * 예전 모양의 상태를 지금 모양으로(state.version 이 낮으면). 하트 개수는 늘 그대로.
- * 1 → 2: 친밀도 점수를 하트 하나 6점 단위로, 2 → 3: 하트마다 점수가 다른 곡선(friends.js 의 HEART_AT)으로.
+ * 1 → 2: 친밀도 점수를 하트 하나 6점 단위로, 2 → 3: 하트마다 점수가 다른 곡선(friends.js 의 HEART_AT)으로,
+ * 3 → 4: 이야기 퀘스트 맨 앞에 '토벌 안내서 읽기' 단계가 생겨 받아 둔 이야기의 단계 번호를 한 칸 민다.
  */
 export function upgradeState(s) {
   const v = s.version || 1;
   if (v >= STATE_VERSION) return s;
-  let friends = s.friends;
+  let friends = s.friends, quests = s.quests;
   if (friends && v < 2) friends = upgradeFriends(friends);
   if (friends && v < 3) friends = curveFriends(friends);
-  return { ...s, version: STATE_VERSION, ...(friends ? { friends } : {}) };
+  if (quests && v < 4) quests = shiftStoryStep(quests);
+  return { ...s, version: STATE_VERSION, ...(friends ? { friends } : {}), ...(quests ? { quests } : {}) };
 }
 
 /** storage(getItem/setItem/removeItem) 위의 저장소. 막힌 storage 에서도 throw 하지 않는다. */

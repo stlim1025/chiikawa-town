@@ -83,6 +83,34 @@ export function hasLicense(state, id) {
   return !!licensesOf(state)[id];
 }
 
+/**
+ * 시험 공부: 필기는 정해진 공부거리에서 나온다(안 보고 시험 봤다가 필기에서 떨어지는 일이 많았다).
+ *  liquor   쿠리만쥬 강의(LIQUOR_LESSONS 를 다 듣기) · hunter 검정소 토벌 안내서 펼치기 · arbeiter 라멘 로우 레시피 북 펼치기
+ * state.study = { liquor?: 들은 강의 수, hunter?: 안내서를 펼친 날, arbeiter?: 레시피 북을 펼친 날 }
+ */
+export const STUDY = {
+  liquor: { what: '쿠리만쥬 강의', where: '쿠리만쥬에게 「술 공부하고 싶어」' },
+  hunter: { what: '토벌 안내서', where: '검정소 토벌 안내서' },
+  arbeiter: { what: '레시피 북', where: '라멘 로우 레시피 북' }
+};
+export const studyOf = (state) => state.study || {};
+/** 공부한 만큼: { have, need }. 예전 저장의 술 강의는 liquorLesson(지금까지 들은 강의 번호)도 센다. */
+export function studyProgress(state, id) {
+  const st = studyOf(state);
+  if (id === 'liquor') return { have: Math.min(LIQUOR_LESSONS.length, Math.max(st.liquor || 0, state.liquorLesson || 0)), need: LIQUOR_LESSONS.length };
+  return { have: st[id] ? 1 : 0, need: 1 };
+}
+export const isStudied = (state, id) => { const p = studyProgress(state, id); return p.have >= p.need; };
+/** 공부했다고 적는다. liquor 는 들은 강의 수(n), 나머지는 펼친 날(n). 이미 적혀 있으면 그대로. */
+export function markStudy(state, id, n) {
+  const st = studyOf(state);
+  if (id === 'liquor' ? (st.liquor || 0) >= n : st[id]) return state;
+  return { ...state, study: { ...st, [id]: n } };
+}
+export function isValidStudy(st) {
+  return !!st && typeof st === 'object' && !Array.isArray(st) && Object.entries(st).every(([id, v]) => STUDY[id] && typeof v === 'number' && Number.isFinite(v) && v >= 0);
+}
+
 /** 응시료를 낸다. { ok, state, reason: 'owned' | 'money' } */
 export function payFee(state, id) {
   if (hasLicense(state, id)) return { ok: false, reason: 'owned', state };

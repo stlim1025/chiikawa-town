@@ -166,7 +166,7 @@ function monsterCards(s, withCount) {
 /**
  * 게시판(노동 접수), 제초 검정소, 라멘 로우, 가구점, 부동산, 포셰트 가게, 설정 창. (집 안은 ui/homeui.js)
  * handlers: { getState, acceptJob(typeId), quitJob(), reportJob(), startExam(), buy(itemId), toTitle(),
- *   takeLicense(id: 'liquor' | 'arbeiter'), workRamen(),
+ *   takeLicense(id: 'liquor' | 'arbeiter' | 'hunter'), studied(id: 'hunter' | 'arbeiter') (토벌 안내서 · 레시피 북을 펼쳤다), workRamen(),
  *   thumbs() → { 가구id: 그림 URL }, buyFurniture(id),
  *   payRent() (밀린 집세만 · 쫓겨났어도 낼 수 있지만 쫓겨난 건 그대로), rentAgain() (쫓겨난 뒤 밀린 집세 + 이번 주 집세 내고 다시 세 들기),
  *   buyHouse(), applyLottery(), buyByLottery(), dayLabel(day), nextDay(요일) → 그 요일이 오는 날,
@@ -200,6 +200,8 @@ export function createPanels(ui, handlers) {
     }
     close(true);
     current = { kind, extra: phone ? phoneExtra : extra };
+    // 시험 공부거리를 펼쳤다(검정소 토벌 안내서 · 라멘 로우 레시피 북): 시험 전 검정관이 확인한다
+    if (kind === 'guidebook' || kind === 'recipes') handlers.studied?.(kind === 'guidebook' ? 'hunter' : 'arbeiter');
     // 옷장은 내 캐릭터가 보이게 옆에 붙여 띄운다(어둡게 덮지 않는다)
     const backdrop = h('div', { class: phone ? 'backdrop phone-backdrop' : kind === 'wardrobe' ? 'backdrop side' : 'backdrop' });
     backdrop.addEventListener('pointerdown', (e) => { if (e.target === backdrop) close(); });
@@ -696,9 +698,11 @@ export function createPanels(ui, handlers) {
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },
-    recipes() {
+    // 레시피 북: 라멘 로우에서(가게로), 시험 전 검정관이 펼쳐 줬으면 검정소로 돌아간다
+    recipes(s, extra) {
+      const back = extra && extra.back === 'exam' ? ['exam', '검정소로'] : ['shop', '가게로'];
       return [head('레시피 북'), recipeCards(),
-        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('shop') }, '가게로'), closeBtn())];
+        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show(back[0]) }, back[1]), closeBtn())];
     },
     // 마을폰 '자격증' 앱(폰 안 화면: 닫기는 아래 홈 버튼)
     licenses(s) {
@@ -1148,6 +1152,8 @@ export function createPanels(ui, handlers) {
     close: () => close(),
     openBoard: () => show('board'),
     openExam: () => show('exam'),
+    openGuidebook: () => show('guidebook'), // 토벌 안내서(시험 전 검정관이 펼쳐 준다)
+    openRecipes: (extra) => show('recipes', extra), // 레시피 북({ back: 'exam' } 이면 검정소로 돌아간다)
     openShop: () => show('shop'),
     openLicenses: () => show('licenses'),
     openFurniture: () => show('furniture'),

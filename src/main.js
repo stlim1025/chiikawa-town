@@ -49,7 +49,7 @@ import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
-import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
+import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
@@ -389,6 +389,8 @@ function boot() {
     cheers() { const k = kuriAtPub(); if (k) cheersWith(k); },
     // 검정소 시험 · 라멘 로우 알바
     takeLicense: (id) => takeLicense(id),
+    // 시험 공부거리(토벌 안내서 · 레시피 북)를 펼쳤다: 펼친 날을 적어 둔다(시험 전 검정관 확인 · 이야기 퀘스트 '안내서 읽기')
+    studied: (id) => { const s = markStudy(state, id, state.clock.day); if (s !== state) commit(s); },
     licenseCard: (id) => licenseCardData(id),
     workRamen: () => workRamen(),
     // 가구점
@@ -1281,8 +1283,9 @@ function boot() {
       if (HOME_ACTS[n.kind]) opts.push(['homeact', HOME_ACTS[n.kind].ask]);
       if (friendOf(state, n.kind).snack !== state.clock.day) opts.push(['snack', '출출한데… 간식 있어?']);
     }
-    // 쿠리만쥬: 술 자격 공부(강의) · 자격을 따면 한 잔
-    if (n.kind === 'kurimanju' && mode !== 'visit') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : ['study', '술 공부하고 싶어']);
+    // 쿠리만쥬: 술 자격 공부(강의) · 자격을 따면 한 잔. '술 공부' 부탁 중이면 강의 듣기를 묶음에 접지 않고 바로 보이게
+    const lessonQuest = stepOf(state, 'liquorStudy') && stepOf(state, 'liquorStudy').type === 'study' && !stepReady(state, 'liquorStudy');
+    if (n.kind === 'kurimanju' && mode !== 'visit') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : lessonQuest ? ['lesson', '강의 들으러 왔어'] : ['study', '술 공부하고 싶어']);
     if (n.kind === 'pochette') opts.push(['shop', '포셰트 구경할래']);
     // 지갑이 있는 친구: 하트를 꽉 채우면 돈을 빌릴 수 있고, 빌렸으면 갚는다. 쫓겨났으면 밤에 하룻밤 재워 달라고 한다.
     if (VILLAGERS[n.kind]) {
@@ -1332,9 +1335,9 @@ function boot() {
           enterVisit(n.kind);
         });
       }
-      else if (k === 'study') {
+      else if (k === 'study' || k === 'lesson') {
         const i = (state.liquorLesson || 0) % LIQUOR_LESSONS.length;
-        commit({ ...state, liquorLesson: i + 1 });
+        commit(markStudy({ ...state, liquorLesson: i + 1 }, 'liquor', i + 1)); // 들은 강의 수(시험 전 검정관이 확인한다)
         // 시험에 나오는 말은 빨갛게(LIQUOR_MARKS) — 첫 강의에서 그렇다고 알려 준다
         const intro = i === 0 ? [{ text: '빨갛게 보이는 말은 시험에 꼭 나와. 잘 봐 둬~', marks: ['빨갛게'] }] : [];
         sayAs(n, [...intro, ...LIQUOR_LESSONS[i].map((text) => ({ text, marks: LIQUOR_MARKS })), { text: '오늘 강의 끝~ 하아~', chips: [{ icon: ICO.book, text: `${i + 1} / ${LIQUOR_LESSONS.length}` }] }], () => reward(n, 'talk'));
@@ -1764,9 +1767,33 @@ function boot() {
   function showLicenseCard(id, kicker, s = state, extra = null) {
     hud.notice({ kicker, card: licenseCardEl(licenseCardData(id, s)), tone: 'good', sub: (extra && extra.sub) || '자격증 앱에 넣어 뒀어요', chips: extra && extra.chips, ok: '받았다!' });
   }
-  /** 검정소 시험: 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. */
-  function takeLicense(id) {
+  /**
+   * 시험 전에 검정관(대장 갑옷 씨)이 공부했는지 묻는다(licenses.js 의 STUDY): 공부거리를 안 봤으면 먼저 보러 가라고 하고,
+   * 그래도 보겠다면 그대로 시험. 안내서 · 레시피 북은 그 자리에서 펼쳐 준다. → 물어봤으면 true(시험은 대답한 뒤에)
+   */
+  function examCheck(id) {
+    const p = studyProgress(state, id);
+    if (p.have >= p.need) return false;
+    const captain = whoOf({ kind: 'captain' });
+    const line = id === 'liquor'
+      ? (p.have ? `흠. 쿠리만쥬 강의는 ${p.have}강까지 들었군. 필기는 강의에서 나온다. 끝까지 듣고 오는 게 좋을 거다.` : '흠흠. 술 자격 필기는 쿠리만쥬 강의에서 나온다. 강의는 듣고 왔나?')
+      : id === 'hunter' ? '흠흠. 토벌 안내서는 읽어 봤나? 필기는 전부 안내서에서 나온다.' : '흠흠. 라멘 로우 레시피 북은 봤나? 필기는 레시피에서 나온다.';
+    const free = () => { if (mode === 'play' && !panels.isOpen() && !guide.open) input.setEnabled(true); };
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    guide.ask(line, [id === 'liquor' ? '강의 듣고 올게요' : `${STUDY[id].what} 먼저 볼게요`, '그래도 볼래요'], (i) => {
+      if (i === 1) { takeLicense(id, true); return; }
+      if (id === 'hunter') panels.openGuidebook();
+      else if (id === 'arbeiter') panels.openRecipes({ back: 'exam' });
+      else guide.say([{ text: '쿠리만쥬에게 「술 공부하고 싶어」라고 말을 걸어 봐라. 흠흠.', chips: [{ icon: ICO.book, text: `${p.have} / ${p.need}강` }] }], free, captain);
+    }, captain);
+    return true;
+  }
+  /** 검정소 시험: (공부 확인) → 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. sure: 공부 확인을 이미 했다 */
+  function takeLicense(id, sure = false) {
     if (hunterExam) { hud.toast('토벌 실기 중이에요!'); return; }
+    if (!sure && !hasLicense(state, id) && state.money >= LICENSES[id].fee && examCheck(id)) return;
     const L = LICENSES[id], r = payFee(state, id);
     if (!r.ok) { hud.toast(r.reason === 'money' ? '응시료가 부족해요' : '이미 있는 자격이에요'); return; }
     commit(r.state);

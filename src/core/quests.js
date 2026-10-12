@@ -1,6 +1,6 @@
 import { FRIENDS, friendOf, hearts, ptsForHearts, MAX_HEARTS, GIFT_HEARTS, befriendBy } from './friends.js';
 import { homeOf, FURNITURE } from './home.js';
-import { hasLicense } from './licenses.js';
+import { hasLicense, studyProgress, STUDY } from './licenses.js';
 import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from './wardrobe.js';
 import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
@@ -16,6 +16,7 @@ import { VILLAGERS, villagerOf } from './villagers.js';
  *   hunt    { species, n }             그 몬스터를 n 마리 잡고(단계를 받은 뒤부터 센다) to 에게 알린다
  *   pull    { kind, n }                그 풀을 n 개 뽑고 to 에게 알린다
  *   license { id }                     그 자격증을 따고 to 에게 알린다
+ *   study   { id }                     그 자격 시험 공부(licenses.js 의 STUDY: 술 강의 · 토벌 안내서)를 하고 to 에게 알린다(이미 그 자격이 있으면 끝난 것으로)
  *   talk    { }                        to 에게 말을 건다
  *   visit   { place, night?, evening?, with? } 그곳에 가면 저절로 끝난다(night 면 밤 19시 ~ 새벽 5시, evening 이면 저녁 17 ~ 21시에만,
  *                                       with 면 부탁한 친구와 같이 가야 한다)
@@ -75,9 +76,11 @@ export const QUESTS = {
   story: {
     title: '바위산의 수상한 기척', giver: 'captain', story: true, needHearts: 0, tutorial: true,
     ask: '무슨 일이에요?',
-    offer: ['흠흠. {name}, 잠깐 이야기 좀 하지.', '요즘 마을 밖 몬스터가 부쩍 늘었다. 특히 북쪽 바위산 쪽이다.', '마을을 지키려면 토벌할 줄 아는 사람이 필요해.', '검정소에서 토벌 자격증을 따 와라. 토벌 안내서부터 읽고, 무기는 도구점에서.'],
+    offer: ['흠흠. {name}, 잠깐 이야기 좀 하지.', '요즘 마을 밖 몬스터가 부쩍 늘었다. 특히 북쪽 바위산 쪽이다.', '마을을 지키려면 토벌할 줄 아는 사람이 필요해.', '토벌 자격증을 따 와라. 그 전에 검정소 토벌 안내서부터 읽고 와라. 필기는 전부 거기서 나온다.'],
     steps: [
-      { type: 'license', id: 'hunter', goal: '검정소에서 토벌 자격증을 따자!', say: ['흠! 합격했군. 역시 내 눈은 틀리지 않았다.', '그럼 첫 임무다. 바위산의 이끼 거북을 3마리 줄여 줘라.'] },
+      // 안내서를 안 읽고 시험부터 봤다가 필기에서 떨어지는 일이 많아서, 먼저 읽고 오게 한다(예전 저장은 save.js 가 단계 번호를 한 칸 민다)
+      { type: 'study', id: 'hunter', goal: '검정소에서 토벌 안내서를 읽어 보자! (검정소 창 · 토벌 안내서 「읽기」)', say: ['흠. 안내서는 읽었군.', '몬스터가 사는 곳 · 공격 · 전리품, 필기는 안내서에 적힌 그대로 나온다.', '준비가 되면 검정소에서 시험을 봐라. 자격증을 따면 무기는 도구점에서 살 수 있다.'] },
+      { type: 'license', id: 'hunter', goal: '검정소에서 토벌 자격증을 따자! (응시료 300원)', say: ['흠! 합격했군. 역시 내 눈은 틀리지 않았다.', '그럼 첫 임무다. 바위산의 이끼 거북을 3마리 줄여 줘라.'] },
       { type: 'hunt', species: 'turtle', n: 3, goal: '북쪽 바위산의 이끼 거북 세 마리를 잡자!', say: ['수고했다. 그런데… 이상하군.', '쓰러뜨려도 쓰러뜨려도 바위산 쪽에서 계속 나타난다고 한다.', '랏코라면 뭔가 알지도 모른다. 랏코 수련장에 가 봐라.'] },
       { type: 'talk', to: 'rakko', goal: '랏코에게 바위산 이야기를 물어보자!', say: ['…대장이 보냈나.', '바위산 깊은 곳에서 이상한 기척이 난다. 몬스터들이 거기서 깨어나는 것 같다.', '옛날 이야기라면 카니가 잘 알 거다. 헌책방에 가 봐라.'] },
       { type: 'talk', to: 'kani', goal: '카니 헌책방에서 옛이야기를 들어 보자!', say: ['…바위산 이야기?', '(낡은 그림책을 펼친다)', '…"바위산 깊은 곳, 길이 끝나는 곳에 커다란 버섯이 산다. 포자를 뿌려 풀과 몬스터를 깨운다"…', '…그림책 이야기인 줄 알았는데…', '…바위산 오솔길 끝이야. 조심해. 딱.'] },
@@ -112,6 +115,18 @@ export const QUESTS = {
     offer: ['하아~ 이번에 새 안주를 만들어 보려고.', '말랑말랑한 젤리를 구우면… 겉은 바삭, 속은 쫀득하지 않을까?', '강가 슬라임이 떨어뜨리는 말랑 젤리 3개랑 빨간 열매 4개만 있으면 돼~', '하아~ 부탁해도 될까?'],
     steps: [{ type: 'bring', items: { jelly: 3, berry: 4 }, goal: '말랑 젤리 세 개랑 빨간 열매 네 개를 쿠리만쥬에게 갖다주자!', say: ['오~ 고마워!', '(지글지글… 고소하고 달콤한 냄새가 난다)', '하아~ 대성공이야! 이건 네 몫. 배고플 때 먹어~'] }],
     reward: { money: 500, bond: 3, items: { jellybake: 2 } }
+  },
+  // 술 자격증 길잡이: 강의 8강을 끝까지 듣고 → 검정소에서 시험. 자격이 있으면 부탁하지 않는다(맥주 한 잔 부탁으로 이어진다)
+  liquorStudy: {
+    title: '쿠리만쥬의 술 공부', giver: 'kurimanju', needHearts: 0, tutorial: true, unlessLicense: 'liquor', ask: '요즘 뭐 재밌는 거 있어?',
+    offer: ['하아~ {name}, 맥주집 생맥주 마셔 봤어?', '아… 술 자격증이 있어야 마실 수 있구나.', '좋아, 내가 위스키 강의를 해 줄게. 시험 범위가 딱 위스키거든~',
+      { text: '여덟 번만 들으면 돼. 빨갛게 보이는 말은 시험에 꼭 나오니까 잘 봐 둬~', marks: ['빨갛게'] }],
+    steps: [
+      { type: 'study', id: 'liquor', goal: '쿠리만쥬의 위스키 강의 8강을 끝까지 듣자! (쿠리만쥬에게 「강의 들으러 왔어」)',
+        say: ['하아~ 끝까지 다 들었네. 대단해~', '이제 검정소에 가서 술 자격 시험을 봐.', '필기는 강의에서 빨갛던 말 그대로 나오고, 실기는 하이볼 만들기야~'] },
+      { type: 'license', id: 'liquor', goal: '검정소에서 술 자격 시험을 보자! (응시료 600원)', say: ['하아~ 합격 축하해!', '이제 맥주집 생맥주도 마실 수 있어. 다음엔 같이 한 잔 하자~'] }
+    ],
+    reward: { money: 300, bond: 3, items: { bottlebeer: 2 } }
   },
   cheers: {
     title: '쿠리만쥬와 맥주 한 잔', giver: 'kurimanju', needHearts: 2, needLicense: 'liquor', ask: '요즘 맥주는 어때?',
@@ -344,6 +359,7 @@ export function progressOf(state, id) {
   if (step.type === 'hunt') return { have: Math.min(step.n, ((state.hunted || {})[step.species] || 0) - q.base), need: step.n };
   if (step.type === 'pull') return { have: Math.min(step.n, ((state.weedLog || {})[step.kind] || 0) - q.base), need: step.n };
   if (step.type === 'together') return { have: Math.min(step.n, Math.max(0, actsWith(state, step.act, reportTo(id, step)) - q.base)), need: step.n };
+  if (step.type === 'study') { const p = studyProgress(state, step.id); return hasLicense(state, step.id) ? { have: p.need, need: p.need } : p; }
   if (step.type === 'bring') {
     const b = bagOf(state).items;
     const need = Object.values(step.items).reduce((a, n) => a + n, 0);
@@ -411,6 +427,7 @@ function baseOffer(state, id) {
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
   if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
+  if (Q.unlessLicense && hasLicense(state, Q.unlessLicense)) return false; // 이미 그 자격이 있으면 따라는 부탁은 안 한다
   if (Q.after && !isDone(state, Q.after)) return false;
   if (Q.minDay && state.clock && state.clock.day < Q.minDay) return false;
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
@@ -525,6 +542,13 @@ export function pickTrack(state) {
 }
 /** 장면 단계(scene)에 멈춘 퀘스트들: 장면은 저장되지 않으니, 장면이 안 돌고 있는데 이 단계면(장면 도중 새로고침) 그만둔 것으로 본다. */
 export const staleScenes = (state) => activeQuests(state).filter((id) => { const st = stepOf(state, id); return !!st && st.type === 'scene'; });
+/** 버전 3 이하 저장: 이야기(story) 맨 앞에 '토벌 안내서 읽기' 단계가 생겼으니 받아 둔 이야기의 단계 번호를 한 칸 민다(하던 단계 그대로). */
+export function shiftStoryStep(quests) {
+  const q = quests && quests.story;
+  if (!q) return quests;
+  return { ...quests, story: { ...q, step: Math.min(q.step + 1, QUESTS.story.steps.length) } };
+}
+
 /** 퀘스트를 없던 일로(다시 부탁받을 수 있게). */
 export function dropQuest(state, id) {
   const qs = { ...questsOf(state) };
@@ -569,7 +593,8 @@ export function shortGoal(state, id) {
     return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '의 ' : ''}${josa(M.name, '을/를')} 잡자!`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
   }
   if (step.type === 'pull') return { goal: `${josa(WEED_KINDS[step.kind].name, '을/를')} 뽑자!`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
-  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n: p ? `${p.have} / ${p.need}` : '', parts: [] };
+  const n = p && !(step.type === 'study' && p.need <= 1) ? `${p.have} / ${p.need}` : ''; // 안내서 읽기처럼 한 번이면 0 / 1 은 안 보인다
+  return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n, parts: [] };
 }
 
 /** visit 단계: 지금 그곳에 와 있는지. place: { x, z }, hour: 지금 시각. */
@@ -608,6 +633,7 @@ export function checkQuestData() {
       if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
       if (st.type === 'together' && (!ACTS[st.act] || !(st.n > 0))) errs.push(id + ': act');
       if (st.type === 'scene' && typeof st.scene !== 'string') errs.push(id + ': scene');
+      if (st.type === 'study' && !STUDY[st.id]) errs.push(id + ': study');
       if (st.hours && !(Array.isArray(st.hours) && st.hours.length === 2)) errs.push(id + ': hours');
       if (Q.daily && !(Q.again >= 1)) errs.push(id + ': again');
       if (!st.goal || !st.say) errs.push(id + ': goal/say');
