@@ -4474,9 +4474,12 @@ function boot() {
         pulling.pull = chargePull(pulling.pull, dt);
         player.power = pulling.pull.power;
         sound.chargeUpdate(player.power);
-        if (before < pulling.pull.greenFrom && player.power >= pulling.pull.greenFrom) sound.play('zone'); // 지금 떼면 깔끔하게!
+        // 지금 떼면 깔끔하게! (끝에 닿고 되돌아오는 길에 초록 칸 위쪽으로 들어설 때도)
+        if (pulling.pull.back ? before > pulling.pull.greenTo && player.power <= pulling.pull.greenTo : before < pulling.pull.greenFrom && player.power >= pulling.pull.greenFrom) sound.play('zone');
         weeds.tug(pulling.weed, pulling.pull.power);
         hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
+        // 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었으면 그대로 끊어진다(실패)
+        if (pulling.pull.over) { hud.toast('너무 오래 당겼어요!', 1800); endPull(); }
       }
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
         : pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting ? null : findTarget();

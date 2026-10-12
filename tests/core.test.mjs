@@ -46,6 +46,22 @@ test('release results', () => {
   assert.equal(W.releasePull(W.chargePull(p, mid * p.chargeTime)), 'clean');
   assert.equal(W.releasePull(W.chargePull(p, 1 * p.chargeTime)), 'snapped');
 });
+test('게이지는 끝에 닿으면 한 번만 되돌아오고, 돌아오는 길의 초록 칸에서 떼도 깔끔하다. 왼쪽 끝까지 오면 실패', () => {
+  const p = W.startPull('weed', { random: () => 0.5 }), mid = (p.greenFrom + p.greenTo) / 2;
+  const peak = W.chargePull(p, 1.1 * p.chargeTime); // 끝을 0.1 지나쳤다 → 0.9 로 되돌아온다
+  assert.ok(peak.back && !peak.over && Math.abs(peak.power - 0.9) < 1e-9);
+  const back = W.chargePull(p, (2 - mid) * p.chargeTime); // 끝까지 갔다가 초록 칸 가운데로 돌아왔다
+  assert.ok(back.back);
+  assert.equal(W.releasePull(back), 'clean');
+  const low = W.chargePull(p, 1.9 * p.chargeTime); // 거의 다 돌아왔다(0.1): 끝까지 당겼으니 '안 뽑힘'이 아니라 끊어진다
+  assert.ok(!low.over);
+  assert.equal(W.releasePull(low), 'snapped');
+  let held = p;
+  for (let i = 0; i < 300 && !held.over; i++) held = W.chargePull(held, 0.016); // 한 프레임씩 계속 누르고 있으면
+  assert.ok(held.over && held.power === 0, '왼쪽 끝에 오면 over');
+  assert.equal(W.releasePull(held), 'snapped');
+  assert.ok(held.t > 1.9 * p.chargeTime, '오른쪽 끝에서 한 번만 되돌아온다(왕복 한 번)');
+});
 test('multi-stage advance', () => {
   let pr = W.advanceWeed(null, 'giantweed', 'clean');
   assert.deepEqual([pr.stage, pr.done], [1, false]);

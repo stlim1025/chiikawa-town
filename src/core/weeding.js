@@ -62,17 +62,25 @@ export function startPull(kind, { stamina = 100, maxStamina = 100, random = Math
   };
 }
 
-/** 누르고 있는 동안 힘을 채운다. 흔들리는 풀은 초록 구간도 움직인다. */
+/**
+ * 누르고 있는 동안 힘을 채운다. 흔들리는 풀은 초록 구간도 움직인다.
+ * 게이지는 오른쪽 끝(1)에 닿으면 한 번만 같은 빠르기로 왼쪽으로 되돌아온다(back: 되돌아오는 중) — 게이지가 빠른 풀에서
+ * 미처 못 떼도 돌아오는 길에 한 번 더 초록 칸을 지난다. 왼쪽 끝(0)까지 돌아왔는데도 누르고 있으면 over(실패로 끝낸다).
+ */
 export function chargePull(pull, seconds) {
   const t = (pull.t || 0) + seconds;
   const off = pull.drift ? pull.drift.amp * Math.sin(pull.drift.phase + t * pull.drift.speed) : 0;
   const greenFrom = (pull.base ?? pull.greenFrom) + off;
-  return { ...pull, t, power: Math.min(1, pull.power + seconds / pull.chargeTime), greenFrom, greenTo: greenFrom + (pull.width ?? pull.greenTo - pull.greenFrom) };
+  const step = seconds / pull.chargeTime;
+  let power = pull.back ? pull.power - step : pull.power + step, back = !!pull.back, over = !!pull.over;
+  if (!back && power >= 1) { back = true; power = 2 - power; } // 끝에 닿은 만큼 바로 되돌아온다
+  if (back && power <= 0) { power = 0; over = true; }
+  return { ...pull, t, power: Math.max(0, Math.min(1, power)), back, over, greenFrom, greenTo: greenFrom + (pull.width ?? pull.greenTo - pull.greenFrom) };
 }
 
-/** 손을 뗄 때 결과: 'none' 안 뽑힘, 'snapped' 끊어짐, 'clean' 깔끔하게. */
+/** 손을 뗄 때 결과: 'none' 안 뽑힘, 'snapped' 끊어짐, 'clean' 깔끔하게. 끝까지 당겼다 돌아오는 중이면 조금만 남아도 끊어진다. */
 export function releasePull(pull) {
-  if (pull.power < 0.25) return 'none';
+  if (pull.power < 0.25 && !pull.back) return 'none';
   if (pull.power >= pull.greenFrom && pull.power <= pull.greenTo) return 'clean';
   return 'snapped';
 }
