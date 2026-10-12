@@ -27,6 +27,8 @@ import { createNpcs } from './actors/npcs.js';
 import { createInput } from './ui/joystick.js';
 import { createHud } from './ui/hud.js';
 import { createPanels, ICO } from './ui/panels.js';
+import { createMulti } from './net/multi.js';
+import { createRemotePlayers } from './net/remote.js';
 import { openCreator } from './ui/creator.js';
 import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
@@ -208,9 +210,34 @@ function boot() {
   const seen = (tip) => state.seenTips.includes(tip);
   const markSeen = (tip) => { state = { ...state, seenTips: [...state.seenTips, tip] }; };
 
+  // ---------- 같이 놀기(멀티): 같은 방 친구들의 캐릭터 · 연결(서버: server/TownServer) ----------
+  const remotes = createRemotePlayers(scene);
+  const multi = createMulti({
+    joined: (p) => remotes.add(p), moved: (id, m) => remotes.move(id, m), left: (id) => remotes.remove(id),
+    said: (id, text) => remotes.say(id, text), emote: (id, name) => remotes.emote(id, name), cleared: () => remotes.clear(),
+    status: () => panels.refresh('multi')
+  });
+  // 서버 주소 · 방 코드는 이 브라우저에 기억해 둔다(다음에 또 넣지 않게)
+  const MP_KEY = { server: 'chiikawa-town-mp-server', code: 'chiikawa-town-mp-room' };
+  const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 저장이 막혀 있으면 이번만 */ } };
+  const mpDraft = { server: lsGet(MP_KEY.server), code: lsGet(MP_KEY.code) };
+  let mySay = null; // 내가 한 한마디 { text, until } — 내 머리 위에도 말풍선
+  const multiPanel = {
+    state: () => ({ status: multi.status, error: multi.error, room: multi.room, players: multi.players, server: mpDraft.server, code: mpDraft.code }),
+    draft(key, v) { mpDraft[key] = v; lsSet(MP_KEY[key], v); },
+    connect() {
+      if (!state || !player) return;
+      multi.connect(mpDraft.server, mpDraft.code, { name: myName(), look: myLook(), x: player.position.x, z: player.position.z, yaw: player.yaw });
+    },
+    leave() { multi.leave(); },
+    say(text) { multi.say(text); mySay = { text, until: performance.now() + 3500 }; }
+  };
+
   // ---------- 창 ----------
   const panels = createPanels(ui, {
     getState: () => state,
+    multi: multiPanel,
     villageLive: () => villageLive(),
     getSound: () => sound.prefs,
     toast: (text) => hud.toast(text),
@@ -577,6 +604,7 @@ function boot() {
     /** 메인(타이틀)으로 나간다. 진행은 저장되고, 타이틀에서 이어하기·새로 시작하기를 고른다. */
     toTitle() {
       cancelPull();
+      multi.leave(); // 같이 놀기 방에서도 나온다
       cutBossMusic(); // 보스전 곡도 멈춘다
       resetFun();
       endHunterExam();
@@ -4606,6 +4634,9 @@ function boot() {
       if (saveTimer > 10) { saveTimer = 0; save(); }
     }
     npcs.update(dt, t, focus);
+    // 같이 놀기: 같은 방 친구들은 내가 마을에 있을 때만 보이고, 내 움직임은 0.1초마다(집 안 · 장면 중이면 'away')
+    remotes.update(dt, mode === 'play' && !closeup);
+    if (player && state) multi.tick(dt, { x: +player.position.x.toFixed(2), z: +player.position.z.toFixed(2), yaw: +player.yaw.toFixed(2), anim: player.anim || 'idle', area: mode === 'play' ? 'village' : 'away' });
     if (mode !== 'play') streaks.setActive(false);
     applySky(starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 }); // 별똥별맨 미리 보기 동안은 하늘만 밤
     if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else { const pp = pajama.camPose(dt); if (pp) cam.set(pp.pos, pp.look); else cam.follow(focus, dt); } }
@@ -4630,6 +4661,8 @@ function boot() {
     const bubbles = npcs.labels(), mark = tutorialMarker();
     if (mark) bubbles.push(mark);
     bubbles.push(...monsters.labels(focus), ...questMarks(focus), ...doingLabels(focus)); // 몬스터 이름 · 체력 줄, 퀘스트 ! · ?, 친구가 하는 일
+    bubbles.push(...remotes.labels()); // 같이 놀기: 다른 플레이어 이름표 · 한마디
+    if (mySay && performance.now() < mySay.until && player) bubbles.push({ id: 'mp-me', x: player.position.x, y: 1.75, z: player.position.z, text: mySay.text, kind: 'bubble' });
     const prompt = showTargetCue(bubbles);
     if (prompt) bubbles.push(prompt);
     // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게), 먼 간판은 작고 흐리게

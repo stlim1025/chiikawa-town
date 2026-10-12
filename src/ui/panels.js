@@ -50,6 +50,8 @@ const APP_ICON = {
   quests: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="25" rx="3" fill="#fff"/><path d="M7 10a4 4 0 0 1 8 0v20a4 4 0 0 1-8 0zM25 30a4 4 0 0 0 8 0" fill="#fff" stroke="#e8a83e" stroke-width="2"/><path d="M15 15h11M15 20h11M15 25h7" stroke="#e8a83e" stroke-width="2.2" stroke-linecap="round"/></svg>',
   // 친구: 하트
   friends: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33S7 24.6 7 15.4A6.6 6.6 0 0 1 20 12.6a6.6 6.6 0 0 1 13 2.8C33 24.6 20 33 20 33z" fill="#fff"/><path d="M13.5 16a3.4 3.4 0 0 1 3.8-2.6" fill="none" stroke="#f28fb0" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  // 같이 놀기: 손잡은 두 친구
+  multi: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="13" cy="14" r="6" fill="#fff"/><circle cx="27" cy="14" r="6" fill="#fff"/><path d="M5 33q1-11 8-11t8 11zM19 33q1-11 8-11t8 11z" fill="#fff"/><path d="M17 27h6" stroke="#5aa98c" stroke-width="2.6" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
@@ -178,7 +180,9 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'dev'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev'];
+  // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
+  const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
   const DEV_KEY = 'chiikawa-town-dev';
   const devOn = () => { try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; } };
@@ -1123,6 +1127,7 @@ export function createPanels(ui, handlers) {
           app('weeds', APP_ICON.weeds, '풀 도감', () => show('weeds')),
           app('quests', APP_ICON.quests, '퀘스트', () => show('quests')),
           app('friends', APP_ICON.friends, '친구', () => show('friends')),
+          app('multi', APP_ICON.multi, '같이 놀기', () => show('multi')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
@@ -1154,6 +1159,33 @@ export function createPanels(ui, handlers) {
     // 마을폰 '저장 옮기기': 설정에서 고른 쪽(내보내기 · 불러오기)
     saveio(s) {
       return saveMode === 'in' ? saveImport() : saveExport(s);
+    },
+    /**
+     * 마을폰 '같이 놀기': 서버 주소와 방 코드를 넣고 들어가면 같은 방 친구들이 내 마을에 보인다.
+     * 진행은 각자 기기에 있고, 서버는 움직임과 한마디만 나눈다. handlers.multi = { state(), draft(key, v), connect(), leave(), say(text) }
+     */
+    multi() {
+      const M = handlers.multi, st = M.state(), busy = st.status === 'connecting', on = st.status === 'on';
+      const field = (label, key, placeholder, max) => {
+        const inp = h('input', { class: 'name-input mp-input', value: st[key] || '', placeholder, maxlength: max, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': label });
+        inp.addEventListener('input', () => M.draft(key, inp.value)); // 다시 그려도 넣던 글이 남게
+        return [h('h3', { class: 'shop-sec' }, label), inp];
+      };
+      const out = [appBar('같이 놀기')];
+      out.push(h('p', { class: st.status === 'error' ? 'note warn' : 'phone-note' },
+        on ? `${st.room} 방에 나까지 ${st.players.length + 1}명이 있어요` : busy ? '서버에 연결하는 중…' : st.status === 'error' ? st.error : '같은 방 코드를 넣은 친구들이 내 마을에 보여요'));
+      if (!on) {
+        out.push(...field('서버 주소', 'server', '예: my-pc.tail1234.ts.net', 120), ...field('방 코드', 'code', '예: 치이카와', 16));
+        out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.connect() }, busy ? '연결하는 중…' : '들어가기')));
+        return out;
+      }
+      out.push(h('h3', { class: 'shop-sec' }, '같이 있는 친구'),
+        st.players.length ? h('div', { class: 'mp-players' }, st.players.map((p) => h('span', { class: 'chip' }, p.name)))
+          : h('p', { class: 'note' }, '아직 아무도 없어요. 친구에게 서버 주소와 방 코드를 알려 주세요'));
+      out.push(h('h3', { class: 'shop-sec' }, '한마디'),
+        h('div', { class: 'mp-says' }, MP_SAYS.map((t) => h('button', { class: 'btn', type: 'button', onClick: () => { M.say(t); close(); } }, t))));
+      out.push(h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => M.leave() }, '나가기')));
+      return out;
     }
   };
 
@@ -1192,6 +1224,8 @@ export function createPanels(ui, handlers) {
     openWeeds: () => show('weeds'),
     openMonsters: () => show('monsters'),
     openQuests: () => show('quests'),
-    openSettings: (extra) => show('settings', extra)
+    openSettings: (extra) => show('settings', extra),
+    /** 지금 그 창(kind)이 떠 있으면 다시 그린다(같이 놀기 연결 상태가 바뀌었을 때). */
+    refresh: (kind) => { if (current && current.kind === kind) render(); }
   };
 }

@@ -117,6 +117,7 @@ export function createPlayer(scene, chibi, village) {
       if (eatT > 0) { eatT = Math.max(0, eatT - dt); if (eatT === 0) stopEat(); }
       actT = Math.max(0, actT - dt);
       const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : eatT > 0 ? eatMode : actT > 0 ? actMode : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      api.anim = mode; // 지금 몸짓(같이 놀기에서 다른 사람에게 보낸다)
       // 풀 뽑기 · 춤 · 만세 중에는 무기를 넣어 둔다(손이 풀 · 머리에 박히지 않게)
       const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer');
       if (show !== weaponShown) { weaponShown = show; showHeld(); }
