@@ -89,7 +89,7 @@ import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
-import { WEAPONS, DROPS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
+import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
@@ -1974,10 +1974,11 @@ function boot() {
     let got = 0;
     if (drop) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
     commit(s);
-    if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: `+${DROPS[drop].name}`, kind: 'drop' }); hud.bagBump(); }
+    // 전리품 · 토벌 일감 진행: 열매 따기처럼 그림 + 숫자가 반짝이며 통통(가방 개수는 가방이 톡 튀는 것으로)
+    if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: '+1', kind: 'pick', icon: itemSvg(drop) }); hud.bagBump(); }
     else if (drop) hud.toast('가방이 꽉 찼어요');
     if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌!`, 2600, { icon: monsterSvg(m.species) });
-    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.floatText({ x: m.x, y: m.mesh.height + 0.85, z: m.z, text: `${m.M.name} ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'tip' });
+    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.floatText({ x: m.x, y: m.mesh.height + 1.05, z: m.z, text: `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'pick', icon: monsterSvg(m.species) });
     celebrateIfDone(before, state.job);
     rankNews();
     // 이야기 속 왕버섯을 쓰러뜨렸다
