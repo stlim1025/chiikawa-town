@@ -993,7 +993,10 @@ function boot() {
           const g = next.license.grade;
           next = { ...next, exam: null };
           sound.play('fail');
-          hud.notice({ kicker: `제초 검정 ${gradeName(g - 1)} 시험`, stamp: '불합격', tone: 'bad', sub: `${josa(W.name, '이/가')} 끊어져서 연속이 끊겼어요(깔끔하게 ${exam.streak} / ${exam.need}번)`,
+          // "깔끔하게 세 번 연달아 뽑으면 합격인데, 두 번째에서 잡초가 끊어졌어요." (말하듯 한 문장, 숫자는 말로)
+          const ORD = ['', '첫', '두', '세', '네', '다섯'], at = exam.streak + 1;
+          const sub = `깔끔하게 ${TIMES[exam.need] || exam.need} 번 연달아 뽑으면 합격인데, ${ORD[at] || at} 번째에서 ${josa(W.name, '이/가')} 끊어졌어요.`;
+          hud.notice({ kicker: `제초 검정 ${gradeName(g - 1)} 시험`, stamp: '불합격', tone: 'bad', sub,
             chips: [{ icon: ICO.pin, text: '검정소에서 다시' }, { icon: 'coin', text: won(EXAM_FEE[g]) }], ok: '다시 해 볼게요' });
           staffSay('captain', 'fail', 16, player.position);
         }
