@@ -104,6 +104,7 @@ export function createNpcs(scene, village, weeds, berries) {
   }
 
   let lastPlayer = { x: 0, z: 0 };
+  let puppeting = false; // 같이 놀기: 친구 마을에 놀러 가 주인 마을 친구들의 모습을 따라 보여 주는 중(puppet)
   /** (x, z) 로 가면 내 캐릭터에게 밀려날 만큼 더 다가가는지(그쪽으로 걸으면 밀려서 제자리걸음이 된다). */
   const intoPlayer = (n, x, z) => {
     const d = Math.hypot(lastPlayer.x - x, lastPlayer.z - z);
@@ -667,11 +668,53 @@ export function createNpcs(scene, village, weeds, berries) {
         if (n.faceYaw != null) n.yaw = n.faceYaw; // 연출: 정해진 쪽(카메라)을 본다(우는 얼굴 클로즈업)
         n.chibi.root.rotation.y = n.yaw;
         showProp(n, propFor(n.kind, mode)); // 맥주 · 책 · 빗자루 · 라멘 그릇처럼 그 몸짓에 드는 물건
+        n.mode = mode; // 같이 놀기: 놀러 온 친구에게 보낼 지금 몸짓
         animateChibi(n.chibi, mode, t, { phase: n.phase, power });
       }
     },
-    /** 말풍선 라벨. */
+    /** 같이 놀기(주인): 놀러 온 친구에게 보낼 마을 친구들의 지금 모습 [[kind, x, z, yaw, 몸짓, 말풍선 | '', 집 안이면 1]]. */
+    snapshot() {
+      return list.map((n) => [n.kind, +n.x.toFixed(2), +n.z.toFixed(2), +n.yaw.toFixed(2), n.mode || 'idle', n.bubble ? n.bubble.text : '', n.away ? 1 : 0]);
+    },
+    /**
+     * 같이 놀기(손님): 내 마을 친구들 대신 주인 마을 친구들의 모습(주인이 보낸 snapshot)을 따라 보여 준다.
+     * 받은 자리로 부드럽게 따라가고, 내 친구들의 자리 · 할 일은 건드리지 않는다. states 가 null 이면 그만두고 내 친구들로 돌아온다.
+     */
+    puppet(states, dt, t) {
+      if (!states) {
+        if (!puppeting) return;
+        puppeting = false;
+        for (const n of list) { n.pup = null; n.chibi.root.visible = !n.away; } // 자리 · 소품은 다음 update 에서 내 친구들 것으로
+        return;
+      }
+      puppeting = true;
+      const k = 1 - Math.exp(-dt * 8), byKind = new Map(states.map((s) => [s[0], s]));
+      for (const n of list) {
+        const s = byKind.get(n.kind), away = !s || !!s[6];
+        n.chibi.root.visible = !away;
+        if (away) { if (n.pup) n.pup.bubble = ''; continue; }
+        const [, x, z, yaw] = s;
+        if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) continue;
+        if (!n.pup || Math.hypot(x - n.pup.x, z - n.pup.z) > 8) n.pup = { x, z, yaw, phase: n.phase, bubble: '' }; // 처음 · 멀리 옮겼으면 바로 그 자리에
+        const P = n.pup, ox = P.x, oz = P.z;
+        P.x += (x - P.x) * k;
+        P.z += (z - P.z) * k;
+        let d = yaw - P.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        P.yaw += d * k;
+        P.phase += Math.hypot(P.x - ox, P.z - oz) * 9; // 걸음은 실제로 움직인 만큼(update 와 같은 비율)
+        P.bubble = typeof s[5] === 'string' ? s[5].slice(0, 40) : '';
+        const mode = typeof s[4] === 'string' && /^[a-zA-Z]{1,16}$/.test(s[4]) ? s[4] : 'idle'; // 몸짓 이름 모양만('idolSing' 처럼, 모르는 몸짓이면 서 있기)
+        n.chibi.root.position.set(P.x, groundY(P.x, P.z), P.z);
+        n.chibi.root.rotation.y = P.yaw;
+        showProp(n, propFor(n.kind, mode));
+        animateChibi(n.chibi, mode, t, { phase: P.phase, power: mode === 'pull' ? 0.6 : 0 });
+      }
+    },
+    /** 말풍선 라벨(놀러 간 동안은 주인 마을 친구들의 말풍선). */
     labels() {
+      if (puppeting) return list.filter((n) => n.pup && n.pup.bubble && n.chibi.root.visible).map((n) => ({ id: 'npc-' + n.kind, x: n.pup.x, y: n.chibi.height + 0.35, z: n.pup.z, text: n.pup.bubble, kind: 'bubble' }));
       return list.filter((n) => n.bubble && !n.away).map((n) => ({ id: 'npc-' + n.kind, x: n.x, y: n.chibi.height + 0.35, z: n.z, text: n.bubble.text, kind: 'bubble' }));
     }
   };

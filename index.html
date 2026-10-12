@@ -1243,8 +1243,11 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */
 .app.friends .app-ico { background: #ee7489; }
 .app.multi .app-ico { background: #5aa98c; }
-/* 같이 놀기: 서버 주소 · 방 코드 칸, 같이 있는 친구 이름표, 한마디 버튼, 다른 플레이어 머리 위 이름표 */
-.mp-input { font-size: 18px; }
+/* 같이 놀기: 내 마을 코드 카드, 친구 마을 코드 칸, 같이 있는 친구 이름표, 한마디 버튼, 다른 플레이어 머리 위 이름표 */
+.mp-code { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 16px; background: #fff; border: 2px solid #cfe6dc; border-radius: 14px; }
+.mp-code-text { font-size: 26px; letter-spacing: 4px; color: #3f7a63; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.mp-code .btn { flex: none; min-height: 38px; padding: 2px 16px 4px; }
+.mp-input { font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
 .mp-players, .mp-says { display: flex; flex-wrap: wrap; gap: 6px; }
 .mp-says .btn { min-height: 38px; padding: 2px 14px 4px; font-size: 17px; }
 .world-label.mp-name { padding: 1px 10px 3px; font-size: 15px; color: #fff; background: rgba(74, 110, 96, 0.85); border-radius: 999px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); }

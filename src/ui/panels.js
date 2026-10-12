@@ -414,9 +414,10 @@ export function createPanels(ui, handlers) {
     if (current.afterRender) { const f = current.afterRender; current.afterRender = null; f(); }
     [p, p.querySelector('.cat-list')].forEach((e, i) => { if (e && keep[i]) e.scrollTop = keep[i]; });
     if (!current.phone) return;
-    // 폰 상태 줄: 지금 시각 · 날짜
-    current.status.time.textContent = timeLabel(s.clock);
-    current.status.date.textContent = handlers.dayLabel(s.clock.day);
+    // 폰 상태 줄: 지금 시각 · 날짜(친구 마을에 놀러 간 동안은 그 마을 시계)
+    const now = handlers.phoneNow ? handlers.phoneNow() : null;
+    current.status.time.textContent = now ? now.time : timeLabel(s.clock);
+    current.status.date.textContent = now ? now.date : handlers.dayLabel(s.clock.day);
     // 지도 화면: 지도 칸이 화면에 붙은 뒤에 만든다(칸 크기를 재야 해서)
     const host = p.querySelector('.mapview');
     if (host) current.view = createMapView(host, { explored: s.explored || '', player: handlers.playerPos(), labels: handlers.mapLabels(), friends: handlers.mapFriends ? handlers.mapFriends() : [] });
@@ -1161,30 +1162,48 @@ export function createPanels(ui, handlers) {
       return saveMode === 'in' ? saveImport() : saveExport(s);
     },
     /**
-     * 마을폰 '같이 놀기': 방 코드를 넣고 들어가면 같은 방 친구들이 내 마을에 보인다(서버 주소는 고정이라 보이지 않는다).
-     * 진행은 각자 기기에 있고, 서버는 움직임과 한마디만 나눈다. handlers.multi = { state(), draft(key, v), connect(), leave(), say(text) }
+     * 마을폰 '같이 놀기': 동물의 숲처럼 내 마을 문을 열면 친구가 내 마을 코드로 놀러 오고, 나도 친구 마을 코드로 놀러 간다.
+     * 진행은 각자 기기에 있고, 서버는 움직임 · 한마디와 주인 마을의 모습만 나눈다(서버 주소는 고정이라 보이지 않는다).
+     * handlers.multi = { state(), draft(key, v), open(), shut(), visit(), goHome(), copy(), say(text) }
      */
     multi() {
-      const M = handlers.multi, st = M.state(), busy = st.status === 'connecting', on = st.status === 'on';
-      const field = (label, key, placeholder, max) => {
-        const inp = h('input', { class: 'name-input mp-input', value: st[key] || '', placeholder, maxlength: max, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': label });
-        inp.addEventListener('input', () => M.draft(key, inp.value)); // 다시 그려도 넣던 글이 남게
-        return [h('h3', { class: 'shop-sec' }, label), inp];
-      };
+      const M = handlers.multi, st = M.state(), busy = st.status === 'connecting';
+      const opened = st.status === 'open', away = st.visiting;
+      const says = () => [h('h3', { class: 'shop-sec' }, '한마디'),
+        h('div', { class: 'mp-says' }, MP_SAYS.map((t) => h('button', { class: 'btn', type: 'button', onClick: () => { M.say(t); close(); } }, t)))];
+      const chips = (list, empty) => list.length ? h('div', { class: 'mp-players' }, list.map((p) => h('span', { class: 'chip' }, p.name))) : h('p', { class: 'note' }, empty);
       const out = [appBar('같이 놀기')];
-      out.push(h('p', { class: st.status === 'error' ? 'note warn' : 'phone-note' },
-        on ? `${st.room} 방에 나까지 ${st.players.length + 1}명이 있어요` : busy ? '서버에 연결하는 중…' : st.status === 'error' ? st.error : '같은 방 코드를 넣은 친구들이 내 마을에 보여요'));
-      if (!on) {
-        out.push(...field('방 코드', 'code', '예: 치이카와', 16));
-        out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.connect() }, busy ? '연결하는 중…' : '들어가기')));
+      if (st.status === 'error') out.push(h('p', { class: 'note warn' }, st.error));
+      // 친구 마을에 놀러 와 있다: 같이 있는 친구 · 한마디 · 집으로
+      if (away) {
+        const host = st.hostName || '친구';
+        out.push(h('p', { class: 'phone-note' }, busy ? '연결을 다시 잇는 중…' : `${host}의 마을에 놀러 와 있어요`),
+          h('h3', { class: 'shop-sec' }, '같이 있는 친구'), chips(st.players, '아무도 없어요'),
+          ...says(),
+          h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onClick: () => M.goHome() }, '집으로 돌아가기')));
         return out;
       }
-      out.push(h('h3', { class: 'shop-sec' }, '같이 있는 친구'),
-        st.players.length ? h('div', { class: 'mp-players' }, st.players.map((p) => h('span', { class: 'chip' }, p.name)))
-          : h('p', { class: 'note' }, '아직 아무도 없어요. 친구에게 방 코드를 알려 주세요'));
-      out.push(h('h3', { class: 'shop-sec' }, '한마디'),
-        h('div', { class: 'mp-says' }, MP_SAYS.map((t) => h('button', { class: 'btn', type: 'button', onClick: () => { M.say(t); close(); } }, t))));
-      out.push(h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => M.leave() }, '나가기')));
+      // 내 마을 코드: 문을 열면 친구가 이 코드로 놀러 온다
+      out.push(h('h3', { class: 'shop-sec' }, '내 마을 코드'),
+        h('div', { class: 'mp-code' },
+          h('b', { class: 'mp-code-text', 'aria-label': `내 마을 코드 ${[...(st.myCode || '')].join(' ')}` }, st.myCode || '------'),
+          h('button', { class: 'btn', type: 'button', onClick: () => M.copy() }, '복사')));
+      if (opened) {
+        out.push(h('p', { class: 'phone-note' }, '문이 열려 있어요. 친구가 이 코드로 놀러 올 수 있어요'),
+          h('h3', { class: 'shop-sec' }, '놀러 온 친구'), chips(st.players, '아직 아무도 안 왔어요'),
+          ...says(),
+          h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => M.shut() }, '문 닫기')));
+        return out;
+      }
+      const hosting = busy && st.role === 'host', visitingNow = busy && st.role === 'guest';
+      out.push(h('p', { class: 'phone-note' }, '문을 열면 친구가 내 마을 코드로 놀러 올 수 있어요'),
+        h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.open() }, hosting ? '문 여는 중…' : '문 열기')));
+      // 친구 마을 놀러 가기: 친구가 알려 준 마을 코드
+      const inp = h('input', { class: 'name-input mp-input', value: st.code || '', placeholder: '예: K7QX2M', maxlength: 6, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': '친구 마을 코드' });
+      inp.addEventListener('input', () => M.draft('code', inp.value)); // 다시 그려도 넣던 글이 남게
+      out.push(h('h3', { class: 'shop-sec' }, '친구 마을 놀러 가기'), inp,
+        h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.visit() }, visitingNow ? '가는 중…' : '놀러 가기')),
+        h('p', { class: 'note' }, '친구가 문을 열어 두었을 때만 놀러 갈 수 있어요'));
       return out;
     }
   };

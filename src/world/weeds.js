@@ -223,8 +223,12 @@ export function createWeeds(scene, village, random = Math.random) {
   };
   const dropHint = (w) => { if (w.hint) { scene.remove(w.hint); w.hint = null; } };
   const applyVisibility = (focus) => {
-    for (const w of list) w.mesh.visible = !w.hidden && (!focus || Math.hypot(w.x - focus.x, w.z - focus.z) < DRAW_DIST);
+    for (const w of list) w.mesh.visible = !guestOn && !w.hidden && (!focus || Math.hypot(w.x - focus.x, w.z - focus.z) < DRAW_DIST);
   };
+  // 같이 놀기(손님): 친구 마을에 놀러 간 동안은 내 풀을 숨기고(자라지도 않는다) 주인이 보낸 풀을 대신 보여 준다
+  let guestOn = false;
+  const guest = new Map(); // '종류:주인 풀 id' → 풀 모양
+  const fly = (mesh, clean) => flying.push({ mesh, t: 0, vy: clean ? 4.2 : 2.6, vx: (random() - 0.5) * 1.2, spin: (random() - 0.5) * 12 });
 
   return {
     list,
@@ -276,6 +280,50 @@ export function createWeeds(scene, village, random = Math.random) {
       }
       flying.push({ mesh: m, t: 0, vy: result === 'clean' ? 4.2 : 2.6, vx: (random() - 0.5) * 1.2, spin: (random() - 0.5) * 12 });
     },
+    /** 같이 놀기(주인): 놀러 온 친구에게 보낼 마을 울타리 안 풀 [[id, kind, x, z, 뽑힌 단계, 숨었으면 1]]. */
+    snapshot() {
+      const out = [];
+      for (const w of list) if (Math.hypot(w.x, w.z) <= VILLAGE_R + 1) out.push([w.id, w.kind, +w.x.toFixed(2), +w.z.toFixed(2), w.stage, w.hidden ? 1 : 0]);
+      return out;
+    },
+    /**
+     * 같이 놀기(손님): 내 풀은 숨기고 주인 마을의 풀(주인이 보낸 snapshot)을 대신 보여 준다(뽑을 수는 없다).
+     * 지난번에 있다가 없어진 풀은 뽑힌 것이라 날아가게 한다. null 이면 주인 풀을 치우고 내 풀을 다시 보인다.
+     */
+    showGuest(items) {
+      if (!items) {
+        if (!guestOn) return;
+        guestOn = false;
+        for (const m of guest.values()) scene.remove(m);
+        guest.clear();
+        cull = 0; // 다음 update 에서 내 풀을 다시 보인다
+        return;
+      }
+      if (!guestOn) {
+        guestOn = true;
+        for (const w of list) { w.mesh.visible = false; if (w.hint) w.hint.visible = false; }
+      }
+      const keep = new Set();
+      for (const it of items) {
+        if (!Array.isArray(it)) continue;
+        const [id, kind, x, z, stage, hidden] = it;
+        if (!Object.hasOwn(WEED_KINDS, kind) || !Object.hasOwn(BUILD, kind) || !Number.isFinite(id) || !Number.isFinite(x) || !Number.isFinite(z)) continue;
+        const key = kind + ':' + id;
+        keep.add(key);
+        let m = guest.get(key);
+        if (!m) {
+          m = weedMesh(kind);
+          m.rotation.y = (id * 2.399) % (Math.PI * 2); // 같은 풀은 늘 같은 쪽을 보게(받을 때마다 돌지 않게)
+          scene.add(m);
+          guest.set(key, m);
+        }
+        const st = Math.max(0, Math.min(4, Math.floor(stage) || 0));
+        m.position.set(x, 0.06 * st, z);
+        m.rotation.x = 0.12 * st * (id % 2 ? 1 : -1);
+        m.visible = !hidden;
+      }
+      for (const [key, m] of guest) if (!keep.has(key)) { guest.delete(key); m.visible = true; fly(m, true); }
+    },
     /** 종류별 지금 자라 있는 수(디버그 · 테스트). */
     counts() {
       const c = {};
@@ -306,6 +354,7 @@ export function createWeeds(scene, village, random = Math.random) {
         f.mesh.scale.setScalar(Math.max(0.01, 1 - f.t * 1.3));
         if (f.t > 0.8) { scene.remove(f.mesh); flying.splice(i, 1); }
       }
+      if (guestOn) return; // 친구 마을에 놀러 간 동안: 내 풀은 숨긴 채 자라지도, 다시 나지도 않는다
       list.forEach((w) => {
         if (w.grow < 1) { w.grow = Math.min(1, w.grow + dt * 1.5); w.mesh.scale.setScalar(w.grow); }
       });
