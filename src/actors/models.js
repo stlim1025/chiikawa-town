@@ -16,11 +16,11 @@ export const EAR_TYPES = [
 export const BODY_COLORS = ['#ffffff', '#f8e9b0', '#ffd6e0', '#cfe7ff', '#d8f0c8', '#e6dcff', '#f6d2b0', '#d9cfc4'];
 export const PATTERNS = [{ id: 'none', label: '없음' }, { id: 'part', label: '가르마' }, { id: 'spots', label: '얼룩' }];
 export const CHEEK_COLORS = ['#f5a3b5', '#f7b98c', '#d7b3f0', '#ff9b9b'];
-export const EYE_TYPES = [{ id: 'dot', label: '동글' }, { id: 'sparkle', label: '반짝' }, { id: 'sleepy', label: '졸린' }, { id: 'smile', label: '웃는' }];
-export const BROW_TYPES = [{ id: 'none', label: '없음' }, { id: 'thin', label: '가는' }, { id: 'thick', label: '굵은' }, { id: 'worried', label: '시무룩' }];
-export const MOUTH_TYPES = [{ id: 'small', label: '작은 입' }, { id: 'open', label: '벌린 입' }, { id: 'cat', label: '고양이 입' }, { id: 'grin', label: '활짝' }];
-export const BEARD_TYPES = [{ id: 'none', label: '없음' }, { id: 'whiskers', label: '고양이 수염' }, { id: 'mustache', label: '콧수염' }, { id: 'goatee', label: '염소수염' }, { id: 'full', label: '덥수룩' }];
-export const HAIR_TYPES = [{ id: 'none', label: '없음' }, { id: 'tuft', label: '삐침 머리' }, { id: 'bangs', label: '앞머리' }, { id: 'bob', label: '단발' }, { id: 'bun', label: '똥머리' }, { id: 'twin', label: '양갈래' }, { id: 'curly', label: '곱슬' }];
+export const EYE_TYPES = [{ id: 'dot', label: '동글' }, { id: 'sparkle', label: '반짝' }, { id: 'teary', label: '울먹' }, { id: 'smile', label: '웃는' }, { id: 'wink', label: '윙크' }, { id: 'sleepy', label: '쿨쿨' }];
+export const BROW_TYPES = [{ id: 'none', label: '없음' }, { id: 'thin', label: '가는' }, { id: 'thick', label: '콩' }, { id: 'worried', label: '시무룩' }];
+export const MOUTH_TYPES = [{ id: 'small', label: '방긋' }, { id: 'open', label: '벌린 입' }, { id: 'cat', label: '고양이 입' }, { id: 'grin', label: '활짝' }, { id: 'blep', label: '메롱' }];
+export const BEARD_TYPES = [{ id: 'none', label: '없음' }, { id: 'whiskers', label: '고양이 수염' }, { id: 'mustache', label: '돌돌 콧수염' }, { id: 'goatee', label: '염소수염' }, { id: 'full', label: '복슬 수염' }];
+export const HAIR_TYPES = [{ id: 'none', label: '없음' }, { id: 'tuft', label: '더듬이' }, { id: 'bangs', label: '앞머리' }, { id: 'bob', label: '단발' }, { id: 'bun', label: '똥머리' }, { id: 'twin', label: '양갈래' }, { id: 'curly', label: '뽀글' }];
 export const HAIR_COLORS = ['#7a5236', '#3a3236', '#f3d27a', '#f6a9c4', '#9fd0f2', '#9fdcc0', '#c4b4e8', '#fbfaf5'];
 export const ACCESSORIES = [{ id: 'none', label: '없음' }, { id: 'ribbon', label: '리본' }, { id: 'sprout', label: '새싹' }, { id: 'glasses', label: '안경' }, { id: 'flower', label: '꽃' }, { id: 'cap', label: '모자' }, { id: 'crown', label: '왕관' }];
 
@@ -114,7 +114,7 @@ function geometryFor(m) {
     case 'kani': return patternGeometry('kani', (x, y, z) => (y > 0.32 && z > 0.15 ? KANI_DARK : KANI));
     default:
       if (m.startsWith('part:')) { const [, dark, light] = m.split(':'); return patternGeometry(m, partPattern(dark, light)); }
-      throw new Error('unknown part mesh ' + m);
+      return lookGeometry(m); // 내 캐릭터 꾸미기 도형(호 · 반달 · 머리카락 · 수염 껍질), 모르면 오류
   }
 }
 
@@ -501,119 +501,195 @@ function withProps(kind, def) {
 
 const darken = (hex, k) => new THREE.Color(hex).lerp(new THREE.Color('#2b2224'), k).getStyle();
 
-/** 내 캐릭터 얼굴: 눈, 눈썹, 볼, 입, 수염. */
+/** 내 캐릭터 얼굴: 눈, 눈썹, 볼, 입, 수염. 웃는 눈 · 입 같은 선은 둥근 호(arc)로, 벌린 입은 반달(half)로 그린다. */
 function playerFace(parts, hc, hr, look) {
-  const eyeX = 0.14, eyeY = 0.02, mY = -0.09;
-  const hairInk = darken(look.hairColor, 0.35);
+  const eyeX = 0.135, eyeY = 0.02, mY = -0.085;
+  const hairInk = darken(look.hairColor, 0.35), browInk = look.hair === 'none' ? EYE : hairInk;
+  /** 얼굴 위 부품 하나(그늘 · 외곽선 없이). rz: 얼굴 면 안에서 돌리기. */
+  const put = (m, c, x, y, s, rz = 0, push = 0.004) => {
+    const q = onHead(hc, hr, x, y, push);
+    parts.push({ m, c, p: q.p, r: [q.r[0], q.r[1], rz], s, n: 'head', o: false });
+  };
+  /** 반짝이는 눈동자: 까만 타원 + 큰 눈빛 · 작은 눈빛(울먹이면 아래에 물기). */
+  const roundEye = (x, w, h, { teary = false, iris = null } = {}) => {
+    put('dot', EYE, x, eyeY, [w, h, 0.02], 0, 0); // 눈동자는 얼굴에 붙이고 그 위로 겹겹이(묻히지 않게 조금씩 앞으로)
+    if (iris) put('dot', iris, x, eyeY - h * 0.5, [w * 0.58, h * 0.26, 0.01], 0, 0.012); // 눈 아래쪽 은은한 빛
+    put('dot', SHINE, x + w * 0.3, eyeY + h * 0.36, [w * 0.42, h * 0.36, 0.008], 0, 0.016);
+    put('dot', SHINE, x - w * 0.34, eyeY - h * 0.3, [w * 0.2, h * 0.17, 0.008], 0, 0.016);
+    if (teary) { put('dot', '#bfe6ff', x, eyeY - h * 0.6, [w * 0.66, h * 0.17, 0.01], 0, 0.014); put('dot', SHINE, x + w * 0.38, eyeY - h * 0.05, [w * 0.13, h * 0.11, 0.008], 0, 0.016); } // 글썽이는 물기
+  };
+  const happyEye = (x) => put('arc:2.3:0.3', EYE, x, eyeY - 0.004, [0.03, 0.03, 0.01]); // ∩ 웃는 눈
   [-1, 1].forEach((sd) => {
-    const e = onHead(hc, hr, sd * eyeX, eyeY);
-    if (look.eyes === 'sleepy') {
-      parts.push({ m: 'dot', c: EYE, p: e.p, r: e.r, s: [0.05, 0.012, 0.012], n: 'head', o: false });
-    } else if (look.eyes === 'smile') {
-      [-1, 1].forEach((k) => {
-        const q = onHead(hc, hr, sd * eyeX + k * 0.017, eyeY + 0.004, 0.002);
-        parts.push({ m: 'dot', c: EYE, p: q.p, r: [q.r[0], q.r[1], -k * 0.7], s: [0.026, 0.008, 0.008], n: 'head', o: false });
-      });
-    } else {
-      const big = look.eyes === 'sparkle';
-      const es = big ? [0.054, 0.072, 0.022] : [0.042, 0.058, 0.02];
-      parts.push({ m: 'dot', c: EYE, p: e.p, r: e.r, s: es, n: 'head', o: false });
-      const h = onHead(hc, hr, sd * eyeX + 0.012, eyeY + es[1] * 0.35, 0.012);
-      parts.push({ m: 'dot', c: SHINE, p: h.p, r: h.r, s: [es[0] * 0.38, es[1] * 0.32, 0.008], n: 'head', o: false });
-      if (big) {
-        const h2 = onHead(hc, hr, sd * eyeX - 0.015, eyeY - es[1] * 0.3, 0.012);
-        parts.push({ m: 'dot', c: SHINE, p: h2.p, r: h2.r, s: [es[0] * 0.2, es[1] * 0.18, 0.008], n: 'head', o: false });
-      }
-    }
-    if (look.brows !== 'none') {
-      const b = onHead(hc, hr, sd * eyeX, eyeY + 0.1, 0.003);
-      const thick = look.brows === 'thick';
-      const tilt = look.brows === 'worried' ? -sd * 0.38 : 0;
-      parts.push({ m: 'dot', c: look.hair === 'none' ? EYE : hairInk, p: b.p, r: [b.r[0], b.r[1], tilt], s: thick ? [0.05, 0.017, 0.01] : [0.042, 0.008, 0.008], n: 'head', o: false });
-    }
-    const ck = onHead(hc, hr, sd * 0.25, -0.08, -0.004);
-    parts.push({ m: 'dot', c: look.cheek, p: ck.p, r: ck.r, s: [0.075, 0.034, 0.012], n: 'head', o: false });
-    if (look.beard === 'whiskers') {
-      [-1, 0, 1].forEach((k) => {
-        const w = onHead(hc, hr, sd * 0.33, -0.05 + k * 0.028, 0.004);
-        parts.push({ m: 'dot', c: EYE, p: w.p, r: [w.r[0], w.r[1], sd * k * 0.22], s: [0.065, 0.005, 0.005], n: 'head', o: false });
-      });
-    } else if (look.beard === 'mustache') {
-      const ms = onHead(hc, hr, sd * 0.042, mY + 0.032, 0.008);
-      parts.push({ m: 'dot', c: hairInk, p: ms.p, r: [ms.r[0], ms.r[1], -sd * 0.35], s: [0.05, 0.02, 0.016], n: 'head', o: false });
+    const x = sd * eyeX;
+    if (look.eyes === 'sleepy') put('arc:1.9:0.24', EYE, x, eyeY + 0.006, [0.032, 0.032, 0.01], Math.PI); // ∪ 쿨쿨 감은 눈
+    else if (look.eyes === 'smile' || (look.eyes === 'wink' && sd > 0)) happyEye(x);
+    else if (look.eyes === 'sparkle') roundEye(x, 0.056, 0.074, { iris: '#8a72c9' });
+    else if (look.eyes === 'teary') roundEye(x, 0.052, 0.07, { teary: true });
+    else roundEye(x, 0.044, 0.06); // 동글(예전 저장의 모르는 눈도)
+    // 눈썹: 가는 · 콩(동그란 콩눈썹) · 시무룩(안쪽이 올라간)
+    if (look.brows === 'thin') put('arc:1.5:0.2', browInk, x, eyeY + 0.108, [0.032, 0.032, 0.01], -sd * 0.12);
+    else if (look.brows === 'thick') put('dot', browInk, x * 0.86, eyeY + 0.104, [0.026, 0.017, 0.01]);
+    else if (look.brows === 'worried') put('arc:1.4:0.22', browInk, x * 0.95, eyeY + 0.1, [0.03, 0.03, 0.01], sd * 0.42);
+    // 볼
+    put('dot', look.cheek, sd * 0.25, -0.075, [0.07, 0.036, 0.012], 0, -0.004);
+    // 수염: 고양이 수염(가는 세 가닥) · 콧수염(동글게 말린 양 끝)
+    if (look.beard === 'whiskers') [-1, 0, 1].forEach((k) => put('dot', '#5a4a4e', sd * 0.335, -0.045 + k * 0.026, [0.058, 0.0045, 0.005], sd * k * 0.2));
+    else if (look.beard === 'mustache') {
+      put('dot', hairInk, sd * 0.03, mY + 0.03, [0.036, 0.016, 0.012], -sd * 0.28, 0.008);
+      put('arc:4.2:0.42', hairInk, sd * 0.066, mY + 0.046, [0.013, 0.013, 0.008], sd * 2.2, 0.008); // 끝이 동그랗게 말린다
     }
   });
-  const mo = onHead(hc, hr, 0, mY);
-  if (look.mouth === 'open') {
-    parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: [0.045, 0.035, 0.014], n: 'head', o: false });
-    const tg = onHead(hc, hr, 0, mY - 0.016, 0.004);
-    parts.push({ m: 'dot', c: '#f28a9b', p: tg.p, r: tg.r, s: [0.025, 0.012, 0.01], n: 'head', o: false });
-  } else if (look.mouth === 'cat') {
-    [-0.027, -0.009, 0.009, 0.027].forEach((x, i) => {
-      const q = onHead(hc, hr, x, mY + 0.004, 0.002);
-      parts.push({ m: 'dot', c: MOUTH, p: q.p, r: [q.r[0], q.r[1], i % 2 ? 0.6 : -0.6], s: [0.012, 0.006, 0.006], n: 'head', o: false });
-    });
-  } else if (look.mouth === 'grin') {
-    parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: [0.07, 0.024, 0.012], n: 'head', o: false });
-  } else {
-    parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: [0.028, 0.014, 0.01], n: 'head', o: false });
-  }
-  if (look.beard === 'goatee') {
-    const g = onHead(hc, hr, 0, mY - 0.075, 0.008);
-    parts.push({ m: 'dot', c: hairInk, p: g.p, r: g.r, s: [0.036, 0.05, 0.026], n: 'head', o: false });
-  } else if (look.beard === 'full') {
-    parts.push({ m: 'sphere', c: look.hairColor, p: [0, 0.6, 0.2], s: [0.3, 0.15, 0.2], n: 'head' });
-  }
+  // 입: 작은 입(∪) · 벌린 입(반달 + 혀) · 고양이 입(ω) · 활짝(큰 반달 + 혀) · 메롱(∪ + 쏙 내민 혀)
+  if (look.mouth === 'open') { put('half', MOUTH, 0, mY + 0.008, [0.03, 0.03, 1]); put('half', '#f28a9b', 0, mY - 0.012, [0.018, 0.012, 1], 0, 0.006); }
+  else if (look.mouth === 'grin') { put('half', MOUTH, 0, mY + 0.012, [0.05, 0.042, 1]); put('half', '#f28a9b', 0, mY - 0.017, [0.03, 0.016, 1], 0, 0.006); }
+  else if (look.mouth === 'cat') [-1, 1].forEach((sd) => put('arc:2.6:0.3', MOUTH, sd * 0.0135, mY + 0.006, [0.0135, 0.0135, 0.008], Math.PI));
+  else if (look.mouth === 'blep') { put('dot', '#f28a9b', 0.004, mY - 0.012, [0.013, 0.017, 0.01], 0, 0.006); put('arc:2.2:0.3', MOUTH, 0, mY + 0.006, [0.02, 0.02, 0.008], Math.PI, 0.008); }
+  else put('arc:2.1:0.32', MOUTH, 0, mY + 0.004, [0.02, 0.02, 0.008], Math.PI);
+  // 염소수염: 턱 밑에 작은 세모 털
+  if (look.beard === 'goatee') put('cone', hairInk, 0, mY - 0.052, [0.026, 0.05, 0.012], Math.PI, 0.006);
+  // 복슬 수염: 볼 아래를 감싸는 뭉게뭉게 털(머리 · 수염 색, 외곽선 있음)
+  else if (look.beard === 'full') parts.push({ m: 'beard:full', c: look.hairColor, p: hc, s: [hr[0] * 1.05, hr[1] * 1.05, hr[2] * 1.06], n: 'head' });
 }
 
-/** 이마를 덮는 앞머리 다섯 가닥. */
-function fringe(parts, hc, C) {
-  [-0.24, -0.12, 0, 0.12, 0.24].forEach((x) => {
-    const f = onHead(hc, [0.43, 0.37, 0.39], x, 0.17 + Math.abs(x) * 0.12, 0.014);
-    parts.push({ m: 'sphere', c: C, p: f.p, r: f.r, s: [0.085, 0.075, 0.05], n: 'head' });
+// ---------- 머리카락 · 수염 껍질 도형 ----------
+const sstep = (e0, e1, x) => { const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
+/** 앞머리 가닥 모양: 이마 폭 ±w(라디안)를 n 가닥으로 — 가닥 끝(1)은 둥글고 가닥 사이(0)는 뾰족하게 파인다. */
+function lobe(a, n, w, shift = 0) {
+  const u = ((a - shift + w) / (2 * w)) * n;
+  if (u <= 0 || u >= n) return 0;
+  return Math.sqrt(Math.sin(Math.PI * (u - Math.floor(u))));
+}
+/**
+ * 머리에 씌우는 두께 있는 껍질(머리카락 · 수염). 단위 구 위의 a(앞 0 · 오른쪽 + · 뒤 ±π)와 t(정수리 0 ~ 아래 π)로 적는다.
+ * edge(a): 아랫단의 t, from(a): 윗단의 t(없으면 정수리부터), bump(a, t): 반지름에 더할 것, span: [a0, a1](없으면 한 바퀴).
+ * 바깥 · 안쪽 면과 테두리 띠로 닫힌 도형이라, 앞머리 끝 같은 아랫단에도 외곽선이 또렷하게 생긴다.
+ */
+function shellGeometry({ edge, from = null, bump = () => 0, span = null, inner = 0.9, nu = 72, nv = 12 }) {
+  const full = !span, [a0, a1] = span || [-Math.PI, Math.PI], cols = full ? nu : nu + 1;
+  const pos = [], idx = [];
+  for (const layer of [0, 1]) for (let j = 0; j <= nv; j++) for (let i = 0; i < cols; i++) {
+    const a = a0 + (i / nu) * (a1 - a0), t0 = from ? from(a) : 0, t = t0 + (j / nv) * (edge(a) - t0);
+    const r = (1 + bump(a, t)) * (layer ? inner : 1);
+    pos.push(r * Math.sin(a) * Math.sin(t), r * Math.cos(t), r * Math.cos(a) * Math.sin(t));
+  }
+  // 정수리(from 이 없으면 j = 0 줄은 한 점)는 꼭짓점 하나로 모아 외곽선이 갈라지지 않게, 한 바퀴면 이음매도 이어 붙인다
+  const at = (layer, j, i) => layer * (nv + 1) * cols + j * cols + (!from && j === 0 ? 0 : full ? i % cols : i);
+  const tri = (a, b, c) => { if (a !== b && b !== c && a !== c) idx.push(a, b, c); };
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    const A = at(0, j, i), B = at(0, j, i + 1), C = at(0, j + 1, i + 1), D = at(0, j + 1, i);
+    tri(A, D, B); tri(B, D, C); // 바깥 면(밖을 본다)
+    const a = at(1, j, i), b = at(1, j, i + 1), c = at(1, j + 1, i + 1), d = at(1, j + 1, i);
+    tri(a, b, d); tri(b, c, d); // 안쪽 면
+  }
+  for (let i = 0; i < nu; i++) {
+    const O = at(0, nv, i), O2 = at(0, nv, i + 1), I = at(1, nv, i), I2 = at(1, nv, i + 1);
+    tri(O, I, O2); tri(O2, I, I2); // 아랫단 띠
+    if (from) { const T = at(0, 0, i), T2 = at(0, 0, i + 1), U = at(1, 0, i), U2 = at(1, 0, i + 1); tri(T, T2, U); tri(T2, U2, U); } // 윗단 띠
+  }
+  if (!full) for (const [i, flip] of [[0, false], [nu, true]]) for (let j = 0; j < nv; j++) { // 양 끝 마구리
+    const O = at(0, j, i), O2 = at(0, j + 1, i), I = at(1, j, i), I2 = at(1, j + 1, i);
+    if (flip) { tri(O, O2, I); tri(O2, I2, I); } else { tri(O, I, O2); tri(O2, I, I2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+/**
+ * 머리선: 앞은 앞머리 가닥(top ~ top + deep), 옆 · 뒤는 side → back, 그 사이는 부드럽게(fade: 앞머리 폭에 곱해 옆으로 넘어가는 곳).
+ * lock: 얼굴 양옆에 늘어뜨린 둥근 옆머리 가닥의 길이(0 이면 없음), ruffle: 옆 · 뒷머리 끝을 몽글몽글하게(뽀글).
+ */
+function hairline(a, { n = 3, w = 0.85, top = 0.27, deep = 0.09, side = 0.55, back = 0.62, shift = 0, fade = [0.75, 1.6], lock = 0.08, ruffle = 0 }) {
+  const P = Math.PI, A = Math.abs(a);
+  const front = (top + deep * lobe(a, n, w, shift)) * P, rest = (side + (back - side) * sstep(1.7, P, A) + ruffle * sstep(1.3, 1.9, A) * (0.5 + 0.5 * Math.cos(10 * a))) * P;
+  const sideLock = lock * Math.exp(-(((A - w * 1.15) / 0.14) ** 2)) * P;
+  return front + (rest - front) * sstep(w * fade[0], w * fade[1], A) + sideLock;
+}
+/** 헤어스타일마다의 껍질 도형(처음 쓸 때 만들어 둔다). */
+const HAIR_LINES = {
+  bangs: { n: 3 },
+  bob: { n: 5, w: 0.8, top: 0.28, deep: 0.06, side: 0.76, back: 0.74, lock: 0 },
+  bun: { n: 2, w: 0.9, top: 0.25, deep: 0.11, shift: 0.18 },
+  curly: { n: 5, top: 0.27, deep: 0.08, side: 0.54, back: 0.58, lock: 0, ruffle: 0.06 }
+};
+/** 뽀글 머리 털 뭉치 자리(단위 구 위의 방향): 정수리 하나, 그 둘레 다섯, 옆 · 뒤 여덟. */
+const CURLS = [[0, 0.12, 6], [0.22, 0.3, 5], [0.42, 0.44, 8]].flatMap(([t, off, n]) => Array.from({ length: n }, (_, i) => {
+  const a = off + (i / n) * Math.PI * 2, tt = t * Math.PI;
+  return [Math.sin(a) * Math.sin(tt), Math.cos(tt), Math.cos(a) * Math.sin(tt)];
+})).filter((v, i, list) => list.findIndex((o) => Math.hypot(o[0] - v[0], o[1] - v[1], o[2] - v[2]) < 1e-6) === i);
+const HAIR_BUMP = {
+  // 단발: 옆머리는 볼록하게, 끝은 안으로 살짝 말린다
+  bob: (a, t) => 0.03 * sstep(0.35 * Math.PI, 0.6 * Math.PI, t) * sstep(0.7, 1.2, Math.abs(a)) - 0.025 * sstep(hairline(a, HAIR_LINES.bob) - 0.1 * Math.PI, hairline(a, HAIR_LINES.bob), t),
+  // 뽀글: 머리 위에 둥근 털 뭉치가 뭉게뭉게(가장 가까운 뭉치만큼 부푼다 — 매끈해야 외곽선이 갈라지지 않는다)
+  curly: (a, t) => {
+    const x = Math.sin(a) * Math.sin(t), y = Math.cos(t), z = Math.cos(a) * Math.sin(t);
+    let best = 0;
+    for (const [bx, by, bz] of CURLS) best = Math.max(best, Math.exp(-((1 - (x * bx + y * by + z * bz)) / 0.045)));
+    return 0.035 + 0.13 * best;
+  }
+};
+const lookGeo = new Map();
+const cachedGeo = (key, make) => { if (!lookGeo.has(key)) lookGeo.set(key, make()); return lookGeo.get(key); };
+function lookGeometry(m) {
+  return cachedGeo(m, () => {
+    const [kind, a, b] = m.split(':');
+    // 호(선): 가운데가 원점에 오는 ∩ 모양 굵은 선(span 라디안, tube 굵기). rz = π 면 ∪
+    if (kind === 'arc') return new THREE.TorusGeometry(1, +b, 6, Math.max(8, Math.round(+a * 8)), +a).rotateZ(Math.PI / 2 - +a / 2).translate(0, -1, 0);
+    if (kind === 'ring') return new THREE.TorusGeometry(1, +a, 8, 28);
+    if (kind === 'half') return new THREE.CircleGeometry(1, 20, Math.PI, Math.PI); // 아래 반달(위가 곧은 벌린 입)
+    if (kind === 'hair') return shellGeometry({ edge: (x) => hairline(x, HAIR_LINES[a]), bump: HAIR_BUMP[a] });
+    if (kind === 'beard') {
+      // 턱 밑으로 동글하게 부푼 털: 윗단은 입 아래에서 볼 아래로, 아랫단은 몽글몽글 세 덩이, 아래로 갈수록 앞으로 부푼다
+      const P = Math.PI;
+      return shellGeometry({ span: [-1.05, 1.05], from: (x) => (0.625 - 0.05 * sstep(0, 1.05, Math.abs(x))) * P,
+        edge: (x) => (0.68 + 0.07 * lobe(x, 3, 1.05)) * P, bump: (x, t) => 0.03 + 0.1 * sstep(0.6 * P, 0.76 * P, t) * (1 - 0.5 * sstep(0.5, 1.05, Math.abs(x))),
+        nu: 64, nv: 12, inner: 0.86 });
+    }
+    throw new Error('unknown part mesh ' + m);
   });
 }
 
-/** 머리카락. */
+/** 머리카락: 앞머리 가닥이 있는 한 덩어리 껍질 + 스타일마다 덧붙이는 것(똥머리 · 양갈래 · 더듬이). */
 function hairParts(parts, hc, look) {
-  const C = look.hairColor, top = { m: 'hairTop', c: C, p: hc, s: [0.445, 0.385, 0.405], n: 'head', ds: true };
+  const C = look.hairColor, shell = (style) => ({ m: 'hair:' + style, c: C, p: hc, s: [0.452, 0.39, 0.41], n: 'head' });
   switch (look.hair) {
-    case 'tuft':
-      parts.push({ m: 'cone', c: C, p: [0.02, 1.06, 0.06], r: [0.3, 0, -0.5], s: [0.045, 0.17, 0.045], n: 'head' });
-      parts.push({ m: 'cone', c: C, p: [-0.04, 1.07, 0.03], r: [0.2, 0, 0.45], s: [0.035, 0.12, 0.035], n: 'head' });
+    case 'tuft': // 정수리에 동그랗게 말린 더듬이 한 가닥
+      parts.push({ m: 'arc:4.4:0.3', c: C, p: [0.015, 1.18, 0.03], r: [0, 0, -0.5], s: [0.055, 0.055, 0.055], n: 'head' });
       break;
     case 'bangs':
-      parts.push(top);
-      fringe(parts, hc, C);
+      parts.push(shell('bangs'));
       break;
     case 'bob':
-      parts.push(top);
-      parts.push({ m: 'hairCap', c: C, p: hc, s: [0.465, 0.41, 0.425], n: 'head', ds: true });
-      fringe(parts, hc, C);
+      parts.push(shell('bob'));
       break;
     case 'bun':
-      parts.push(top);
-      parts.push({ m: 'sphere', c: C, p: [0, 1.17, -0.06], s: [0.13, 0.12, 0.13], n: 'head' });
-      parts.push({ m: 'sphere', c: '#f48fb1', p: [0, 1.07, -0.05], s: [0.07, 0.03, 0.07], n: 'head' });
+      parts.push(shell('bun'));
+      parts.push({ m: 'sphere', c: C, p: [0, 1.17, -0.09], s: [0.14, 0.13, 0.14], n: 'head' });
+      parts.push({ m: 'ring:0.32', c: '#f48fb1', p: [0, 1.085, -0.08], r: [Math.PI / 2 - 0.25, 0, 0], s: [0.1, 0.1, 0.1], n: 'head' });
       break;
     case 'twin':
-      parts.push(top);
+      parts.push(shell('bangs'));
       [-1, 1].forEach((sd) => {
-        parts.push({ m: 'sphere', c: C, p: [sd * 0.46, 0.76, -0.08], r: [0, 0, sd * 0.3], s: [0.1, 0.18, 0.1], n: 'head' });
-        parts.push({ m: 'sphere', c: '#f48fb1', p: [sd * 0.41, 0.92, -0.06], s: [0.045, 0.045, 0.045], n: 'head' });
+        parts.push({ m: 'sphere', c: C, p: [sd * 0.49, 0.7, -0.07], r: [0, 0, sd * 0.32], s: [0.105, 0.165, 0.105], n: 'head' });
+        parts.push({ m: 'sphere', c: '#f48fb1', p: [sd * 0.43, 0.85, -0.05], s: [0.042, 0.042, 0.042], n: 'head' });
       });
       break;
     case 'curly':
-      parts.push(top);
-      for (let i = 0; i < 11; i++) {
-        const a = 0.95 + (i / 10) * (Math.PI * 2 - 1.9);
-        parts.push({ m: 'sphere', c: C, p: [Math.sin(a) * 0.38, 0.93, Math.cos(a) * 0.34], s: [0.09, 0.09, 0.09], n: 'head' });
-      }
-      [[-0.12, 1.1, 0.05], [0.12, 1.1, 0.05], [0, 1.13, -0.08]].forEach((p) => parts.push({ m: 'sphere', c: C, p, s: [0.085, 0.085, 0.085], n: 'head' }));
+      parts.push(shell('curly'));
       break;
     default:
       break;
   }
+}
+
+/** 머리카락 위에 얹는 장식 자리: 모자 · 왕관 · 새싹은 위로, 리본 · 꽃 · 별 핀은 바깥으로(뽀글 머리는 더). */
+function liftAccessory(list, look, hc) {
+  if (['none', 'tuft'].includes(look.hair)) return list;
+  const curly = look.hair === 'curly';
+  if (['cap', 'crown', 'sprout'].includes(look.accessory)) { const up = curly ? 0.1 : 0.025; return list.map((pt) => ({ ...pt, p: [pt.p[0], pt.p[1] + up, pt.p[2]] })); }
+  if (['ribbon', 'flower', 'starpin'].includes(look.accessory)) { const k = curly ? 1.14 : 1.05; return list.map((pt) => ({ ...pt, p: [pt.p[0] * k, hc[1] + (pt.p[1] - hc[1]) * k, pt.p[2] * k] })); }
+  return list;
 }
 
 /** 머리 장식. */
@@ -722,7 +798,9 @@ function playerDef(rawLook) {
   }
   playerFace(parts, hc, hr, look);
   hairParts(parts, hc, look);
-  accessoryParts(parts, hc, hr, look);
+  const acc = [];
+  accessoryParts(acc, hc, hr, look);
+  parts.push(...liftAccessory(acc, look, hc)); // 머리카락이 있으면 그만큼 위 · 밖으로(묻히지 않게)
   pochetteParts(parts, pochette);
   // 손에 드는 불(평소엔 숨김, player.setHeld 로 켠다): 왼손에. 랜턴은 손잡이에 매단 등, 손전등은 앞을 향한 원통
   parts.push({ m: 'box', c: '#4a3f48', p: [-0.4, 0.22, 0.12], s: [0.03, 0.12, 0.03], n: 'armL', tag: 'lantern' });
