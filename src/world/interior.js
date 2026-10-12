@@ -258,6 +258,18 @@ export function createInterior() {
     },
     /** 그 자리에 바로 선다(확인용). */
     standAt(x, z) { pos.x = x; pos.z = z; },
+    /** 같이 놀기: 문간에 먼저 와 있는 사람(others [{ x, z }])과 겹치지 않게 옆 빈자리로 비켜 선다(가구 · 벽은 피한다). */
+    stepAside(home, others) {
+      if (!others.length) return;
+      for (const [dx, dz] of [[0, 0], [1.05, 0], [-1.05, 0], [1.0, -0.8], [-1.0, -0.8], [0, -1.05], [1.9, -0.45], [-1.9, -0.45], [0, -2.0]]) {
+        const x = pos.x + dx, z = pos.z + dz;
+        if (blocked(home, x, z, 0.3) || !others.every((o) => Math.hypot(o.x - x, o.z - z) > 0.95)) continue;
+        pos.x = x;
+        pos.z = z;
+        if (me) me.root.position.set(x, 0, z);
+        return;
+      }
+    },
     /**
      * 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null
      * guest: 같이 놀기로 친구 집에 놀러 왔으면 문(나가기)만.

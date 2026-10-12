@@ -323,7 +323,8 @@ export function createHud(ui, input) {
      */
     setVisitors(info) {
       visitTag.hidden = !info;
-      const key = info ? info.label + '|' + info.names.join(',') : '';
+      const party = (info && info.party) || [];
+      const key = info ? info.label + '|' + info.names.join(',') + '|' + party.join(',') : '';
       if (visitTag.dataset.k === key) return;
       visitTag.dataset.k = key;
       visitTag.replaceChildren();
@@ -336,6 +337,18 @@ export function createHud(ui, input) {
         const chip = el('b', 'vs-name');
         chip.textContent = name;
         visitTag.appendChild(chip);
+      }
+      // 같이 토벌 파티: 줄을 바꿔 '같이 토벌' 과 파티 친구 이름
+      if (party.length) {
+        visitTag.appendChild(el('i', 'vs-br'));
+        const lab2 = el('span', 'vs-lab');
+        lab2.textContent = '같이 토벌';
+        visitTag.appendChild(lab2);
+        for (const name of party) {
+          const chip = el('b', 'vs-name vs-party');
+          chip.textContent = name;
+          visitTag.appendChild(chip);
+        }
       }
       visitTag.classList.remove('got'); void visitTag.offsetWidth; visitTag.classList.add('got');
     },

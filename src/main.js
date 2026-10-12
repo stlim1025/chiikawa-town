@@ -237,8 +237,9 @@ function boot() {
       // 같이 토벌하던 친구가 쓰러졌다: 다가가서 깨워 줄 수 있다
       if (m && m.anim === 'faint' && was && was !== 'faint' && m.area === 'village') hud.toast(`${josa(multi.nameOf(id) || '친구', '이/가')} 쓰러졌어요! 다가가서 깨워 주세요`, 3600);
     },
-    left: (id, name) => { eachRemote((r) => r.remove(id)); releaseHolds(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
-    said: (id, text) => eachRemote((r) => r.say(id, text)), emote: (id, name) => eachRemote((r) => r.emote(id, name)), cleared: () => eachRemote((r) => r.clear()),
+    left: (id, name) => { eachRemote((r) => r.remove(id)); releaseHolds(id); leaveParty(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
+    said: (id, text) => eachRemote((r) => r.say(id, text)), emote: (id, name) => eachRemote((r) => r.emote(id, name)),
+    cleared: () => { eachRemote((r) => r.clear()); clearParty(); },
     world: (w) => takeWorld(w),
     guestAct: (id, a) => takeGuestAct(id, a),
     direct: (id, a) => takeDirect(id, a),
@@ -379,10 +380,11 @@ function boot() {
   }
   /** 같이 놀기 꼬리표(왼쪽 위): 주인은 놀러 온 친구 이름, 손님은 놀러 와 있는 마을. */
   function updateVisitTag() {
-    if (visiting && !visiting.arriving) hud.setVisitors({ label: `${multi.hostName || '친구'}의 마을에 놀러 왔어요`, names: [] });
+    const party = [...mpParty.values()]; // 같이 토벌 파티
+    if (visiting && !visiting.arriving) hud.setVisitors({ label: `${multi.hostName || '친구'}의 마을에 놀러 왔어요`, names: [], party });
     else if (!visiting && multi.status === 'open') {
       const guests = multi.players.map((p) => p.name);
-      hud.setVisitors(guests.length ? { label: '놀러 온 친구', names: guests } : { label: '마을 문이 열려 있어요', names: [] });
+      hud.setVisitors(guests.length ? { label: '놀러 온 친구', names: guests, party } : { label: '마을 문이 열려 있어요', names: [], party });
     } else hud.setVisitors(null);
   }
   /**
@@ -520,6 +522,15 @@ function boot() {
   function takeDirect(id, a) {
     if (!state || !a || typeof a !== 'object') return;
     if (a.t === 'wake') { wakeUp(multi.nameOf(id)); return; }
+    // 같이 토벌 파티(주인 · 손님 누구끼리든)
+    if (a.t === 'invite') { takeInvite(id); return; }
+    if (a.t === 'party') {
+      const name = multi.nameOf(id) || '친구';
+      if (a.ok) joinParty(id, name); else hud.toast(`${josa(name, '은/는')} 지금은 같이 못 간대요`, 2400);
+      return;
+    }
+    if (a.t === 'unparty') { leaveParty(id); return; }
+    if (a.t === 'pkill') { mpPartyKill(id, a); return; }
     if (!visiting || visiting.arriving || id !== multi.hostId) return; // 아래는 놀러 간 마을 주인만 보낸다
     if (a.t === 'hurt') {
       const dmg = Math.max(1, Math.min(80, Math.round(a.dmg) || 1)), sp = Object.hasOwn(MONSTERS, a.sp) ? a.sp : null;
@@ -591,12 +602,89 @@ function boot() {
     const allies = guestAllies();
     if (allies.length) monsters.update(dt, t, { player: player.position, active: false, night: nightNow, onHit: onMonsterHit, allies, onAllyHit });
   }
-  /** 가까이 쓰러진 친구가 있으면 깨우기 대상(findTarget · findGuestTarget). */
-  function wakeOptions(p, options) {
-    for (const d of remotes.downed()) {
-      const dd = Math.hypot(d.x - p.x, d.z - p.z);
-      if (dd < 1.6) options.push({ d: -2, t: { type: 'wakeMp', id: d.id, name: d.name, x: d.x, z: d.z, label: `${d.name} 깨우기` } });
+  /** 가까운 다른 사람: 쓰러져 있으면 깨우기, 아니면 말 걸기(같이 토벌 파티) 대상(findTarget · findGuestTarget). */
+  function playerOptions(p, options) {
+    for (const o of remotes.visible()) {
+      const dd = Math.hypot(o.x - p.x, o.z - p.z);
+      if (o.anim === 'faint' && dd < 1.6) options.push({ d: -2, t: { type: 'wakeMp', id: o.id, name: o.name, x: o.x, z: o.z, label: `${o.name} 깨우기` } });
+      else if (o.anim !== 'faint' && dd < 1.4) options.push({ d: dd - 0.1, t: { type: 'mpTalk', id: o.id, name: o.name, x: o.x, z: o.z, label: '말 걸기' } });
     }
+  }
+
+  // 같이 토벌 파티: 다른 사람에게 말 걸어 '같이 토벌하러 가자!' → 받아 주면 파티. 파티 중에 쓰러뜨린 몬스터는
+  // 토벌 일감 · 퀘스트를 파티 모두가 같이 세고(토벌 점수는 나눠 갖는다), 전리품은 가방 대신 그 자리 바닥에 떨어진다(누구든 줍는다)
+  const mpParty = new Map(); // 연결 id → 이름
+  const mpWho = (name) => ({ kind: 'me', name, tag: '#e3f4ec', ink: '#3f7a63' }); // 대화 상자 이름표(다른 사람)
+  /** 다른 사람에게 말 걸기: 같이 토벌하러 가자 · 파티 그만하자 · 인사. */
+  function talkToPlayer(tg) {
+    const inParty = mpParty.has(tg.id);
+    cancelPull();
+    player.face(tg.x, tg.z);
+    input.setEnabled(false);
+    hud.setAction(null);
+    guide.ask(`${tg.name}에게 뭐라고 할까?`, [inParty ? '파티 그만하자' : '같이 토벌하러 가자!', '안녕~!', '그만두기'], (i) => {
+      input.setEnabled(true);
+      if (i === 1) { multiPanel.say('안녕~!'); return; }
+      if (i !== 0) return;
+      if (inParty) { multi.direct(tg.id, { t: 'unparty' }); leaveParty(tg.id); return; }
+      multi.direct(tg.id, { t: 'invite' });
+      hud.toast(`${tg.name}에게 같이 토벌하자고 했어요`, 2400);
+    }, meWho());
+  }
+  /** 같이 토벌하자는 말을 받았다: 바쁘면 다음에, 아니면 대답을 고른다. */
+  function takeInvite(id) {
+    const name = multi.nameOf(id) || '친구';
+    if (mpParty.has(id)) { multi.direct(id, { t: 'party', ok: true }); return; }
+    const busy = !state || mode !== 'play' || guide.open || panels.isOpen() || pulling || downed || sleeping || fainting || funBusy();
+    if (busy) { multi.direct(id, { t: 'party', ok: false }); return; }
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    sound.play('job');
+    guide.ask('같이 토벌하러 가자!', ['좋아!', '다음에 할래'], (i) => {
+      input.setEnabled(true);
+      const ok = i === 0 && multi.players.some((p) => p.id === id); // 그새 돌아갔으면 못 맺는다
+      multi.direct(id, { t: 'party', ok });
+      if (ok) joinParty(id, name);
+    }, mpWho(name));
+  }
+  function joinParty(id, name) {
+    mpParty.set(id, name);
+    updateVisitTag();
+    sound.play('job');
+    hud.toast(`${josa(name, '과/와')} 파티를 맺었어요!`, 3200, { chips: [{ text: '토벌 일감은 같이 세요' }, { text: '전리품은 바닥에' }] });
+  }
+  /** 파티가 끝났다(그만하자고 했거나 · 상대가 돌아갔다). */
+  function leaveParty(id) {
+    const name = mpParty.get(id);
+    if (!mpParty.delete(id)) return;
+    updateVisitTag();
+    hud.toast(`${josa(name || '친구', '과/와')} 파티가 끝났어요`, 2400);
+  }
+  function clearParty() { if (mpParty.size) { mpParty.clear(); updateVisitTag(); } }
+  /** 파티의 다른 사람이 몬스터를 쓰러뜨렸다: 토벌 일감 · 퀘스트를 같이 세고, 토벌 점수는 나눠 갖는다(전리품은 바닥에 있다). */
+  function mpPartyKill(id, a) {
+    if (!state || !mpParty.has(id) || !Object.hasOwn(MONSTERS, a.sp)) return;
+    const M = MONSTERS[a.sp], split = Math.max(1, Math.min(8, Math.floor(a.n) || 2));
+    const x = Number.isFinite(a.x) ? a.x : player.position.x, z = Number.isFinite(a.z) ? a.z : player.position.z;
+    let s = recordHunt(state, a.sp);
+    s = addKill(s, 'me', a.sp, split);
+    const before = s.job;
+    const counted = s.job && JOB_TYPES[s.job.typeId].kind === a.sp && !isComplete(s.job);
+    if (counted) s = { ...s, job: recordPull(s.job, a.sp, a.clean ? 'clean' : 'snapped') };
+    commit(s);
+    hud.floatText({ x, y: (M.height || 1) + 0.9, z, text: `같이 잡았다 +${killPoints(a.sp, split)}점`, kind: 'drop' });
+    if (state.hunted[a.sp] === 1) hud.toast(`${M.name} 첫 토벌!`, 2600, { icon: monsterSvg(a.sp) });
+    else if (counted && !isComplete(state.job)) hud.floatText({ x, y: (M.height || 1) + 1.3, z, text: `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'pick', icon: monsterSvg(a.sp) });
+    celebrateIfDone(before, state.job);
+    rankNews();
+  }
+  /** 파티 전리품: 가방 대신 그 자리 바닥에(놀러 가 있으면 주인 마을 바닥, 아니면 내 마을 바닥). */
+  function dropToWorld(id, x, z) {
+    const at = village.nearestFree(x, z, 0.2);
+    if (visiting) multi.act({ t: 'put', id, n: 1, clean: 0, weapon: 0, x: r2(at.x), z: r2(at.z) });
+    else commit(placeItem(state, id, 1, at.x, at.z));
+    hud.floatText({ x: at.x, y: 0.9, z: at.z, text: '바닥에', kind: 'pick', icon: itemSvg(id) });
   }
 
   // 바닥 물건: 주인 마을 바닥(state.ground)을 같이 쓴다. 손님은 주울 때 주인에게 '줍기'를 보내고 주인이 건네준 만큼(got)만 가방에 넣는다(둘이 같이 주워도 하나만)
@@ -665,6 +753,7 @@ function boot() {
     hud.setAction(null);
     interior.setHome(visiting.house);
     interior.setPlayer(myLook());
+    interior.stepAside(visiting.house, homeRemotes.players().filter((p) => p.area === 'home')); // 먼저 와 있는 사람과 겹치지 않게 옆에 선다
     sound.play('job');
     hud.toast(`${multi.hostName || '친구'}네 집에 들어왔어요`, 2400);
   }
@@ -1131,6 +1220,8 @@ function boot() {
       guide.setGoal(null);
       examGoal = null; // 다음에 들어오면 승급 시험 쪽지를 다시 띄운다
       npcs.setFollow('hachiware', false);
+      // 마을 친구들이 하던 일감 · 일정을 멈춘다(타이틀에서도 친구들은 움직이는데, 일정 끝에 진행(state)을 고치다 오류가 났다)
+      for (const n of npcs.list) npcs.plan(n, []);
       hud.setAction(null);
       state = null;
       mode = 'title';
@@ -1291,6 +1382,7 @@ function boot() {
     hud.setAction(null);
     interior.setHome(homeOf(state));
     interior.setPlayer(myLook());
+    interior.stepAside(homeOf(state), homeRemotes.players().filter((p) => p.area === 'home')); // 같이 놀기: 집에 와 있는 친구와 겹치지 않게
     homeUI.open();
     sound.play('job');
     const unpaid = housingOf(state).unpaid;
@@ -1777,6 +1869,7 @@ function boot() {
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
     else if (target.type === 'wakeMp') wakeFriend(target);
+    else if (target.type === 'mpTalk') talkToPlayer(target);
     else if (target.type === 'hostHome') enterHostHome();
   });
 
@@ -2533,16 +2626,18 @@ function boot() {
       if (killed) onKill(m);
     }
   }
-  /** 몬스터를 쓰러뜨렸다: 전리품은 가방에, 토벌 일감이면 센다(한 번도 안 맞고 잡으면 깔끔하게). */
+  /** 몬스터를 쓰러뜨렸다: 전리품은 가방에(같이 놀기 파티면 그 자리 바닥에), 토벌 일감이면 센다(한 번도 안 맞고 잡으면 깔끔하게). */
   function onKill(m) {
     sound.play('poof');
     if (m.M.boss) cutBossMusic(); // 보스를 쓰러뜨리면 보스 곡은 바로 뚝
     if (m.exam) { examDummyDown(); return; }
-    // 토벌 점수(랭킹): 같이 토벌 중이면 나와 데려간 친구들이 똑같이 나눠 갖는다
-    const crew = ['me', ...npcs.partyKinds()];
+    // 토벌 점수(랭킹): 같이 토벌 중이면 나와 데려간 친구들 · 같이 놀기 파티가 똑같이 나눠 갖는다
+    const crew = ['me', ...npcs.partyKinds()], partners = [...mpParty.keys()], split = crew.length + partners.length;
     let s = recordHunt(state, m.species);
-    for (const who of crew) s = addKill(s, who, m.species, crew.length);
-    if (crew.length > 1) hud.floatText({ x: m.x, y: m.mesh.height + 0.9, z: m.z, text: `나눠서 +${killPoints(m.species, crew.length)}점`, kind: 'drop' });
+    for (const who of crew) s = addKill(s, who, m.species, split);
+    if (split > 1) hud.floatText({ x: m.x, y: m.mesh.height + 0.9, z: m.z, text: `나눠서 +${killPoints(m.species, split)}점`, kind: 'drop' });
+    // 같이 놀기 파티: 파티의 다른 사람도 토벌 일감 · 퀘스트를 같이 센다
+    for (const pid of partners) multi.direct(pid, { t: 'pkill', sp: m.species, x: r2(m.x), z: r2(m.z), clean: m.hitPlayer ? 0 : 1, n: split });
     // 친구 마을에서 잡은 것(m.remote)은 전리품 · 점수 · 일감만: 내 마을 이야기 · 구역 보스는 그대로
     if (m.species === 'kingcap' && !m.remote) s = { ...s, story: { ...(s.story || {}), bossSeen: true, bossDown: true } };
     if (BOSS_LAIRS[m.species] && !m.remote) s = markBossDown(s, m.species, s.clock.day); // 구역 보스: 오늘은 끝, 내일 다시 나타난다
@@ -2550,10 +2645,11 @@ function boot() {
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
     const drop = m.M.drop;
     let got = 0;
-    if (drop) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
+    if (drop && !partners.length) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
     commit(s);
     // 전리품 · 토벌 일감 진행: 열매 따기처럼 그림 + 숫자가 반짝이며 통통(가방 개수는 가방이 톡 튀는 것으로)
-    if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: '+1', kind: 'pick', icon: itemSvg(drop) }); hud.bagBump(); }
+    if (drop && partners.length) dropToWorld(drop, m.x, m.z); // 파티: 전리품은 그 자리 바닥에(누구든 줍는다)
+    else if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: '+1', kind: 'pick', icon: itemSvg(drop) }); hud.bagBump(); }
     else if (drop) hud.toast('가방이 꽉 찼어요');
     if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌!`, 2600, { icon: monsterSvg(m.species) });
     else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.floatText({ x: m.x, y: m.mesh.height + 1.05, z: m.z, text: `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'pick', icon: monsterSvg(m.species) });
@@ -3249,7 +3345,7 @@ function boot() {
   const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다', momonga: '졸려! 말 걸지 마!' };
   const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 귀찮게 하지 마!' };
   const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다', momonga: '…뭘 봐? 아침부터' };
-  const tireNpc = (kind, amount) => { state = villagerEnergy(state, kind, -amount, state.clock.day); };
+  const tireNpc = (kind, amount) => { if (state) state = villagerEnergy(state, kind, -amount, state.clock.day); }; // 메인으로 나간 뒤(state 없음)에는 세지 않는다
   /** 집(동굴)으로 걸어가서 들어간다. */
   function npcGoHome(n, why, quiet = false) {
     const d = homeDoor(n.kind);
@@ -4541,7 +4637,7 @@ function boot() {
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
-    wakeOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기
+    playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
   }
@@ -4555,7 +4651,7 @@ function boot() {
       const m = monsters.nearest(p.x, p.z, WEAPONS[wid].range + 0.5);
       if (m) options.push({ d: -1, t: { type: 'attack', monster: m, label: '공격' } });
     }
-    wakeOptions(p, options);
+    playerOptions(p, options);
     const gi = ground.nearest(p.x, p.z, 1.15);
     if (gi) options.push({ d: Math.hypot(gi.x - p.x, gi.z - p.z) - 0.3, t: { type: 'pickup', g: gi.g, x: gi.x, z: gi.z, label: `${groundName(gi)}${gi.n > 1 ? ` ×${gi.n}` : ''} 줍기` } });
     const hs = village.spots.home, hd = Math.hypot(hs.x - p.x, hs.z - p.z);
@@ -4748,6 +4844,7 @@ function boot() {
     if (tg.type === 'story') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'story' }; // 사이드스토리(토끼굴 들어가기)
     if (tg.type === 'wish') return { x: player.position.x, z: player.position.z, r: 0.7, y: 1.9, id: 'wish' }; // 내 발밑 · 머리 위에
     if (tg.type === 'wakeMp') return { x: tg.x, z: tg.z, r: 0.6, y: 1.1, id: 'mpw' + tg.id }; // 같이 놀기: 쓰러진 친구
+    if (tg.type === 'mpTalk') return { x: tg.x, z: tg.z, r: 0.55, y: 1.55, id: 'mpt' + tg.id }; // 같이 놀기: 다른 사람에게 말 걸기
     if (tg.type === 'hostHome') { const s = village.spots.home; return { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'phostHome' }; }
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;

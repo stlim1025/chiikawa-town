@@ -88,12 +88,14 @@ export function createRemotePlayers(scene, area = 'village') {
   function animOf(id) { const p = list.get(id); return p ? p.anim : null; }
   /** 받은 마지막 자리 · 있는 곳 · 몸짓 [{ id, name, x, z, area, anim }](주인: 몬스터가 노릴 놀러 온 친구들). */
   function players() { return [...list.values()].map((p) => ({ id: p.id, name: p.name, x: p.tx, z: p.tz, area: p.area, anim: p.anim })); }
-  /** 쓰러져 깨워 주길 기다리는 사람(보이는 사람만) [{ id, name, x, z }]. */
-  function downed() {
+  /** 지금 보이는 사람 [{ id, name, x, z, anim }](말 걸기 · 깨우기 대상). */
+  function visible() {
     const out = [];
-    for (const p of list.values()) if (p.chibi.root.visible && p.anim === 'faint') out.push({ id: p.id, name: p.name, x: p.x, z: p.z });
+    for (const p of list.values()) if (p.chibi.root.visible) out.push({ id: p.id, name: p.name, x: p.x, z: p.z, anim: p.anim });
     return out;
   }
+  /** 쓰러져 깨워 주길 기다리는 사람(보이는 사람만) [{ id, name, x, z }]. */
+  function downed() { return visible().filter((p) => p.anim === 'faint'); }
 
-  return { add, move, say, emote, remove, clear, update, labels, players, downed, animOf, get size() { return list.size; } };
+  return { add, move, say, emote, remove, clear, update, labels, players, visible, downed, animOf, get size() { return list.size; } };
 }
