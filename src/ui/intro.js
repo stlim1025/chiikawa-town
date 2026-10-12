@@ -9,7 +9,7 @@ const GREETERS = [
 /** 처음 왔을 때: 마을 밖 숲길 끝에서 주민 모집 전단지를 다시 펼쳐 보는 혼잣말(누르거나 FLYER_LINE_SEC 초가 지나면 다음 줄). */
 const FLYER_LINES = [
   '(숲길 끝에서 꼬깃꼬깃한 전단지를 다시 펼쳐 본다…)',
-  '빈집 있음 · 일감 많음 · 친구도 많음… 여기가 맞겠지?',
+  '빈집 있음, 일감 많음, 친구도 많음… 여기가 맞겠지?',
   '(저 앞에 알록달록한 마을 입구가 보인다!)',
   '좋아… 새로운 마을에서 힘내 보자!'
 ];
@@ -46,7 +46,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
       <ul class="flyer-list">
         <li><b>★ 빈집 있음</b><small>집세 저렴! 월요일마다</small></li>
         <li><b>★ 일감 많음</b><small>풀 뽑기부터 차근차근</small></li>
-        <li><b>★ 친구 많음</b><small>라멘 · 축제 · 별이 쏟아지는 밤</small></li>
+        <li><b>★ 친구 많음</b><small>라멘, 축제, 별이 쏟아지는 밤</small></li>
       </ul>
       <p class="flyer-note">경험 없어도 OK! 몸만 오세요~</p>
       <div class="flyer-tabs" aria-hidden="true"><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab torn">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span></div>

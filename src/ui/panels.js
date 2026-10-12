@@ -489,7 +489,7 @@ export function createPanels(ui, handlers) {
       const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].pass} / ${L[id].questions}`];
       const LINES = {
         liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
-        arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명 · 레시피 북 보면서'], ['book', '레시피 북']],
+        arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명, 레시피 북을 봐도 돼요'], ['book', '레시피 북']],
         hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개 · 몬스터 ${L.hunter.foes.length}마리 · ${L.hunter.hits}번 맞으면 탈락`], ['book', '토벌 안내서']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
@@ -970,8 +970,9 @@ export function createPanels(ui, handlers) {
     // 변신 살롱: 귀 · 몸 색 · 무늬 · 얼굴 · 머리를 새로 고른다(이름 · 장식은 그대로, 장식은 집 옷장에서)
     salon(s) {
       return [head('변신 살롱', s.money), h('p', { class: 'sub' }, '어머, 어서 와요~ 오늘은 어떤 모습이 되고 싶어요?'),
-        h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '모습 바꾸기'), h('div', { class: 'd' }, '귀 · 몸 색 · 얼굴 · 머리를 새로 골라요 · 마음에 안 들면 그만둬도 돈은 안 받아요')),
+        h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '모습 바꾸기'), h('div', { class: 'd' }, '귀부터 얼굴, 머리까지 새로 골라요')),
           priceBtn(SALON_PRICE, s.money, () => { close(true); handlers.salon(); }, 'btn pink')),
+        h('p', { class: 'note' }, '마음에 안 들면 그만둬도 돼요. 돈은 바꿀 때만 받아요.'),
         h('div', { class: 'actions' }, closeBtn())];
     },
     books(s) {

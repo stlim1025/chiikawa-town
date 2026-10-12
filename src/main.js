@@ -2733,7 +2733,7 @@ function boot() {
         if (!sleepy && hour >= BED_HOUR - 1 && !buddyYawned.has(kind)) { buddyYawned.add(kind); npcs.say(n, BUDDY_YAWN[kind] || '하아암… 졸려~'); npcs.emote(n, 'stretch', 1.4); }
         if (sleepy) {
           endBuddy(kind, buddyBedLine(kind));
-          hud.toast(`${josa(nameOf(kind), '이/가')} 졸려서 집에 갔어요 · 부탁은 내일 이어서 해요`, 3200, { icon: faceIcon(kind) });
+          hud.toast(`${josa(nameOf(kind), '이/가')} 졸려서 집에 갔어요. 부탁은 내일 이어서 해요`, 3200, { icon: faceIcon(kind) });
           npcGoHome(n, 'sleep', true);
         } else if (villagerOf(state, kind, day).energy < TIRED) { endBuddy(kind, BUDDY_SAY[kind] ? BUDDY_SAY[kind].stop : null); npcGoHome(n, 'nap', true); }
         continue;
