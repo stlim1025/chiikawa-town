@@ -64,6 +64,14 @@ export const LIQUOR_QUIZ = [
   { q: '위스키와 물을 1:1로 섞어 마시는 방법은?', right: '트와이스 업', wrong: ['미즈와리', '온더록'], hint: '트와이스 업' }
 ];
 
+/**
+ * 강의에서 빨갛게 칠할 말: 필기 문제의 정답 · hint 중 강의에 그대로 나오는 것(긴 것부터).
+ * 강의를 들으면서 시험에 나올 말을 알아보게(그냥 듣고 넘기다 필기에서 떨어지는 일이 많았다).
+ */
+export const LIQUOR_MARKS = [...new Set(LIQUOR_QUIZ.flatMap((item) => [item.right, item.hint]))]
+  .filter((w) => LIQUOR_LESSONS.some((lesson) => lesson.some((line) => line.includes(w))))
+  .sort((a, b) => b.length - a.length);
+
 /** 하이볼 실기: 위스키는 잔의 이만큼까지, 탄산수를 넣은 뒤 전체는 이만큼까지(넘치면 안 된다). */
 export const WHISKY_BAND = [0.18, 0.32];
 export const SODA_BAND = [0.82, 0.97];

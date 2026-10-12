@@ -49,7 +49,7 @@ import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
-import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
+import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
@@ -1335,7 +1335,9 @@ function boot() {
       else if (k === 'study') {
         const i = (state.liquorLesson || 0) % LIQUOR_LESSONS.length;
         commit({ ...state, liquorLesson: i + 1 });
-        sayAs(n, [...LIQUOR_LESSONS[i], { text: '오늘 강의 끝~ 하아~', chips: [{ icon: ICO.book, text: `${i + 1} / ${LIQUOR_LESSONS.length}` }] }], () => reward(n, 'talk'));
+        // 시험에 나오는 말은 빨갛게(LIQUOR_MARKS) — 첫 강의에서 그렇다고 알려 준다
+        const intro = i === 0 ? [{ text: '빨갛게 보이는 말은 시험에 꼭 나와. 잘 봐 둬~', marks: ['빨갛게'] }] : [];
+        sayAs(n, [...intro, ...LIQUOR_LESSONS[i].map((text) => ({ text, marks: LIQUOR_MARKS })), { text: '오늘 강의 끝~ 하아~', chips: [{ icon: ICO.book, text: `${i + 1} / ${LIQUOR_LESSONS.length}` }] }], () => reward(n, 'talk'));
       } else if (k === 'drink') {
         // 맥주집에 와 있을 때만 같이 건배(하루 한 번 · 두 잔 값). 다른 데서는 저녁에 맥주집으로 오라고 한다
         if (!kuriAtPub()) { sayAs(n, [isPubHour(hourOf(state.clock)) ? '좋지~ 맥주집에서 기다릴게! 하아~' : { text: '하아~ 맥주는 맥주집이지', chips: [{ icon: ICO.clock, text: '저녁 5 ~ 9시' }] }], () => { if (isPubHour(hourOf(state.clock))) npcPub(n); endTalk(); }); return; }

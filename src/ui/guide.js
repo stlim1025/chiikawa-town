@@ -2,13 +2,30 @@
  * 대화 상자(동물의 숲처럼 아래쪽, 기울어진 이름표와 통통 튀는 ▼)와, 지금 할 일을 알려 주는 쪽지.
  * 하치와레뿐 아니라 마을 친구 누구나 이 상자로 말한다. who = { kind, name, tag(이름표 색), ink(이름 글씨 색), hearts? }
  * say(lines, onDone, who): 한 줄씩 보여 주고 다 읽으면 onDone. 상자 아무 곳이나 누르거나 ▼ 버튼(엔터·스페이스)으로 넘긴다.
- *   줄은 글 한 줄이거나 { text, chips: [{ icon(SVG), text, done? }] }: 글 밑에 물건 · 몬스터 그림 꼬리표를 단다(몇 개 모았는지 등).
+ *   줄은 글 한 줄이거나 { text, chips: [{ icon(SVG), text, done? }], marks?: [말] }: 글 밑에 물건 · 몬스터 그림 꼬리표를 단다(몇 개 모았는지 등).
+ *   marks 에 든 말은 글 속에서 빨갛게 칠한다(쿠리만쥬 술 강의에서 시험에 나오는 말).
  * ask(text, choices, onPick, who): 말 한 줄과 오른쪽 위 선택지 말풍선. 고르면 onPick(번호).
  * onDone · onPick 안에서 다시 say · ask 를 부르면 상자가 닫히지 않고 바로 이어진다.
  * opts.onLine(who, text): 새 줄이 나올 때마다(말소리용 — 글을 보고 그 친구 목소리를 고른다). opts.dock: 할 일 쪽지를 붙일 곳(HUD 왼쪽 위 기둥).
  * opts.onCue(cue): { text, cue } 줄이 나올 때(연출 신호: 피자호빵 클로즈업 · 울기 시작 …).
  */
 const HACHI = { kind: 'hachiware', name: '하치와레', tag: '#a9d4f2', ink: '#2f5577' };
+
+/** 글을 칠할 말(marks)과 나머지 조각으로 나눈다. 긴 말부터 찾아 겹치지 않게. → [{ text, mark }] (이어 붙이면 원래 글) */
+export function markSegments(text, marks = []) {
+  const list = marks.filter(Boolean).sort((a, b) => b.length - a.length), out = [];
+  let i = 0, plain = '';
+  while (i < text.length) {
+    const w = list.find((m) => text.startsWith(m, i));
+    if (!w) { plain += text[i++]; continue; }
+    if (plain) out.push({ text: plain, mark: false });
+    plain = '';
+    out.push({ text: w, mark: true });
+    i += w.length;
+  }
+  if (plain) out.push({ text: plain, mark: false });
+  return out;
+}
 
 export function createGuide(ui, { onLine, dock, onCue } = {}) {
   const box = document.createElement('div');
@@ -70,7 +87,9 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
     const w = typeof L !== 'string' && L.who ? L.who : baseWho;
     if (w !== who) setWho(w);
     if (typeof L !== 'string' && L.cue) onCue?.(L.cue);
-    text.textContent = typeof L === 'string' ? L : L.text;
+    if (typeof L !== 'string' && L.marks) {
+      text.replaceChildren(...markSegments(L.text, L.marks).map((p) => (p.mark ? Object.assign(document.createElement('b'), { className: 'g-mark', textContent: p.text }) : document.createTextNode(p.text))));
+    } else text.textContent = typeof L === 'string' ? L : L.text;
     setChips(typeof L === 'string' ? [] : L.chips);
     next.setAttribute('aria-label', i === lines.length - 1 ? '알겠어!' : '다음');
     onLine?.(who, text.textContent);
