@@ -503,8 +503,11 @@ export function createPanels(ui, handlers) {
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
+        const take = h('button', { class: 'btn pink', type: 'button', disabled: s.money < L[id].fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L[id].fee ? `${won(L[id].fee)} 부족` : `시험 보기 ${won(L[id].fee)}`);
+        // 슈퍼 알바이터: 시험 보기 밑에 레시피 북(필기 범위)을 바로 펼쳐 보는 버튼(다 보면 검정소로 돌아온다)
         const side2 = own ? h('span', { class: 'lic-badge done' }, ico('check'), '합격')
-          : h('button', { class: 'btn pink', type: 'button', disabled: s.money < L[id].fee, onClick: () => { close(true); handlers.takeLicense(id); } }, s.money < L[id].fee ? `${won(L[id].fee)} 부족` : `시험 보기 ${won(L[id].fee)}`);
+          : id === 'arbeiter' ? h('div', { class: 'lic-side' }, take, h('button', { class: 'btn', type: 'button', onClick: () => show('recipes', { back: 'exam' }) }, ico('book'), '레시피 북 보기'))
+            : take;
         out.push(card(EMBLEM[id], L[id].name, side2, own ? [['check', `${handlers.dayLabel(licensesOf(s)[id].day)}에 땄어요`]] : LINES[id]));
       }
       // 토벌 랭킹: 내 순위(자격증이 있으면) · 랭커 특전(무기에 얼굴 새기기)

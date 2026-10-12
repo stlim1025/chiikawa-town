@@ -1213,6 +1213,9 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .lic-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .lic-top > :nth-child(2) { flex: 1 1 130px; min-width: 0; }
 .lic-top .btn, .lic-top .lic-badge { flex: 0 0 auto; margin-left: auto; }
+/* 시험 보기 밑에 버튼을 하나 더(슈퍼 알바이터: 레시피 북 보기) — 두 버튼을 같은 폭으로 세로로 */
+.lic-side { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-left: auto; }
+.lic-top .lic-side .btn { margin-left: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 /* 지금 읽어야 할 공부거리(대장 갑옷 씨가 "안내서부터 읽어라" 한 단계): 노란 바탕 · 반짝이는 테두리 · 왼쪽 위 '여기!' 딱지 */
 .panel .row.hl { position: relative; margin-top: 18px; background: var(--butter); box-shadow: 0 0 0 3px var(--yellow-deep); animation: hl-glow 1.2s ease-in-out infinite alternate; }
 .hl-tag { position: absolute; left: 14px; top: -14px; padding: 0 12px 2px; border-radius: 999px; background: #e0524f; color: #fff; font-size: 16px; rotate: -4deg; box-shadow: 0 2px 0 #a8433a;
