@@ -350,6 +350,8 @@ function boot() {
       hud.toast(`보수 ${pay.toLocaleString('ko-KR')}원을 받았어요!`);
       staffSay('labor', 'paid', 9, player.position);
       player.cheerTime = 1.2;
+      // 첫날 안내의 첫 보수: 게시판을 닫고 하치와레가 바로 마무리 이야기를 한다(창을 연 채로 다음 일감을 받으면 안내가 풀 뽑기로 되돌아가 하치와레가 계속 따라다녔다)
+      if (state.tutorial === 'report') { panels.close(); enterTutorial('tips', 'report'); }
     },
     startExam() {
       if (!canTakeExam(state.license)) return;
