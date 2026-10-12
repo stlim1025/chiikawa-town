@@ -10,8 +10,11 @@ const GREETERS = [
 const FLYER_LINES = [
   '(숲길 끝에서 꼬깃꼬깃한 전단지를 다시 펼쳐 본다…)',
   '빈집 있음 · 일감 많음 · 친구도 많음… 여기가 맞겠지?',
-  '(저 앞에 알록달록한 마을 입구가 보인다!)'
+  '(저 앞에 알록달록한 마을 입구가 보인다!)',
+  '좋아… 새로운 마을에서 힘내 보자!'
 ];
+/** 마지막 혼잣말(다짐)에서는 두 팔을 번쩍 들고, 전단지를 접어 넣고 힘차게 걸어 들어간다. */
+const CHEER_LINE = FLYER_LINES.length - 1;
 const FLYER_LINE_SEC = 3.2;
 
 const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
@@ -65,6 +68,8 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
 
   function showLine() {
     sayEl.textContent = FLYER_LINES[line];
+    sayEl.classList.toggle('cheer', line === CHEER_LINE);
+    if (line === CHEER_LINE) player.cheerTime = 1.6; // 다짐: 두 팔을 번쩍
     lineT = 0;
   }
   /** 전단지 다음 줄(마지막 줄 뒤에는 전단지를 접고 걸어 들어간다). */

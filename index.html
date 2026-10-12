@@ -624,6 +624,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .flyer-tab.torn { visibility: hidden; }
 .flyer-say { max-width: min(560px, 92vw); margin: 0; padding: 10px 22px 12px; border-radius: 18px; background: var(--dots), var(--paper); box-shadow: 0 4px 0 var(--shadow);
   color: #5a3d22; font-size: 21px; text-align: center; }
+/* 마지막 혼잣말(다짐 '새로운 마을에서 힘내 보자!'): 분홍 말풍선이 톡 튄다 */
+.flyer-say.cheer { background: var(--dots), #ffe3ea; color: #8a3b52; font-size: 23px; animation: say-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes say-pop { from { transform: scale(0.8); } to { transform: none; } }
 @keyframes fly-in { from { opacity: 0; transform: translateY(30px) scale(0.92); } to { opacity: 1; transform: none; } }
 @keyframes fly-out { to { opacity: 0; transform: translateY(-24px) scale(0.95); } }
 @media (max-height: 640px) { .intro-flyer { gap: 8px; } .flyer-paper { padding-top: 16px; } .flyer-title { font-size: 34px; } .flyer-art { max-height: 60px; } .flyer-burst { width: 50px; height: 50px; font-size: 13px; }

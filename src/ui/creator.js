@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   EAR_TYPES, BODY_COLORS, PATTERNS, CHEEK_COLORS, EYE_TYPES, BROW_TYPES, MOUTH_TYPES, BEARD_TYPES,
-  HAIR_TYPES, HAIR_COLORS, ACCESSORIES, normalizeLook, buildChibi, animateChibi
+  HAIR_TYPES, HAIR_COLORS, STARTER_ACCESSORIES, normalizeLook, buildChibi, animateChibi
 } from '../actors/models.js';
 import { createScenery } from './scenery.js';
 import { setCelLight } from '../render/toon.js';
@@ -31,7 +31,7 @@ const TABS = [
   { id: 'hair', label: '머리', groups: [
     { key: 'hair', title: '헤어스타일', options: opt(HAIR_TYPES) },
     { key: 'hairColor', title: '머리와 수염 색', options: sw(HAIR_COLORS, HAIR_COLOR_NAMES) },
-    { key: 'accessory', title: '장식', options: opt(ACCESSORIES) }
+    { key: 'accessory', title: '장식', options: opt(STARTER_ACCESSORIES) } // 비싼 장식(왕관 등)은 포셰트 가게에서
   ] }
 ];
 

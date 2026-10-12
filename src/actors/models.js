@@ -22,7 +22,11 @@ export const MOUTH_TYPES = [{ id: 'small', label: '방긋' }, { id: 'open', labe
 export const BEARD_TYPES = [{ id: 'none', label: '없음' }, { id: 'whiskers', label: '고양이 수염' }, { id: 'mustache', label: '돌돌 콧수염' }, { id: 'goatee', label: '염소수염' }, { id: 'full', label: '복슬 수염' }];
 export const HAIR_TYPES = [{ id: 'none', label: '없음' }, { id: 'tuft', label: '더듬이' }, { id: 'bangs', label: '앞머리' }, { id: 'bob', label: '단발' }, { id: 'bun', label: '똥머리' }, { id: 'twin', label: '양갈래' }, { id: 'curly', label: '뽀글' }];
 export const HAIR_COLORS = ['#7a5236', '#3a3236', '#f3d27a', '#f6a9c4', '#9fd0f2', '#9fdcc0', '#c4b4e8', '#fbfaf5'];
-export const ACCESSORIES = [{ id: 'none', label: '없음' }, { id: 'ribbon', label: '리본' }, { id: 'sprout', label: '새싹' }, { id: 'glasses', label: '안경' }, { id: 'flower', label: '꽃' }, { id: 'cap', label: '모자' }, { id: 'crown', label: '왕관' }];
+export const ACCESSORIES = [{ id: 'none', label: '없음' }, { id: 'ribbon', label: '리본' }, { id: 'sprout', label: '새싹' }, { id: 'glasses', label: '안경' }, { id: 'flower', label: '꽃' }, { id: 'cap', label: '모자' }, { id: 'crown', label: '왕관' },
+  { id: 'bandage', label: '반창고' }, { id: 'berrypin', label: '딸기 핀' }, { id: 'beret', label: '베레모' }, { id: 'strawhat', label: '밀짚모자' }, { id: 'sunglasses', label: '선글라스' },
+  { id: 'headphones', label: '헤드폰' }, { id: 'flowercrown', label: '화관' }, { id: 'halo', label: '천사 고리' }];
+/** 캐릭터 만들기에서 고를 수 있는 장식: 싼 기본 장식만(왕관 같은 비싼 것은 포셰트 가게에서 사야 한다). */
+export const STARTER_ACCESSORIES = ACCESSORIES.filter((o) => ['none', 'ribbon', 'sprout', 'glasses', 'flower', 'cap'].includes(o.id));
 
 /** 빠진 항목을 기본값으로 채운다(예전 저장 데이터 호환). */
 export function normalizeLook(look = {}) {
@@ -687,8 +691,8 @@ function hairParts(parts, hc, look) {
 function liftAccessory(list, look, hc) {
   if (['none', 'tuft'].includes(look.hair)) return list;
   const curly = look.hair === 'curly';
-  if (['cap', 'crown', 'sprout'].includes(look.accessory)) { const up = curly ? 0.1 : 0.025; return list.map((pt) => ({ ...pt, p: [pt.p[0], pt.p[1] + up, pt.p[2]] })); }
-  if (['ribbon', 'flower', 'starpin'].includes(look.accessory)) { const k = curly ? 1.14 : 1.05; return list.map((pt) => ({ ...pt, p: [pt.p[0] * k, hc[1] + (pt.p[1] - hc[1]) * k, pt.p[2] * k] })); }
+  if (['cap', 'crown', 'sprout', 'beret', 'strawhat', 'headphones', 'flowercrown', 'halo'].includes(look.accessory)) { const up = curly ? 0.1 : 0.025; return list.map((pt) => ({ ...pt, p: [pt.p[0], pt.p[1] + up, pt.p[2]] })); }
+  if (['ribbon', 'flower', 'starpin', 'berrypin'].includes(look.accessory)) { const k = curly ? 1.14 : 1.05; return list.map((pt) => ({ ...pt, p: [pt.p[0] * k, hc[1] + (pt.p[1] - hc[1]) * k, pt.p[2] * k] })); }
   return list;
 }
 
@@ -731,6 +735,55 @@ function accessoryParts(parts, hc, hr, look) {
       parts.push({ m: 'sphere', c: '#e8706a', p: [0, 1.0, 0], s: [0.33, 0.2, 0.32], n: 'head' });
       parts.push({ m: 'cylinder', c: '#e8706a', p: [0, 0.98, 0.26], s: [0.22, 0.02, 0.16], n: 'head' });
       parts.push({ m: 'sphere', c: '#ffffff', p: [0, 1.2, 0], s: [0.035, 0.035, 0.035], n: 'head' });
+      break;
+    case 'bandage': { // 왼쪽 볼 위에 비스듬히 붙인 반창고(가운데 패드)
+      const b = onHead(hc, hr, -0.24, -0.005, 0.006), pad = onHead(hc, hr, -0.24, -0.005, 0.01);
+      parts.push({ m: 'box', c: '#f6d2a8', p: b.p, r: [b.r[0], b.r[1], 0.5], s: [0.1, 0.036, 0.008], n: 'head', o: false });
+      parts.push({ m: 'box', c: '#eab98a', p: pad.p, r: [pad.r[0], pad.r[1], 0.5], s: [0.032, 0.032, 0.008], n: 'head', o: false });
+      break;
+    }
+    case 'berrypin': // 오른쪽 머리 옆에 딸기 하나(꼭지는 초록 잎)
+      parts.push({ m: 'sphere', c: '#e8455a', p: [0.3, 1.05, 0.14], r: [0, 0, -0.3], s: [0.05, 0.062, 0.042], n: 'head' });
+      parts.push({ m: 'cone', c: '#6fae5f', p: [0.315, 1.1, 0.14], r: [Math.PI, 0, -0.3], s: [0.05, 0.03, 0.045], n: 'head' });
+      [[-0.016, 0.012], [0.014, -0.004], [-0.004, -0.024]].forEach(([dx, dy]) => parts.push({ m: 'dot', c: '#ffe08a', p: [0.3 + dx, 1.05 + dy, 0.183], s: [0.007, 0.007, 0.004], n: 'head', o: false }));
+      break;
+    case 'beret': // 살짝 기울여 쓴 남색 베레모 + 꼭지
+      parts.push({ m: 'sphere', c: '#4f6b9a', p: [0.03, 1.07, -0.01], r: [0, 0, 0.18], s: [0.36, 0.1, 0.34], n: 'head' });
+      parts.push({ m: 'cylinder', c: '#4f6b9a', p: [0.05, 1.16, -0.01], s: [0.016, 0.04, 0.016], n: 'head' });
+      break;
+    case 'strawhat': // 넓은 챙 + 둥근 꼭대기 + 빨간 띠
+      parts.push({ m: 'cylinder', c: '#f0d48a', p: [0, 0.99, 0], r: [0.12, 0, 0], s: [0.47, 0.035, 0.47], n: 'head' }); // 앞으로 살짝 기운 챙
+      parts.push({ m: 'sphere', c: '#f0d48a', p: [0, 1.05, -0.01], s: [0.28, 0.2, 0.28], n: 'head' });
+      parts.push({ m: 'cylinder', c: '#e0524f', p: [0, 1.03, -0.01], s: [0.285, 0.05, 0.285], n: 'head' });
+      break;
+    case 'sunglasses': // 까만 동글 렌즈 + 테 + 렌즈에 비친 빛
+      [-1, 1].forEach((sd) => {
+        const g = onHead(hc, hr, sd * 0.14, 0.02, 0.028), sh = onHead(hc, hr, sd * 0.14 - 0.022, 0.042, 0.034);
+        parts.push({ m: 'dot', c: '#2b2a33', p: g.p, r: g.r, s: [0.07, 0.064, 0.01], n: 'head', o: false });
+        parts.push({ m: 'ring', c: '#3a3236', p: g.p, r: g.r, s: [0.075, 0.075, 0.075], n: 'head', o: false });
+        parts.push({ m: 'dot', c: '#ffffff', p: sh.p, r: [sh.r[0], sh.r[1], 0.6], s: [0.022, 0.009, 0.004], n: 'head', o: false });
+      });
+      {
+        const b = onHead(hc, hr, 0, 0.03, 0.03);
+        parts.push({ m: 'dot', c: '#3a3236', p: b.p, r: b.r, s: [0.04, 0.008, 0.008], n: 'head', o: false });
+      }
+      break;
+    case 'headphones': // 머리 위로 넘긴 분홍 띠(호) + 양옆 귀덮개
+      parts.push({ m: 'arc:2.7:0.08', c: '#f48fb1', p: [0, 1.2, 0], s: [0.46, 0.46, 0.46], n: 'head' });
+      [-1, 1].forEach((sd) => {
+        parts.push({ m: 'sphere', c: '#f48fb1', p: [sd * 0.44, 0.86, 0], s: [0.06, 0.1, 0.1], n: 'head' });
+        parts.push({ m: 'sphere', c: '#fff6f9', p: [sd * 0.475, 0.86, 0], s: [0.02, 0.07, 0.07], n: 'head', o: false });
+      });
+      break;
+    case 'flowercrown': // 초록 덩굴 고리 + 둘레의 들꽃
+      parts.push({ m: 'ring:0.1', c: '#7cc46a', p: [0, 1.06, 0], r: [Math.PI / 2 - 0.12, 0, 0], s: [0.32, 0.32, 0.32], n: 'head' });
+      for (let i = 0; i < 8; i++) { // 꽃은 덩굴 위에 얹혀 위로 봉긋(앞쪽은 살짝 아래로 기운다)
+        const a = (i / 8) * Math.PI * 2, z = Math.cos(a) * 0.33;
+        parts.push({ m: 'sphere', c: ['#f6a9c4', '#ffffff', '#ffd66b', '#c4b4e8'][i % 4], p: [Math.sin(a) * 0.33, 1.11 - z * 0.12, z], s: [0.075, 0.06, 0.075], n: 'head' });
+      }
+      break;
+    case 'halo': // 머리 위에 둥실 뜬 금빛 고리
+      parts.push({ m: 'ring:0.12', c: '#ffd84a', p: [0, 1.34, 0], r: [Math.PI / 2 - 0.15, 0, 0], s: [0.2, 0.2, 0.2], n: 'head' });
       break;
     case 'crown':
       parts.push({ m: 'cylinder', c: '#f3c84b', p: [0, 1.06, 0], s: [0.17, 0.07, 0.17], n: 'head' });
@@ -818,7 +871,7 @@ function playerDef(rawLook) {
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
   for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
-  const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama'].includes(look.accessory) ? 0.15 : 0;
+  const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
 

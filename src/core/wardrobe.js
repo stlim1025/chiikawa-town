@@ -2,7 +2,8 @@ import { trySpend } from './state.js';
 import { countOf, takeItem } from './inventory.js';
 
 /**
- * 꾸미기 소품: 머리에 다는 장식(리본 · 꽃 · 새싹 · 안경 · 모자 · 왕관). 포셰트 가게에서 사고, 집 옷장에서 바꿔 단다.
+ * 꾸미기 소품: 머리 · 얼굴에 다는 장식(리본 · 꽃 · 새싹 · 안경 · 모자 · 왕관 · 반창고 · 머리핀 · 베레모 · 밀짚모자 · 선글라스 · 헤드폰 · 화관 · 천사 고리).
+ * 포셰트 가게에서 사고, 집 옷장에서 바꿔 단다(한 번에 하나). 캐릭터 만들기에서는 싼 기본 장식만 고를 수 있다(actors/models.js 의 STARTER_ACCESSORIES).
  * craft 가 있는 소품은 돈 대신 그 재료로 포셰트 갑옷 씨가 만들어 준다(별 조각 셋 → 별 조각 머리핀).
  * state.wardrobe = { owned: [소품 id], wear: 단 소품 id | 'none' }. 예전 저장은 캐릭터 만들기에서 고른 장식을 가진 것으로 친다.
  */
@@ -13,6 +14,14 @@ export const ACCESSORY_ITEMS = {
   glasses: { name: '동글 안경', price: 400, note: '똑똑해 보이는 안경' },
   cap: { name: '빨간 모자', price: 500, note: '햇빛 가리개 모자' },
   crown: { name: '반짝 왕관', price: 3000, note: '반짝이는 황금 왕관' },
+  bandage: { name: '말랑 반창고', price: 100, note: '볼에 붙이는 반창고 — 개구쟁이처럼' },
+  berrypin: { name: '딸기 머리핀', price: 250, note: '머리 옆에 빨간 딸기 하나' },
+  beret: { name: '남색 베레모', price: 600, note: '살짝 기울여 쓰는 화가 모자' },
+  strawhat: { name: '밀짚모자', price: 700, note: '빨간 띠를 두른 여름 모자' },
+  sunglasses: { name: '동글 선글라스', price: 900, note: '햇빛 쨍한 날엔 이것' },
+  headphones: { name: '분홍 헤드폰', price: 1200, note: '머리 위로 넘기는 폭신한 헤드폰' },
+  flowercrown: { name: '들꽃 화관', price: 1500, note: '알록달록 들꽃을 엮은 화관' },
+  halo: { name: '천사 고리', price: 2000, note: '머리 위에 둥실 떠 있는 금빛 고리' },
   pajama: { name: '귀 달린 잠옷', price: 0, gift: true, note: '포셰트 갑옷 씨가 만든 후드 잠옷(선물). 입으면 온몸이 폭신한 연보라' },
   starpin: { name: '별 조각 머리핀', price: 0, craft: { starshard: 3 }, note: '별똥별맨의 별 조각 셋으로 만든 반짝이는 머리핀' }
 };
