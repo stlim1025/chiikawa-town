@@ -45,7 +45,7 @@ function ringOf(pot, t) {
 }
 
 /**
- * 라멘 로우 주방. mode 'work'(알바: duration 초 동안 손님을 받는다) | 'exam'(슈퍼 알바이터 실기: 손님 3명, 실수하면 불합격, 레시피 북 없음).
+ * 라멘 로우 주방. mode 'work'(알바: duration 초 동안 손님을 받는다) | 'exam'(슈퍼 알바이터 실기: 손님 3명, 실수하면 불합격, 레시피 북은 볼 수 있다).
  * 화면: 위 노렌(가게 이름 · 남은 시간 · 번 돈) → 주문표 줄 → 왼쪽 위 수프 통 · 왼쪽 아래 면 채반과 냄비 → 가운데 큰 그릇 → 오른쪽 위 토핑 통 · 오른쪽 아래 내기.
  * 알바에서는 그릇 아래에 고른 손님 주문과 그릇을 맞춰 본 칩(들어감 / 아직 / 빼야 함)이 뜬다. 실기에서는 그릇에 든 것만.
  * onEnd({ completed, served, earned, missed, wrong, reason }): 결과 화면에서 '확인'을 누르면.
@@ -79,7 +79,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
       </section>
       <section class="kx-st kx-tops"><h3>토핑</h3><div class="kx-grid">${TOPS.map((id) => ing(id, panArt(id))).join('')}</div></section>
       <section class="kx-acts">
-        ${exam ? '' : '<button class="kx-small" type="button" data-k="book">레시피 북</button>'}
+        <button class="kx-small" type="button" data-k="book">레시피 북</button>
         <button class="kx-small" type="button" data-k="trash"><span class="ico">${TRASH_ART}</span>그릇 비우기</button>
         <button class="kx-serve" type="button" data-k="serve"><span class="bell" aria-hidden="true"></span>내기!</button>
       </section>

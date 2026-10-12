@@ -1952,14 +1952,14 @@ function boot() {
   }
   /**
    * 토벌 자격증 실기: 검정소 앞마당에 허수아비가 먼저 서고, 다 쓰러뜨리면 쫓아와 공격하는 몬스터(LICENSES.hunter.foes)가
-   * 한 마리씩 차례로 나온다(앞 몬스터를 쓰러뜨리면 다음). 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
+   * 나온다(여럿이면 앞 몬스터를 쓰러뜨릴 때마다 한 마리씩 차례로). 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
    */
   function startHunterPractical(pass, fail) {
     const L = LICENSES.hunter, ex = village.spots.exam;
     endOverlay();
     const at = ([dx, dz]) => village.nearestFree(ex.x + dx, ex.z + dz, 0.5);
     const dummies = [[-2.4, 1.6], [2.4, 1.6], [0, 3.0]].slice(0, L.dummies).map(at);
-    const foes = [[-3.4, 5.4], [0, 6.4], [3.4, 5.4]].slice(0, L.foes.length).map(at);
+    const foes = [[0, 6.4], [-3.4, 5.4], [3.4, 5.4]].slice(0, L.foes.length).map(at); // 한 마리면 정면에서
     dummies.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
     // 몬스터는 허수아비를 다 쓰러뜨린 뒤에 한 마리씩(foes.in: 다음 몬스터가 나오기까지 초, null 이면 아직 차례가 아니다)
     hunterExam = { t: L.practical, left: dummies.length + foes.length, hits: 0, pass, fail, foes: { at: foes, next: 0, in: null } };

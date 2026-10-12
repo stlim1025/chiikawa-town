@@ -486,7 +486,7 @@ export function createPanels(ui, handlers) {
       const L = LICENSES, test = (id) => ['pen', `필기 ${L[id].pass} / ${L[id].questions}`];
       const LINES = {
         liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
-        arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명'], ['book', '레시피 북']],
+        arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명 · 레시피 북 보면서'], ['book', '레시피 북']],
         hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개 · 몬스터 ${L.hunter.foes.length}마리 · ${L.hunter.hits}번 맞으면 탈락`], ['book', '토벌 안내서']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {

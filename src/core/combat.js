@@ -178,8 +178,10 @@ export function huntQuiz(n, random = Math.random) {
     () => q('rule', '전리품은 어디에서 팔까?', '노동 접수', ['도구점', '검정소', '포셰트 가게']),
     () => q('rule', '무기는 어디에서 살까?', '도구점', ['노동 접수', '검정소', '가구점'])
   ];
-  // 안내서 세부 문제는 종류마다 두 번씩 뽑아 두고 규칙 문제와 섞는다 → 같은 글은 빼고 n 개
-  const pool = shuffle([...Object.values(KINDS), ...Object.values(KINDS), ...RULES]).map((f) => f());
+  // 안내서 세부 문제는 종류마다 두 번씩 뽑아 두고 규칙 문제와 섞는다 → 같은 글은 빼고 n 개.
+  // 숫자를 외워야 하는 문제(맞으면 줄어드는 기운 · 판매가)는 한 번씩만(너무 어렵다는 말이 많았다)
+  const HARD = new Set([KINDS.dmg, KINDS.price]);
+  const pool = shuffle([...Object.values(KINDS), ...Object.values(KINDS).filter((f) => !HARD.has(f)), ...RULES]).map((f) => f());
   const seen = new Set();
   return pool.filter((x) => !seen.has(x.q) && seen.add(x.q)).slice(0, n);
 }

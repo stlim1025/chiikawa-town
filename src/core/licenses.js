@@ -2,16 +2,16 @@ import { trySpend } from './state.js';
 
 /**
  * 제초 검정 말고 검정소에서 딸 수 있는 자격.
- *  liquor   술 자격: 쿠리만쥬에게 위스키 강의(8강)를 듣고 → 필기(전문 지식 6문제 중 5개, 문제당 15초) + 실기(하이볼 만들기)
- *  arbeiter 슈퍼 알바이터: 필기(레시피 · 조리 규칙 6문제 중 5개, 문제당 12초) + 실기(레시피 북 없이 손님 3명에게 실수 없이) → 라멘 로우 알바
+ *  liquor   술 자격: 쿠리만쥬에게 위스키 강의(8강)를 듣고 → 필기(전문 지식 6문제 중 4개, 문제당 20초) + 실기(하이볼 만들기)
+ *  arbeiter 슈퍼 알바이터: 필기(레시피 · 조리 규칙 6문제 중 4개, 문제당 18초) + 실기(레시피 북을 보면서 손님 3명에게 실수 없이) → 라멘 로우 알바
  * state.licenses = { liquor?: { day: 딴 날 }, arbeiter?: { day } }, state.ramenDay = 마지막으로 알바한 날
  */
 export const LICENSES = {
-  liquor: { name: '술 자격', fee: 600, questions: 6, pass: 5, seconds: 15 },
-  arbeiter: { name: '슈퍼 알바이터', fee: 800, questions: 6, pass: 5, seconds: 12 },
-  // 4단계: 토벌 자격증 — 필기(토벌 안내서를 꼼꼼히 봐야 푸는 8문제 중 7개, 문제당 10초)
-  //   + 실기(허수아비 2개를 먼저, 그다음 쫓아와 공격하는 몬스터 foes 가 한 마리씩 차례로 — 75초 안에 모두 쓰러뜨리기, hits 번 맞으면 불합격) → 토벌 일감
-  hunter: { name: '토벌 자격증', fee: 300, questions: 8, pass: 7, seconds: 10, dummies: 2, foes: ['fluff', 'hopper', 'shroom'], hits: 3, practical: 75 }
+  liquor: { name: '술 자격', fee: 600, questions: 6, pass: 4, seconds: 20 },
+  arbeiter: { name: '슈퍼 알바이터', fee: 800, questions: 6, pass: 4, seconds: 18 },
+  // 4단계: 토벌 자격증 — 필기(토벌 안내서를 보면 푸는 8문제 중 6개, 문제당 15초)
+  //   + 실기(허수아비 2개를 먼저, 그다음 쫓아와 공격하는 몬스터 foes 한 마리 — 75초 안에 모두 쓰러뜨리기, hits 번 맞으면 불합격) → 토벌 일감
+  hunter: { name: '토벌 자격증', fee: 300, questions: 8, pass: 6, seconds: 15, dummies: 2, foes: ['fluff'], hits: 3, practical: 75 }
 };
 
 /**

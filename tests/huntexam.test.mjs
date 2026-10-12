@@ -11,10 +11,10 @@ const right = (q) => q.choices[q.answer];
 const wrong = (q) => q.choices.filter((_, i) => i !== q.answer);
 const many = (n = 300) => Array.from({ length: n }, () => huntQuiz(L.questions)).flat();
 
-test('필기: 8문제 중 7개, 문제당 10초', () => {
+test('필기: 8문제 중 6개, 문제당 15초(너무 어렵다는 말에 조금 낮췄다)', () => {
   assert.ok(L.questions >= 8, `문제 수 ${L.questions}`);
-  assert.ok(L.pass >= L.questions - 1, `합격 ${L.pass} / ${L.questions}`);
-  assert.ok(L.seconds <= 10, `문제당 ${L.seconds}초`);
+  assert.equal(L.pass, L.questions - 2, `합격 ${L.pass} / ${L.questions}`);
+  assert.ok(L.seconds >= 15 && L.seconds <= 20, `문제당 ${L.seconds}초`);
   const qs = huntQuiz(L.questions);
   assert.equal(qs.length, L.questions);
   assert.equal(new Set(qs.map((q) => q.q)).size, qs.length, '같은 문제가 두 번 나오지 않는다');
@@ -69,13 +69,19 @@ test('필기: 따옴표로 묶은 전리품 이름 뒤 조사도 받침에 맞�
   }
 });
 
-test('실기: 허수아비 뒤에 쫓아와 공격하는 몬스터가 차례로 나오고, 세 번 맞으면 불합격', () => {
-  assert.ok(Array.isArray(L.foes) && L.foes.length >= 3, '몬스터 셋 이상');
+test('필기: 숫자를 외워야 하는 문제(기운 · 판매가)는 덜 나온다', () => {
+  const qs = many(), hard = qs.filter((q) => q.type === 'dmg' || q.type === 'price').length, easy = qs.filter((q) => q.type === 'region' || q.type === 'atk').length;
+  assert.ok(hard < easy, `숫자 문제 ${hard} · 사는 곳 · 공격 문제 ${easy}`);
+});
+
+test('실기: 허수아비 뒤에 쫓아와 공격하는 몬스터 한 마리, 세 번 맞으면 불합격', () => {
+  assert.ok(Array.isArray(L.foes) && L.foes.length === 1, '몬스터는 한 마리');
   for (const k of L.foes) {
     const M = MONSTERS[k];
     assert.ok(M && !M.boss && M.attack && M.dmg > 0 && M.speed > 0 && !M.night, `${k} 는 낮에 쫓아와 공격하는 몬스터`);
   }
   assert.ok(L.hits >= 2 && L.hits <= 3, `맞으면 불합격: ${L.hits}번`);
   assert.ok(L.practical >= 70 && L.practical <= 90, `제한 시간 ${L.practical}초(몬스터가 하나씩 나오니 넉넉히)`);
-  assert.ok(L.dummies + L.foes.length >= 5, '쓰러뜨릴 것 다섯 이상');
+  assert.ok(MONSTERS[L.foes[0]].hp <= 3 && MONSTERS[L.foes[0]].region === 'fields', '가장 쉬운 들판 몬스터');
+  assert.ok(L.dummies >= 1, '허수아비가 먼저');
 });
