@@ -65,7 +65,7 @@ import { openRaffleSpin } from './ui/rafflespin.js';
 import { raffleOf, earnTicket, drawRaffle } from './core/raffle.js';
 import {
   VILLAGERS, MEAL_PRICE, takeFromBoard, returnToBoard, villagerOf, villagerTakesJob, payVillager, villagerSpend, villagerPay,
-  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, TIRED, NAP_ENERGY, MEAL_ENERGY,
+  canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, BED_HOUR, TIRED, NAP_ENERGY, MEAL_ENERGY,
   boardOf, MAX_JOBS_PER_DAY, updateVillager
 } from './core/villagers.js';
 import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, killPoints, PARTY_HEARTS } from './core/hunters.js';
@@ -116,7 +116,7 @@ import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName, placeItem } from './core/ground.js';
 import { pantryOf, addToPantry, takeFromPantry, snackOf, shareOf, sellPantry, thanksOf, hatedOf, SNACK_ENERGY } from './core/pantry.js';
-import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest } from './core/quests.js';
+import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest, ACTS } from './core/quests.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -1307,7 +1307,11 @@ function boot() {
     const pick = (k) => {
       if (k.startsWith('qoffer:')) offerQuest(n, k.slice(7));
       else if (k.startsWith('qreport:')) reportQuest(n, k.slice(8));
-      else if (k.startsWith('qwith:')) sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].go : '좋아!'], () => { endTalk(); startBuddy(n); });
+      else if (k.startsWith('qwith:')) {
+        // 잘 시간이 다 됐으면 내일 같이 하자고 한다(하다 말고 자러 가지 않게)
+        if (hourOf(state.clock) >= BED_HOUR - 1 || isSleepHour(hourOf(state.clock))) sayAs(n, [BUDDY_LATE[n.kind] || '오늘은 늦었으니까 내일 같이 하자~'], endTalk);
+        else sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].go : '좋아!'], () => { endTalk(); startBuddy(n); });
+      }
       else if (k === 'qstop') sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].stop : '그래, 다음에 또!'], () => { endTalk(); endBuddy(n.kind); });
       else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`「${QUESTS[id].title}」`, goalLine(id), n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
@@ -2700,9 +2704,14 @@ function boot() {
         continue;
       }
       tireNpc(kind, 0.3); // 돌아다니기만 해도 조금씩
-      if (buddies.has(kind)) { // 일상 부탁으로 같이 다니는 중: 밤이 되거나 지치면 인사하고 집으로(부탁은 그대로, 다음에 또 같이)
+      if (buddies.has(kind)) { // 일상 부탁으로 같이 다니는 중: 잘 시간 한 시간 전부터 졸리다고 알리고, 잘 시간이 되면 하던 일에 맞게 인사하고 집으로(부탁은 그대로, 내일 이어서)
         const sleepy = isSleepHour(hour);
-        if (sleepy || villagerOf(state, kind, day).energy < TIRED) { endBuddy(kind, BUDDY_SAY[kind] ? BUDDY_SAY[kind].stop : null); npcGoHome(n, sleepy ? 'sleep' : 'nap', true); }
+        if (!sleepy && hour >= BED_HOUR - 1 && !buddyYawned.has(kind)) { buddyYawned.add(kind); npcs.say(n, BUDDY_YAWN[kind] || '하아암… 졸려~'); npcs.emote(n, 'stretch', 1.4); }
+        if (sleepy) {
+          endBuddy(kind, buddyBedLine(kind));
+          hud.toast(`${josa(nameOf(kind), '이/가')} 졸려서 집에 갔어요 · 부탁은 내일 이어서 해요`, 3200, { icon: faceIcon(kind) });
+          npcGoHome(n, 'sleep', true);
+        } else if (villagerOf(state, kind, day).energy < TIRED) { endBuddy(kind, BUDDY_SAY[kind] ? BUDDY_SAY[kind].stop : null); npcGoHome(n, 'nap', true); }
         continue;
       }
       if (n.party) { // 같이 토벌 중: 밤이 되거나 지치면 인사하고 집으로
@@ -3007,6 +3016,28 @@ function boot() {
     momonga: { go: '흥, 빨리 와!', stop: '흥! 다음엔 끝까지 같이 가.', ramen: '흥, 나쁘지 않네.', weed: '왜 내가 이걸… 흥!', berry: '이건 내 거!' },
     rakko: { go: '…가지.', stop: '…다음에 또.', ramen: '…훗.', weed: '…이것도 수련이다.', berry: '…달군.' }
   };
+  // 같이 다니다 잘 시간이 다가올 때(한 시간 전) 하품하며 하는 말 · 잘 시간이 되어 헤어질 때 하던 일에 맞춘 인사({act} 그 일, {act은} 그 일 + 은/는)
+  const BUDDY_YAWN = {
+    chiikawa: '…하암… 졸려… 조금만 더…', hachiware: '하아암~ 슬슬 졸리다~ 조금만 더 하자!', usagi: '(크게 하품) …우라…',
+    kurimanju: '하아~ 슬슬 졸리네~', momonga: '흥… 졸려. 빨리 끝내!', rakko: '…슬슬 잘 시간이군.'
+  };
+  const BUDDY_BED = {
+    chiikawa: '…졸려… {act}… 내일 마저 하자… (꾸벅)', hachiware: '하아암~ 오늘은 여기까지! {act은} 내일 마저 하자~',
+    usagi: '(꾸벅꾸벅…) 우라… (내일 하자는 듯 집 쪽을 가리킨다)', kurimanju: '하아~ 졸려서 안 되겠다. {act은} 내일 하자~',
+    momonga: '졸려! {act은} 내일 해! 흥!', rakko: '…잘 시간이다. {act은} 내일 마저 하지.'
+  };
+  /** 잘 시간이 다 돼서 같이 가자고 하면. */
+  const BUDDY_LATE = {
+    chiikawa: '…오늘은… 졸려… 내일 같이 하자…!', hachiware: '오늘은 벌써 늦었어~ 내일 같이 하자!', usagi: '(하품하며 집 쪽을 가리킨다) 우라…',
+    kurimanju: '하아~ 오늘은 늦었네. 내일 하자~', momonga: '지금 몇 시인 줄 알아? 내일 해! 흥!', rakko: '…오늘은 늦었다. 내일 하지.'
+  };
+  const buddyYawned = new Set(); // 이번에 같이 다니면서 졸리다고 이미 말한 친구
+  /** 그 친구와 같이 하던 부탁의 일(라멘 먹기 · 풀 뽑기 · 열매 따기 · 산책)에 맞춘 잘 자 인사. */
+  function buddyBedLine(kind) {
+    const id = activeQuests(state).find((q) => { const st = stepOf(state, q); return isBuddyStep(st) && reportTo(q, st) === kind; });
+    const st = id && stepOf(state, id), act = st ? (st.type === 'together' ? ACTS[st.act] : '산책') : '같이 하던 거';
+    return (BUDDY_BED[kind] || '{act은} 내일 마저 하자~').replace('{act은}', josa(act, '은/는')).replace('{act}', act);
+  }
   /** 친구가 나를 따라나선다(하던 일정은 그만두고). */
   function startBuddy(n) {
     if (!n || n.away || buddies.has(n.kind)) return;
@@ -3019,6 +3050,7 @@ function boot() {
   /** 같이 다니기를 그만둔다(say 가 있으면 한마디). */
   function endBuddy(kind, say = null) {
     if (!buddies.delete(kind)) return;
+    buddyYawned.delete(kind);
     const n = npcs.byKind(kind);
     if (n) { npcs.setFollow(kind, false); if (say) npcs.say(n, say); restHere(kind, 10 + Math.random() * 20); }
     syncParty();

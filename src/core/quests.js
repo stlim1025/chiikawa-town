@@ -6,7 +6,7 @@ import { ACCESSORY_ITEMS, wardrobeOf } from './wardrobe.js';
 import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
 import { WEED_KINDS, josa } from './weeding.js';
 import { hourOf } from './clock.js';
-import { VILLAGERS, villagerOf } from './villagers.js';
+import { VILLAGERS, villagerOf, BED_HOUR } from './villagers.js';
 
 /**
  * 퀘스트(5단계): 친구마다 고충(부탁)과 마을 이야기. 친구 머리 위에 ! 가 뜨면 부탁이 있다는 뜻이고,
@@ -387,12 +387,16 @@ function dayRoll(day, id) {
   h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
   return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
 }
+/** 같이 다니는 부탁(같이 하기 · 같이 가기)은 잘 시간(BED_HOUR) 이만큼 전부터는 새로 하지 않는다(하다 말고 자러 가지 않게). */
+export const BUDDY_WISH_GAP = 2;
+const buddyQuest = (id) => QUESTS[id].steps.some((st) => st.type === 'together' || (st.type === 'visit' && st.with));
 /** 그 친구가 지금 그 일상 부탁을 할 형편인지: 시간대 · 형편(배고픔 · 돈 · 기운) · 그날 마음(chance). */
 export function wishNow(state, id) {
   const Q = QUESTS[id], W = Q.wish;
   if (!W) return true;
   const day = state.clock.day, hour = hourOf(state.clock);
-  if (hour < W.hours[0] || hour >= W.hours[1] || dayRoll(day, id) >= W.chance) return false;
+  const end = buddyQuest(id) ? Math.min(W.hours[1], BED_HOUR - BUDDY_WISH_GAP) : W.hours[1];
+  if (hour < W.hours[0] || hour >= end || dayRoll(day, id) >= W.chance) return false;
   const v = VILLAGERS[Q.giver] ? villagerOf(state, Q.giver, day) : null;
   if (W.need === 'hungry') return !!v && v.energy < 55;
   if (W.need === 'tired') return !!v && v.energy < 45;

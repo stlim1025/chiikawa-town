@@ -7,6 +7,7 @@ const S = await import(G + 'save.js');
 const St = await import(G + 'state.js');
 const F = await import(G + 'friends.js');
 const C = await import(G + 'combat.js');
+const V = await import(G + 'villagers.js');
 const L = await import(G + 'licenses.js');
 
 const fresh = () => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', money: 1000, player: { x: 0, z: 0 } });
@@ -170,4 +171,15 @@ test('예전 저장(버전 3)의 이야기 퀘스트는 단계 번호를 한 칸
   assert.ok(S.isValidState(done));
   // 지금 버전은 그대로
   assert.equal(S.deserialize(S.serialize({ ...fresh(), quests: { story: { step: 0, base: 0 } } })).state.quests.story.step, 0);
+});
+
+test('같이 다니는 일상 부탁(같이 하기 · 같이 가기)은 잘 시간 두 시간 전부터 새로 뜨지 않는다', () => {
+  const { BED_HOUR } = V;
+  const buddy = Q.QUEST_ORDER.filter((id) => Q.QUESTS[id].daily && Q.QUESTS[id].steps.some((st) => st.type === 'together' || (st.type === 'visit' && st.with)));
+  assert.ok(buddy.includes('ramenDate') && buddy.includes('weedPal'));
+  const late = BED_HOUR - Q.BUDDY_WISH_GAP + 0.25;
+  for (const id of buddy) for (let day = 1; day <= 30; day++) {
+    const s = { ...fresh(), clock: { day, t: (late - 6) / 24 } };
+    assert.equal(Q.wishNow(s, id), false, `${id} ${day}일 ${late}시`);
+  }
 });
