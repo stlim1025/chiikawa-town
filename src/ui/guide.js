@@ -190,6 +190,13 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
       goal.classList.toggle('incoming', !!t && hold);
     },
     /** 할 일 쪽지 칸(hud.announce 의 target). */
-    goalEl: goal
+    goalEl: goal,
+    /** 끝까지 읽지 않고 상자를 닫는다(onDone 은 부르지 않는다). 입장 연출 건너뛰기용. */
+    close() {
+      done = null;
+      pickFn = null;
+      choosing = false;
+      box.hidden = true;
+    }
   };
 }

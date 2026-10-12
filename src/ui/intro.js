@@ -6,16 +6,15 @@ const GREETERS = [
   ['hachiware', 1.3, -1.8, '어? 그 전단지! 새로 이사 오는 친구구나!', '다시 왔구나~ 반가워!'],
   ['usagi', 0.1, -3.1, '우라!', '야하!']
 ];
-/** 처음 왔을 때: 마을 밖 숲길 끝에서 주민 모집 전단지를 다시 펼쳐 보는 혼잣말(누르거나 FLYER_LINE_SEC 초가 지나면 다음 줄). */
+/** 처음 왔을 때: 마을 밖 숲길 끝에서 주민 모집 전단지를 다시 펼쳐 보는 혼잣말. 친구와 말할 때처럼 아래 대화 상자에 내 이름으로, 눌러야 다음 줄. */
 const FLYER_LINES = [
   '(숲길 끝에서 꼬깃꼬깃한 전단지를 다시 펼쳐 본다…)',
   '빈집 있음, 일감 많음, 친구도 많음… 여기가 맞겠지?',
   '(저 앞에 알록달록한 마을 입구가 보인다!)',
   '좋아… 새로운 마을에서 힘내 보자!'
 ];
-/** 마지막 혼잣말(다짐)에서는 두 팔을 번쩍 들고, 전단지를 접어 넣고 힘차게 걸어 들어간다. */
+/** 마지막 혼잣말(다짐)에서는 두 팔을 번쩍 들고, 다 읽으면 전단지를 접어 넣고 힘차게 걸어 들어간다. */
 const CHEER_LINE = FLYER_LINES.length - 1;
-const FLYER_LINE_SEC = 3.2;
 
 const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
 
@@ -23,7 +22,7 @@ const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3
  * 마을 입장 연출: (처음이면) 마을 밖에서 주민 모집 전단지를 펼쳐 보고 → 걸어 들어와 입구를 지나면 도장이 찍히고, 친구들이 마중 나온다.
  * start(onDone, fresh) 으로 시작, 매 프레임 update(dt). 건너뛰기 버튼이 있다.
  */
-export function createIntro(ui, { player, cam, npcs, village, sound }) {
+export function createIntro(ui, { player, cam, npcs, village, sound, guide, me }) {
   const E = village.entrance;
   // 마을 이름 리본: 리본이 펼쳐지고 이름이 떠오른 뒤 '어서 와요!' 딱지가 톡 붙는다
   const stamp = document.createElement('div');
@@ -50,9 +49,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
       </ul>
       <p class="flyer-note">경험 없어도 OK! 몸만 오세요~</p>
       <div class="flyer-tabs" aria-hidden="true"><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab torn">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span></div>
-    </div>
-    <p class="flyer-say" aria-live="polite"></p>`;
-  const sayEl = flyer.querySelector('.flyer-say');
+    </div>`;
   const skip = document.createElement('button');
   skip.type = 'button';
   skip.className = 'btn skip-btn';
@@ -64,37 +61,29 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
   const wide = { pos: new THREE.Vector3(5.5, 6.5, E.outside.z + 8), look: new THREE.Vector3(0, 1.4, E.gateZ) };
   const pos = new THREE.Vector3(), look = new THREE.Vector3();
   let t = 0, greetT = 0, active = false, stamped = false, greeted = false, done = null, first = true;
-  let phase = 'walk', line = 0, lineT = 0; // phase: 'flyer' 전단지 보는 중 · 'walk' 걸어 들어가는 중
+  let phase = 'walk'; // phase: 'flyer' 전단지 보는 중 · 'walk' 걸어 들어가는 중
 
-  function showLine() {
-    sayEl.textContent = FLYER_LINES[line];
-    sayEl.classList.toggle('cheer', line === CHEER_LINE);
-    if (line === CHEER_LINE) player.cheerTime = 1.6; // 다짐: 두 팔을 번쩍
-    lineT = 0;
+  /** 전단지 혼잣말: 다짐 앞까지 읽으면 두 팔을 번쩍 들며 마지막 줄, 그것까지 읽으면 전단지를 접고 걸어 들어간다. */
+  function readFlyer() {
+    guide.say(FLYER_LINES.slice(0, CHEER_LINE), () => {
+      if (!active || phase !== 'flyer') return;
+      player.cheerTime = 1.6;
+      guide.say([FLYER_LINES[CHEER_LINE]], walkIn, me());
+    }, me());
   }
-  /** 전단지 다음 줄(마지막 줄 뒤에는 전단지를 접고 걸어 들어간다). */
-  function nextLine() {
-    if (phase !== 'flyer') return;
-    line++;
-    if (line < FLYER_LINES.length) { showLine(); sound?.play('click'); return; }
+  function walkIn() {
+    if (!active || phase !== 'flyer') return;
     flyer.classList.add('leave');
     setTimeout(() => { flyer.hidden = true; flyer.classList.remove('leave'); }, 380);
     phase = 'walk';
     t = 0;
     player.walkTo = { x: E.inside.x, z: E.inside.z, speed: 2.6 };
   }
-  flyer.addEventListener('click', nextLine);
-  const onKey = (e) => {
-    if (!active || phase !== 'flyer' || !['Space', 'Enter', 'NumpadEnter'].includes(e.code)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.repeat) nextLine();
-  };
-  window.addEventListener('keydown', onKey, true);
 
   function finish() {
     if (!active) return;
     active = false;
+    if (phase === 'flyer') guide.close(); // 혼잣말 도중에 건너뛰면 대화 상자도 닫는다
     phase = 'walk';
     player.walkTo = null;
     player.placeAt(E.inside.x, E.inside.z);
@@ -117,7 +106,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
       stamp.querySelector('.vt-kicker').textContent = fresh ? '어서 와요!' : '또 왔어요!';
       player.placeAt(E.outside.x, E.outside.z);
       player.face(E.outside.x, E.outside.z - 1);
-      if (fresh) { phase = 'flyer'; line = 0; showLine(); flyer.hidden = false; player.walkTo = null; }
+      if (fresh) { phase = 'flyer'; flyer.hidden = false; player.walkTo = null; readFlyer(); }
       else { phase = 'walk'; player.walkTo = { x: E.inside.x, z: E.inside.z, speed: 2.6 }; }
       // 마중 친구들은 처음부터 입구(들어오는 내 캐릭터) 쪽을 보고 기다린다
       GREETERS.forEach(([kind, dx, dz]) => {
@@ -133,8 +122,6 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
       if (phase === 'flyer') {
         cam.set(wide.pos, wide.look);
         GREETERS.forEach(([kind]) => { const n = npcs.byKind(kind); if (n) n.timer = Math.max(n.timer, 2); });
-        lineT += dt;
-        if (lineT > FLYER_LINE_SEC) nextLine();
         return;
       }
       t += dt;

@@ -590,10 +590,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @media (max-height: 420px) { .village-title { top: 30%; } .vt-name { font-size: 40px; } .vt-kicker { font-size: 21px; } }
 @media (max-width: 520px) { .vt-name { font-size: 38px; gap: 8px; } .vt-ribbon { padding: 10px 30px 12px; } }
 .skip-btn { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
-/* 처음 마을에 올 때: 주민 모집 전단지(가운데) + 혼잣말(아래). 누르면 다음 줄, 다 보면 위로 날아가고 걸어 들어간다.
+/* 처음 마을에 올 때: 주민 모집 전단지(가운데). 혼잣말은 친구와 말할 때처럼 아래 대화 상자(.guide)에 나오니 전단지는 그 위에 띄우고,
+   누르는 건 대화 상자가 받는다(전단지는 클릭을 흘려보낸다). 다 읽으면 위로 날아가고 걸어 들어간다.
    진짜 전단지처럼: 네 번 접었던 자국 · 누렇게 바랜 가장자리 · 압정 둘 · 빨간 큰 제목 · 별 딱지 · 마을 그림 · 아래 뜯어 가는 연락처 쪽지(한 장은 뜯겨 나갔다) */
-.intro-flyer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px; z-index: 5; cursor: pointer;
+.intro-flyer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px 16px 150px; z-index: 4; pointer-events: none;
   animation: fly-in 0.55s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+@media (orientation: portrait) and (max-width: 640px) { .intro-flyer { padding-bottom: 250px; } } /* 세로 휴대폰은 대화 상자가 조이스틱 위로 올라가 있다 */
 .intro-flyer[hidden] { display: none; }
 .intro-flyer.leave { animation: fly-out 0.38s ease-in forwards; }
 .flyer-paper { position: relative; width: min(340px, 86vw); padding: 22px 20px 0; color: #4a3424; text-align: center; rotate: -2.5deg;
@@ -622,15 +624,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .flyer-tab { flex: 1; padding: 6px 0 10px; border-left: 1px dashed #cbb48c; font-size: 10px; line-height: 1.25; color: #6b4a2e; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: -1px; }
 .flyer-tab:first-child { border-left: 0; }
 .flyer-tab.torn { visibility: hidden; }
-.flyer-say { max-width: min(560px, 92vw); margin: 0; padding: 10px 22px 12px; border-radius: 18px; background: var(--dots), var(--paper); box-shadow: 0 4px 0 var(--shadow);
-  color: #5a3d22; font-size: 21px; text-align: center; }
-/* 마지막 혼잣말(다짐 '새로운 마을에서 힘내 보자!'): 분홍 말풍선이 톡 튄다 */
-.flyer-say.cheer { background: var(--dots), #ffe3ea; color: #8a3b52; font-size: 23px; animation: say-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
-@keyframes say-pop { from { transform: scale(0.8); } to { transform: none; } }
 @keyframes fly-in { from { opacity: 0; transform: translateY(30px) scale(0.92); } to { opacity: 1; transform: none; } }
 @keyframes fly-out { to { opacity: 0; transform: translateY(-24px) scale(0.95); } }
-@media (max-height: 640px) { .intro-flyer { gap: 8px; } .flyer-paper { padding-top: 16px; } .flyer-title { font-size: 34px; } .flyer-art { max-height: 60px; } .flyer-burst { width: 50px; height: 50px; font-size: 13px; }
-  .flyer-list li { font-size: 15px; } .flyer-list li small { font-size: 11px; } .flyer-note { margin: 4px 0 6px; font-size: 13px; } .flyer-tab { font-size: 9px; padding: 4px 0 6px; } .flyer-say { font-size: 17px; } }
+@media (max-height: 640px) { .intro-flyer { gap: 8px; padding-bottom: 110px; } .flyer-paper { padding-top: 16px; } .flyer-title { font-size: 34px; } .flyer-art { max-height: 60px; } .flyer-burst { width: 50px; height: 50px; font-size: 13px; }
+  .flyer-list li { font-size: 15px; } .flyer-list li small { font-size: 11px; } .flyer-note { margin: 4px 0 6px; font-size: 13px; } .flyer-tab { font-size: 9px; padding: 4px 0 6px; } }
 @media (prefers-reduced-motion: reduce) { .intro-flyer, .intro-flyer.leave { animation: none; } }
 
 /* ---------- 스티커 작업대: 컨베이어 위로 과일이 지나가고 가운데 틀에서 붙인다 ---------- */

@@ -4136,7 +4136,7 @@ function boot() {
     const chibi = buildChibi(myLook());
     if (!player) {
       player = createPlayer(scene, chibi, village);
-      intro = createIntro(ui, { player, cam, npcs, village, sound });
+      intro = createIntro(ui, { player, cam, npcs, village, sound, guide, me: () => meWho() });
     } else player.setModel(chibi);
     // 이어하기: 입장 연출 없이 지난번에 있던 자리에서 바로 시작한다(처음 만든 캐릭터만 마을 입구로 걸어 들어온다)
     if (!fresh) {
