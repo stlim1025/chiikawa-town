@@ -882,7 +882,7 @@ function boot() {
       sound.play('clean');
       player.face(bush.x, bush.z);
       hud.bagBump();
-      hud.toast('빨간 열매 +1', 1600, { icon: itemSvg('berry'), chips: [{ text: `가방에 ${countOf(state, 'berry')}개` }] });
+      hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: `+빨간 열매 (가방에 ${countOf(state, 'berry')}개)`, kind: 'drop' });
       return;
     }
     const before = state.job;
@@ -892,7 +892,7 @@ function boot() {
     sound.play('clean');
     player.face(bush.x, bush.z);
     player.cheerTime = 0.6;
-    if (!isComplete(state.job)) hud.toast(`${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1300, { icon: itemSvg('berry') });
+    if (!isComplete(state.job)) hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: `빨간 열매 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'tip' });
     celebrateIfDone(before, state.job);
   }
 
@@ -929,8 +929,10 @@ function boot() {
     hud.hideMeter();
   }
 
-  function endPull() {
+  /** tooLong: 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었다(그대로 끊어진다). */
+  function endPull(tooLong = false) {
     const { weed, pull } = pulling;
+    const pop = (text, kind) => hud.floatText({ x: weed.x, y: 1.15, z: weed.z, text, kind }); // 결과는 위 알림 줄 대신 풀 위에서 톡
     pulling = null;
     sound.chargeStop();
     player.busy = false;
@@ -941,16 +943,17 @@ function boot() {
     delete weed.busy;
     const step = releasePull(pull), W = WEED_KINDS[weed.kind];
     sound.play(step === 'clean' ? 'clean' : step === 'snapped' ? 'snap' : 'none');
-    if (step === 'none') { hud.toast('조금 더 꾹 눌러요'); return; }
+    if (step === 'none') { pop('조금 더 꾹~', 'tip'); return; }
 
     let next = useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
-    if (W.poison && step === 'snapped') hud.toast('윽, 독이 튀었다!', 2000, { icon: itemSvg(weed.kind) });
+    if (W.poison && step === 'snapped') pop('윽, 독이 튀었다!', 'snap');
+    else if (tooLong) pop('너무 오래 당겼다…', 'snap');
     // 여러 번에 나눠 뽑는 풀: 아직 남았으면 조금 올라온 채로 두고 다시 누르게
     const prog = advanceWeed({ stage: weed.stage, flawed: weed.flawed }, weed.kind, step);
     if (!prog.done) {
       weed.flawed = prog.flawed;
       weeds.loosen(weed, prog.stage);
-      if (!(W.poison && step === 'snapped')) hud.toast('한 번 더!', 1400, { icon: itemSvg(weed.kind), chips: [{ text: `${prog.stage} / ${W.stages || 1}` }] });
+      if (!(W.poison && step === 'snapped') && !tooLong) pop(`한 번 더! ${prog.stage} / ${W.stages || 1}`, 'tip');
       state = next;
       save();
       return;
@@ -971,7 +974,7 @@ function boot() {
     }
     weeds.remove(weed, result);
     if (first && weed.kind !== 'weed') hud.banner('새 풀!', W.name, 2400);
-    else if (!(W.poison && step === 'snapped')) hud.toast(result === 'clean' ? '깔끔하게!' : '끊어졌다…', 1200, { icon: itemSvg(weed.kind) });
+    else if (!(W.poison && step === 'snapped') && !tooLong) pop(result === 'clean' ? '깔끔!' : '끊어졌다…', result === 'clean' ? 'clean' : 'snap');
 
     if (next.exam && examCounts(next.exam, weed.kind)) {
       const exam = examStep(next.exam, result);
@@ -1951,7 +1954,7 @@ function boot() {
     if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: `+${DROPS[drop].name}`, kind: 'drop' }); hud.bagBump(); }
     else if (drop) hud.toast('가방이 꽉 찼어요');
     if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌!`, 2600, { icon: monsterSvg(m.species) });
-    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.toast(`${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, 1300, { icon: monsterSvg(m.species) });
+    else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.floatText({ x: m.x, y: m.mesh.height + 0.85, z: m.z, text: `${m.M.name} ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'tip' });
     celebrateIfDone(before, state.job);
     rankNews();
     // 이야기 속 왕버섯을 쓰러뜨렸다
@@ -4498,7 +4501,7 @@ function boot() {
         weeds.tug(pulling.weed, pulling.pull.power);
         hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
         // 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었으면 그대로 끊어진다(실패)
-        if (pulling.pull.over) { hud.toast('너무 오래 당겼어요!', 1800); endPull(); }
+        if (pulling.pull.over) endPull(true);
       }
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
         : pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting ? null : findTarget();

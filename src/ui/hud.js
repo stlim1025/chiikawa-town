@@ -462,12 +462,15 @@ export function createHud(ui, input) {
     hurt() { hurtFx.classList.remove('on'); void hurtFx.offsetWidth; hurtFx.classList.add('on'); },
     /** 화면을 어둡게 덮는다(기절). on=false 면 걷는다. */
     curtain(on, text = '') { curtain.textContent = text; curtain.classList.toggle('on', !!on); },
-    /** 월드 위치에서 떠오르는 글씨(맞힌 힘, 얻은 전리품). kind: 'dmg' | 'drop' | 'hurt' */
+    /**
+     * 월드 위치에서 떠오르는 글씨(맞힌 힘, 얻은 전리품, 풀 뽑기 · 열매 따기 결과). 위 알림 줄 대신 그 자리에서 톡 튄다.
+     * kind: 'dmg' | 'drop' | 'hurt' | 'note' | 'clean' 깔끔하게(반짝이며 통통) | 'snap' 끊어짐(흔들리며 가라앉음) | 'tip' 진행 · 요령(작은 말풍선)
+     */
     floatText({ x, y, z, text, kind = 'dmg' }) {
       const e = el('div', 'float-fx ' + kind);
       e.textContent = text;
       mount(e);
-      fx.push({ x, y, z, el: e, until: performance.now() + (kind === 'drop' ? 1300 : kind === 'note' ? 1400 : 900) });
+      fx.push({ x, y, z, el: e, until: performance.now() + ({ drop: 1300, note: 1400, clean: 1200, snap: 1100, tip: 1300 }[kind] || 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     /**
