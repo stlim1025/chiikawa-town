@@ -465,12 +465,16 @@ export function createHud(ui, input) {
     /**
      * 월드 위치에서 떠오르는 글씨(맞힌 힘, 얻은 전리품, 풀 뽑기 · 열매 따기 결과). 위 알림 줄 대신 그 자리에서 톡 튄다.
      * kind: 'dmg' | 'drop' | 'hurt' | 'note' | 'clean' 깔끔하게(반짝이며 통통) | 'snap' 끊어짐(흔들리며 가라앉음) | 'tip' 진행 · 요령(작은 말풍선)
+     *   | 'pick' 딴 것(그림 + 숫자가 반짝이며 통통, 열매 따기). icon: 글 앞에 붙일 그림(SVG 문자열)
      */
-    floatText({ x, y, z, text, kind = 'dmg' }) {
+    floatText({ x, y, z, text, kind = 'dmg', icon = null }) {
       const e = el('div', 'float-fx ' + kind);
-      e.textContent = text;
+      if (icon) { const i = el('span', 'fx-ico'); i.innerHTML = icon; e.appendChild(i); }
+      const t = el('span', 'fx-txt');
+      t.textContent = text;
+      e.appendChild(t);
       mount(e);
-      fx.push({ x, y, z, el: e, until: performance.now() + ({ drop: 1300, note: 1400, clean: 1200, snap: 1100, tip: 1300 }[kind] || 900) });
+      fx.push({ x, y, z, el: e, until: performance.now() + ({ drop: 1300, note: 1400, clean: 1200, snap: 1100, tip: 1300, pick: 1200 }[kind] || 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     /**

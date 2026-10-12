@@ -882,7 +882,7 @@ function boot() {
       sound.play('clean');
       player.face(bush.x, bush.z);
       hud.bagBump();
-      hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: `+빨간 열매 (가방에 ${countOf(state, 'berry')}개)`, kind: 'drop' });
+      hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: '+1', kind: 'pick', icon: itemSvg('berry') }); // 가방 개수는 가방이 톡 튀는 것으로
       return;
     }
     const before = state.job;
@@ -892,7 +892,7 @@ function boot() {
     sound.play('clean');
     player.face(bush.x, bush.z);
     player.cheerTime = 0.6;
-    if (!isComplete(state.job)) hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: `빨간 열매 ${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'tip' });
+    if (!isComplete(state.job)) hud.floatText({ x: bush.x, y: 1.2, z: bush.z, text: `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'pick', icon: itemSvg('berry') });
     celebrateIfDone(before, state.job);
   }
 
