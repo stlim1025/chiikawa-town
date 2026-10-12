@@ -469,6 +469,15 @@ export function createPanels(ui, handlers) {
     exam(s) {
       const lic = s.license, mult = PAY_MULT[lic.grade];
       const out = [head('검정소', s.money)];
+      // 토벌 안내서 칸. 대장 갑옷 씨가 "안내서부터 읽어라" 한 단계(이야기 첫 단계)에서는 맨 위로 올려 반짝이는 테두리 · '여기!' 딱지로 눈에 띄게
+      const sq = questState(s, 'story'), sp = sq && !sq.done && QUESTS.story.steps[sq.step].type === 'study' ? progressOf(s, 'story') : null;
+      const readNow = !!sp && sp.have < sp.need;
+      const guideRow = h('div', { class: `row lic guide-row${readNow ? ' hl' : ''}` },
+        readNow ? h('b', { class: 'hl-tag' }, '여기!') : null,
+        h('div', { class: 'lic-top' }, svgSpan('lic-ico', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 10q8-3 15 1q7-4 15-1v21q-8-3-15 1q-7-4-15-1z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2" stroke-linejoin="round"/><path d="M20 11v21" stroke="#c98a5a" stroke-width="2"/><circle cx="12.5" cy="19" r="4" fill="#8fd16a"/><path d="M10.5 18.5h1M14 18.5h1" stroke="#335" stroke-width="1.4" stroke-linecap="round"/><path d="M23 17h8M23 21h8M23 25h5" stroke="#c9a77c" stroke-width="2" stroke-linecap="round"/></svg>'),
+          h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, readNow ? '대장 갑옷 씨가 읽어 보래요' : '몬스터 도감과 규칙')),
+          h('button', { class: readNow ? 'btn primary' : 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기')));
+      if (readNow) out.push(guideRow);
       // 자격 한 장: 위 줄에 이름 · 상태(버튼), 아래에 아이콘 한 줄씩
       const card = (art, title, side, lines) => h('div', { class: 'row lic' },
         h('div', { class: 'lic-top' }, svgSpan('lic-ico', art), h('div', { class: 't' }, title), side),
@@ -506,10 +515,7 @@ export function createPanels(ui, handlers) {
             me ? chipLine(chip('star', me.ranker ? 'ranker-chip' : '', me.ranker ? `랭커 ${me.rank}위` : `${me.rank}위`), chip(null, '', `${me.points}점`))
               : chipLine(chip('star', '', `상위 ${RANKER_TOP}명`))),
           h('button', { class: 'btn', type: 'button', onClick: () => show('ranking') }, '보기'))));
-      out.push(h('div', { class: 'row lic guide-row' },
-        h('div', { class: 'lic-top' }, svgSpan('lic-ico', '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 10q8-3 15 1q7-4 15-1v21q-8-3-15 1q-7-4-15-1z" fill="#fff6dc" stroke="#c98a5a" stroke-width="2" stroke-linejoin="round"/><path d="M20 11v21" stroke="#c98a5a" stroke-width="2"/><circle cx="12.5" cy="19" r="4" fill="#8fd16a"/><path d="M10.5 18.5h1M14 18.5h1" stroke="#335" stroke-width="1.4" stroke-linecap="round"/><path d="M23 17h8M23 21h8M23 25h5" stroke="#c9a77c" stroke-width="2" stroke-linecap="round"/></svg>'),
-          h('div', {}, h('div', { class: 't' }, '토벌 안내서'), h('div', { class: 'd' }, '몬스터 도감과 규칙')),
-          h('button', { class: 'btn', type: 'button', onClick: () => show('guidebook') }, '읽기'))));
+      if (!readNow) out.push(guideRow);
       out.push(h('div', { class: 'actions' }, closeBtn()));
       return out;
     },

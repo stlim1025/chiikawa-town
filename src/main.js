@@ -1608,6 +1608,23 @@ function boot() {
     if (reward.gifts.length) setTimeout(() => hud.toast('선물을 받았어요!', 3000, { chips: reward.gifts.map((g) => ({ text: FURNITURE[g].name })) }), 4400);
     refreshLook();
   }
+  /**
+   * 토벌 안내서 읽기(이야기 첫 단계): 다 읽고 창을 닫으면 검정소 앞 대장 갑옷 씨가 그 자리에서 받아 주고, '이야기가 이어져요' 카드로
+   * 다음 할 일(토벌 자격증)이 갱신된다. 대장이 근처에 없으면(수련장에 갔거나) '다 읽었어요!' 카드만 띄우고 말을 걸면 이어진다.
+   */
+  let studyShown = null; // '다 읽었어요!' 카드를 띄운 단계(같은 단계에 두 번 띄우지 않는다)
+  function studyReport() {
+    const st = stepOf(state, 'story');
+    if (!st || st.type !== 'study' || !stepReady(state, 'story')) return;
+    const n = npcs.byKind('captain'), p = player.position;
+    if (n && !n.away && Math.hypot(n.x - p.x, n.z - p.z) < 9) { beginTalk(n); finishQuestStep('story', n, st.say); return; }
+    const key = 'story:' + state.quests.story.step;
+    if (studyShown === key) return;
+    studyShown = key;
+    sound.play('ready');
+    player.cheerTime = 1.2;
+    hud.announce({ kicker: '다 읽었어요!', title: QUESTS.story.title, sub: '대장 갑옷 씨에게 알려요', to: 'quest', id: 'story' });
+  }
   /** 퀘스트에 나오는 곳의 월드 자리. */
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
@@ -1672,6 +1689,7 @@ function boot() {
       }
     }
     if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
+    if (free && !talking) studyReport();
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
     if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
