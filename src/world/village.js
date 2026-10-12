@@ -321,24 +321,34 @@ export function buildVillage(scene) {
     obstacles.push({ x, z, r: 0.66, soft: true });
     solid(g, g.children, true);
   }
-  /** 간판 글씨(캔버스 그림): 흰 바탕에 굵은 갈색 손글씨, 나뭇결 같은 짧은 선 몇 개. 글꼴이 늦게 오면 다시 그린다. */
-  function signTexture(text) {
+  /**
+   * 간판 글씨(캔버스 그림): 흰 바탕에 굵은 갈색 손글씨, 나뭇결 같은 짧은 선 몇 개. 글꼴이 늦게 오면 다시 그린다.
+   * w: 그림 폭(높이 140 기준 간판 가로세로 비율에 맞춘다), size: 글씨 크기, spaced: 글자 사이를 한 칸씩 띄운다(짧은 간판). 글이 길면 폭에 맞게 글씨를 줄인다.
+   */
+  function signTexture(text, { w = 512, size = 104, spaced: spread = true } = {}) {
     const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 140;
+    canvas.width = w; canvas.height = 140;
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     const draw = () => {
       const c = canvas.getContext('2d');
       c.fillStyle = '#fbfaf5';
-      c.fillRect(0, 0, 512, 140);
+      c.fillRect(0, 0, w, 140);
       c.strokeStyle = 'rgba(90, 68, 49, 0.45)';
       c.lineWidth = 3;
-      [[40, 22], [62, 30], [455, 18], [470, 28], [70, 108], [440, 104], [452, 112]].forEach(([lx, ly]) => { c.beginPath(); c.moveTo(lx, ly); c.lineTo(lx, ly + 14); c.stroke(); });
+      [[40, 22], [62, 30], [455, 18], [470, 28], [70, 108], [440, 104], [452, 112]].forEach(([lx, ly]) => {
+        const px = lx < 256 ? lx : w - (512 - lx); // 오른쪽 선은 오른쪽 끝에 붙인다
+        c.beginPath(); c.moveTo(px, ly); c.lineTo(px, ly + 14); c.stroke();
+      });
       c.fillStyle = '#6e3a2e';
-      c.font = 'bold 104px Gaegu, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+      const font = (px) => `bold ${px}px Gaegu, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`, line = spread ? text.split('').join(' ') : text;
+      c.font = font(size);
+      const tw = c.measureText(line).width;
+      if (tw > w - 70) c.font = font(Math.floor((size * (w - 70)) / tw));
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillText(text.split('').join(' '), 256, 76);
+      if (!spread) { c.strokeStyle = '#6e3a2e'; c.lineWidth = 4; c.lineJoin = 'round'; c.strokeText(line, w / 2, 76); } // 긴 간판은 멀리서도 읽히게 한 겹 더 굵게
+      c.fillText(line, w / 2, 76);
       tex.needsUpdate = true;
     };
     draw();
@@ -557,8 +567,8 @@ export function buildVillage(scene) {
   // ---------- 마을 문 넷: 나무 기둥 둘 · 간판 · 문 앞 화분 ----------
   // 문은 재질을 따로 두어, 바로 뒤를 지나는 내 캐릭터를 가리지 않게 반투명하게 만든다
   const gates = [];
-  /** (gx, gz) 에 나무 문을 세운다. yaw 는 돌린 각(남북 문 0, 동서 문 π/2), title 은 간판 글. */
-  function gate(gx, gz, yaw, title) {
+  /** (gx, gz) 에 나무 문을 세운다. yaw 는 돌린 각(남북 문 0, 동서 문 π/2), title 은 간판 글. painted 면 간판 판에도 글을 그린다(앞뒤 양쪽). */
+  function gate(gx, gz, yaw, title, painted = false) {
     const g = new THREE.Group(), wood = '#c49a6c';
     g.position.set(gx, 0, gz);
     g.rotation.y = yaw;
@@ -578,11 +588,23 @@ export function buildVillage(scene) {
     });
     gatePart(GEO.box, '#f5ead2', { position: [0, 2.05, 0], scale: [3.0, 0.48, 0.12], shell: true });
     gatePart(ROOF, '#f4a091', { position: [0, 2.3, 0], scale: [3.5, 0.36, 0.5], shell: true });
+    if (painted) {
+      // 글씨 판: 마을 밖에서 들어올 때(앞)도, 마을 안에서 나갈 때(뒤)도 읽히게 앞뒤에 한 장씩. 문이 반투명해지면 같이 흐려진다(gt.mats)
+      const mat = new THREE.MeshBasicMaterial({ map: signTexture(title, { w: 1024, size: 128, spaced: false }) });
+      [1, -1].forEach((sd) => {
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.84, 0.39), mat);
+        sign.position.set(0, 2.05, sd * 0.065);
+        sign.rotation.y = sd > 0 ? 0 : Math.PI;
+        g.add(sign);
+      });
+      signs.push(mat);
+      gt.mats.push(mat);
+    }
     world.add(g);
     labels.push({ x: gx, y: 3.1, z: gz, text: title });
     gates.push(gt);
   }
-  gate(GATES.south.x, GATES.south.z, 0, '치이카와 마을');
+  gate(GATES.south.x, GATES.south.z, 0, '치이카와 마을', true); // 마을 정문: 간판에 마을 이름
   gate(GATES.north.x, GATES.north.z, 0, '바위산 가는 길');
   gate(GATES.west.x, GATES.west.z, Math.PI / 2, '숲 가는 길');
   gate(GATES.east.x, GATES.east.z, Math.PI / 2, '들판 가는 길');
