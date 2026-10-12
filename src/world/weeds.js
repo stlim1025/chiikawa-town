@@ -299,13 +299,11 @@ export function createWeeds(scene, village, random = Math.random) {
     /** 같이 놀기(주인): 내 풀을 id 로 찾는다(손님이 뽑았다고 알려 올 때). */
     byId(id) { return list.find((w) => w.id === id) || null; },
     /**
-     * 같이 놀기(주인): 놀러 온 친구에게 보낼 마을 울타리 안 풀 [[id, kind, x, z, 뽑힌 단계, 숨었으면 1, 끊긴 적 있으면 1, 뽑는 중]].
-     * busyOf(w): 뽑는 중인 사람(0 아무도 · 1 주인이나 마을 친구 · 손님 연결 id).
+     * 같이 놀기(주인): 놀러 온 친구에게 보낼 풀(마을 밖 포함 — 같이 토벌하러 나가서도 뽑는다)
+     * [[id, kind, x, z, 뽑힌 단계, 숨었으면 1, 끊긴 적 있으면 1, 뽑는 중]]. busyOf(w): 뽑는 중인 사람(0 아무도 · 1 주인이나 마을 친구 · 손님 연결 id).
      */
     snapshot(busyOf = () => 0) {
-      const out = [];
-      for (const w of list) if (Math.hypot(w.x, w.z) <= VILLAGE_R + 1) out.push([w.id, w.kind, +w.x.toFixed(2), +w.z.toFixed(2), w.stage, w.hidden ? 1 : 0, w.flawed ? 1 : 0, busyOf(w)]);
-      return out;
+      return list.map((w) => [w.id, w.kind, +w.x.toFixed(2), +w.z.toFixed(2), w.stage, w.hidden ? 1 : 0, w.flawed ? 1 : 0, busyOf(w)]);
     },
     /**
      * 같이 놀기(손님): 내 풀은 숨기고 주인 마을의 풀(주인이 보낸 snapshot)을 대신 보여 주고 뽑게 한다(active · remove).

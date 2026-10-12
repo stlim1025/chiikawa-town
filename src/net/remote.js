@@ -6,15 +6,19 @@ import { groundY } from '../core/layout.js';
  * 머리 위에 이름표와 한마디 말풍선을 띄운다. 마을에 있을 때만 보인다(집 안 · 다른 장면이면 숨긴다).
  */
 
-/** 그대로 따라 할 몸짓(그 밖 · 손에 무언가 드는 공격 몸짓은 서 있기로). */
-const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze']);
+/** 그대로 따라 할 몸짓(그 밖은 서 있기로). swing · thrust: 같이 토벌할 때 휘두르기, faint: 쓰러져 깨워 주길 기다린다. */
+const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze', 'swing', 'thrust', 'faint']);
 /** 한마디 말풍선이 떠 있는 시간(초). */
 const SAY_SEC = 3.5;
 /** 받은 위치와 이만큼 넘게 떨어져 있으면 따라가지 않고 바로 옮긴다(순간 이동 · 다시 접속). */
 const SNAP = 8;
 
-export function createRemotePlayers(scene) {
+/**
+ * scene: 그릴 장면. area: 이 장면에 보일 사람의 있는 곳('village' 마을과 바깥 · 'home' 마을 주인의 집 안 — 집 안은 바닥 높이 0).
+ */
+export function createRemotePlayers(scene, area = 'village') {
   const list = new Map();
+  const floorY = (x, z) => (area === 'village' ? groundY(x, z) : 0);
 
   function add(p) {
     remove(p.id);
@@ -28,6 +32,7 @@ export function createRemotePlayers(scene) {
     const p = list.get(id);
     if (!p) return;
     if (Math.hypot(m.x - p.x, m.z - p.z) > SNAP) { p.x = m.x; p.z = m.z; }
+    if (m.anim !== p.anim) p.animT = 0; // 휘두르기는 시작부터 다시
     p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area;
   }
   function say(id, text) { const p = list.get(id); if (p) { p.say = text; p.sayT = SAY_SEC; } }
@@ -40,11 +45,11 @@ export function createRemotePlayers(scene) {
   }
   function clear() { for (const id of [...list.keys()]) remove(id); }
 
-  /** 매 프레임. show: 내가 마을에 있는지(집 안 · 장면 중이면 모두 숨긴다). */
+  /** 매 프레임. show: 내가 이 장면에 있는지(아니면 모두 숨긴다). 이 장면(area)에 있는 사람만 보인다. */
   function update(dt, show) {
     const k = 1 - Math.exp(-dt * 10);
     for (const p of list.values()) {
-      const vis = show && p.area === 'village';
+      const vis = show && p.area === area;
       p.chibi.root.visible = vis;
       p.sayT = Math.max(0, p.sayT - dt);
       p.emoteT = Math.max(0, p.emoteT - dt);
@@ -57,11 +62,13 @@ export function createRemotePlayers(scene) {
       while (d < -Math.PI) d += Math.PI * 2;
       p.yaw += d * k;
       p.t += dt;
+      p.animT = (p.animT || 0) + dt;
       p.phase += Math.hypot(p.x - ox, p.z - oz) * 3.2; // 걸음은 실제로 움직인 만큼(내 캐릭터와 같은 비율)
       const anim = p.emoteT > 0 ? p.emote : ANIMS.has(p.anim) ? p.anim : 'idle';
-      p.chibi.root.position.set(p.x, groundY(p.x, p.z), p.z);
+      p.chibi.root.position.set(p.x, floorY(p.x, p.z), p.z);
       p.chibi.root.rotation.y = p.yaw;
-      animateChibi(p.chibi, anim, p.t, { phase: p.phase, moving: anim === 'walk' });
+      const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
+      animateChibi(p.chibi, anim, p.t, { phase: p.phase, moving: anim === 'walk', swing });
     }
   }
 
@@ -77,5 +84,16 @@ export function createRemotePlayers(scene) {
     return out;
   }
 
-  return { add, move, say, emote, remove, clear, update, labels, get size() { return list.size; } };
+  /** 그 사람의 지금 몸짓(없으면 null). */
+  function animOf(id) { const p = list.get(id); return p ? p.anim : null; }
+  /** 받은 마지막 자리 · 있는 곳 · 몸짓 [{ id, name, x, z, area, anim }](주인: 몬스터가 노릴 놀러 온 친구들). */
+  function players() { return [...list.values()].map((p) => ({ id: p.id, name: p.name, x: p.tx, z: p.tz, area: p.area, anim: p.anim })); }
+  /** 쓰러져 깨워 주길 기다리는 사람(보이는 사람만) [{ id, name, x, z }]. */
+  function downed() {
+    const out = [];
+    for (const p of list.values()) if (p.chibi.root.visible && p.anim === 'faint') out.push({ id: p.id, name: p.name, x: p.x, z: p.z });
+    return out;
+  }
+
+  return { add, move, say, emote, remove, clear, update, labels, players, downed, animOf, get size() { return list.size; } };
 }

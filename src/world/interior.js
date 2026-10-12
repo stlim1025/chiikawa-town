@@ -258,11 +258,16 @@ export function createInterior() {
     },
     /** 그 자리에 바로 선다(확인용). */
     standAt(x, z) { pos.x = x; pos.z = z; },
-    /** 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null */
-    target(home) {
+    /**
+     * 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null
+     * guest: 같이 놀기로 친구 집에 놀러 왔으면 문(나가기)만.
+     */
+    target(home, { guest = false } = {}) {
       const opts = [];
-      for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
-      opts.push({ type: 'wardrobe', x: WARDROBE.x, z: WARDROBE.z, r: 0.85, label: '옷장', reach: 1.5 });
+      if (!guest) {
+        for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
+        opts.push({ type: 'wardrobe', x: WARDROBE.x, z: WARDROBE.z, r: 0.85, label: '옷장', reach: 1.5 });
+      }
       opts.push({ type: 'door', x: DOOR.x, z: DOOR.z, r: 0.6, label: '나가기', reach: 0.9 });
       let best = null, bd = Infinity;
       for (const o of opts) { const d = Math.hypot(o.x - pos.x, o.z - pos.z); if (d < o.reach && d < bd) { bd = d; best = o; } }
@@ -276,6 +281,9 @@ export function createInterior() {
       cue.scale.setScalar(t.r * (1 + 0.07 * Math.sin(time * 6)));
     },
     get playerPos() { return pos; },
+    /** 집 안 내 캐릭터가 바라보는 방향 · 걷는 중인지(같이 놀기: 같이 있는 친구에게 보낸다). */
+    get playerYaw() { return yaw; },
+    get playerMoving() { return moving; },
     /** 옷장을 열 때: 카메라(앞) 쪽을 보고 서서 바뀐 모습이 보이게. */
     faceCamera() { yaw = 0; moving = false; },
     showGrid(on) { tiles.forEach((t) => { t.visible = on; t.material = tileMat; }); },

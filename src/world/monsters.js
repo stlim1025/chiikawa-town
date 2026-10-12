@@ -663,9 +663,10 @@ export function createMonsters(scene, village, random = Math.random) {
     m.tele = { g, c: [mk(D_DISC, TELE_BASE), mk(D_DISC, TELE_FILL), mk(D_RING, TELE_EDGE)], l: [mk(D_RECT, TELE_BASE), mk(D_RECT, TELE_FILL), mk(D_RECT, TELE_EDGE), mk(D_RECT, TELE_EDGE)] };
     return m.tele;
   }
-  const hideTele = (m) => { if (m.tele) m.tele.g.visible = false; };
+  const hideTele = (m) => { if (m.tele) m.tele.g.visible = false; m.teleInfo = null; };
   /** 둥근 표시: 테두리는 다 친 넓이, 안쪽은 k(0..1) 만큼 차오른다. 다 차면 그 자리를 친다. */
   function showCircle(m, x, z, r, k) {
+    m.teleInfo = ['c', x, z, r, k]; // 같이 놀기: 놀러 온 친구 화면에도 같은 표시를
     const T = tele(m), [base, fill, ring] = T.c, f = Math.max(0.02, r * Math.min(1, k));
     T.g.visible = true;
     T.g.position.set(x, 0.045, z);
@@ -676,6 +677,7 @@ export function createMonsters(scene, village, random = Math.random) {
   }
   /** 띠 표시: (x, z) 에서 yaw 쪽으로 길이 len, 폭 w. 안쪽은 k 만큼 차오른다. */
   function showLine(m, x, z, yaw, len, w, k) {
+    m.teleInfo = ['l', x, z, yaw, len, w, k];
     const T = tele(m), [base, fill, a, b] = T.l;
     T.g.visible = true;
     T.g.position.set(x, 0.045, z);
@@ -700,7 +702,7 @@ export function createMonsters(scene, village, random = Math.random) {
       mesh.position.set(x, 0.45, z);
       sh.position.set(x, 0.03, z);
       scene.add(mesh); scene.add(sh);
-      shots.push({ x, z, vx: Math.sin(yaw) * A.speed, vz: Math.cos(yaw) * A.speed, life: A.life, r: A.r, dmg: Math.round(m.M.dmg * (A.dmgK || 1)), mesh, sh, owner: m, t: 0 });
+      shots.push({ x, z, vx: Math.sin(yaw) * A.speed, vz: Math.cos(yaw) * A.speed, life: A.life, r: A.r, c: A.color, dmg: Math.round(m.M.dmg * (A.dmgK || 1)), mesh, sh, owner: m, t: 0 });
     }
   }
 
@@ -766,11 +768,15 @@ export function createMonsters(scene, village, random = Math.random) {
   // ---------- 공격 ----------
   /** 마을 안은 안전하다. 검정소 앞마당의 토벌 실기 몬스터(m.exam)만은 마을 안에서도 나를 노린다. */
   const safeFrom = (m) => playerSafe && !m.exam;
-  /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). */
+  /**
+   * 지금 노리는 상대를 칠 수 있는지. 같이 놀기로 놀러 온 친구(ally.player)는 그 친구가 마을 밖에 있으면,
+   * 같이 토벌하는 마을 친구는 내가 돌아다니는 중이면(창 · 대화 중이 아니면), 나는 그러면서 마을 밖에 있으면.
+   */
+  const targetOn = (m) => (curFoe ? (curFoe.player ? !curFoe.safe : C.active) : C.active && !safeFrom(m));
+  /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). 노리는 상대가 친구면 그 친구를. */
   function hurt(m, dmg, x, z) {
-    if (!C || !C.active) return;
+    if (!C || !targetOn(m)) return;
     if (curFoe) { C.onAllyHit?.(curFoe.kind, { dmg, x, z }, m); return; }
-    if (safeFrom(m)) return;
     m.hitPlayer = true;
     C.onHit?.(m, { dmg, x, z });
   }
@@ -860,7 +866,7 @@ export function createMonsters(scene, village, random = Math.random) {
     base.scale.set(r, 1, r); ring.scale.set(r, 1, r); fill.scale.set(0.02, 1, 0.02);
     g.position.set(x, 0.05, z);
     scene.add(g);
-    hazards.push({ owner: m, x, z, r, warn, dmg, t: 0, g, fill });
+    hazards.push({ owner: m, x, z, r, warn, dmg, t: 0, g, fill, foe: curFoe ? curFoe.kind : null }); // foe: 노린 친구(그 친구가 맞는다)
   }
   function rain(m, A) {
     const dmg = Math.round(m.M.dmg * (A.dmgK || 1)), spots = [{ x: P.x, z: P.z }];
@@ -880,7 +886,11 @@ export function createMonsters(scene, village, random = Math.random) {
       h.fill.scale.set(f, 1, f);
       if (h.t < h.warn) continue;
       poof(h.x, 0.6, h.z, 0.35, 8);
+      // 친구를 노린 포자 비는 그 친구 자리로 맞는지 본다(갱신이 끝난 뒤라 P 는 내 자리)
+      const foe = h.foe && allies.find((o) => o.kind === h.foe), me = P;
+      if (foe) { P = foe; curFoe = foe; }
       impact(h.owner, h.x, h.z, h.r, h.dmg);
+      if (foe) { P = me; curFoe = null; }
       scene.remove(h.g);
       hazards.splice(i, 1);
     }
@@ -949,7 +959,7 @@ export function createMonsters(scene, village, random = Math.random) {
   /** 예고: 몸이 붉게 깜빡이고, 칠 곳에 빨간 표시가 차오른다. 겨누는 공격은 도중에 겨눈 곳을 굳힌다. */
   function windStep(m, dt) {
     const A = m.atk, kind = A.kind;
-    if (!C.active || safeFrom(m)) { cancel(m); return; }
+    if (!targetOn(m)) { cancel(m); return; }
     const k = 1 - m.wind / m.windMax;
     if (!m.locked) {
       m.aim.x = P.x; m.aim.z = P.z;
@@ -1189,6 +1199,84 @@ export function createMonsters(scene, village, random = Math.random) {
     if (wings.length) wings.forEach((w) => { w.children[0].material = body.material; });
   }
 
+  /** 무기가 닿을 수 있는 몬스터인지(쓰러졌거나 잠들었거나 땅속 · 높이 뛰어오른 것은 안 맞는다). */
+  const hittable = (m) => !m.dead && !m.dormant && !m.under && !(m.airY > 0.7);
+  /**
+   * 무기에 맞았다: 체력이 줄고 밀려나며 멈칫한다(예고 중인 가벼운 몬스터는 공격이 끊긴다. 돌진 · 회전처럼 한번 시작한 공격은 밀리지 않는다).
+   * (x, z): 친 사람 자리. → 쓰러뜨렸는지
+   */
+  function applyHit(m, x, z, dmg, knock) {
+    m.hp -= dmg;
+    m.flash = 0.13;
+    m.engaged = true;
+    if (m.species === 'dummy') m.wobble = 1;
+    const committed = m.state === 'act' && m.atk && COMMITTED[m.atk.kind];
+    const d = Math.hypot(m.x - x, m.z - z) || 1;
+    const push = (HEAVY[m.species] ? 0.45 : 1.2) * knock;
+    // 왕버섯은 맞아도 밀리거나 멈칫하지 않는다(계속 때려서 묶어 둘 수 없게)
+    if (m.species !== 'dummy' && !committed && !m.M.boss) { m.kx = ((m.x - x) / d) * push * 6; m.kz = ((m.z - z) / d) * push * 6; }
+    if (m.M.boss) { /* 슈퍼 아머 */ }
+    else if (m.state === 'wind' && !HEAVY[m.species]) { cancel(m); m.stun = 0.35; }
+    else if (m.state === 'chase' || m.state === 'recover') m.stun = 0.35;
+    if (m.state === 'wander') { m.state = 'chase'; m.alert = 0.8; }
+    const killed = m.hp <= 0;
+    if (killed) { m.dead = true; m.deadT = 0; hideTele(m); if (m.tongue) setTongue(m, 0); poof(m.x, 0.4 + m.mesh.hover, m.z, m.M.size); }
+    return killed;
+  }
+
+  // ---------- 같이 놀기(손님): 친구 마을에 놀러 간 동안은 내 몬스터를 숨기고 멈춘 채, 주인이 보낸 몬스터 모습을 따라 보여 준다 ----------
+  let guest = null; // 주인 몬스터 id → 꼭두각시(모양 · 몸짓만, 생각과 공격은 주인 쪽에서)
+  const guestShots = [], guestRain = []; // 주인 마을에서 날아가는 탄 · 포자 비 표시
+  const STATES = new Set(['wander', 'chase', 'wind', 'act', 'recover', 'return']);
+  const clamp01 = (v) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+  /** 내 몬스터 · 탄 · 표시를 숨긴다(on=false 면 다음 update 에서 다시 보인다). */
+  function hideOwn(on) {
+    for (const m of list) {
+      if (on) { m.mesh.root.visible = false; if (m.tele) m.tele.g.visible = false; if (m.mound) m.mound.visible = false; }
+      else if (m.teleInfo && m.tele) m.tele.g.visible = true;
+    }
+    for (const s of shots) { s.mesh.visible = !on; s.sh.visible = !on; }
+    for (const h of hazards) h.g.visible = !on;
+    for (const r of sprouts) r.s.visible = !on;
+  }
+  function puppet(id, species, x, z, yaw) {
+    const M = MONSTERS[species], mesh = monsterMesh(species);
+    mesh.root.position.set(x, groundY(x, z), z);
+    scene.add(mesh.root);
+    return {
+      id, species, M, mesh, x, z, yaw, tx: x, tz: z, tyaw: yaw, hp: M.hp, state: 'wander', wind: 0, windMax: 1, atk: null, airY: 0, diveY: 0,
+      under: false, flash: 0, stun: 0, pinch: 0, lunge: 0, popT: 0, phase: random() * 10, engaged: false, dormant: false, alert: 0,
+      dead: false, deadT: 0, spinA: 0, rollA: 0, wobble: 0, teleInfo: null, tongueLen: 0, guest: true
+    };
+  }
+  function dropPuppet(m) {
+    scene.remove(m.mesh.root);
+    if (m.tele) scene.remove(m.tele.g);
+    if (m.mound) scene.remove(m.mound);
+  }
+  /** 연기 · 충격파 고리가 퍼지고 사라진다. */
+  function fxStep(dt) {
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i];
+      w.t += dt;
+      const k = Math.min(1, w.t / 0.35), r = w.r * (0.35 + 0.65 * k);
+      w.mesh.scale.set(r, 1, r);
+      w.mat.opacity = 0.85 * (1 - k);
+      if (k >= 1) { scene.remove(w.mesh); w.mat.dispose(); waves.splice(i, 1); }
+    }
+    for (let i = poofs.length - 1; i >= 0; i--) {
+      const f = poofs[i];
+      f.t += dt;
+      for (const b of f.bits) {
+        b.d.position.x += b.vx * dt; b.d.position.y += b.vy * dt; b.d.position.z += b.vz * dt;
+        b.vx *= 0.9; b.vz *= 0.9;
+        b.d.scale.multiplyScalar(1 + dt * 1.5);
+      }
+      f.mat.opacity = Math.max(0, 0.9 - f.t * 1.6);
+      if (f.t > 0.55) { scene.remove(f.g); f.mat.dispose(); poofs.splice(i, 1); }
+    }
+  }
+
   for (const [species, S] of Object.entries(SPAWN)) {
     if (species === 'moth') continue; // 밤에만
     for (let i = 0; i < S.n; i++) spawn(species, null);
@@ -1243,7 +1331,7 @@ export function createMonsters(scene, village, random = Math.random) {
     /** 살아 있는 것 중 (x, z) 에서 maxDist 안의 가장 가까운 몬스터(땅속에 숨은 것은 빼고). */
     nearest(x, z, maxDist, fn = null) {
       let best = null, bd = maxDist;
-      for (const m of list) {
+      for (const m of guest ? guest.values() : list) { // 친구 마을에 놀러 간 동안은 주인 마을 몬스터
         if (m.dead || m.dormant || m.under || (fn && !fn(m))) continue;
         const d = Math.hypot(m.x - x, m.z - z) - m.M.size;
         if (d < bd) { bd = d; best = m; }
@@ -1258,30 +1346,205 @@ export function createMonsters(scene, village, random = Math.random) {
     strike({ x, z, yaw, range, dmg, knock = 1, arc }) {
       const out = [];
       for (const m of list) {
-        if (m.dead || m.dormant || m.under || m.airY > 0.7 || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size, arc)) continue;
-        m.hp -= dmg;
-        m.flash = 0.13;
-        m.engaged = true;
-        if (m.species === 'dummy') m.wobble = 1;
-        const committed = m.state === 'act' && m.atk && COMMITTED[m.atk.kind];
-        const d = Math.hypot(m.x - x, m.z - z) || 1;
-        const push = (HEAVY[m.species] ? 0.45 : 1.2) * knock;
-        // 왕버섯은 맞아도 밀리거나 멈칫하지 않는다(계속 때려서 묶어 둘 수 없게)
-        if (m.species !== 'dummy' && !committed && !m.M.boss) { m.kx = ((m.x - x) / d) * push * 6; m.kz = ((m.z - z) / d) * push * 6; }
-        if (m.M.boss) { /* 슈퍼 아머 */ }
-        else if (m.state === 'wind' && !HEAVY[m.species]) { cancel(m); m.stun = 0.35; }
-        else if (m.state === 'chase' || m.state === 'recover') m.stun = 0.35;
-        if (m.state === 'wander') { m.state = 'chase'; m.alert = 0.8; }
-        const killed = m.hp <= 0;
-        if (killed) { m.dead = true; m.deadT = 0; hideTele(m); if (m.tongue) setTongue(m, 0); poof(m.x, 0.4 + m.mesh.hover, m.z, m.M.size); }
-        out.push({ m, killed });
+        if (!hittable(m) || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size, arc)) continue;
+        out.push({ m, killed: applyHit(m, x, z, dmg, knock) });
       }
       return out;
+    },
+    /**
+     * 같이 놀기(주인): 놀러 온 친구가 휘두른 무기가 몬스터 m 에 닿았다(내가 친 것과 같게 밀리고 멈칫한다).
+     * by: 그 친구(allies 의 kind) — 맞은 몬스터는 그 친구에게 덤비기도 한다. → 쓰러뜨렸는지
+     */
+    playerHit(m, { x, z, dmg, knock = 1, by = null }) {
+      if (!hittable(m)) return false;
+      const killed = applyHit(m, x, z, dmg, knock);
+      const committed = m.state === 'act' && m.atk && COMMITTED[m.atk.kind];
+      if (!killed && by && !committed && m.state !== 'wind' && random() < (m.M.boss ? 0.3 : 0.6)) m.foe = by;
+      return killed;
+    },
+    /** 같이 놀기(주인): id 로 몬스터를 찾는다(살아 있는 것만). */
+    byId(id) { return list.find((m) => m.id === id && !m.dead) || null; },
+    /**
+     * 같이 놀기(주인): 놀러 온 친구 둘레(points 에서 R 안)의 몬스터 모습
+     * [[id, 종류, x, z, yaw, 상태, 예고 진행, 공격 종류, 뜬 높이, 땅속 1, 체력, 싸우는 중 1, 잠 1, 예고 표시, 혀 길이, 멈칫 1, 쓰러짐 1]].
+     */
+    snapshot(points, R = 44) {
+      const r2 = (v) => Math.round(v * 100) / 100, out = [];
+      for (const m of list) {
+        if (m.leaving || m.exam || !points.some((q) => Math.hypot(m.x - q.x, m.z - q.z) < R)) continue;
+        const tel = m.tele && m.tele.g.visible && m.teleInfo ? m.teleInfo.map((v) => (typeof v === 'number' ? r2(v) : v)) : 0;
+        out.push([m.id, m.species, r2(m.x), r2(m.z), r2(m.yaw), m.state, m.state === 'wind' ? r2(1 - m.wind / m.windMax) : 0, m.atk ? m.atk.kind : '',
+          r2(m.airY || 0), m.under ? 1 : 0, Math.max(0, m.hp), m.engaged ? 1 : 0, m.dormant ? 1 : 0, tel, m.tongue && m.tongue.g.visible ? r2(m.tongue.cyl.scale.y) : 0,
+          m.stun > 0 ? 1 : 0, m.dead ? 1 : 0]);
+      }
+      return out;
+    },
+    /** 지금 보이는 몬스터들(친구 마을에 놀러 간 동안은 주인 마을 몬스터). */
+    active() { return guest ? [...guest.values()].filter((m) => !m.dead) : list; },
+    /**
+     * 같이 놀기(손님): 내 몬스터는 숨기고 멈춘 채, 주인이 보낸 몬스터 모습(snapshot)과 탄 · 포자 비(fxSnapshot)를 보여 준다.
+     * 받은 값은 하나씩 확인해서 쓴다. items 가 null 이면 주인 몬스터를 치우고 내 몬스터로 돌아온다.
+     */
+    showGuest(items, fx = null) {
+      if (!items) {
+        if (!guest) return;
+        for (const m of guest.values()) dropPuppet(m);
+        guest = null;
+        for (const s of guestShots) { scene.remove(s.mesh); scene.remove(s.sh); }
+        guestShots.length = 0;
+        for (const g of guestRain) scene.remove(g.g);
+        guestRain.length = 0;
+        hideOwn(false);
+        return;
+      }
+      if (!guest) { guest = new Map(); hideOwn(true); }
+      const seen = new Set();
+      for (const it of items) {
+        if (!Array.isArray(it)) continue;
+        const [id, sp, x, z, yaw, st, wk, kind, air, under, hp, eng, dorm, tel, tng, stun, dead] = it;
+        if (!Number.isFinite(id) || !Object.hasOwn(MONSTERS, sp) || !Number.isFinite(x) || !Number.isFinite(z)) continue;
+        seen.add(id);
+        let m = guest.get(id);
+        if (m && m.species !== sp) { dropPuppet(m); m = null; }
+        if (!m) { m = puppet(id, sp, x, z, Number.isFinite(yaw) ? yaw : 0); guest.set(id, m); }
+        if (m.dead) continue;
+        if (Math.hypot(x - m.x, z - m.z) > 8) { m.x = x; m.z = z; } // 멀리 옮겼으면 바로 그 자리에
+        m.tx = x; m.tz = z;
+        if (Number.isFinite(yaw)) m.tyaw = yaw;
+        if (m.state !== 'wind' && st === 'wind') m.windStart = true;
+        m.state = STATES.has(st) ? st : 'wander';
+        m.windMax = 1;
+        m.wind = 1 - clamp01(wk);
+        m.atk = typeof kind === 'string' && kind ? { kind } : null;
+        m.airY = Number.isFinite(air) ? Math.max(0, Math.min(6, air)) : 0;
+        m.under = !!under;
+        if (Number.isFinite(hp)) { if (hp < m.hp - 0.5) m.flash = 0.13; m.hp = Math.max(0, Math.min(m.M.hp, hp)); }
+        m.engaged = !!eng;
+        m.dormant = !!dorm;
+        m.stun = stun ? 0.2 : 0;
+        m.teleInfo = Array.isArray(tel) && (tel[0] === 'c' || tel[0] === 'l') && tel.slice(1).every(Number.isFinite) ? tel : null;
+        m.tongueLen = Number.isFinite(tng) ? Math.max(0, Math.min(6, tng)) : 0;
+        if (dead) { m.dead = true; m.deadT = 0; hideTele(m); if (m.tongue) setTongue(m, 0); poof(m.x, 0.4 + m.mesh.hover, m.z, m.M.size); }
+      }
+      // 주인 쪽에서 멀어져 안 보내 준 몬스터는 조용히 치운다(쓰러진 것은 쓰러짐 표시를 먼저 받는다)
+      for (const [id, m] of guest) if (!seen.has(id) && !m.dead) { dropPuppet(m); guest.delete(id); }
+      // 탄: 받은 자리 · 빠르기로 다음 소식까지 날려 보낸다
+      const shotRows = fx && Array.isArray(fx.shots) ? fx.shots.filter((s) => Array.isArray(s) && s.slice(0, 5).every(Number.isFinite)).slice(0, 60) : [];
+      while (guestShots.length > shotRows.length) { const s = guestShots.pop(); scene.remove(s.mesh); scene.remove(s.sh); }
+      shotRows.forEach(([x, z, vx, vz, r, c], i) => {
+        let s = guestShots[i];
+        const color = typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : '#ffffff';
+        if (!s || s.c !== color) {
+          if (s) { scene.remove(s.mesh); scene.remove(s.sh); }
+          const mesh = new THREE.Mesh(GEO.sphere, shotMat(color));
+          addOutline(mesh, 0.02);
+          const sh = new THREE.Mesh(D_DISC, SHADOW_MAT);
+          scene.add(mesh); scene.add(sh);
+          s = guestShots[i] = { mesh, sh, c: color, t: 0 };
+        }
+        Object.assign(s, { x, z, vx, vz });
+        s.mesh.scale.setScalar(Math.max(0.05, Math.min(1.5, r)));
+        s.sh.scale.set(r, 1, r);
+      });
+      // 포자 비 표시
+      const rainRows = fx && Array.isArray(fx.rain) ? fx.rain.filter((h) => Array.isArray(h) && h.every(Number.isFinite)).slice(0, 30) : [];
+      while (guestRain.length > rainRows.length) scene.remove(guestRain.pop().g);
+      rainRows.forEach(([x, z, r, k], i) => {
+        let h = guestRain[i];
+        if (!h) {
+          const g = new THREE.Group();
+          const mk = (geo, mat) => { const o = new THREE.Mesh(geo, mat); o.renderOrder = 3; g.add(o); return o; };
+          const base = mk(D_DISC, TELE_BASE), fill = mk(D_DISC, TELE_FILL), ring = mk(D_RING, TELE_EDGE);
+          scene.add(g);
+          h = guestRain[i] = { g, base, fill, ring };
+        }
+        h.g.position.set(x, 0.05, z);
+        h.base.scale.set(r, 1, r); h.ring.scale.set(r, 1, r);
+        const f = Math.max(0.02, r * clamp01(k));
+        h.fill.scale.set(f, 1, f);
+      });
+    },
+    /** 같이 놀기(손님): 매 프레임 주인 마을 몬스터를 받은 자리로 부드럽게 옮기고 몸짓 · 예고 표시를 그린다. onWind(m): 공격 예고를 시작했다. */
+    guestStep(dt, t, { onWind } = {}) {
+      if (!guest) return;
+      const k = 1 - Math.exp(-dt * 12);
+      TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
+      for (const [id, m] of guest) {
+        const root = m.mesh.root;
+        if (m.dead) {
+          m.deadT += dt;
+          const kk = m.deadT / 0.35;
+          root.scale.setScalar(Math.max(0.01, (1 + kk * 0.3) * (1 - kk)));
+          root.rotation.y += dt * 14;
+          if (m.mound) m.mound.visible = false;
+          if (kk >= 1) { dropPuppet(m); guest.delete(id); }
+          continue;
+        }
+        const ox = m.x, oz = m.z;
+        m.x += (m.tx - m.x) * k;
+        m.z += (m.tz - m.z) * k;
+        let d = m.tyaw - m.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        m.yaw += d * k;
+        const moving = Math.hypot(m.x - ox, m.z - oz) > dt * 0.25;
+        m.flash = Math.max(0, m.flash - dt);
+        m.lunge = Math.max(0, m.lunge - dt);
+        if (m.state === 'act' && m.atk && m.atk.kind === 'spin') m.spinA += dt * 18; else m.spinA = 0;
+        if (m.state === 'act' && m.atk && m.atk.kind === 'roll') m.rollA += dt * 8; else m.rollA = 0;
+        if (m.windStart) { m.windStart = false; onWind?.(m); }
+        root.visible = true;
+        root.position.set(m.x, groundY(m.x, m.z), m.z);
+        root.rotation.y = m.yaw;
+        animate(m, dt, t, moving);
+        const T = m.teleInfo;
+        if (T && T[0] === 'c') showCircle(m, T[1], T[2], T[3], T[4]);
+        else if (T && T[0] === 'l') showLine(m, T[1], T[2], T[3], T[4], T[5], T[6]);
+        else hideTele(m);
+        if (m.tongueLen > 0.02 || m.tongue) setTongue(m, m.tongueLen);
+        if (m.under) {
+          const md = mound(m), kk = m.M.size / 0.48;
+          md.visible = true;
+          md.position.set(m.x, 0, m.z);
+          md.scale.set(0.42 * kk, 0.13 * kk, 0.42 * kk);
+        } else if (m.mound) m.mound.visible = false;
+      }
+      for (const s of guestShots) {
+        s.t += dt;
+        s.x += s.vx * dt; s.z += s.vz * dt;
+        s.mesh.position.set(s.x, 0.45 + Math.sin(s.t * 10) * 0.05, s.z);
+        s.sh.position.set(s.x, 0.03, s.z);
+      }
+      fxStep(dt);
+    },
+    /**
+     * 같이 놀기(손님): 내 무기가 주인 마을 몬스터에 닿았는지(맞은 몬스터는 깜빡이고 체력 줄만 먼저 줄인다. 진짜 피해는 주인 쪽에서).
+     * → [{ m }]
+     */
+    strikeGuest({ x, z, yaw, range, dmg, arc }) {
+      const out = [];
+      if (!guest) return out;
+      for (const m of guest.values()) {
+        if (!hittable(m) || !inSwing(x, z, yaw, range, m.x, m.z, m.M.size, arc)) continue;
+        m.flash = 0.13;
+        m.hp = Math.max(0, m.hp - dmg);
+        poof(m.x, 0.3 + m.mesh.hover, m.z, 0.12, 3);
+        out.push({ m });
+      }
+      return out;
+    },
+    /** 같이 놀기(주인): 놀러 온 친구 둘레의 날아가는 탄 [[x, z, vx, vz, 크기, 색]] · 포자 비 표시 [[x, z, r, 차오름]]. */
+    fxSnapshot(points, R = 44) {
+      const r2 = (v) => Math.round(v * 100) / 100, near = (x, z) => points.some((q) => Math.hypot(x - q.x, z - q.z) < R);
+      return {
+        shots: shots.filter((s) => near(s.x, s.z)).map((s) => [r2(s.x), r2(s.z), r2(s.vx), r2(s.vz), s.r, s.c || '#ffffff']),
+        rain: hazards.filter((h) => near(h.x, h.z)).map((h) => [r2(h.x), r2(h.z), h.r, r2(Math.min(1, h.t / h.warn))])
+      };
     },
     /** 머리 위 체력 줄 · 알아챔(!) 표시. */
     labels(focus) {
       const out = [];
-      for (const m of list) {
+      for (const m of guest ? guest.values() : list) {
         if (m.dead || m.under || !m.mesh.root.visible || Math.hypot(m.x - focus.x, m.z - focus.z) > 16) continue;
         const y = m.mesh.height + (m.airY || 0) + (m.species === 'moth' ? Math.sin(performance.now() / 385 + m.phase) * 0.18 : 0);
         if (m.dormant) { out.push({ id: 'mz' + m.id, x: m.x, y, z: m.z, text: `${m.M.name} 쿨쿨…`, kind: 'mhp', pct: 1, boss: true }); continue; }
@@ -1312,9 +1575,12 @@ export function createMonsters(scene, village, random = Math.random) {
       glowMat.emissive.setRGB(1, 0.85, 0.4).multiplyScalar(0.3 + 0.9 * nightK);
       TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
       playerSafe = inVillage(p.x, p.z, 0.6);
+      const players = allies.filter((o) => o.player); // 같이 놀기: 놀러 온 친구들(몬스터는 나와 친구 중 가까운 사람을 노린다)
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i], M = m.M, root = m.mesh.root;
         const dp = Math.hypot(m.x - p.x, m.z - p.z);
+        let dNear = dp; // 나나 놀러 온 친구 중 가장 가까운 사람까지(멀리 있는 몬스터는 쉬게 한다)
+        for (const o of players) dNear = Math.min(dNear, Math.hypot(m.x - o.x, m.z - o.z));
         m.mesh.ghost.visible = ghostsOn && dp < 18; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
         if (m.dead) {
           m.deadT += dt;
@@ -1334,7 +1600,7 @@ export function createMonsters(scene, village, random = Math.random) {
           if (m.leaveT > 1.6) removeAt(i);
           continue;
         }
-        if (dp > ACTIVE_DIST && !m.exam) {
+        if (dNear > ACTIVE_DIST && !m.exam) {
           root.visible = false;
           if (m.state === 'wind' || m.state === 'act' || m.state === 'recover') { cancel(m); m.state = 'wander'; m.under = false; }
           if (m.mound) m.mound.visible = false;
@@ -1359,6 +1625,19 @@ export function createMonsters(scene, village, random = Math.random) {
           const damp = Math.exp(-dt * 9);
           m.kx *= damp; m.kz *= damp;
         }
+        // 같이 놀기: 돌아다니는 몬스터는 나와 놀러 온 친구 중 더 가까운 사람을 본다(어그로가 둘 다에게 튄다)
+        if (players.length && m.state === 'wander') {
+          const cur = m.foe ? allies.find((o) => o.kind === m.foe) : null;
+          if (!cur || cur.player) {
+            let best = null, bd = ctx.active && !playerSafe ? dp : Infinity;
+            for (const o of players) {
+              if (o.safe) continue;
+              const d = Math.hypot(m.x - o.x, m.z - o.z);
+              if (d < bd) { bd = d; best = o; }
+            }
+            m.foe = best ? best.kind : null;
+          }
+        }
         // 같이 토벌하는 친구에게 어그로가 끌렸으면 그 친구를 노린다(쓰러졌거나 떠났으면 다시 나를). 그동안 P · 거리를 그 친구 것으로
         const ally = m.foe ? allies.find((o) => o.kind === m.foe) : null;
         if (m.foe && !ally) m.foe = null;
@@ -1369,7 +1648,8 @@ export function createMonsters(scene, village, random = Math.random) {
           // 노리는 상대가 들어가 있는 보스 마당: 안팎이 갈리면 서로 못 본다(바깥 몬스터는 분지 · 협곡 안의 나를 쫓지 않고, 보스는 분지 안의 나만 본다)
           const tArena = arenaAt(P.x, P.z, 0.2), tZone = tArena || canyonAt(P.x, P.z);
           const sight = m.engaged ? M.aggro * 1.7 : M.boss ? M.aggro : M.aggro * NOTICE_SCALE * (m.z > P.z + 1 ? NOTICE_BEHIND : 1);
-          const canSee = ctx.active && !safeFrom(m) && !m.dormant && (m.arena ? tArena === m.arena : !tZone) && pd < sight;
+          const on = ally && ally.player ? !ally.safe : ctx.active && !safeFrom(m); // 놀러 온 친구는 그 친구가 마을 밖에 있으면
+          const canSee = on && !m.dormant && (m.arena ? tArena === m.arena : !tZone) && pd < sight;
           if ((m.state === 'wander' || m.state === 'chase') && fromHome > LEASH) { m.state = 'return'; hideTele(m); }
           if (m.state === 'wander') {
             if (canSee) {
@@ -1378,8 +1658,8 @@ export function createMonsters(scene, village, random = Math.random) {
               // 둘레에 같이 토벌하는 친구가 있으면 가끔은 그 친구에게 먼저 덤빈다
               const near = !m.foe && allies.filter((o) => Math.hypot(o.x - m.x, o.z - m.z) < M.aggro * 1.4);
               if (near && near.length && random() < 0.35) m.foe = near[Math.floor(random() * near.length)].kind;
-              ctx.onAggro?.(m);
-            } else if (ctx.active) {
+              if (!ally || !ally.player) ctx.onAggro?.(m); // 나를 알아챘을 때만 으르릉
+            } else if (ctx.active || players.length) {
               m.timer -= dt;
               if (m.timer <= 0 || !m.goal) {
                 m.timer = 2 + random() * 3;
@@ -1417,8 +1697,11 @@ export function createMonsters(scene, village, random = Math.random) {
         const solid = !m.under && m.airY < 0.3;
         // 나와 겹치지 않게(들이받은 뒤에도 내 몸 안으로 파고들지 않는다)
         if (M.speed > 0 && solid) {
-          const qx = m.x - p.x, qz = m.z - p.z, qd = Math.hypot(qx, qz), minD = M.size * 0.8 + 0.35;
-          if (qd > 0.001 && qd < minD) moveBy(m, (qx / qd) * (minD - qd), (qz / qd) * (minD - qd));
+          const minD = M.size * 0.8 + 0.35;
+          for (let k = -1; k < players.length; k++) { // 나, 그리고 놀러 온 친구들
+            const q = k < 0 ? p : players[k], qx = m.x - q.x, qz = m.z - q.z, qd = Math.hypot(qx, qz);
+            if (qd > 0.001 && qd < minD) moveBy(m, (qx / qd) * (minD - qd), (qz / qd) * (minD - qd));
+          }
         }
         // 서로 겹치지 않게 살짝 민다
         if (solid) {
@@ -1450,6 +1733,13 @@ export function createMonsters(scene, village, random = Math.random) {
         s.sh.position.set(s.x, 0.03, s.z);
         let gone = s.t > s.life || (!s.owner.exam && Math.hypot(s.x, s.z) < FENCE - 0.3);
         if (!gone && Math.hypot(s.x - p.x, s.z - p.z) < s.r + ME) { hurt(s.owner, s.dmg, s.x, s.z); gone = true; }
+        // 놀러 온 친구에게 닿아도 터진다(그 친구가 맞는다)
+        if (!gone) for (const o of players) {
+          if (o.safe || Math.hypot(s.x - o.x, s.z - o.z) >= s.r + ME) continue;
+          C?.onAllyHit?.(o.kind, { dmg: s.dmg, x: s.x, z: s.z }, s.owner);
+          gone = true;
+          break;
+        }
         if (gone) {
           poof(s.x, 0.45, s.z, 0.02, 6);
           scene.remove(s.mesh); scene.remove(s.sh);

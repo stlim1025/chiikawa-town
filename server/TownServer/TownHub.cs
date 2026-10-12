@@ -6,8 +6,8 @@ namespace TownServer;
 /// <summary>
 /// 같이 놀기 허브(/town): 동물의 숲처럼 주인이 마을 문을 열면(내 마을 코드) 친구가 그 코드로 놀러 온다.
 /// 서버는 같은 마을 사람들에게 받은 것을 나눠 주기만 한다(게임 진행은 각자 기기에, 마을 상태는 주인이 보낸다).
-/// 클라이언트 → 서버: OpenGate · Visit · Move · Say · Emote · World(주인만) · Act(손님만) · Leave.
-/// 서버 → 클라이언트: playerJoined · playerMoved · playerSaid · playerEmote · playerLeft · world · guestAct(주인만) · gateClosed.
+/// 클라이언트 → 서버: OpenGate · Visit · Move · Say · Emote · World(주인만) · Act(손님만) · Direct(한 사람에게) · Leave.
+/// 서버 → 클라이언트: playerJoined · playerMoved · playerSaid · playerEmote · playerLeft · world · guestAct(주인만) · direct · gateClosed.
 /// </summary>
 public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<TownHub> log) : Hub
 {
@@ -82,6 +82,20 @@ public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<Tow
         var hostId = rooms.HostOf(me.Room);
         if (hostId is null) return;
         await Clients.Client(hostId).SendAsync("guestAct", me.Id, act);
+    }
+
+    /// <summary>
+    /// 같은 마을의 한 사람에게만 보낸다(맞았다 · 쓰러뜨렸다 · 깨웠다 · 주운 물건처럼 그 사람만 알면 되는 일).
+    /// 서버는 내용을 해석하지 않는다(512자까지, 너무 자주 오면 버린다).
+    /// </summary>
+    public async Task Direct(string to, JsonElement payload)
+    {
+        var me = rooms.Get(Context.ConnectionId);
+        var target = rooms.Get(to ?? "");
+        if (me is null || target is null || target.Id == me.Id || target.Room != me.Room) return;
+        if (payload.ValueKind != JsonValueKind.Object || payload.GetRawText().Length > MaxAct) return;
+        if (!me.Acts.Take(Environment.TickCount64, options.ActsPerSecond, options.ActBurst)) return;
+        await Clients.Client(target.Id).SendAsync("direct", me.Id, payload);
     }
 
     /// <summary>
