@@ -19,6 +19,7 @@ import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core
 import { weedSvg } from './weedart.js';
 import { pochetteSvg, itemSvg, accessorySvg, TICKET_SVG } from './itemart.js';
 import { bagOf, itemInfo, countOf } from '../core/inventory.js';
+import { pantryOf } from '../core/pantry.js';
 import { sellPrice, sellableIds } from '../core/market.js';
 import { canGift } from '../core/gifts.js';
 import { ACCESSORY_ITEMS, wardrobeOf } from '../core/wardrobe.js';
@@ -621,14 +622,16 @@ export function createPanels(ui, handlers) {
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
         const F = FRIENDS[k], hc = hearts(f);
-        // 하트 몇 개면 무슨 선물 · 다음 하트까지 몇 · 오늘 한 일 같은 건 앱에서 알려 주지 않는다(빌린 돈만)
-        const chips = [f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null];
+        // 하트 몇 개면 무슨 선물 · 다음 하트까지 몇 · 오늘 한 일 같은 건 앱에서 알려 주지 않는다(빌린 돈 · 친구 가방에 든 것만)
+        const bag = Object.entries(pantryOf(s, k)).filter(([id, n]) => n > 0 && itemInfo(id));
+        const chips = [f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null,
+          ...bag.slice(0, 6).map(([id, n]) => h('span', { class: 'chip', title: itemInfo(id).name }, svgSpan('ico', itemSvg(id)), n > 1 ? `×${n}` : ''))];
         out.push(h('div', { class: `row f-card${f.pts ? '' : ' new'}` }, face(k),
           h('div', {},
             h('div', { class: 't' }, F.name,
               h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
             live.doing[k] ? h('div', { class: 'f-now' }, live.doing[k].svg ? svgSpan('f-now-ico', live.doing[k].svg) : null, live.doing[k].text) : null,
-            f.debt ? h('div', { class: 'mon-chips' }, chips) : null)));
+            f.debt || bag.length ? h('div', { class: 'mon-chips', 'aria-label': '친구 가방' }, chips) : null)));
       });
       return out;
     },

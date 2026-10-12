@@ -18,6 +18,11 @@ export function dropItem(state, id, n, x, z) {
   if (!t.taken) return { ok: false, reason: 'none', state };
   return { ok: true, state: { ...t.state, ground: [...list, { g: nextG(list), id, n: t.taken, clean: t.clean, x, z }] }, n: t.taken };
 }
+/** 내 가방과 상관없이 물건을 바닥에 놓는다(친구가 싫어하는 선물을 버릴 때). 바닥이 꽉 찼으면 가장 오래된 것부터 치운다. */
+export function placeItem(state, id, n, x, z) {
+  const list = groundOf(state).slice(-(MAX_GROUND - 1));
+  return { ...state, ground: [...list, { g: nextG(groundOf(state)), id, n, clean: 0, x, z }] };
+}
 /** 가진 무기를 떨어뜨린다(들고 있었으면 빈손이 된다). */
 export function dropWeapon(state, id, x, z) {
   const list = groundOf(state), w = weaponOf(state);

@@ -4,6 +4,7 @@ import { isValidHousing } from './housing.js';
 import { isValidFriends, upgradeFriends, curveFriends } from './friends.js';
 import { STATE_VERSION } from './state.js';
 import { isValidLicenses, isValidStudy } from './licenses.js';
+import { isValidPantry } from './pantry.js';
 import { isValidBoard, isValidVillagers } from './villagers.js';
 import { isValidPochette } from './pochette.js';
 import { isValidExplored } from './explore.js';
@@ -45,6 +46,7 @@ export function isValidState(s) {
   if (s.ramenDay !== undefined && !num(s.ramenDay)) return false;
   if (s.liquorLesson !== undefined && !num(s.liquorLesson)) return false;
   if (s.study !== undefined && !isValidStudy(s.study)) return false; // 시험 공부(술 강의 · 토벌 안내서 · 레시피 북)
+  if (s.pantry !== undefined && !isValidPantry(s.pantry)) return false; // 친구들의 가방(선물 · 전리품)
   if (s.board !== undefined && !isValidBoard(s.board)) return false; // 예전 저장에는 없다
   if (s.villagers !== undefined && !isValidVillagers(s.villagers)) return false;
   if (s.theftDay !== undefined && !num(s.theftDay)) return false;

@@ -141,10 +141,15 @@ export function befriend(state, kind, action, day) {
 export function befriendBy(state, kind, pts, day) {
   return gain(state, kind, friendOf(state, kind), pts, day);
 }
-/** 그날 상한 안에서 pts 만큼 올리고, 하트가 GIFT_HEARTS 개가 되면 선물 가구를 집에 넣는다. */
-function gain(state, kind, f, pts, day) {
-  const before = friendOf(state, kind), got = Math.max(0, Math.min(pts, DAY_CAP - todayPts(f, day)));
-  const next = { ...f, pts: f.pts + got, capDay: day, capPts: todayPts(f, day) + got };
+/** 선물(gifts.js)로 오르는 친밀도: 하루 한 번(gotDay)이라 일상 친밀도의 그날 상한과 따로 센다. → befriend 와 같은 모양 */
+export function giftBond(state, kind, pts, day) {
+  const f = { ...friendOf(state, kind), gotDay: day };
+  return gain(state, kind, f, pts, day, false);
+}
+/** 그날 상한 안에서(capped 가 false 면 상한 없이) pts 만큼 올리고, 하트가 GIFT_HEARTS 개가 되면 선물 가구를 집에 넣는다. */
+function gain(state, kind, f, pts, day, capped = true) {
+  const before = friendOf(state, kind), got = capped ? Math.max(0, Math.min(pts, DAY_CAP - todayPts(f, day))) : Math.max(0, pts);
+  const next = capped ? { ...f, pts: f.pts + got, capDay: day, capPts: todayPts(f, day) + got } : { ...f, pts: f.pts + got };
   let s = state, gift = null;
   const giftId = FRIENDS[kind] && FRIENDS[kind].gift;
   if (giftId && !next.gift && hearts(next) >= GIFT_HEARTS) {
@@ -210,5 +215,5 @@ export function isValidFriends(fr) {
   if (!fr || typeof fr !== 'object' || Array.isArray(fr)) return false;
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   return Object.entries(fr).every(([kind, f]) => FRIENDS[kind] && f && num(f.pts) && f.pts >= 0 && num(f.talk) && num(f.play) && typeof f.gift === 'boolean'
-    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt', 'watch', 'giftDay', 'capDay', 'capPts'].every((k) => f[k] === undefined || num(f[k])));
+    && (f.debt === undefined || (num(f.debt) && f.debt >= 0)) && ['drink', 'home', 'snack', 'hunt', 'watch', 'giftDay', 'gotDay', 'capDay', 'capPts'].every((k) => f[k] === undefined || num(f[k])));
 }

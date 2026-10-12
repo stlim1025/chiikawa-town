@@ -20,13 +20,16 @@ export const PRIZES = [
   { id: 'white', rank: '참가상', ballName: '하얀', ball: '#fbfaf5', item: 'tissue', weight: 48 }
 ];
 
-/** 추첨에서만 받는 물건(먹을 것 · 휴지). */
+/**
+ * 추첨에서만 받는 물건(먹을 것 · 휴지). sell: 노동 접수에서 팔 때 받는 값 — 3등까지는 한 번 돌리는 값(RAFFLE_PRICE)보다 비싸게 팔린다
+ * (평균으로는 돌리는 값보다 덜 받는다: 무게대로 따지면 한 번에 100원 남짓).
+ */
 export const RAFFLE_ITEMS = {
-  hotpot: { name: '전골 세트', kind: 'food', note: '경품 추첨 1등! 냄비 가득 보글보글 끓는 전골. 먹으면 기운이 60 찬다.', eat: 60 },
-  fruitbasket: { name: '과일 바구니', kind: 'food', note: '경품 추첨 2등. 반들반들한 과일이 가득. 먹으면 기운이 35 찬다.', eat: 35 },
-  cookies: { name: '쿠키 상자', kind: 'food', note: '경품 추첨 3등. 바삭바삭 버터 쿠키. 먹으면 기운이 18 찬다.', eat: 18 },
-  candy: { name: '막대 사탕', kind: 'food', note: '경품 추첨 4등. 달콤한 딸기 맛. 먹으면 기운이 6 찬다.', eat: 6 },
-  tissue: { name: '휴지', kind: 'misc', note: '경품 추첨 참가상. 부드러운 휴지 한 팩. 울보 친구에게 선물하면 좋아할지도?' }
+  hotpot: { name: '전골 세트', kind: 'food', note: '경품 추첨 1등! 냄비 가득 보글보글 끓는 전골. 먹으면 기운이 60 찬다. 노동 접수에서 1,200원에 팔린다.', eat: 60, sell: 1200 },
+  fruitbasket: { name: '과일 바구니', kind: 'food', note: '경품 추첨 2등. 반들반들한 과일이 가득. 먹으면 기운이 35 찬다. 노동 접수에서 400원에 팔린다.', eat: 35, sell: 400 },
+  cookies: { name: '쿠키 상자', kind: 'food', note: '경품 추첨 3등. 바삭바삭 버터 쿠키. 먹으면 기운이 18 찬다. 노동 접수에서 200원에 팔린다.', eat: 18, sell: 200 },
+  candy: { name: '막대 사탕', kind: 'food', note: '경품 추첨 4등. 달콤한 딸기 맛. 먹으면 기운이 6 찬다.', eat: 6, sell: 40 },
+  tissue: { name: '휴지', kind: 'misc', note: '경품 추첨 참가상. 부드러운 휴지 한 팩. 울보 친구에게 선물하면 좋아할지도?', sell: 10 }
 };
 registerItems(RAFFLE_ITEMS);
 

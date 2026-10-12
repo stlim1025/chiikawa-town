@@ -114,7 +114,8 @@ import { createCliff } from './world/cliff.js';
 import { createPit } from './world/pit.js';
 import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
-import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName } from './core/ground.js';
+import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName, placeItem } from './core/ground.js';
+import { pantryOf, addToPantry, takeFromPantry, snackOf, shareOf, sellPantry, thanksOf, hatedOf, SNACK_ENERGY } from './core/pantry.js';
 import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest } from './core/quests.js';
 
 const ui = document.getElementById('ui');
@@ -2113,11 +2114,49 @@ function boot() {
     giftFor = null;
     if (!n) return;
     const r = giveGift(state, n.kind, id, state.clock.day);
-    if (!r.ok) { sayAs(n, [r.reason === 'cap' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
+    if (!r.ok) { sayAs(n, [r.reason === 'today' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
     commit(r.state);
-    sound.play('job');
+    sound.play(r.taste === 'hate' ? 'none' : 'job');
     hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2400, { icon: itemSvg(id) });
+    // 싫어하는 선물: 성격대로 살짝 싫은 티를 낸다(친밀도는 안 오른다). 모몽가 · 우사기는 대화가 끝나자마자 내 앞에서 버리고,
+    // 착한 친구들은 일단 받아 두었다가 내가 없을 때 몰래 버린다(lifeDecide · staffTossSecret)
+    if (r.taste === 'hate') { sayAs(n, [giftLine(n.kind, 'hate')], () => { endTalk(); if (r.tossNow) tossAway(n, id); }); return; }
     sayAs(n, [giftLine(n.kind, r.love ? 'love' : 'ok')], () => showBond(n, r));
+  }
+  /** 내가 그 친구를 볼 수 없는지(멀리 있거나 집 안 · 연출 중): 착한 친구는 이럴 때만 몰래 버린다. */
+  const unseen = (n) => mode !== 'play' || Math.hypot(player.position.x - n.x, player.position.z - n.z) > 18;
+  /** 싫은 선물을 받아 둔 착한 친구: 조용한 곳으로 걸어가 두리번거리고, 그래도 내가 안 보이면 몰래 내려놓는다(보이면 그만둔다). */
+  function npcTossSecret(n, id) {
+    const a = Math.random() * Math.PI * 2, spot = village.nearestFree(n.x + Math.sin(a) * 4.5, n.z + Math.cos(a) * 4.5, 0.5);
+    setDoing(n.kind, null, '산책');
+    npcs.plan(n, [{ do: 'walk', x: spot.x, z: spot.z, near: 0.5 }, { do: 'act', anim: 'look', time: 1.6 }, {
+      do: 'call', fn: () => {
+        if (!state || !pantryOf(state, n.kind)[id] || !unseen(n)) { restHere(n.kind, 5); return; } // 들킬 것 같으면 다음에
+        commit(placeItem(takeFromPantry(state, n.kind, id, 1).state, id, 1, n.x + 0.4, n.z + 0.3), false);
+        npcs.say(n, giftLine(n.kind, 'toss'));
+        restHere(n.kind, 6 + Math.random() * 6);
+      }
+    }]);
+  }
+  /** 가게를 지키는 사람(갑옷 씨들 · 시사 · 카니)은 자리를 비우지 않고, 내가 안 보일 때 가게 옆에 슬쩍 내려놓는다. */
+  function staffTossSecret(n, kind) {
+    const id = hatedOf(state, kind);
+    if (!id || !unseen(n)) return;
+    const at = village.nearestFree(n.x - 0.9, n.z + 0.6, 0.3);
+    commit(placeItem(takeFromPantry(state, kind, id, 1).state, id, 1, at.x, at.z), false);
+    npcs.say(n, giftLine(kind, 'toss'));
+  }
+  /** 싫어하는 선물을 받은 친구가 조금 떨어진 곳에 버린다(바닥 물건이라 내가 다시 주울 수 있다). 친구 집 안이면 그 집 문 앞에. */
+  function tossAway(n, id) {
+    setTimeout(() => {
+      if (!state || !n) return;
+      const inside = mode === 'visit', d = inside ? homeDoor(n.kind) : null;
+      const a = (n.yaw || 0) + Math.PI * (0.6 + Math.random() * 0.8), bx = d ? d.x : n.x, bz = d ? d.z + 1.2 : n.z;
+      const at = village.nearestFree(bx + Math.sin(a) * 1.1, bz + Math.cos(a) * 1.1, 0.3);
+      commit(placeItem(state, id, 1, at.x, at.z));
+      if (!inside) npcs.emote(n, 'think', 1.2);
+      npcs.say(n, giftLine(n.kind, 'toss'));
+    }, 700);
   }
   /** 친밀도가 오른 것을 보여 주고(머리 위 하트 · 선물 가구) 대화를 끝낸다. r: befriend 결과 모양 */
   function showBond(n, r) {
@@ -2684,6 +2723,7 @@ function boot() {
       const n = npcs.byKind(kind);
       if (!n || n.away || staged.has(kind) || npcs.busy(n) || n === talking) continue; // 연출 중(시사 시험 날)이면 그대로
       staffGreet(n, kind);
+      if (Math.random() < 0.03) staffTossSecret(n, kind); // 싫은 선물을 받아 뒀으면 내가 안 볼 때 슬쩍
       if (lifeClock >= restUntil[kind]) staffDecide(n, kind, hour);
     }
     maybeSteal(day, hour);
@@ -2729,6 +2769,7 @@ function boot() {
           npcs.say(n, lineOf(n.kind, 'jobDone', { pay: `+${won(pay)}` }));
           happen({ type: 'job', who: n.kind, title: T.title });
           setTimeout(() => staffSay('labor', 'paid', 8, n), 1600);
+          npcSellBag(n);
         } else {
           if (job.day === state.clock.day) commit(returnToBoard(state, typeId, job.day), false); // 그날 일감이면 다시 건다
           npcs.say(n, lineOf(n.kind, 'jobFail'));
@@ -2793,7 +2834,8 @@ function boot() {
         onKill: (m) => {
           job.done++;
           tireNpc(n.kind, 8);
-          commit(addKill(state, n.kind, m.species), false);
+          const s = addKill(state, n.kind, m.species);
+          commit(m.M.drop && Math.random() < 0.6 ? addToPantry(s, n.kind, m.M.drop, 1).state : s, false); // 전리품은 친구 가방에(게시판에서 판다)
           npcs.say(n, lineOf(n.kind, 'huntCry'));
           rankNews();
         } },
@@ -2804,6 +2846,7 @@ function boot() {
           commit(payVillager(state, n.kind, pay, state.clock.day), false);
           npcs.say(n, lineOf(n.kind, 'huntDone', { pay: `+${won(pay)}` }));
           happen({ type: 'hunt', who: n.kind, mon: MONSTERS[T.kind] ? MONSTERS[T.kind].name : '몬스터' });
+          npcSellBag(n);
         } else {
           if (job.day === state.clock.day) commit(returnToBoard(state, typeId, job.day), false);
           npcs.say(n, lineOf(n.kind, 'huntFail'));
@@ -3020,6 +3063,46 @@ function boot() {
     }]);
   }
 
+  // ---------- 친구들의 가방(core/pantry.js): 꺼내 먹기 · 나눠 주기 · 팔기 · 답례 ----------
+  const SNACK_SAY = { chiikawa: '…냠…♪', hachiware: '냠냠~ 맛있다!', usagi: '우라~!', kurimanju: '하아~ 맛있네', rakko: '…훗. 맛있군.', momonga: '흥, 맛있네!' };
+  const SHARE_SAY = {
+    chiikawa: '…{w}… 이거 좋아하지…? 줄게…!', hachiware: '{w}! 이거 좋아하지? 너 줄게~', usagi: '(가방에서 불쑥 꺼내 내민다) 우라!',
+    kurimanju: '하아~ 이거 {w} 좋아하잖아. 가져가', rakko: '…{w}, 이거 받아라.', momonga: '흥! 나 이거 필요 없어. {w} 가져!'
+  };
+  const THANKS_SAY = {
+    chiikawa: '…이거… 받은 건데… 너한테 주고 싶어…!', hachiware: '이거 받았는데~ 너 주고 싶어서 아껴 뒀어!', usagi: '(가방을 뒤적뒤적… 불쑥 내민다) 야하!',
+    kurimanju: '하아~ 이거 너 줄게. 늘 고마우니까', rakko: '…답례다. 받아라.', momonga: '흥! 남아서 주는 거야! 고마워서 그런 거 아니야!'
+  };
+  /** 가방의 먹을 것을 꺼내 먹는다: 그 자리에서 냠냠, 기운이 찬다(마을 소식에도 남는다). */
+  function npcSnack(n, id) {
+    const info = itemInfo(id);
+    setDoing(n.kind, 'bowl', `${info.name} 먹기`);
+    npcs.plan(n, [{ do: 'act', anim: 'nibble', time: 3.2, say: `${SNACK_SAY[n.kind] || '냠냠'} (${josa(info.name, '을/를')} 꺼내 먹는다)` }, {
+      do: 'call', fn: () => {
+        const t = takeFromPantry(state, n.kind, id, 1);
+        if (t.taken) { commit(villagerEnergy(t.state, n.kind, info.eat, state.clock.day), false); happen({ type: 'snack', who: n.kind, item: info.name }); }
+        restHere(n.kind, 6 + Math.random() * 8);
+      }
+    }]);
+  }
+  /** 수다 끝에: 내가 좋아하지 않는데 상대가 좋아하는 물건이 가방에 있으면 나눠 준다. → 나눠 줬는지 */
+  function shareAfterChat(from, to) {
+    const id = shareOf(state, from.kind, to.kind);
+    if (!id || Math.random() > 0.8) return false;
+    commit(addToPantry(takeFromPantry(state, from.kind, id, 1).state, to.kind, id, 1).state, false);
+    npcs.say(from, (SHARE_SAY[from.kind] || '이거 줄게!').replace('{w}', nameOf(to.kind)));
+    setTimeout(() => { if (!state) return; npcs.say(to, giftLine(to.kind, 'love')); npcs.emote(to, joyAnim(to.kind), 1.6); }, 1500);
+    happen({ type: 'share', who: from.kind, with: to.kind, item: itemInfo(id).name });
+    return true;
+  }
+  /** 노동 접수에 온 김에 가방의 전리품 · 풀(좋아하지 않는 것)을 팔아 지갑에 보탠다. */
+  function npcSellBag(n) {
+    const r = sellPantry(state, n.kind);
+    if (!r.earned) return;
+    commit(payVillager(r.state, n.kind, r.earned, state.clock.day), false);
+    setTimeout(() => { if (state) npcs.say(n, `가방 정리~ +${won(r.earned)}`); }, 2600);
+  }
+
   // ---------- 똑똑한 친구들: 마음(욕구) · 하는 일 · 오늘 기억과 소문 · 친구끼리 수다 · 공연 · 먼저 다가오기 ----------
   // 친구마다 { fun 심심함, social 외로움, doing 지금 하는 일 { icon, text }, mem 기억한 일(어제 · 오늘), told 나에게 한 이야기, greetAt }
   const minds = {};
@@ -3078,6 +3161,12 @@ function boot() {
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
+    // 배가 고프면 가방(선물 · 나눠 받은 것)의 먹을 것을 꺼내 먹는다(라멘값을 아낀다)
+    const snack = v.energy < SNACK_ENERGY && hour >= 7 && hour < 21 ? snackOf(state, kind) : null;
+    if (snack && (v.energy < TIRED || Math.random() < 0.75)) { npcSnack(n, snack); return 'snack'; } // 지쳤으면 낮잠보다 간식 먼저
+    // 싫은 선물을 받아 둔 착한 친구: 내가 멀리 있을 때 몰래 버리러 간다
+    const hated = hatedOf(state, kind);
+    if (hated && unseen(n) && Math.random() < 0.5) { npcTossSecret(n, hated); return 'toss'; }
     const goal = goalOf(state, kind);
     const ctx = {
       kind, hour, energy: v.energy, money: v.money, fun: m.fun, social: m.social, diligence: spec.diligence, appetite: spec.eat,
@@ -3162,6 +3251,7 @@ function boot() {
         happen({ type: 'chat', who: a.kind, with: b.kind });
         if (conv.told) remember(b.kind, conv.told);
         minds[b.kind] = satisfy(mindOf(b.kind), 'chat');
+        if (!shareAfterChat(a, b)) shareAfterChat(b, a); // 가방에 상대가 좋아하는 게 있으면 나눠 준다
       }
     });
   }
@@ -3309,7 +3399,10 @@ function boot() {
     lastGreetAt = lifeClock;
     const story = untold(kind), G = GIFT[kind];
     const line = story ? story.line : fillLine(pickLine(GREET_RUN[kind] || ['{me}!']), { me: myName() });
-    const gift = h >= 3 && G && f.giftDay !== state.clock.day && Math.random() < 0.35 ? G : null;
+    // 친한 친구의 선물: 가방에 좋아하지 않는 물건이 있으면 그걸 답례로(없으면 늘 주던 것)
+    const back = thanksOf(state, kind);
+    const gift = h >= 3 && G && f.giftDay !== state.clock.day && Math.random() < 0.35
+      ? (back && Math.random() < 0.6 ? { item: back, n: 1, line: THANKS_SAY[kind] || G.line, fromBag: true } : G) : null;
     setDoing(kind, 'heart', '나에게 인사');
     const far = Math.hypot(player.position.x - n.x, player.position.z - n.z) > 7;
     const steps = [{ do: 'approach', near: 1.8, max: 18, run: far }, {
@@ -3326,7 +3419,8 @@ function boot() {
   }
   /** 친한 친구가 주는 선물(하루 한 번). */
   function giftFrom(n, g) {
-    const r = addItem(state, g.item, g.n);
+    if (g.fromBag && !pantryOf(state, n.kind)[g.item]) return; // 다가오는 사이 먹거나 나눠 줬다
+    const r = addItem(g.fromBag ? takeFromPantry(state, n.kind, g.item, g.n).state : state, g.item, g.n);
     if (!r.added) return;
     commit(markDay(r.state, n.kind, 'giftDay', state.clock.day));
     npcs.say(n, g.line);

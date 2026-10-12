@@ -5,7 +5,7 @@ import { LIKES, loves, canGift, giveGift, giftLine } from '../src/core/gifts.js'
 import { ACCESSORY_ITEMS, craftAccessory, buyAccessory, wardrobeOf, isValidWardrobe } from '../src/core/wardrobe.js';
 import { JOB_TYPES } from '../src/core/jobs.js';
 import { DROPS } from '../src/core/combat.js';
-import { FRIENDS, friendOf, DAY_CAP } from '../src/core/friends.js';
+import { FRIENDS, friendOf, DAY_CAP, befriend } from '../src/core/friends.js';
 import { addItem, countOf, itemInfo } from '../src/core/inventory.js';
 import { createState } from '../src/core/state.js';
 import { SHOPS } from '../src/core/shop.js';
@@ -72,18 +72,20 @@ test('선물: 좋아하는 물건이면 친밀도가 더 오르고, 하나만 �
   assert.equal(friendOf(love.state, 'chiikawa').pts, 2);
   const plain = giveGift(s, 'hachiware', 'weed', 3);
   assert.ok(plain.ok && !plain.love);
-  assert.equal(plain.gained, 1);
+  assert.equal(plain.gained, 0, '값싼 보통 물건은 받기만 하고 친밀도는 안 오른다');
 });
 
-test('선물: 하루 친밀도 상한이 차면 받지 않고 물건도 그대로', () => {
+test('선물: 한 친구에게 하루 한 번(받지 않으면 물건도 그대로), 이야기 · 놀기 상한과는 따로', () => {
   let s = withItems({ tissue: 5 });
-  s = giveGift(s, 'chiikawa', 'tissue', 3).state; // +2 = DAY_CAP
+  s = befriend(befriend(s, 'chiikawa', 'talk', 3).state, 'chiikawa', 'play', 3).state; // 그날 일상 상한(DAY_CAP)을 채워도
   assert.equal(DAY_CAP, 2);
-  const again = giveGift(s, 'chiikawa', 'tissue', 3);
+  const first = giveGift(s, 'chiikawa', 'tissue', 3);
+  assert.ok(first.ok && first.gained > 0, '선물 점수는 따로 오른다');
+  const again = giveGift(first.state, 'chiikawa', 'tissue', 3);
   assert.equal(again.ok, false);
-  assert.equal(again.reason, 'cap');
-  assert.equal(countOf(again.state, 'tissue'), countOf(s, 'tissue'));
-  assert.ok(giveGift(s, 'chiikawa', 'tissue', 4).ok, '다음 날은 또 받는다');
+  assert.equal(again.reason, 'today');
+  assert.equal(countOf(again.state, 'tissue'), countOf(first.state, 'tissue'));
+  assert.ok(giveGift(first.state, 'chiikawa', 'tissue', 4).ok, '다음 날은 또 받는다');
 });
 
 test('선물: 없는 물건 · 모르는 친구는 안 되고, 대사는 친구마다(없으면 기본)', () => {
