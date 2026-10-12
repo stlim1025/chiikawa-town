@@ -50,13 +50,15 @@ export function openSticker(ui, { need, done = 0, stamina, maxStamina, onResult,
     fruitEl.classList.remove('stuck');
     fruit = { start: performance.now(), dur: (2.4 - Math.min(made, 8) * 0.08) / d.speedScale, judged: false };
   }
-  /** 과일 가운데 위치(0..1, 0.5 가 틀 한가운데). 시간으로 계산해서 화면이 드문드문 그려져도 정확하다. */
-  const pos = () => Math.min(1.1, -0.1 + ((performance.now() - fruit.start) / 1000 / fruit.dur) * 1.2);
+  /** 과일 가운데 위치(0..1, 0.5 가 틀 한가운데). 시간으로 계산해서 화면이 드문드문 그려져도 정확하다. at: 그 시각(누른 순간). */
+  const pos = (at = performance.now()) => Math.min(1.1, -0.1 + ((at - fruit.start) / 1000 / fruit.dur) * 1.2);
+  /** 누른 순간의 시각: 이벤트에 찍힌 시각(화면이 바빠 처리가 늦어도 누른 그때로 판정). 믿을 수 없는 값이면 지금. */
+  const pressedAt = (e) => { const now = performance.now(), t = e && e.timeStamp; return t > 0 && t <= now && now - t < 500 ? t : now; };
 
-  function judge() {
-    if (!alive || !fruit || fruit.judged) return;
+  function judge(at = performance.now()) {
+    if (!alive || !fruit || fruit.judged || at < fruit.start) return; // 지난 과일 때 누른 것을 새 과일의 빗나감으로 치지 않는다
     fruit.judged = true;
-    const off = Math.abs(pos() - 0.5), half = zoneW / 200;
+    const off = Math.abs(pos(at) - 0.5), half = zoneW / 200;
     const result = off <= half * 0.35 ? 'clean' : off <= half ? 'snapped' : 'none';
     const r = onResult(result);
     if (r === false) { finish(); return; }
@@ -90,11 +92,15 @@ export function openSticker(ui, { need, done = 0, stamina, maxStamina, onResult,
   }
   const onKey = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); finish(); }
-    else if ((e.key === ' ' || e.key === 'Enter') && document.activeElement !== wrap.querySelector('[data-quit]')) { e.preventDefault(); judge(); }
+    else if ((e.key === ' ' || e.key === 'Enter') && document.activeElement !== wrap.querySelector('[data-quit]')) { e.preventDefault(); if (!e.repeat) judge(pressedAt(e)); }
   };
   document.addEventListener('keydown', onKey, true);
-  go.addEventListener('click', judge);
-  belt.addEventListener('pointerdown', (e) => { e.preventDefault(); judge(); });
+  // 손(마우스)이 닿는 순간에 판정한다: 아이폰은 click 이 손을 뗄 때 와서, 가운데보다 일찍 눌러야 맞던 문제가 있었다
+  let lastTap = -1e9;
+  const tap = (e) => { e.preventDefault(); lastTap = performance.now(); judge(pressedAt(e)); };
+  go.addEventListener('pointerdown', tap);
+  go.addEventListener('click', () => { if (performance.now() - lastTap > 600) judge(); }); // 보조 기기처럼 누름 없이 오는 click 만
+  belt.addEventListener('pointerdown', tap);
   wrap.querySelector('[data-quit]').addEventListener('click', finish);
 
   showCount();
