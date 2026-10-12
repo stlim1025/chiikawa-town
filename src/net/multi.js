@@ -4,6 +4,8 @@
  * SignalR 클라이언트는 처음 들어갈 때만 CDN 에서 불러온다(같이 놀기를 안 쓰면 받지 않는다).
  */
 const SIGNALR_URL = 'https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/+esm';
+/** 같이 놀기 서버(Tailscale Funnel 고정 주소, server/README.md). 화면에는 보이지 않고 방 코드만 넣는다. */
+export const DEFAULT_SERVER = 'desktop-jc07560.tail4a150e.ts.net';
 /** 위치를 보내는 간격(초). 서버는 0.05초보다 자주 오면 버린다. */
 export const SEND_EVERY = 0.1;
 /** 가만히 있어도 이만큼(초)마다 한 번은 보낸다. */
@@ -101,7 +103,7 @@ export function createMulti(events = {}) {
         return status === 'on';
       } catch {
         await stop();
-        setStatus('error', '서버에 연결할 수 없어요. 주소와 서버가 켜져 있는지 확인해 주세요');
+        setStatus('error', '같이 놀기 서버에 연결할 수 없어요. 서버가 켜져 있을 때 다시 해 주세요');
         return false;
       }
     },

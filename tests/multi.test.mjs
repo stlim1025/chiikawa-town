@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hubUrl, roomCode } from '../src/net/multi.js';
+import { hubUrl, roomCode, DEFAULT_SERVER } from '../src/net/multi.js';
+
+test('고정 서버 주소는 Tailscale Funnel 의 https 허브 주소가 된다', () => {
+  assert.match(hubUrl(DEFAULT_SERVER), /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.ts\.net\/town$/);
+});
 
 test('서버 주소를 허브 주소로: 도메인만 넣으면 https, localhost 는 http, 끝에 /town', () => {
   assert.equal(hubUrl('my-pc.tail1234.ts.net'), 'https://my-pc.tail1234.ts.net/town');

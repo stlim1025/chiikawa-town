@@ -27,7 +27,7 @@ import { createNpcs } from './actors/npcs.js';
 import { createInput } from './ui/joystick.js';
 import { createHud } from './ui/hud.js';
 import { createPanels, ICO } from './ui/panels.js';
-import { createMulti } from './net/multi.js';
+import { createMulti, DEFAULT_SERVER } from './net/multi.js';
 import { createRemotePlayers } from './net/remote.js';
 import { openCreator } from './ui/creator.js';
 import { showTitle } from './ui/title.js';
@@ -217,18 +217,20 @@ function boot() {
     said: (id, text) => remotes.say(id, text), emote: (id, name) => remotes.emote(id, name), cleared: () => remotes.clear(),
     status: () => panels.refresh('multi')
   });
-  // 서버 주소 · 방 코드는 이 브라우저에 기억해 둔다(다음에 또 넣지 않게)
-  const MP_KEY = { server: 'chiikawa-town-mp-server', code: 'chiikawa-town-mp-room' };
+  // 서버 주소는 고정(DEFAULT_SERVER, 화면에 보이지 않는다). 내 PC 에서 시험할 때만 주소 뒤 ?mpserver=localhost:5280 으로 바꾼다.
+  // 방 코드는 이 브라우저에 기억해 둔다(다음에 또 넣지 않게)
+  const mpServer = new URLSearchParams(location.search).get('mpserver') || DEFAULT_SERVER;
+  const MP_KEY = { code: 'chiikawa-town-mp-room' };
   const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 저장이 막혀 있으면 이번만 */ } };
-  const mpDraft = { server: lsGet(MP_KEY.server), code: lsGet(MP_KEY.code) };
+  const mpDraft = { code: lsGet(MP_KEY.code) };
   let mySay = null; // 내가 한 한마디 { text, until } — 내 머리 위에도 말풍선
   const multiPanel = {
-    state: () => ({ status: multi.status, error: multi.error, room: multi.room, players: multi.players, server: mpDraft.server, code: mpDraft.code }),
-    draft(key, v) { mpDraft[key] = v; lsSet(MP_KEY[key], v); },
+    state: () => ({ status: multi.status, error: multi.error, room: multi.room, players: multi.players, code: mpDraft.code }),
+    draft(key, v) { if (!MP_KEY[key]) return; mpDraft[key] = v; lsSet(MP_KEY[key], v); },
     connect() {
       if (!state || !player) return;
-      multi.connect(mpDraft.server, mpDraft.code, { name: myName(), look: myLook(), x: player.position.x, z: player.position.z, yaw: player.yaw });
+      multi.connect(mpServer, mpDraft.code, { name: myName(), look: myLook(), x: player.position.x, z: player.position.z, yaw: player.yaw });
     },
     leave() { multi.leave(); },
     say(text) { multi.say(text); mySay = { text, until: performance.now() + 3500 }; }

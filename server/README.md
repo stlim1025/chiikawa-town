@@ -20,9 +20,11 @@ dotnet run
 
 ### 혼자 시험하기(내 PC 안에서만)
 
+게임은 고정 서버 주소(`src/net/multi.js` 의 `DEFAULT_SERVER`)로 붙는다. 내 PC 서버로 시험할 때만 주소 뒤에 `?mpserver=` 를 붙인다.
+
 1. 게임을 `python -m http.server 8765` 로 띄운다(저장소 루트에서).
-2. 게임 마을폰 → **같이 놀기** → 서버 주소 `localhost:5280`, 방 코드 아무거나(예: `test`) → 들어가기.
-3. 다른 창에서 `http://127.0.0.1:8765` 로 열면 저장이 따로라서 다른 캐릭터로 같은 방에 들어가 볼 수 있다.
+2. `http://localhost:8765/?mpserver=localhost:5280` 로 열고 마을폰 → **같이 놀기** → 방 코드 아무거나(예: `test`) → 들어가기.
+3. 다른 창에서 `http://127.0.0.1:8765/?mpserver=localhost:5280` 로 열면 저장이 따로라서 다른 캐릭터로 같은 방에 들어가 볼 수 있다.
 
 ## 친구와 놀기: Tailscale Funnel
 
@@ -37,11 +39,12 @@ Tailscale Funnel 을 쓰면 **공유기 포트포워딩 · 방화벽 · 인증�
    tailscale funnel --bg 5280
    ```
 
-4. `tailscale funnel status` 로 나온 주소(`https://….ts.net`)를 친구에게 알려 준다.
-5. 친구는 게임 마을폰 → **같이 놀기** → 서버 주소에 그 주소(앞의 `https://` 는 빼도 된다)와 같은 방 코드를 넣는다.
+4. `tailscale funnel status` 로 나온 주소(`https://….ts.net`)가 게임의 `DEFAULT_SERVER`(`src/net/multi.js`)와 같은지 확인한다.
+   지금 주소: `desktop-jc07560.tail4a150e.ts.net`. 주소가 바뀌면 `DEFAULT_SERVER` 만 고치면 된다.
+5. 친구는 GitHub Pages 의 게임에서 마을폰 → **같이 놀기** → **방 코드만** 넣고 들어간다(서버 주소는 화면에 보이지 않는다).
 
 > PC 가 켜져 있고 서버가 돌고 있을 때만 들어올 수 있습니다.
-> 이 주소는 누구에게나 열려 있으니 방 코드는 친구끼리만 나누세요.
+> 서버 주소는 누구에게나 열려 있으니 방 코드는 친구끼리만 나누세요. 안 쓸 때는 `tailscale funnel --https=443 off` 로 끌 수 있습니다.
 
 ## 설정(`appsettings.json`)
 

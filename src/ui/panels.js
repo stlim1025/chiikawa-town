@@ -1161,7 +1161,7 @@ export function createPanels(ui, handlers) {
       return saveMode === 'in' ? saveImport() : saveExport(s);
     },
     /**
-     * 마을폰 '같이 놀기': 서버 주소와 방 코드를 넣고 들어가면 같은 방 친구들이 내 마을에 보인다.
+     * 마을폰 '같이 놀기': 방 코드를 넣고 들어가면 같은 방 친구들이 내 마을에 보인다(서버 주소는 고정이라 보이지 않는다).
      * 진행은 각자 기기에 있고, 서버는 움직임과 한마디만 나눈다. handlers.multi = { state(), draft(key, v), connect(), leave(), say(text) }
      */
     multi() {
@@ -1175,13 +1175,13 @@ export function createPanels(ui, handlers) {
       out.push(h('p', { class: st.status === 'error' ? 'note warn' : 'phone-note' },
         on ? `${st.room} 방에 나까지 ${st.players.length + 1}명이 있어요` : busy ? '서버에 연결하는 중…' : st.status === 'error' ? st.error : '같은 방 코드를 넣은 친구들이 내 마을에 보여요'));
       if (!on) {
-        out.push(...field('서버 주소', 'server', '예: my-pc.tail1234.ts.net', 120), ...field('방 코드', 'code', '예: 치이카와', 16));
+        out.push(...field('방 코드', 'code', '예: 치이카와', 16));
         out.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.connect() }, busy ? '연결하는 중…' : '들어가기')));
         return out;
       }
       out.push(h('h3', { class: 'shop-sec' }, '같이 있는 친구'),
         st.players.length ? h('div', { class: 'mp-players' }, st.players.map((p) => h('span', { class: 'chip' }, p.name)))
-          : h('p', { class: 'note' }, '아직 아무도 없어요. 친구에게 서버 주소와 방 코드를 알려 주세요'));
+          : h('p', { class: 'note' }, '아직 아무도 없어요. 친구에게 방 코드를 알려 주세요'));
       out.push(h('h3', { class: 'shop-sec' }, '한마디'),
         h('div', { class: 'mp-says' }, MP_SAYS.map((t) => h('button', { class: 'btn', type: 'button', onClick: () => { M.say(t); close(); } }, t))));
       out.push(h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => M.leave() }, '나가기')));
