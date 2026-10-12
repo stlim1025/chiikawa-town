@@ -989,9 +989,13 @@ function boot() {
           if (state.license.grade >= NOVICE) cheerGrade5(); // 첫 자격(견습 → 5급): 안내해 준 하치와레가 축하
           player.cheerTime = 2;
         } else {
+          // 불합격: 작은 알림 한 줄로는 떨어진 줄도 몰랐다 → 자격증 필기처럼 가운데 '불합격' 도장 카드(몇 번까지 했는지, 다시 볼 곳 · 값)
+          const g = next.license.grade;
           next = { ...next, exam: null };
           sound.play('fail');
-          hud.toast('불합격…', 2400);
+          hud.notice({ kicker: `제초 검정 ${gradeName(g - 1)} 시험`, stamp: '불합격', tone: 'bad', sub: `${josa(W.name, '이/가')} 끊어져서 연속이 끊겼어요(깔끔하게 ${exam.streak} / ${exam.need}번)`,
+            chips: [{ icon: ICO.pin, text: '검정소에서 다시' }, { icon: 'coin', text: won(EXAM_FEE[g]) }], ok: '다시 해 볼게요' });
+          staffSay('captain', 'fail', 16, player.position);
         }
       } else next = { ...next, exam };
     }
