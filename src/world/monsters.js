@@ -43,6 +43,11 @@ const FENCE = VILLAGE_R + 1.4;
 const REFILL_SECONDS = 20;
 /** 내 몸 반지름(맞았는지 잴 때 더한다). */
 const ME = 0.32;
+/**
+ * 알아채기: 데이터의 aggro 보다 좁게(내가 보기도 전에 덤벼 왔다). 카메라 쪽(남쪽 — 화면 아래, 거의 화면 밖)에 있으면 더 좁게.
+ * 알아챈 뒤 NOTICE_SEC('!' 가 떠 있는 동안)은 쫓아오기만 하고 공격하지 않는다. 보스는 제 마당 안에서만 보니 그대로.
+ */
+const NOTICE_SCALE = 0.75, NOTICE_BEHIND = 0.7, NOTICE_SEC = 0.9;
 
 /**
  * 공격 방식. 모두 '예고(wind) → 공격(act) → 휘청(rec) → 쉬기(cool)' 순서다.
@@ -1363,11 +1368,13 @@ export function createMonsters(scene, village, random = Math.random) {
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
           // 노리는 상대가 들어가 있는 보스 마당: 안팎이 갈리면 서로 못 본다(바깥 몬스터는 분지 · 협곡 안의 나를 쫓지 않고, 보스는 분지 안의 나만 본다)
           const tArena = arenaAt(P.x, P.z, 0.2), tZone = tArena || canyonAt(P.x, P.z);
-          const canSee = ctx.active && !safeFrom(m) && !m.dormant && (m.arena ? tArena === m.arena : !tZone) && pd < (m.engaged ? M.aggro * 1.7 : M.aggro);
+          const sight = m.engaged ? M.aggro * 1.7 : M.boss ? M.aggro : M.aggro * NOTICE_SCALE * (m.z > P.z + 1 ? NOTICE_BEHIND : 1);
+          const canSee = ctx.active && !safeFrom(m) && !m.dormant && (m.arena ? tArena === m.arena : !tZone) && pd < sight;
           if ((m.state === 'wander' || m.state === 'chase') && fromHome > LEASH) { m.state = 'return'; hideTele(m); }
           if (m.state === 'wander') {
             if (canSee) {
-              m.state = 'chase'; m.alert = 0.9; m.engaged = true;
+              m.state = 'chase'; m.alert = NOTICE_SEC; m.engaged = true;
+              m.cool = Math.max(m.cool, NOTICE_SEC); // '!' 가 떠 있는 동안은 공격하지 않는다(알아채자마자 덤비지 않게)
               // 둘레에 같이 토벌하는 친구가 있으면 가끔은 그 친구에게 먼저 덤빈다
               const near = !m.foe && allies.filter((o) => Math.hypot(o.x - m.x, o.z - m.z) < M.aggro * 1.4);
               if (near && near.length && random() < 0.35) m.foe = near[Math.floor(random() * near.length)].kind;
