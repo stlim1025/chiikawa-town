@@ -11,10 +11,11 @@ const SHISA = '#f7cf5e', SHISA_MANE = '#e8833a', KANI = '#fbd1d8', KANI_DARK = '
 
 /** 내 캐릭터 선택지. */
 export const EAR_TYPES = [
-  { id: 'round', label: '둥근 귀' }, { id: 'pointy', label: '뾰족한 귀' }, { id: 'bunny', label: '토끼 귀' }, { id: 'small', label: '작은 귀' }
+  { id: 'round', label: '둥근 귀' }, { id: 'pointy', label: '뾰족한 귀' }, { id: 'bunny', label: '토끼 귀' }, { id: 'small', label: '작은 귀' },
+  { id: 'floppy', label: '강아지 귀' }, { id: 'lop', label: '늘어진 토끼 귀' }, { id: 'mouse', label: '큰 동글 귀' }, { id: 'fox', label: '여우 귀' }
 ];
 export const BODY_COLORS = ['#ffffff', '#f8e9b0', '#ffd6e0', '#cfe7ff', '#d8f0c8', '#e6dcff', '#f6d2b0', '#d9cfc4'];
-export const PATTERNS = [{ id: 'none', label: '없음' }, { id: 'part', label: '가르마' }, { id: 'spots', label: '얼룩' }];
+export const PATTERNS = [{ id: 'none', label: '없음' }, { id: 'part', label: '가르마' }, { id: 'spots', label: '얼룩' }, { id: 'stripes', label: '줄무늬' }, { id: 'heart', label: '하트' }];
 export const CHEEK_COLORS = ['#f5a3b5', '#f7b98c', '#d7b3f0', '#ff9b9b'];
 export const EYE_TYPES = [{ id: 'dot', label: '동글' }, { id: 'sparkle', label: '반짝' }, { id: 'teary', label: '울먹' }, { id: 'smile', label: '웃는' }, { id: 'wink', label: '윙크' }, { id: 'sleepy', label: '쿨쿨' }];
 export const BROW_TYPES = [{ id: 'none', label: '없음' }, { id: 'thin', label: '가는' }, { id: 'thick', label: '콩' }, { id: 'worried', label: '시무룩' }];
@@ -51,6 +52,35 @@ function patternGeometry(key, fn) {
   patternGeoCache.set(key, g);
   return g;
 }
+/**
+ * 무늬 경계가 또렷한 구(내 캐릭터 무늬): field(x, y, z) > 0 인 곳은 paint, 나머지는 base.
+ * 꼭짓점마다 색을 칠하면 경계가 삼각형 모양대로 계단지니, 경계를 지나는 삼각형은 field = 0 인 자리에서 잘라 두 색 조각으로 나눈다.
+ */
+function paintedSphere(key, field, paint, base) {
+  if (patternGeoCache.has(key)) return patternGeoCache.get(key);
+  const src = new THREE.SphereGeometry(1, 96, 64), P = src.attributes.position, I = src.index;
+  const pos = [], col = [], cIn = new THREE.Color(paint), cOut = new THREE.Color(base);
+  const tri = (a, b, c, color) => { for (const v of [a, b, c]) { pos.push(v.x, v.y, v.z); col.push(color.r, color.g, color.b); } };
+  const cut = (a, b, fa, fb) => a.clone().lerp(b, fa / (fa - fb)).normalize();
+  for (let t = 0; t < I.count; t += 3) {
+    const v = [0, 1, 2].map((k) => new THREE.Vector3().fromBufferAttribute(P, I.getX(t + k)));
+    const f = v.map((p) => field(p.x, p.y, p.z)), s = f.map((x) => x > 0);
+    if (s[0] === s[1] && s[1] === s[2]) { tri(v[0], v[1], v[2], s[0] ? cIn : cOut); continue; }
+    // 혼자 다른 쪽에 있는 꼭짓점 쪽 작은 삼각형 하나 + 나머지 사각형(삼각형 둘), 감는 방향은 그대로
+    const k = s[0] !== s[1] && s[0] !== s[2] ? 0 : s[1] !== s[0] && s[1] !== s[2] ? 1 : 2, k1 = (k + 1) % 3, k2 = (k + 2) % 3;
+    const ab = cut(v[k], v[k1], f[k], f[k1]), ac = cut(v[k], v[k2], f[k], f[k2]), lone = s[k] ? cIn : cOut, rest = s[k] ? cOut : cIn;
+    tri(v[k], ab, ac, lone);
+    tri(ab, v[k1], v[k2], rest);
+    tri(ab, v[k2], ac, rest);
+  }
+  src.dispose();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(pos, 3)); // 반지름 1 인 구라 법선 = 위치
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  patternGeoCache.set(key, g);
+  return g;
+}
 // 정수리를 모자처럼 덮는 무늬. 이마 가운데에 작은 홈이 파인다(하치와레).
 function partPattern(dark, light) {
   return (x, y, z) => {
@@ -58,6 +88,38 @@ function partPattern(dark, light) {
     return y > 0.3 + notch ? dark : light;
   };
 }
+// ---------- 내 캐릭터 무늬 ----------
+/** 무늬 색: 몸 색마다 어울리는 한 톤 진한 색(하양은 하치와레 같은 연파랑). 목록에 없는 색은 같은 빛깔로 진하게. */
+const PATTERN_TONES = { ffffff: '#8db3dd', f8e9b0: '#e5b35f', ffd6e0: '#f29db5', cfe7ff: '#84b2e5', d8f0c8: '#94c77f', e6dcff: '#ab96e0', f6d2b0: '#d0946a', d9cfc4: '#9c8a7c' };
+function patternTone(body) {
+  const c = new THREE.Color(body), hex = c.getHexString();
+  if (PATTERN_TONES[hex]) return PATTERN_TONES[hex];
+  const hsl = c.getHSL({}, THREE.SRGBColorSpace);
+  return '#' + c.setHSL(hsl.h, Math.min(1, hsl.s * 0.6 + 0.35), Math.max(0.3, hsl.l - 0.22), THREE.SRGBColorSpace).getHexString();
+}
+// 얼룩: 오른쪽 이마에서 귀까지 큰 얼룩, 왼쪽 뒤통수에 큰 얼룩, 이마 왼쪽과 뒤통수 아래에 작은 얼룩. [방향 x, y, z, 크기(각)]
+const SPOTS = [[0.62, 0.5, 0.6, 0.46], [-0.55, 0.15, -0.82, 0.5], [-0.42, 0.62, 0.66, 0.17], [0.38, -0.15, -0.91, 0.2]]
+  .map(([x, y, z, r]) => { const l = Math.hypot(x, y, z); return [x / l, y / l, z / l, r]; });
+const wavy = (x, y, z) => 0.05 * Math.sin(x * 9 + y * 7) + 0.035 * Math.sin(z * 11 - x * 6); // 얼룩 가장자리를 살짝 물결지게
+// 줄무늬: 이마에서 정수리 너머 뒤통수까지 세 줄(가운데가 가장 길다). [x, 시작 각, 끝 각]: 각은 앞(0) → 정수리(π/2) → 뒤(π)
+const STRIPES = [[0, 0.5, 2.75], [-0.25, 0.78, 2.55], [0.25, 0.78, 2.55]];
+const taper = (t, a, b, k) => Math.sqrt(Math.max(0, Math.min(1, (t - a) / k, (b - t) / k))); // 끝으로 갈수록 가늘게(끝은 동글게)
+const heartField = (u, v) => { const q = u * u + v * v - 1; return u * u * v * v * v - q * q * q; }; // 하트 안이면 > 0
+/** 내 캐릭터 머리 무늬: [field(x, y, z) — 무늬 안이면 > 0, 무늬 색]. tone: 무늬 색, accent: 하트 색(볼 색). */
+function lookPattern(kind, tone, accent) {
+  switch (kind) {
+    case 'part': return [(x, y, z) => y - 0.3 - (z > 0 ? Math.max(0, 0.2 - Math.abs(x) * 0.9) : 0), tone]; // 하치와레처럼 이마 가운데가 파인 모자
+    case 'spots': return [(x, y, z) => Math.max(...SPOTS.map(([a, b, c, r]) => r + wavy(x, y, z) - Math.acos(Math.min(1, x * a + y * b + z * c)))), tone];
+    case 'stripes': return [(x, y, z) => {
+      const t = Math.atan2(y, z), side = Math.atan2(Math.abs(x), z); // side: 앞(0) → 옆(π/2)
+      return Math.max(...STRIPES.map(([cx, a, b]) => 0.075 * taper(t, a, b, 0.45) - Math.abs(x - cx)),
+        ...[0.14, -0.06].map((cy) => 0.045 * taper(side, 1.05, 2.0, 0.3) - Math.abs(y - cy))); // 양 볼 옆에 짧은 두 줄
+    }, tone];
+    case 'heart': return [(x, y, z) => (z < 0 ? heartField(x / 0.2, (2.62 - Math.atan2(y, z)) / 0.2) : -1), accent]; // 뒤통수에 큰 하트(게임에서는 뒷모습이 많이 보인다)
+    default: return [() => -1, tone];
+  }
+}
+const LOOK_PATTERNS = new Set(['part', 'spots', 'stripes', 'heart']);
 // 앞(얼굴)이 트인 머리카락 껍질: theta 는 정수리에서 아래로 내려오는 정도
 const CAP_OPEN = 1.9; // 앞쪽으로 트인 폭(라디안)
 const CAPE_OPEN = 2.9; // 망토 앞이 트인 폭(팔은 망토 밖으로 나온다)
@@ -87,6 +149,16 @@ const hairCaps = {
     s.moveTo(0, 1);
     tips.forEach(([x, y], i) => s.quadraticCurveTo(bend[i][0], bend[i][1], x, y));
     return new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -0.5);
+  })(),
+  // 하트(이마 하트 무늬): 앞뒤 두께 1, 폭 2 · 높이 2, 가운데가 원점
+  heart: (() => {
+    const s = new THREE.Shape();
+    s.moveTo(0, -1);
+    s.bezierCurveTo(-0.35, -0.62, -1.1, -0.2, -1, 0.35);
+    s.bezierCurveTo(-0.92, 0.88, -0.25, 1.02, 0, 0.55);
+    s.bezierCurveTo(0.25, 1.02, 0.92, 0.88, 1, 0.35);
+    s.bezierCurveTo(1.1, -0.2, 0.35, -0.62, 0, -1);
+    return new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, -0.5);
   })()
 };
 
@@ -113,11 +185,12 @@ function geometryFor(m) {
     case 'capeHem': return hairCaps.capeHem;
     case 'scarf': return hairCaps.scarf;
     case 'star4': return hairCaps.star4;
+    case 'heart': return hairCaps.heart;
     case 'hachi': return patternGeometry('hachi', partPattern(NAVY, WHITE));
     case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.12 + Math.sin(x * 5) * 0.04 ? KURI_TOP : KURI_BOT));
     case 'kani': return patternGeometry('kani', (x, y, z) => (y > 0.32 && z > 0.15 ? KANI_DARK : KANI));
     default:
-      if (m.startsWith('part:')) { const [, dark, light] = m.split(':'); return patternGeometry(m, partPattern(dark, light)); }
+      if (m.startsWith('pat:')) { const [, kind, tone, base, accent] = m.split(':'), [field, paint] = lookPattern(kind, tone, accent); return paintedSphere(m, field, paint, base); }
       return lookGeometry(m); // 내 캐릭터 꾸미기 도형(호 · 반달 · 머리카락 · 수염 껍질), 모르면 오류
   }
 }
@@ -817,25 +890,23 @@ function playerDef(rawLook) {
   const pochette = rawLook && rawLook.pochette;
   const look = normalizeLook(rawLook);
   const body = look.body;
-  const dark = new THREE.Color(body).lerp(new THREE.Color('#3a3550'), 0.62).getStyle();
+  const tone = patternTone(body), hex = (c) => '#' + new THREE.Color(c).getHexString();
   const parts = [], hc = [0, 0.74, 0], hr = [0.43, 0.37, 0.39], pivots = {};
   parts.push({ m: 'sphere', c: body, p: [0, 0.34, 0], s: [0.34, 0.32, 0.31], n: 'body' });
   parts.push({ m: 'sphere', c: body, p: [0, 0.22, -0.3], s: [0.06, 0.06, 0.06], n: 'body' });
   limbs(parts, body, 0.36, 0.31);
-  const darkHex = '#' + new THREE.Color(dark).getHexString();
-  const lightHex = '#' + new THREE.Color(body).getHexString();
-  parts.push(look.pattern === 'part'
-    ? { m: `part:${darkHex}:${lightHex}`, c: '#ffffff', p: hc, s: hr, n: 'head' }
+  // 무늬는 머리에 직접 칠한다(몸 색마다 어울리는 무늬 색). 하트는 뒤통수에 큰 하트 + 이마에 작은 하트(볼 색)
+  parts.push(LOOK_PATTERNS.has(look.pattern)
+    ? { m: `pat:${look.pattern}:${hex(tone)}:${hex(body)}:${hex(look.cheek)}`, c: '#ffffff', p: hc, s: hr, n: 'head' }
     : { m: 'sphere', c: body, p: hc, s: hr, n: 'head' });
-  if (look.pattern === 'spots') {
-    [[-0.22, 0.2, 0.09], [0.12, 0.28, 0.07], [0.3, 0.05, 0.06]].forEach(([x, y, r]) => {
-      const sp = onHead(hc, hr, x, y, -0.006);
-      parts.push({ m: 'dot', c: dark, p: sp.p, r: sp.r, s: [r, r * 0.8, 0.02], n: 'head', o: false });
-    });
+  if (look.pattern === 'heart') {
+    const f = onHead(hc, hr, 0, 0.2, 0.004);
+    parts.push({ m: 'heart', c: look.cheek, p: f.p, r: f.r, s: [0.034, 0.034, 0.012], n: 'head', o: false });
   }
-  const earColor = look.pattern === 'none' ? body : dark;
+  // 귀 색: 가르마 · 줄무늬는 두 귀 모두 무늬 색, 얼룩은 얼룩이 닿은 오른쪽 귀만
+  const earColor = (sd) => (look.pattern === 'part' || look.pattern === 'stripes' || (look.pattern === 'spots' && sd > 0) ? tone : body);
   if (look.ears === 'pointy') {
-    [-1, 1].forEach((sd) => parts.push({ m: 'cone', c: earColor, p: [sd * 0.25, 0.97, -0.01], r: [0, 0, -sd * 0.38], s: [0.12, 0.21, 0.08], n: 'head' }));
+    [-1, 1].forEach((sd) => parts.push({ m: 'cone', c: earColor(sd), p: [sd * 0.25, 0.97, -0.01], r: [0, 0, -sd * 0.38], s: [0.12, 0.21, 0.08], n: 'head' }));
   } else if (look.ears === 'bunny') {
     [-1, 1].forEach((sd) => {
       const nm = sd < 0 ? 'earL' : 'earR';
@@ -844,10 +915,32 @@ function playerDef(rawLook) {
     });
     pivots.earL = [-0.13, 1.04, -0.02];
     pivots.earR = [0.13, 1.04, -0.02];
+  } else if (look.ears === 'floppy' || look.ears === 'lop') {
+    // 늘어진 귀: 머리 옆(강아지) · 정수리 옆(토끼)에 붙어 볼 옆으로 축 늘어진다. 토끼 귀처럼 따로 마디를 둬서 걸을 때 팔랑인다
+    const lop = look.ears === 'lop', top = lop ? [0.25, 1.04] : [0.36, 0.95];
+    [-1, 1].forEach((sd) => {
+      const nm = sd < 0 ? 'earL' : 'earR';
+      parts.push(lop
+        ? { m: 'sphere', c: earColor(sd), p: [sd * 0.44, 0.76, 0], r: [0, 0, sd * 0.1], s: [0.085, 0.27, 0.06], n: nm, par: 'head' }
+        : { m: 'sphere', c: earColor(sd), p: [sd * 0.41, 0.86, -0.02], r: [0, 0, sd * 0.18], s: [0.075, 0.14, 0.055], n: nm, par: 'head' });
+      pivots[nm] = [sd * top[0], top[1], -0.02];
+    });
+  } else if (look.ears === 'mouse') { // 큰 동글 귀: 넓적한 동그라미에 분홍 속귀
+    [-1, 1].forEach((sd) => {
+      parts.push({ m: 'sphere', c: earColor(sd), p: [sd * 0.3, 1.1, -0.04], r: [0, 0, -sd * 0.35], s: [0.15, 0.15, 0.045], n: 'head' });
+      parts.push({ m: 'dot', c: EAR_PINK, p: [sd * 0.3, 1.1, -0.0], r: [0, 0, -sd * 0.35], s: [0.095, 0.095, 0.02], n: 'head', o: false });
+    });
+  } else if (look.ears === 'fox') { // 여우 귀: 크고 뾰족한 세모에 분홍 속귀
+    [-1, 1].forEach((sd) => {
+      // 원뿔 밑면은 머리 속에 묻는다(머리 위에 떠 있으면 밑면 테두리가 귀와 머리 사이에 가로줄로 보인다)
+      parts.push({ m: 'cone', c: earColor(sd), p: [sd * 0.218, 0.95, -0.03], r: [0, 0, -sd * 0.3], s: [0.17, 0.34, 0.065], n: 'head' });
+      // 속귀: 원뿔은 밑면이 기준점이라 겉귀 밑동보다 살짝 위에서 시작해, 겉귀 앞면 기울기에 맞춰 뒤로 눕힌다
+      parts.push({ m: 'cone', c: EAR_PINK, p: [sd * 0.249, 1.05, 0.022], r: [-0.17, 0, -sd * 0.3], s: [0.07, 0.16, 0.008], n: 'head', o: false });
+    });
   } else if (look.ears === 'small') {
-    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: earColor, p: [sd * 0.22, 1.08, -0.02], s: [0.07, 0.065, 0.05], n: 'head' }));
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: earColor(sd), p: [sd * 0.22, 1.08, -0.02], s: [0.07, 0.065, 0.05], n: 'head' }));
   } else {
-    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: earColor, p: [sd * 0.25, 1.07, -0.02], r: [0, 0, -sd * 0.3], s: [0.11, 0.1, 0.07], n: 'head' }));
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: earColor(sd), p: [sd * 0.25, 1.07, -0.02], r: [0, 0, -sd * 0.3], s: [0.11, 0.1, 0.07], n: 'head' }));
   }
   playerFace(parts, hc, hr, look);
   hairParts(parts, hc, look);
@@ -871,7 +964,7 @@ function playerDef(rawLook) {
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
   for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
-  const tall = look.ears === 'bunny' ? 0.45 : ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo'].includes(look.accessory) ? 0.15 : 0;
+  const tall = look.ears === 'bunny' ? 0.45 : ['mouse', 'fox'].includes(look.ears) || ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
 
@@ -911,7 +1004,7 @@ function buildFromDef(def) {
   def.parts.forEach((pt) => {
     const holder = getPivot(pt.n, pt.par);
     const pv = pivotOf(def, pt.n, pt.p);
-    const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'kani' || pt.m.startsWith('part:');
+    const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'kani' || pt.m.startsWith('pat:');
     // 2D 손그림처럼: 단색 칠(얼굴 부품은 그늘도 없이) + 붓펜 같은 외곽선
     const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned, doubleSide: !!pt.ds, flat: pt.o === false });
     const size = Math.max(Math.abs(pt.s[0]), Math.abs(pt.s[1]), Math.abs(pt.s[2]));
