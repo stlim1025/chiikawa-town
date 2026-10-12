@@ -14,7 +14,7 @@ import { isComplete } from './jobs.js';
 export const TUTORIAL_LINES = {
   hello: [
     '어서 와~! 나는 하치와레야 ♪',
-    '오늘부터 우리 이웃이네! 잘 부탁해~',
+    '전단지 보고 왔구나? 잘 부탁해~',
     '여기선 일해서 돈을 벌어~ 기본은 풀 뽑기!',
     '처음이니까 내가 같이 다녀 줄게!'
   ],
