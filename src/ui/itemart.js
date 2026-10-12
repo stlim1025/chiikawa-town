@@ -76,6 +76,12 @@ const EXTRA = {
   riceball: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="18" ry="4" fill="#e6d8b8"/>
     <path d="M32 9q6 0 14 15t8 20q0 8-10 9H20q-10-1-10-9t8-20 14-15z" fill="#fffdf6" ${S}/>
     <path d="M20 40h24v13H20z" fill="#3e5a46" ${S}/><circle cx="26" cy="25" r="1.5" fill="#e3d8c2"/><circle cx="36" cy="21" r="1.5" fill="#e3d8c2"/><circle cx="38" cy="31" r="1.5" fill="#e3d8c2"/><circle cx="29" cy="33" r="1.5" fill="#e3d8c2"/></svg>`,
+  // 랏코의 대나무 도시락: 펼친 대나무 잎 위에 작은 세모 주먹밥 둘(김 띠)과 단무지 한 쪽
+  rakkobento: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="20" ry="4" fill="#e6d8b8"/>
+    <path d="M4 44q28-20 56-4q-26 16-56 4z" fill="#7cb342" ${S}/><path d="M8 44q24-10 48-3" fill="none" stroke="#4f7f2a" stroke-width="2" stroke-linecap="round"/>
+    <path d="M22 20q4 0 8 9t4 12q0 5-6 5H16q-6 0-6-5t4-12 8-9z" fill="#fffdf6" ${S}/><path d="M15 37h14v8H15z" fill="#3e5a46" ${S}/>
+    <path d="M42 22q4 0 8 9t4 12q0 5-6 5H36q-6 0-6-5t4-12 8-9z" fill="#fffdf6" ${S}/><path d="M35 39h14v8H35z" fill="#3e5a46" ${S}/>
+    <path d="M28 46q4-4 8 0q-4 3-8 0z" fill="#f7d24a" ${S}/></svg>`,
   // 젤리 구이: 꼬치에 꿴 파란 젤리 두 개, 노릇한 구운 자국
   jellybake: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="4" fill="#e6d8b8"/>
     <path d="M10 54L54 10" stroke="${L}" stroke-width="5.4" stroke-linecap="round"/><path d="M10 54L54 10" stroke="#e2c49a" stroke-width="2.8" stroke-linecap="round"/>

@@ -43,7 +43,9 @@ export const QUEST_ITEMS = {
   bottlebeer: { name: '병맥주', kind: 'food', note: '쿠리만쥬가 챙겨 준 시원한 병맥주. 마시면 기운이 25 찬다.', eat: 25 },
   pizzabun: { name: '피자호빵', kind: 'food', note: '라멘 로우의 새 메뉴. 반으로 가르면 치즈가 쭈욱 늘어나는 피자 맛 호빵. 먹으면 기운이 30 찬다.', eat: 30 },
   katsucurry: { name: '시마지로 카츠카레', kind: 'food', note: '섬 정글의 시마지로가 싸 준 바삭한 카츠카레. 살짝 맵다! 먹으면 기운이 45 찬다.', eat: 45 },
-  shellsoup: { name: '섬 조개국', kind: 'food', note: '시마지로의 레시피로 끓인 뜨끈한 조개국. 먹으면 기운이 30 찬다.', eat: 30 }
+  shellsoup: { name: '섬 조개국', kind: 'food', note: '시마지로의 레시피로 끓인 뜨끈한 조개국. 먹으면 기운이 30 찬다.', eat: 30 },
+  // 보스에게 처음 쓰러진 뒤 랏코가 힘내라며 준다(main 의 랏코 조언)
+  rakkobento: { name: '랏코의 대나무 도시락', kind: 'food', note: '"우선 기운부터 채워라" 하며 랏코가 건넨 대나무 잎 도시락. 작은 주먹밥 둘이 들어 있다. 먹으면 기운이 40 찬다.', eat: 40 }
 };
 registerItems(QUEST_ITEMS);
 

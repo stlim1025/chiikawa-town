@@ -2005,14 +2005,14 @@ function boot() {
     hud.hurt();
     hud.floatText({ x: p.x, y: 1.6, z: p.z, text: `기운 −${dmg}`, kind: 'hurt' });
     if (hunterExam && examHit(next)) { if (next <= 0) startFaint(); return; }
-    if (next <= 0) startFaint(soloBossOf(m)); // 혼자 보스에게 도전했다 쓰러졌으면 깨어난 뒤 랏코가 조언하러 온다
+    if (next <= 0) startFaint(bossOf(m)); // 보스에게 처음 쓰러졌으면 깨어난 뒤 랏코가 와서 힘내라며 도시락을 준다
     else if (next <= 25 && warnCool <= 0) { warnCool = 20; hud.toast('기운이 얼마 없어요!', 2400); }
   }
   /**
    * 기절: 화면이 어두워졌다가 내 집 앞에서 깨어난다(누가 데려다준 것처럼 · 쫓겨났으면 쓰러진 쪽 마을 입구).
    * 돈을 조금 잃고(짤랑 소리), FAINT_HOURS 시간이 지나 있다 — 검은 화면에 '(세 시간 뒤…)', 깨면 지금 시각 꼬리표.
    */
-  function startFaint(soloBoss = null) {
+  function startFaint(boss = null) {
     fainting = true;
     cancelPull();
     input.setEnabled(false);
@@ -2046,7 +2046,7 @@ function boot() {
         hud.banner('기절했어요…', home ? '정신을 차려 보니 내 집 앞이었어요' : '정신을 차려 보니 마을 입구였어요', 3600,
           [{ icon: ICO.clock, text: timeLabel(state.clock) }, ...(r.lost ? [{ icon: 'coin', text: `−${won(r.lost)}` }] : [])]);
         for (const kind of npcs.partyKinds()) npcs.say(npcs.byKind(kind), lineOf(kind, 'partyFaint')); // 같이 토벌하던 친구들이 옆으로 달려온다
-        if (!startRakkoAdvice(soloBoss)) rushToMe(); // 혼자 보스에게 졌으면 랏코가 조언하러, 아니면 친한 친구가 달려온다
+        if (!startRakkoAdvice(boss, !npcs.partyKinds().length)) rushToMe(); // 보스에게 처음 졌으면 랏코가, 아니면 친한 친구가 달려온다
       }, 1300);
     }, 1500);
   }
@@ -3558,21 +3558,32 @@ function boot() {
     npcs.plan(f, [{ do: 'approach', near: 1.8, max: 40, run: true }, { do: 'call', fn: () => npcs.say(f, line) }, { do: 'act', anim: 'talk', time: npcs.lineTime(line) + 0.3, quick: true }, { do: 'act', anim: 'idle', time: 2, quick: true }, { do: 'call', fn: () => restHere(f.kind, 8) }]);
   }
   /**
-   * 보스에게 혼자 도전했다가 기절하면, 깨어난 뒤 랏코가 걸어와 조언한다(하루 한 번): 마을 친구들과 친해져서 같이 토벌하라고.
-   * 같이 가 줄 만큼 친한 토벌 친구(하트 PARTY_HEARTS)가 이미 있으면 다음엔 같이 가자고 하라고, 랏코 자신이 그만큼 친하면 자기를 부르라고.
-   * 랏코가 바쁘면(집 · 잠 · 같이 토벌 · 다른 안내) 오지 않는다(그때는 친한 친구가 달려온다).
+   * 보스에게 처음 쓰러지면(혼자든 같이든 한 번만, state.story.rakkoCheer), 깨어난 뒤 랏코가 걸어와 말을 걸고 힘내라며 대나무 도시락을 준다.
+   * 혼자였으면 마을 친구들과 친해져서 같이 토벌하라고(같이 가 줄 친한 토벌 친구가 있으면 같이 가자고 하라고, 랏코 자신이 그만큼 친하면 자기를 부르라고).
+   * 멀리 있거나 집 안이면 화면 밖 가까이까지 나와서 걸어온다. 잠잘 시각 · 같이 토벌 · 다른 안내 중이면 오지 않는다(다음에 보스에게 쓰러지면 다시).
    */
-  let rakkoCall = null, rakkoAdviceDay = -1;
-  /** 이 몬스터에게 쓰러지면 '혼자 보스에게 도전'인지 → 보스 종류 | null(같이 토벌 중이었으면 null). 보스 마당의 부하에게 쓰러져도 그 보스. */
-  const soloBossOf = (m) => (npcs.partyKinds().length ? null : m.M.boss ? m.species : m.arena ? m.arena.id : null);
-  function startRakkoAdvice(boss) {
+  let rakkoCall = null;
+  /** 이 몬스터에게 쓰러지면 보스에게 진 것인지 → 보스 종류 | null. 보스 마당의 부하에게 쓰러져도 그 보스. */
+  const bossOf = (m) => (m.M.boss ? m.species : m.arena ? m.arena.id : null);
+  function startRakkoAdvice(boss, solo) {
     const n = npcs.byKind('rakko'), p = player.position;
-    if (!boss || !state || rakkoAdviceDay === state.clock.day || !n || n.away || n.party || n.lead || n.follow || buddies.has('rakko')
-      || isSleepHour(hourOf(state.clock)) || Math.hypot(n.x - p.x, n.z - p.z) > 60) return false;
-    rakkoAdviceDay = state.clock.day;
-    rakkoCall = { t: 0, boss };
+    if (!boss || !state || (state.story || {}).rakkoCheer || !n || n.party || n.lead || n.follow || buddies.has('rakko') || isSleepHour(hourOf(state.clock))) return false;
+    if (n.away || Math.hypot(n.x - p.x, n.z - p.z) > 20) { // 화면 밖(카메라 쪽) 가까이로 나와서 걸어온다
+      const at = village.nearestFree(p.x + 1.5, p.z + 9, 0.45);
+      npcs.comeOut(n, at.x, at.z);
+      delete awayInfo.rakko;
+      setDoing('rakko', null, null);
+    }
+    rakkoCall = { t: 0, boss, solo };
     npcs.setFollow('rakko', true); // 내 쪽으로 걸어온다
     return true;
+  }
+  /** 랏코의 대나무 도시락을 가방에 넣고, 다시는 오지 않게 적어 둔다. */
+  function giveRakkoBento() {
+    const a = addItem(state, 'rakkobento', 1);
+    commit({ ...a.state, story: { ...(a.state.story || {}), rakkoCheer: state.clock.day } });
+    sound.play('ready');
+    if (a.added) { hud.bagBump(); hud.toast(`${josa(itemInfo('rakkobento').name, '을/를')} 받았어요!`, 3200, { icon: itemSvg('rakkobento') }); }
   }
   function updateRakkoAdvice(dt) {
     if (!rakkoCall) return;
@@ -3582,19 +3593,21 @@ function boot() {
     const near = Math.hypot(n.x - player.position.x, n.z - player.position.z) < 2.4;
     if (!(near || rakkoCall.t > 12) || mode !== 'play' || guide.open || panels.isOpen() || sleeping || funBusy() || fainting || pulling || questScene) return;
     const B = MONSTERS[rakkoCall.boss], ok = (k) => hearts(friendOf(state, k)) >= PARTY_HEARTS;
-    const me = ok('rakko'), others = Object.keys(HUNTER_PROFILES).some((k) => k !== 'rakko' && ok(k));
+    const me = ok('rakko'), others = Object.keys(HUNTER_PROFILES).some((k) => k !== 'rakko' && ok(k)), solo = rakkoCall.solo, foe = B ? B.short || B.name : '그 녀석';
     rakkoCall = null;
     npcs.setFollow('rakko', false);
     beginTalk(n);
     sayAs(n, [
       '…{name}. 쓰러졌다고 들었다.',
-      `…${B ? B.short || B.name : '그 녀석'}에게 혼자 갔었나.`,
-      '그 녀석은 혼자서는 버겁다. …나도 처음엔 그랬다.',
-      ...(me ? ['…나를 불러라. 같이 가 주지.', '다음엔 혼자 가지 마라.']
-        : others ? ['…네가 같이 가자고 하면 따라와 줄 친구가 있다.', '다음엔 혼자 가지 마라.']
-          : ['…마을 친구들과 더 친해져라.', '친해지면 같이 토벌 가자고 할 수 있다. 여럿이면 해볼 만하다.']),
-      '…훗. 우선 기운부터 채워라.'
-    ], endTalk);
+      solo ? `…${foe}에게 혼자 갔었나.` : `…${foe}에게 당했나.`,
+      solo ? '그 녀석은 혼자서는 버겁다. …나도 처음엔 그랬다.' : '그 녀석은 만만치 않다. …나도 처음엔 그랬다.',
+      ...(!solo ? ['…무기를 손보고, 기운을 가득 채워서 다시 가라.']
+        : me ? ['…나를 불러라. 같이 가 주지.', '다음엔 혼자 가지 마라.']
+          : others ? ['…네가 같이 가자고 하면 따라와 줄 친구가 있다.', '다음엔 혼자 가지 마라.']
+            : ['…마을 친구들과 더 친해져라.', '친해지면 같이 토벌 가자고 할 수 있다. 여럿이면 해볼 만하다.']),
+      '(랏코가 대나무 잎으로 싼 도시락을 내민다)',
+      '…이거 먹고 힘내라. 훗. 우선 기운부터 채워라.'
+    ], () => { endTalk(); giveRakkoBento(); });
   }
   /** 머리 위 하는 일 아이콘: 내 둘레 친구들만, 머리 오른쪽 위에 작게(말풍선이 뜨면 잠깐 숨는다). */
   function doingLabels(focus) {

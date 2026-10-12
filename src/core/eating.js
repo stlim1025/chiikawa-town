@@ -18,6 +18,7 @@ export const EAT_STYLE = Object.freeze({
   bottlebeer: style('gulp', 'f-bottle'),
   onigiri: style('nibble', 'f-onigiri'),
   riceball: style('nibble', 'f-onigiri'),
+  rakkobento: style('nibble', 'f-onigiri'),
   berry: style('nibble', 'f-berry'),
   edamame: style('nibble', 'f-edamame'),
   jellybake: style('nibble', 'f-jelly'),
