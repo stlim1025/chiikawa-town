@@ -36,7 +36,7 @@ test('drink friendship: +2 once a day, separate from play', () => {
 });
 test('cheers quest: needs license and 2 hearts, bring berries then evening pub visit', () => {
   assert.deepEqual(Q.checkQuestData(), []);
-  let s = { ...fresh(), friends: { kurimanju: { pts: 2 * F.HEART_PTS, talk: 0, play: 0, gift: false } } }; // 하트 2개
+  let s = { ...fresh(), friends: { kurimanju: { pts: F.ptsForHearts(2), talk: 0, play: 0, gift: false } } }; // 하트 2개
   assert.equal(Q.canOffer(s, 'cheers'), false, 'no license yet');
   s = licensed(s);
   assert.equal(Q.canOffer(s, 'cheers'), true);

@@ -48,7 +48,7 @@ import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
-import { FRIENDS, CHATS, HEART_PTS, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
+import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo } from './core/inventory.js';
@@ -270,7 +270,7 @@ function boot() {
         delete qs.hachiPit;
         const f = friendOf(state, 'hachiware');
         let s = { ...state, quests: qs, license: { ...state.license, grade: Math.min(state.license.grade, 4) }, clock: { day: Math.max(4, state.clock.day), t: (12 - 6) / 24 },
-          friends: { ...(state.friends || {}), hachiware: { ...f, pts: Math.max(f.pts || 0, 2 * HEART_PTS) } } };
+          friends: { ...(state.friends || {}), hachiware: { ...f, pts: Math.max(f.pts || 0, ptsForHearts(2)) } } };
         s = addItem(s, 'vine', 3).state;
         commit(s);
         player.setPosition(pit.front.x, pit.front.z + 6);

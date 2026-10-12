@@ -9,7 +9,7 @@ const S = await import(G + 'save.js');
 
 const at = (day, hour) => ({ day, t: (hour - 6) / 24 });
 const fresh = (day = 3, hour = 17) => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', clock: at(day, hour) });
-const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: h * F.HEART_PTS, talk: 0, play: 0, gift: true } } });
+const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: F.ptsForHearts(h), talk: 0, play: 0, gift: true } } });
 const seen = (s, day) => ({ ...s, story: { ...(s.story || {}), usagiSeen: day } });
 
 test('side story data is consistent', () => { assert.deepEqual(Q.checkQuestData(), []); });

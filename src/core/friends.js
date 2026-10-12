@@ -4,7 +4,7 @@ import { VILLAGERS, villagerOf, villagerSpend, payVillager } from './villagers.j
 /**
  * 마을 친구들: 이름표(대화 상자의 이름과 색), 같이 놀 수 있는지(play), 많이 친해지면 주는 선물 가구(gift).
  * 친밀도는 state.friends[kind] = { pts, talk: 마지막으로 이야기한 날, play: 마지막으로 논 날, gift: 선물을 줬는지 }.
- * 이야기는 하루에 한 번 +1, 놀기는 하루에 한 번 +2. HEART_PTS(6)점마다 하트 하나(최대 5개), 하트 3개가 되면 선물.
+ * 이야기는 하루에 한 번 +1, 놀기는 하루에 한 번 +2. 하트는 HEART_AT 점마다(처음엔 금방, 갈수록 오래 · 최대 5개), 하트 3개가 되면 선물.
  * 너무 빨리 친해지지 않게, 이런 일상 친밀도는 한 친구와 하루에 DAY_CAP 점까지만 오른다(capDay · capPts 에 그날 쌓은 점수).
  */
 export const FRIENDS = {
@@ -80,10 +80,16 @@ export const CHATS = {
   ]
 };
 
-/** 하트 하나에 드는 점수. 예전엔 3점이었는데 너무 빨리 친해져서 두 배로(예전 저장은 upgradeFriends 로 점수를 바꿔 하트는 그대로). */
-export const HEART_PTS = 6;
-export const OLD_HEART_PTS = 3;
+/**
+ * 하트 n 개가 되는 누적 점수: 처음엔 금방 친해지고 갈수록 오래 걸린다(하트마다 2 · 4 · 6 · 8 · 10점).
+ * 하루 상한(DAY_CAP 2점)으로 매일 이야기 + 놀기를 하면 첫 하트는 첫날, 다섯 개는 보름.
+ * 예전 저장은 하트 하나에 같은 점수였다(버전 1: 3점, 버전 2: 6점) → upgradeFriends · curveFriends 가 가진 하트를 그대로 두고 바꾼다.
+ */
+export const HEART_AT = [2, 6, 12, 20, 30];
+export const OLD_HEART_PTS = 3, FLAT_HEART_PTS = 6;
 export const MAX_HEARTS = 5;
+/** 하트 n 개(0..MAX_HEARTS)가 되는 점수. */
+export const ptsForHearts = (n) => (n <= 0 ? 0 : HEART_AT[Math.min(n, MAX_HEARTS) - 1]);
 export const GIFT_HEARTS = 3;
 const GAIN = { talk: 1, play: 2, drink: 2, home: 2, hunt: 2, watch: 1 }; // drink: 맥주집에서 쿠리만쥬와 건배, home: 친구 집에서 같이 놀기(낮잠 · 노래 · 수련 …), hunt: 같이 토벌해서 몬스터를 잡았다, watch: 하치와레 공연을 끝까지 들었다
 
@@ -98,13 +104,27 @@ export function friendOf(state, kind) {
 
 /** 하트 개수(0..5). */
 export function hearts(f) {
-  return Math.min(MAX_HEARTS, Math.floor(f.pts / HEART_PTS));
+  let n = 0;
+  while (n < MAX_HEARTS && f.pts >= HEART_AT[n]) n++;
+  return n;
 }
 
-/** 예전 저장(하트 하나에 OLD_HEART_PTS 점이던 때)의 친밀도 점수를 지금 단위로 바꾼다 — 가진 하트 개수는 그대로. */
+/** 버전 1 저장(하트 하나에 OLD_HEART_PTS 점)의 점수를 버전 2 단위(FLAT_HEART_PTS 점)로 — 가진 하트 개수는 그대로. */
 export function upgradeFriends(friends) {
-  const k = HEART_PTS / OLD_HEART_PTS;
+  const k = FLAT_HEART_PTS / OLD_HEART_PTS;
   return Object.fromEntries(Object.entries(friends).map(([kind, f]) => [kind, { ...f, pts: f.pts * k }]));
+}
+/**
+ * 버전 2 저장(하트 하나에 FLAT_HEART_PTS 점)의 점수를 지금 곡선(HEART_AT)으로 — 가진 하트 개수는 그대로,
+ * 다음 하트까지 채운 비율도 그대로(내림이라 하트가 늘지 않는다). 하트를 다 채우고 남은 점수는 그대로 얹는다.
+ */
+export function curveFriends(friends) {
+  const conv = (pts) => {
+    const h = Math.min(MAX_HEARTS, Math.floor(pts / FLAT_HEART_PTS)), rest = pts - h * FLAT_HEART_PTS;
+    if (h >= MAX_HEARTS) return ptsForHearts(MAX_HEARTS) + rest;
+    return Math.floor(ptsForHearts(h) + (rest / FLAT_HEART_PTS) * (ptsForHearts(h + 1) - ptsForHearts(h)));
+  };
+  return Object.fromEntries(Object.entries(friends).map(([kind, f]) => [kind, { ...f, pts: conv(f.pts) }]));
 }
 
 /**

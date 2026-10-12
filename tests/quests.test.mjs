@@ -9,7 +9,7 @@ const F = await import(G + 'friends.js');
 const C = await import(G + 'combat.js');
 
 const fresh = () => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', money: 1000, player: { x: 0, z: 0 } });
-const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: h * F.HEART_PTS, talk: 0, play: 0, gift: true } } });
+const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: F.ptsForHearts(h), talk: 0, play: 0, gift: true } } });
 
 test('quest data consistent', () => { assert.deepEqual(Q.checkQuestData(), []); });
 test('offers need hearts / license / tutorial', () => {
@@ -42,7 +42,7 @@ test('bring quest: progress, report, reward', () => {
   assert.equal(I.countOf(r.state, 'fluffdown'), 2);
   assert.equal(r.state.money, 1300);
   assert.ok(r.state.wardrobe.owned.includes('flower'));
-  assert.equal(F.friendOf(r.state, 'chiikawa').pts, F.HEART_PTS + Q.QUESTS.pillow.reward.bond); // 하트 1개 + 부탁 보상 점수
+  assert.equal(F.friendOf(r.state, 'chiikawa').pts, F.ptsForHearts(1) + Q.QUESTS.pillow.reward.bond); // 하트 1개 + 부탁 보상 점수
   assert.ok(Q.isDone(r.state, 'pillow'));
   assert.equal(r.state.questTrack, null);
   assert.ok(S.isValidState(r.state));

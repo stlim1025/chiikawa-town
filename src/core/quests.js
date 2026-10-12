@@ -1,4 +1,4 @@
-import { FRIENDS, friendOf, hearts, HEART_PTS, MAX_HEARTS, GIFT_HEARTS, befriendBy } from './friends.js';
+import { FRIENDS, friendOf, hearts, ptsForHearts, MAX_HEARTS, GIFT_HEARTS, befriendBy } from './friends.js';
 import { homeOf, FURNITURE } from './home.js';
 import { hasLicense } from './licenses.js';
 import { bagOf, takeItem, addItem, registerItems, itemInfo } from './inventory.js';
@@ -444,7 +444,7 @@ export function startQuest(state, id) {
 /** 친밀도를 바로 올린다(퀘스트 보상). 하트 3개가 되면 그 친구 선물 가구도. → { state, up, hearts, gift } */
 export function bond(state, kind, pts) {
   if (!FRIENDS[kind] || !pts) return { state, up: false, hearts: hearts(friendOf(state, kind)), gift: null };
-  const f = friendOf(state, kind), next = { ...f, pts: Math.min(f.pts + pts, HEART_PTS * MAX_HEARTS + 2) };
+  const f = friendOf(state, kind), next = { ...f, pts: Math.min(f.pts + pts, ptsForHearts(MAX_HEARTS) + 2) };
   let s = state, gift = null;
   const giftId = FRIENDS[kind].gift;
   if (giftId && !next.gift && hearts(next) >= GIFT_HEARTS) {

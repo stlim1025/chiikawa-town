@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import * as H from '../src/core/hunters.js';
 import { NPC_LINES, lineOf } from '../src/core/npclines.js';
 import { createState } from '../src/core/state.js';
-import { HEART_PTS } from '../src/core/friends.js';
+import { ptsForHearts } from '../src/core/friends.js';
 import { isValidState } from '../src/core/save.js';
 
 const fresh = () => ({ ...createState({ name: '나', look: {} }), tutorial: 'done' });
-const withHearts = (s, kind, n) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: n * HEART_PTS, talk: 0, play: 0, gift: true } } });
+const withHearts = (s, kind, n) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: ptsForHearts(n), talk: 0, play: 0, gift: true } } });
 const lic = (s, kind) => ({ ...s, hunters: { ...(s.hunters || {}), [kind]: { ...H.hunterOf(s, kind), license: 1 } } });
 
 test('같이 잡으면 점수를 나눠 갖고 쓰러뜨린 수는 모두 하나씩', () => {
