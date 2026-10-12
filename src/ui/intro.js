@@ -27,7 +27,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
   stamp.className = 'village-title';
   stamp.hidden = true;
   stamp.innerHTML = '<div class="vt-band"><i class="vt-tail l"></i><i class="vt-tail r"></i><div class="vt-ribbon"><b class="vt-name">치이카와 마을</b><span class="vt-line" aria-hidden="true"></span></div></div><i class="vt-kicker">어서 와요!</i>';
-  // 주민 모집 전단지(처음 왔을 때만): 종이 한 장 + 아래 혼잣말
+  // 주민 모집 전단지(처음 왔을 때만): 압정으로 꽂혀 있던 접힌 종이 한 장(마을 그림 · 아래 뜯어 가는 연락처 쪽지) + 아래 혼잣말
   const flyer = document.createElement('div');
   flyer.className = 'intro-flyer';
   flyer.hidden = true;
@@ -35,15 +35,18 @@ export function createIntro(ui, { player, cam, npcs, village, sound }) {
   flyer.setAttribute('aria-label', '주민 모집 전단지');
   flyer.innerHTML = `
     <div class="flyer-paper">
-      <i class="flyer-tape" aria-hidden="true"></i>
-      <b class="flyer-kicker">주민 모집!</b>
-      <h2>치이카와 마을에서<br>같이 살아요</h2>
-      <ul>
-        <li><b>빈집 있어요</b><small>집세는 월요일마다</small></li>
-        <li><b>일감 많아요</b><small>풀 뽑기부터 차근차근</small></li>
-        <li><b>친구도 많아요</b><small>라멘 가게 · 축제 · 별이 쏟아지는 밤</small></li>
+      <i class="flyer-pin l" aria-hidden="true"></i><i class="flyer-pin r" aria-hidden="true"></i>
+      <b class="flyer-burst">환영!</b>
+      <p class="flyer-sub">~ 치이카와 마을 ~</p>
+      <h2 class="flyer-title">주민 모집</h2>
+      <svg class="flyer-art" viewBox="0 0 240 92" aria-hidden="true"><circle cx="206" cy="22" r="11" fill="#ffd66b" stroke="#e8a93a" stroke-width="2"/><path d="M0 72q60-22 120-6t120-8v34H0z" fill="#bfe6a6" stroke="#6b4a2e" stroke-width="2"/><path d="M112 92q6-14 2-26" fill="none" stroke="#e9c98f" stroke-width="7" stroke-linecap="round"/><path d="M30 70v-16a17 17 0 0 1 34 0v16z" fill="#fff" stroke="#6b4a2e" stroke-width="2"/><rect x="42" y="58" width="9" height="12" rx="4" fill="#cfe7ff" stroke="#6b4a2e" stroke-width="1.6"/><path d="M146 66v-16h28v16" fill="#fff3d6" stroke="#6b4a2e" stroke-width="2"/><path d="M142 51l18-14 18 14z" fill="#f48fb1" stroke="#6b4a2e" stroke-width="2" stroke-linejoin="round"/><rect x="156" y="55" width="8" height="11" rx="2" fill="#c98a5a" stroke="#6b4a2e" stroke-width="1.4"/><path d="M92 66v-12" stroke="#8a5a3a" stroke-width="4" stroke-linecap="round"/><circle cx="92" cy="46" r="12" fill="#8fd16a" stroke="#6b4a2e" stroke-width="2"/><circle cx="214" cy="60" r="8" fill="#f6a9c4" stroke="#6b4a2e" stroke-width="1.6"/><path d="M214 68v6" stroke="#8a5a3a" stroke-width="3" stroke-linecap="round"/><path d="M70 30q4-4 8 0q4-4 8 0" fill="none" stroke="#6b4a2e" stroke-width="1.6" stroke-linecap="round"/><path d="M118 18q3-3 6 0q3-3 6 0" fill="none" stroke="#6b4a2e" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <ul class="flyer-list">
+        <li><b>★ 빈집 있음</b><small>집세 저렴! 월요일마다</small></li>
+        <li><b>★ 일감 많음</b><small>풀 뽑기부터 차근차근</small></li>
+        <li><b>★ 친구 많음</b><small>라멘 · 축제 · 별이 쏟아지는 밤</small></li>
       </ul>
-      <p class="flyer-from">— 치이카와 마을 노동 접수</p>
+      <p class="flyer-note">경험 없어도 OK! 몸만 오세요~</p>
+      <div class="flyer-tabs" aria-hidden="true"><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab torn">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span><span class="flyer-tab">노동 접수<br>치이카와 마을</span></div>
     </div>
     <p class="flyer-say" aria-live="polite"></p>`;
   const sayEl = flyer.querySelector('.flyer-say');

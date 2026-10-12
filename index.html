@@ -590,27 +590,44 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 @media (max-height: 420px) { .village-title { top: 30%; } .vt-name { font-size: 40px; } .vt-kicker { font-size: 21px; } }
 @media (max-width: 520px) { .vt-name { font-size: 38px; gap: 8px; } .vt-ribbon { padding: 10px 30px 12px; } }
 .skip-btn { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
-/* 처음 마을에 올 때: 주민 모집 전단지(가운데) + 혼잣말(아래). 누르면 다음 줄, 다 보면 위로 날아가고 걸어 들어간다 */
-.intro-flyer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 16px; z-index: 5; cursor: pointer;
+/* 처음 마을에 올 때: 주민 모집 전단지(가운데) + 혼잣말(아래). 누르면 다음 줄, 다 보면 위로 날아가고 걸어 들어간다.
+   진짜 전단지처럼: 네 번 접었던 자국 · 누렇게 바랜 가장자리 · 압정 둘 · 빨간 큰 제목 · 별 딱지 · 마을 그림 · 아래 뜯어 가는 연락처 쪽지(한 장은 뜯겨 나갔다) */
+.intro-flyer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px; z-index: 5; cursor: pointer;
   animation: fly-in 0.55s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
 .intro-flyer[hidden] { display: none; }
 .intro-flyer.leave { animation: fly-out 0.38s ease-in forwards; }
-.flyer-paper { position: relative; width: min(360px, 88vw); padding: 26px 26px 18px; border-radius: 6px 10px 8px 12px; background: var(--dots), #fffaf0; color: #6b4a2e; text-align: center;
-  box-shadow: 0 14px 28px rgba(84, 62, 38, 0.28), 0 3px 0 var(--shadow); rotate: -2.5deg; }
-.flyer-tape { position: absolute; top: -12px; left: 50%; width: 92px; height: 26px; margin-left: -46px; border-radius: 3px; background: rgba(252, 217, 91, 0.75); rotate: 3deg; }
-.flyer-kicker { display: inline-block; padding: 2px 16px 4px; border-radius: 999px; background: var(--pink); color: #8a3b52; font-size: 20px; rotate: -3deg; }
-.flyer-paper h2 { margin: 10px 0 12px; font-size: 30px; line-height: 1.2; }
-.flyer-paper ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; text-align: left; }
-.flyer-paper li { position: relative; display: flex; flex-direction: column; padding: 6px 12px 7px 34px; border-radius: 12px; background: #fff3d6; font-size: 19px; }
-.flyer-paper li::before { content: "\2665"; position: absolute; left: 12px; top: 6px; color: #f28a9b; }
-.flyer-paper li small { font-size: 14px; color: var(--ink-soft); }
-.flyer-from { margin: 12px 0 0; font-size: 15px; color: var(--ink-soft); text-align: right; }
+.flyer-paper { position: relative; width: min(340px, 86vw); padding: 22px 20px 0; color: #4a3424; text-align: center; rotate: -2.5deg;
+  background:
+    linear-gradient(90deg, transparent 49.7%, rgba(120, 90, 60, 0.12) 50%, rgba(255, 255, 255, 0.7) 50.4%, transparent 50.8%),
+    linear-gradient(180deg, transparent 49.7%, rgba(120, 90, 60, 0.12) 50%, rgba(255, 255, 255, 0.7) 50.4%, transparent 50.8%),
+    radial-gradient(120% 100% at 50% 40%, #fffdf3 60%, #f6e9c9 100%);
+  box-shadow: 0 16px 30px rgba(84, 62, 38, 0.3), 0 2px 0 #e6d6b0;
+  clip-path: polygon(0 1%, 4% 0, 30% 0.6%, 62% 0, 96% 0.5%, 100% 0, 99.4% 40%, 100% 72%, 99.5% 100%, 0 100%, 0.6% 68%, 0 30%); }
+.flyer-pin { position: absolute; top: 9px; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff9aa8, #e0524f 60%, #a8433a); box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.25); }
+.flyer-pin.l { left: 14px; }
+.flyer-pin.r { right: 14px; }
+.flyer-burst { position: absolute; top: 34px; right: 10px; display: grid; place-items: center; width: 62px; height: 62px; font-size: 16px; color: #fff; background: #f2a33a; rotate: 12deg;
+  clip-path: polygon(50% 0, 61% 18%, 82% 10%, 79% 32%, 100% 40%, 84% 55%, 96% 75%, 74% 76%, 70% 98%, 52% 84%, 33% 100%, 28% 78%, 6% 80%, 16% 60%, 0 44%, 20% 33%, 14% 11%, 37% 17%); }
+.flyer-sub { margin: 0; font-size: 15px; letter-spacing: 2px; color: #8a6a4a; }
+.flyer-title { margin: 2px 0 4px; font-size: 44px; line-height: 1.05; letter-spacing: 6px; color: #e0524f;
+  text-shadow: 2px 2px 0 #fff, -2px 2px 0 #fff, 2px -2px 0 #fff, -2px -2px 0 #fff, 0 5px 0 #ffd66b; }
+.flyer-art { display: block; width: 100%; height: auto; margin: 0 0 6px; }
+.flyer-list { display: grid; gap: 4px; margin: 0; padding: 8px 10px; list-style: none; text-align: left; border: 2px dashed #e0b98a; border-radius: 4px; }
+.flyer-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 18px; }
+.flyer-list li b { font-weight: normal; color: #6b4a2e; white-space: nowrap; }
+.flyer-list li small { font-size: 13px; color: #8a6a4a; text-align: right; }
+.flyer-note { margin: 8px 0 10px; font-size: 15px; color: #c0603f; }
+/* 뜯어 가는 연락처 쪽지: 세로 글씨, 쪽지 사이는 점선(가위로 자른 자리), 세 번째는 누가 뜯어 갔다 */
+.flyer-tabs { display: flex; margin: 0 -20px; border-top: 2px dashed #cbb48c; }
+.flyer-tab { flex: 1; padding: 6px 0 10px; border-left: 1px dashed #cbb48c; font-size: 10px; line-height: 1.25; color: #6b4a2e; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: -1px; }
+.flyer-tab:first-child { border-left: 0; }
+.flyer-tab.torn { visibility: hidden; }
 .flyer-say { max-width: min(560px, 92vw); margin: 0; padding: 10px 22px 12px; border-radius: 18px; background: var(--dots), var(--paper); box-shadow: 0 4px 0 var(--shadow);
   color: #5a3d22; font-size: 21px; text-align: center; }
 @keyframes fly-in { from { opacity: 0; transform: translateY(30px) scale(0.92); } to { opacity: 1; transform: none; } }
 @keyframes fly-out { to { opacity: 0; transform: translateY(-24px) scale(0.95); } }
-@media (max-height: 560px) { .intro-flyer { gap: 10px; } .flyer-paper { padding: 18px 20px 12px; } .flyer-paper h2 { margin: 6px 0 8px; font-size: 23px; }
-  .flyer-paper li { padding: 3px 10px 4px 30px; font-size: 16px; } .flyer-paper li small { font-size: 12px; } .flyer-say { font-size: 17px; } }
+@media (max-height: 640px) { .intro-flyer { gap: 8px; } .flyer-paper { padding-top: 16px; } .flyer-title { font-size: 34px; } .flyer-art { max-height: 60px; } .flyer-burst { width: 50px; height: 50px; font-size: 13px; }
+  .flyer-list li { font-size: 15px; } .flyer-list li small { font-size: 11px; } .flyer-note { margin: 4px 0 6px; font-size: 13px; } .flyer-tab { font-size: 9px; padding: 4px 0 6px; } .flyer-say { font-size: 17px; } }
 @media (prefers-reduced-motion: reduce) { .intro-flyer, .intro-flyer.leave { animation: none; } }
 
 /* ---------- 스티커 작업대: 컨베이어 위로 과일이 지나가고 가운데 틀에서 붙인다 ---------- */
