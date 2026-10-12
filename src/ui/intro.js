@@ -61,6 +61,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound, guide, me }
   const wide = { pos: new THREE.Vector3(5.5, 6.5, E.outside.z + 8), look: new THREE.Vector3(0, 1.4, E.gateZ) };
   const pos = new THREE.Vector3(), look = new THREE.Vector3();
   let t = 0, greetT = 0, active = false, stamped = false, greeted = false, done = null, first = true;
+  let visit = null; // 같이 놀기: 친구 마을에 놀러 갈 때 { title: 리본 이름, kicker }(마중 친구는 주인 마을 친구들이라 손대지 않는다)
   let phase = 'walk'; // phase: 'flyer' 전단지 보는 중 · 'walk' 걸어 들어가는 중
 
   /** 전단지 혼잣말: 다짐 앞까지 읽으면 두 팔을 번쩍 들며 마지막 줄, 그것까지 읽으면 전단지를 접고 걸어 들어간다. */
@@ -100,22 +101,28 @@ export function createIntro(ui, { player, cam, npcs, village, sound, guide, me }
 
   return {
     get active() { return active; },
-    /** fresh: 처음 만든 캐릭터면 true(전단지를 보고 들어오고, 인사가 달라진다). */
-    start(onDone, fresh = true) {
-      t = 0; active = true; stamped = false; greeted = false; done = onDone; first = fresh;
-      stamp.querySelector('.vt-kicker').textContent = fresh ? '어서 와요!' : '또 왔어요!';
+    /**
+     * fresh: 처음 만든 캐릭터면 true(전단지를 보고 들어오고, 인사가 달라진다).
+     * visitInfo: 같이 놀기로 친구 마을에 놀러 갈 때 { title: 리본에 쓸 마을 이름, kicker } — 걸어 들어오기만 하고 마중은 없다.
+     */
+    start(onDone, fresh = true, visitInfo = null) {
+      t = 0; active = true; stamped = false; greeted = false; done = onDone; first = fresh; visit = visitInfo;
+      stamp.querySelector('.vt-name').textContent = visit ? visit.title : '치이카와 마을';
+      stamp.querySelector('.vt-kicker').textContent = visit ? visit.kicker : fresh ? '어서 와요!' : '또 왔어요!';
       player.placeAt(E.outside.x, E.outside.z);
       player.face(E.outside.x, E.outside.z - 1);
-      if (fresh) { phase = 'flyer'; flyer.hidden = false; player.walkTo = null; readFlyer(); }
+      if (fresh && !visit) { phase = 'flyer'; flyer.hidden = false; player.walkTo = null; readFlyer(); }
       else { phase = 'walk'; player.walkTo = { x: E.inside.x, z: E.inside.z, speed: 2.6 }; }
       // 마중 친구들은 처음부터 입구(들어오는 내 캐릭터) 쪽을 보고 기다린다
-      GREETERS.forEach(([kind, dx, dz]) => {
+      if (!visit) GREETERS.forEach(([kind, dx, dz]) => {
         const n = npcs.byKind(kind), x = E.inside.x + dx, z = E.inside.z + dz;
         if (n) { n.x = x; n.z = z; n.state = 'idle'; n.task = null; n.timer = 9; n.talk = 0; n.yaw = Math.atan2(E.outside.x - x, E.outside.z - z); }
       });
       skip.hidden = false;
       cam.set(wide.pos, wide.look);
     },
+    /** 연출을 그대로 멈춘다(끝나면 할 일은 하지 않는다: 걸어 들어가는 도중에 친구 마을 문이 닫혔을 때). */
+    abort() { if (!active) return; done = null; finish(); },
     update(dt) {
       if (!active) return;
       // 전단지를 보는 동안: 카메라는 마을 밖 높은 곳 그대로, 친구들은 입구에서 기다린다
@@ -140,7 +147,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound, guide, me }
         sound?.play('morning');
       }
       // 걸어 들어오는 동안 친구들이 고개(몸)를 천천히 돌려 내 캐릭터를 따라 본다
-      if (!greeted) GREETERS.forEach(([kind]) => {
+      if (!greeted && !visit) GREETERS.forEach(([kind]) => {
         const n = npcs.byKind(kind);
         if (!n) return;
         n.timer = Math.max(n.timer, 2); // 연출 중에는 돌아다니지 않게
@@ -152,7 +159,7 @@ export function createIntro(ui, { player, cam, npcs, village, sound, guide, me }
       if (!greeted && !player.walkTo) {
         greeted = true;
         greetT = t;
-        GREETERS.forEach(([kind, , , hello, again], i) => {
+        if (!visit) GREETERS.forEach(([kind, , , hello, again], i) => {
           const n = npcs.byKind(kind);
           if (n) npcs.talk(n, first ? hello : again);
           setTimeout(() => sound?.play('talk', kind), i * 280); // 셋이 차례로 인사하는 소리

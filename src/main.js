@@ -205,10 +205,14 @@ function boot() {
   let saveTimer = 0;
 
   let saveLocked = false; // 저장을 불러온 직후(새로고침 전): 창을 떠나며 지금 진행으로 덮어쓰지 않게
-  // 같이 놀기: 친구 마을에 놀러 간 중 { code, home: 떠나온 자리 { x, z, yaw }, clock · npcs: 주인이 보낸 시간 · 마을 친구들, arriving · leaving: 커튼 연출 중, warnT }
-  // 놀러 간 동안은 저장하지 않는다(창을 닫으면 떠나기 전 자리 그대로 이어진다)
+  // 같이 놀기: 친구 마을에 놀러 간 중 { code, home: 떠나온 자리 { x, z, yaw }, clock · npcs · weeds · berries: 주인이 보낸 마을 모습, arriving · leaving: 커튼 연출 중, warnAt }
+  // 놀러 간 동안에도 저장은 하되(친구 마을에서 얻은 것은 바로 내 것) 자리는 떠나온 곳으로 적는다: 창을 닫아도 다음에는 내 마을에서 이어진다
   let visiting = null;
-  const save = () => { if (state && player && !saveLocked && !visiting) store.save({ ...state, player: { x: player.position.x, z: player.position.z } }); };
+  const save = () => {
+    if (!state || !player || saveLocked) return;
+    const p = visiting ? visiting.home : player.position;
+    store.save({ ...state, player: { x: p.x, z: p.z } });
+  };
   const commit = (next, persist = true) => { state = next; if (persist) save(); };
   const seen = (tip) => state.seenTips.includes(tip);
   const markSeen = (tip) => { state = { ...state, seenTips: [...state.seenTips, tip] }; };
@@ -225,12 +229,13 @@ function boot() {
       hud.toast(`${josa(p.name, '이/가')} 놀러 왔어요!`, 3000);
     },
     moved: (id, m) => remotes.move(id, m),
-    left: (id, name) => { remotes.remove(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
+    left: (id, name) => { remotes.remove(id); releaseHolds(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
     said: (id, text) => remotes.say(id, text), emote: (id, name) => remotes.emote(id, name), cleared: () => remotes.clear(),
     world: (w) => takeWorld(w),
+    guestAct: (id, a) => takeGuestAct(id, a),
     closed: (hostName) => endVisit('closed', hostName),
     lost: () => endVisit('lost'),
-    status: () => panels.refresh('multi')
+    status: () => { panels.refresh('multi'); updateVisitTag(); }
   });
   // 서버 주소는 고정(DEFAULT_SERVER, 화면에 보이지 않는다). 내 PC 에서 시험할 때만 주소 뒤 ?mpserver=localhost:5280 으로 바꾼다.
   // 친구 마을 코드는 이 브라우저에 기억해 둔다(다음에 또 넣지 않게)
@@ -253,13 +258,14 @@ function boot() {
     async open() {
       if (!state || !player || visiting) return;
       const ok = await multi.open(mpServer, state.villageCode, joinInfo(player.position.x, player.position.z, player.yaw));
-      if (!ok || !state) return; // 못 열었으면 까닭이 폰에 뜬다
-      if (panels.openKind() === 'multi') panels.close();
+      if (!ok || !state) return; // 못 열었으면 까닭이 폰에 뜬다(열리면 폰의 스위치가 '열림'으로)
       sound.play('job');
       hud.toast('문을 열었어요! 친구에게 마을 코드를 알려 주세요', 4200, { chips: [{ text: state.villageCode }] });
     },
     /** 내 마을 문을 닫는다(와 있던 친구들은 집으로 돌아간다). */
     shut() { multi.leave(); hud.toast('문을 닫았어요', 2200); },
+    /** 마을 문 열기 스위치: 열려 있으면 닫고, 닫혀 있으면 연다. */
+    toggleGate() { if (multi.status === 'open') multiPanel.shut(); else if (multi.status !== 'connecting') multiPanel.open(); },
     visit() { startVisit(mpDraft.code); },
     goHome() { if (panels.openKind() === 'multi') panels.close(); endVisit('home'); },
     /** 내 마을 코드를 복사한다(복사가 막힌 브라우저면 코드를 알림으로 보여 준다). */
@@ -272,11 +278,10 @@ function boot() {
     say(text) { multi.say(text); mySay = { text, until: performance.now() + 3500 }; }
   };
 
-  /** 친구 마을에 놀러 가면 서는 곳: 남쪽 정문 바로 안. */
-  const VISIT_SPAWN = { x: 0, z: VILLAGE_R - 2.5 };
   /**
-   * 친구 마을에 놀러 간다(마을폰 '같이 놀기'). 들어가면 커튼 뒤에서 그 마을 정문 앞으로 옮긴다.
-   * 놀러 간 동안 내 시간 · 퀘스트 · 저장은 멈추고, 주인이 보내 주는 시간 · 마을 친구들 · 풀을 보여 준다.
+   * 친구 마을에 놀러 간다(마을폰 '같이 놀기'). 커튼 뒤에서 그 마을 모습으로 바꾸고, 처음 마을에 올 때처럼
+   * 숲길 끝에서 정문으로 걸어 들어간다(리본에 '○○의 마을'). 놀러 간 동안 내 시간 · 퀘스트는 멈추고,
+   * 주인 마을의 풀 · 열매를 내 가방으로, 가게에서는 내 돈으로 산다.
    */
   async function startVisit(typed) {
     if (!state || !player || visiting) return;
@@ -284,9 +289,10 @@ function boot() {
     if (!roomCode(code)) { hud.toast('친구의 마을 코드를 넣어 주세요', 2400); return; }
     if (code === state.villageCode) { hud.toast('내 마을 코드예요. 친구의 마을 코드를 넣어 주세요', 2800); return; }
     if (mode !== 'play' || pulling || sleeping || fainting || sticker || funBusy() || closeup || hunterExam || guide.open) { hud.toast('지금은 놀러 갈 수 없어요', 2400); return; }
-    const ok = await multi.visit(mpServer, code, joinInfo(VISIT_SPAWN.x, VISIT_SPAWN.z, Math.PI));
+    const E = village.entrance;
+    const ok = await multi.visit(mpServer, code, joinInfo(E.outside.x, E.outside.z, Math.PI));
     if (!ok || visiting || !state || mode !== 'play') { if (ok) multi.leave(); return; } // 못 들어갔으면 까닭이 폰에 뜬다
-    const v = visiting = { code, home: { x: player.position.x, z: player.position.z, yaw: player.yaw }, clock: null, npcs: [], weeds: null, arriving: true, leaving: false, warnAt: 0 };
+    const v = visiting = { code, home: { x: player.position.x, z: player.position.z, yaw: player.yaw }, clock: null, npcs: [], weeds: null, berries: null, arriving: true, leaving: false, warnAt: 0 };
     if (panels.isOpen()) panels.close();
     cancelPull();
     partyEnd(null, 'partyLeave');
@@ -297,18 +303,23 @@ function boot() {
     input.setEnabled(false);
     const host = multi.hostName || '친구';
     hud.curtain(true, `${host}의 마을로 가는 중…`);
+    save(); // 떠나기 전 자리를 적어 둔다
     setTimeout(() => {
       if (visiting !== v || v.leaving) return;
       v.arriving = false;
-      weeds.showGuest(v.weeds || []); // 내 풀은 숨기고 주인 마을 풀로
-      player.walkTo = null;
-      player.setPosition(VISIT_SPAWN.x, VISIT_SPAWN.z);
-      player.face(VISIT_SPAWN.x, VISIT_SPAWN.z - 3);
-      cam.snap(player.position);
+      weeds.showGuest(v.weeds || [], multi.you); // 내 풀 · 덤불은 숨기고 주인 마을 것으로
+      if (v.berries) berries.showGuest(v.berries);
+      updateVisitTag();
       hud.curtain(false);
-      input.setEnabled(true);
-      sound.play('job');
-      hud.toast(`${host}의 마을에 놀러 왔어요!`, 3600, { chips: [{ text: '돌아갈 때는 마을폰에서' }] });
+      mode = 'intro';
+      setCinematic(true);
+      intro.start(() => {
+        if (visiting !== v) return;
+        mode = 'play';
+        setCinematic(false);
+        input.setEnabled(true);
+        hud.toast('다 놀았으면 마을폰으로 집에 가요', 3000);
+      }, false, { title: `${host}의 마을`, kicker: '놀러 왔어요!' });
     }, 1000);
   }
   /** 집으로 돌아온다. why: 'home'(내가 돌아감) · 'closed'(주인이 문을 닫았다) · 'lost'(연결이 끊겼다). */
@@ -330,32 +341,97 @@ function boot() {
   /** 놀러 간 것을 바로 끝내고 떠나온 자리로 돌아온다(endVisit 의 커튼 뒤 · 메인으로 나갈 때). */
   function dropVisit() {
     if (!visiting) return;
+    cancelPull();
     const h = visiting.home, curtained = visiting.arriving || visiting.leaving;
     visiting = null;
     if (curtained) hud.curtain(false); // 커튼 연출 도중에 메인으로 나갔으면 걷어 둔다
+    if (mode === 'intro') { intro.abort(); mode = 'play'; setCinematic(false); } // 걸어 들어가는 도중이었다
     npcs.puppet(null);
     weeds.showGuest(null);
+    berries.showGuest(null);
     remotes.clear();
     player.walkTo = null;
     player.setPosition(h.x, h.z);
     player.face(h.x + Math.sin(h.yaw), h.z + Math.cos(h.yaw));
     cam.snap(player.position);
+    updateVisitTag();
   }
-  /** 손님: 주인이 보낸 마을 모습 { c: [날, 시각], d: 주인의 시작 날짜, n: 마을 친구들, w: 풀 }. 서버가 그대로 전한 것이라 하나씩 확인해서 쓴다. */
+  /** 같이 놀기 꼬리표(왼쪽 위): 주인은 놀러 온 친구 이름, 손님은 놀러 와 있는 마을. */
+  function updateVisitTag() {
+    if (visiting && !visiting.arriving) hud.setVisitors({ label: `${multi.hostName || '친구'}의 마을에 놀러 왔어요`, names: [] });
+    else if (!visiting && multi.status === 'open') {
+      const guests = multi.players.map((p) => p.name);
+      hud.setVisitors(guests.length ? { label: '놀러 온 친구', names: guests } : { label: '마을 문이 열려 있어요', names: [] });
+    } else hud.setVisitors(null);
+  }
+  /**
+   * 손님: 주인이 보낸 마을 모습 { c: [날, 시각], d: 주인의 시작 날짜, n: 마을 친구들, w: 풀, b: 열매 덤불 }.
+   * 서버가 그대로 전한 것이라 하나씩 확인해서 쓴다. 풀 · 덤불은 커튼이 다 내려온 뒤에 바꾼다.
+   */
   function takeWorld(w) {
     if (!visiting || !w || typeof w !== 'object') return;
     if (Array.isArray(w.c) && Number.isFinite(w.c[0]) && Number.isFinite(w.c[1])) visiting.clock = { day: Math.max(1, Math.floor(w.c[0])), t: Math.min(0.99999, Math.max(0, w.c[1])) };
     if (typeof w.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.d)) visiting.startDate = w.d;
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
-    if (Array.isArray(w.w)) { visiting.weeds = w.w.slice(0, 400); if (!visiting.arriving) weeds.showGuest(visiting.weeds); } // 커튼이 다 내려온 뒤에 바꾼다
+    if (Array.isArray(w.w)) { visiting.weeds = w.w.slice(0, 400); if (!visiting.arriving) weeds.showGuest(visiting.weeds, multi.you); }
+    if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
+  }
+  /**
+   * 주인: 손님의 행동을 내 마을에 반영한다(받은 값은 하나씩 확인한다). 바뀐 풀 · 덤불은 다음 마을 모습으로 바로 모두에게 간다.
+   * { t: 'grab' | 'drop', id }: 그 풀을 뽑기 시작했다 · 그만뒀다(그동안 나와 마을 친구들은 그 풀을 건드리지 않는다)
+   * { t: 'weed', id, stage, flawed }: 한 단계 뽑았다, { t: 'weed', id, done: 'clean' | 'snapped' }: 다 뽑았다
+   * { t: 'berry', i }: 그 덤불의 열매를 땄다
+   */
+  function takeGuestAct(id, a) {
+    if (!state || !a || typeof a !== 'object') return;
+    weedsT = 0;
+    if (a.t === 'berry') {
+      const b = Number.isInteger(a.i) ? berries.list[a.i] : null;
+      if (b && b.ready) berries.pick(b);
+      return;
+    }
+    const w = Number.isFinite(a.id) ? weeds.byId(a.id) : null;
+    if (!w || Math.hypot(w.x, w.z) > VILLAGE_R + 1) return;
+    const mine = w.busy === 'guest' && w.busyBy === id;
+    if (a.t === 'grab') {
+      if (!w.busy && !npcs.isWorkingOn(w)) { w.busy = 'guest'; w.busyBy = id; w.busyUntil = performance.now() + GUEST_HOLD_MS; }
+    } else if (a.t === 'drop') {
+      if (mine) { delete w.busy; delete w.busyBy; }
+    } else if (a.t === 'weed') {
+      if (mine) { delete w.busy; delete w.busyBy; }
+      if (a.done === 'clean' || a.done === 'snapped') {
+        // 내가 같은 풀을 뽑고 있었으면 친구가 먼저 뽑은 것으로
+        if (pulling && pulling.weed === w) { cancelPull(); hud.floatText({ x: w.x, y: 1.15, z: w.z, text: `${josa(multi.nameOf(id) || '친구', '이/가')} 먼저 뽑았어요`, kind: 'tip' }); }
+        weeds.remove(w, a.done);
+      } else if (Number.isInteger(a.stage) && a.stage > w.stage && a.stage <= 4) {
+        weeds.loosen(w, a.stage);
+        w.flawed = !!a.flawed;
+      }
+    }
+  }
+  /** 주인: 손님이 뽑기 시작한 풀은 이만큼(ms) 그 손님 몫으로 둔다(그만뒀다는 말이 끊겨 안 와도 풀리게). */
+  const GUEST_HOLD_MS = 8000;
+  /** 주인: 그 손님이 잡아 둔 풀을 놓는다(손님이 돌아갔을 때). */
+  function releaseHolds(id) {
+    for (const w of weeds.list) if (w.busy === 'guest' && w.busyBy === id) { delete w.busy; delete w.busyBy; }
+  }
+  /** 주인: 손님에게 보낼 풀의 뽑는 중 표시(0 아무도 · 1 나나 마을 친구 · 손님 연결 id). 오래된 손님 몫은 여기서 풀어 준다. */
+  function weedBusy(w) {
+    if (w.busy === 'guest') {
+      if (performance.now() < w.busyUntil) return w.busyBy;
+      delete w.busy;
+      delete w.busyBy;
+    }
+    return w.busy || npcs.isWorkingOn(w) ? 1 : 0;
   }
   /**
    * 같이 놀기 매 프레임(모든 장면): 내 움직임을 보내고(마을 울타리 안에서 돌아다닐 때만 'village'),
    * 주인이면 손님이 있을 때 내 마을 모습을 보낸다(시간 · 마을 친구들은 0.2초마다, 풀은 1초마다).
    */
   function netTick(dt) {
-    if (visiting && (visiting.arriving || visiting.leaving)) return; // 커튼 연출 중에는 보내지 않는다(정문 앞에서 기다리는 모습 그대로)
-    const p = player.position, inVillage = mode === 'play' && Math.hypot(p.x, p.z) <= VILLAGE_R + 2;
+    if (visiting && (visiting.arriving || visiting.leaving)) return; // 커튼 연출 중에는 보내지 않는다(숲길 끝에서 기다리는 모습 그대로)
+    // 놀러 간 친구는 숲길 끝에서 걸어 들어오는 모습부터 보인다
+    const p = player.position, inVillage = visiting ? mode === 'play' || mode === 'intro' : mode === 'play' && Math.hypot(p.x, p.z) <= VILLAGE_R + 2;
     multi.tick(dt, { x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +player.yaw.toFixed(2), anim: player.anim || 'idle', area: inVillage ? 'village' : 'away' });
     if (multi.status !== 'open' || !multi.count) return;
     worldT -= dt;
@@ -363,10 +439,13 @@ function boot() {
     if (worldT > 0) return;
     worldT = 0.2;
     const w = { c: [state.clock.day, +state.clock.t.toFixed(5)], d: state.startDate, n: npcs.snapshot() };
-    if (weedsT <= 0) { weedsT = 1; w.w = weeds.snapshot(); }
+    if (weedsT <= 0) { weedsT = 1; w.w = weeds.snapshot(weedBusy); w.b = berries.snapshot(); }
     multi.sendWorld(w);
   }
-  /** 손님: 친구 마을에서는 돌아다니며 인사만 한다(내 시간 · 퀘스트 · 저장은 멈춘다. 울타리 밖으로는 못 나간다). */
+  /**
+   * 손님: 친구 마을에서 돌아다니며 풀을 뽑고 열매를 따고(내 가방으로) 가게에서 내 돈으로 산다.
+   * 내 시간 · 퀘스트 이야기는 멈추고, 울타리 밖으로는 못 나간다.
+   */
   function guestTick(dt) {
     const shown = viewState(); // 시계 · 날짜는 주인 마을 것
     panels.tick(shown);
@@ -377,8 +456,9 @@ function boot() {
       const now = performance.now();
       if (now > visiting.warnAt) { visiting.warnAt = now + 4000; hud.toast('친구 마을에서는 울타리 밖으로 나갈 수 없어요', 2200); }
     }
-    target = null;
-    hud.setAction(null);
+    if (pulling) updatePull(dt);
+    target = pulling || panels.isOpen() || guide.open || sleeping || funBusy() ? null : findGuestTarget();
+    hud.setAction(pulling ? '뽑는 중' : target ? target.label : null);
     hud.render(shown);
     const lightMode = lightOf(state);
     hud.setLight(hasTool(state, 'lantern') || hasTool(state, 'flashlight') ? lightMode : null);
@@ -393,6 +473,8 @@ function boot() {
     /** 폰 상태 줄 { time, date }: 친구 마을에 놀러 간 동안은 그 마을 시계(아니면 null 이라 내 시계). */
     phoneNow: () => (visiting && visiting.clock ? { time: timeLabel(visiting.clock), date: dateLabel(visiting.startDate || state.startDate, visiting.clock.day) } : null),
     multi: multiPanel,
+    /** 친구 마을에 놀러 가 있는지(가게에서 알바 · 건배처럼 내 마을에서만 하는 일을 숨긴다). */
+    visiting: () => !!visiting,
     villageLive: () => villageLive(),
     getSound: () => sound.prefs,
     toast: (text) => hud.toast(text),
@@ -1061,6 +1143,7 @@ function boot() {
       const a = addItem(useStamina(state, WORK_STAMINA).state, 'berry', 1, 1);
       if (!a.added) { hud.toast('가방이 꽉 찼어요'); return; }
       berries.pick(bush);
+      if (bush.guest) multi.act({ t: 'berry', i: bush.i }); // 친구 마을 덤불: 주인 마을에서도 빈다(딴 열매는 내 가방에)
       commit(a.state);
       didAct('berry');
       sound.play('clean');
@@ -1071,6 +1154,7 @@ function boot() {
     }
     const before = state.job;
     berries.pick(bush);
+    if (bush.guest) multi.act({ t: 'berry', i: bush.i });
     commit({ ...useStamina(state, WORK_STAMINA).state, job: recordPull(state.job, 'berry', 'clean') });
     didAct('berry');
     sound.play('clean');
@@ -1086,6 +1170,10 @@ function boot() {
     if (!canPullKind(state.license.grade, weed.kind)) { hud.toast(`${W.grade}급부터`, 2200, { icon: itemSvg(weed.kind) }); return; }
     if (state.stamina < STAMINA_PER_PULL) { hud.toast('기운이 없어요', 2000); return; }
     if (npcs.isWorkingOn(weed)) { hud.toast('친구가 뽑으려는 풀이에요'); return; }
+    // 같이 놀기: 놀러 온 친구가 뽑고 있는 내 마을 풀 · 친구 마을에서 다른 사람이 뽑고 있는 풀
+    if (weed.busy === 'guest' && performance.now() < weed.busyUntil) { hud.toast(`${josa(multi.nameOf(weed.busyBy) || '친구', '이/가')} 뽑고 있는 풀이에요`); return; }
+    if (weed.guest && weed.taken) { hud.toast('다른 친구가 뽑고 있는 풀이에요'); return; }
+    if (weed.guest) multi.act({ t: 'grab', id: weed.id }); // 주인에게: 이 풀은 내가 뽑는 중
     // 초록 구간은 뽑을 때마다 다른 자리에, 기운이 낮을수록 좁고 빠르게
     const st = stageLabel(weed);
     // 내 제초 급수가 그 풀보다 높을수록 쉬워진다(core/weeding.js 의 pullSkill)
@@ -1101,9 +1189,24 @@ function boot() {
     sound.chargeStart();
   }
 
+  /** 뽑는 동안 매 프레임: 게이지가 차오르고 풀이 늘어난다(내 마을 · 친구 마을 같이). */
+  function updatePull(dt) {
+    const before = pulling.pull.power;
+    pulling.pull = chargePull(pulling.pull, dt);
+    player.power = pulling.pull.power;
+    sound.chargeUpdate(player.power);
+    // 지금 떼면 깔끔하게! (끝에 닿고 되돌아오는 길에 초록 칸 위쪽으로 들어설 때도)
+    if (pulling.pull.back ? before > pulling.pull.greenTo && player.power <= pulling.pull.greenTo : before < pulling.pull.greenFrom && player.power >= pulling.pull.greenFrom) sound.play('zone');
+    weeds.tug(pulling.weed, pulling.pull.power);
+    hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
+    // 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었으면 그대로 끊어진다(실패)
+    if (pulling.pull.over) endPull(true);
+  }
+
   /** 결과 없이 뽑기를 멈춘다(창이 열리거나 다시 시작할 때). 기운은 쓰지 않는다. */
   function cancelPull() {
     if (!pulling) return;
+    if (pulling.weed.guest) multi.act({ t: 'drop', id: pulling.weed.id });
     weeds.tug(pulling.weed, 0);
     delete pulling.weed.busy;
     pulling = null;
@@ -1128,7 +1231,7 @@ function boot() {
     delete weed.busy;
     const step = releasePull(pull), W = WEED_KINDS[weed.kind];
     sound.play(step === 'clean' ? 'clean' : step === 'snapped' ? 'snap' : 'none');
-    if (step === 'none') { pop('조금 더 꾹~', 'tip'); return; }
+    if (step === 'none') { if (weed.guest) multi.act({ t: 'drop', id: weed.id }); pop('조금 더 꾹~', 'tip'); return; }
 
     let next = useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
     if (W.poison && step === 'snapped') pop('윽, 독이 튀었다!', 'snap');
@@ -1138,6 +1241,7 @@ function boot() {
     if (!prog.done) {
       weed.flawed = prog.flawed;
       weeds.loosen(weed, prog.stage);
+      if (weed.guest) multi.act({ t: 'weed', id: weed.id, stage: prog.stage, flawed: !!prog.flawed }); // 친구 마을 풀: 주인 마을에서도 올라오게
       if (!(W.poison && step === 'snapped') && !tooLong) pop(`한 번 더! ${prog.stage} / ${W.stages || 1}`, 'tip');
       state = next;
       save();
@@ -1158,6 +1262,7 @@ function boot() {
       if (a.added) hud.bagBump(); else hud.toast('가방이 꽉 찼어요');
     }
     weeds.remove(weed, result);
+    if (weed.guest) multi.act({ t: 'weed', id: weed.id, done: result }); // 친구 마을 풀: 주인 마을에서도 뽑힌다(얻은 풀은 내 가방에)
     if (first && weed.kind !== 'weed') hud.banner('새 풀!', W.name, 2400);
     else if (!(W.poison && step === 'snapped') && !tooLong) pop(result === 'clean' ? '깔끔!' : '끊어졌다…', result === 'clean' ? 'clean' : 'snap');
 
@@ -1360,7 +1465,6 @@ function boot() {
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
-    if (visiting) return; // 친구 마을에 놀러 간 동안은 돌아다니며 인사만 한다
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
     if (!down) {
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -1369,7 +1473,7 @@ function boot() {
     if (panels.isOpen() || fainting) return;
     if (pulling) return;
     // 대상이 없어도 무기를 들고 있으면 허공에 휘두른다
-    if (!target) { if (weaponNow()) doSwing(); return; }
+    if (!target) { if (weaponNow() && !visiting) doSwing(); return; } // 친구 마을에서는 무기를 휘두르지 않는다(대상도 풀 · 열매 · 가게만)
     if (target.type === 'attack') doSwing();
     else if (target.type === 'pickup') pickUpGround(target.g);
     else if (target.type === 'weed') beginPull(target.weed);
@@ -4147,6 +4251,32 @@ function boot() {
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
   }
+  /** 같이 놀기: 친구 마을에서 내 돈으로 쓸 수 있는 가게(일감 · 시험 · 집 · 추첨 · 변신은 내 마을에서). */
+  const GUEST_PLACES = new Set(['ramen', 'furniture', 'pochette', 'books', 'tools', 'pub']);
+  /** 친구 마을에서 지금 누르면 할 일: 풀 뽑기 · 열매 따기(내 가방으로) · 가게. */
+  function findGuestTarget() {
+    const p = player.position, options = [];
+    let weed = null, wd = 1.3;
+    for (const w of weeds.active()) {
+      if (!weeds.usable(w)) continue;
+      const d = Math.hypot(w.x - p.x, w.z - p.z);
+      if (d < wd) { wd = d; weed = w; }
+    }
+    if (weed) {
+      const W = WEED_KINDS[weed.kind], st = stageLabel(weed);
+      const label = !canPullKind(state.license.grade, weed.kind) ? `${W.grade}급 풀` : st ? `뽑기 ${st}` : '뽑기';
+      options.push({ d: wd, t: { type: 'weed', weed, label } });
+    }
+    const bush = berries.nearestReady(p.x, p.z, 1.4);
+    if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
+    for (const [key, label] of PLACES) {
+      if (!GUEST_PLACES.has(key)) continue;
+      const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < 1.8) options.push({ d: d - 0.6, t: { type: key, label } });
+    }
+    options.sort((a, b) => a.d - b.d);
+    return options.length ? options[0].t : null;
+  }
 
   // ---------- 행동 안내: 지금 누르면 무엇을 하는지 대상 발밑에 노란 고리, 머리 위에 (PC 면 키 모양과 함께) 할 일 ----------
   const cue = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfcd95b, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
@@ -4719,18 +4849,7 @@ function boot() {
       idolStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
-      if (pulling) {
-        const before = pulling.pull.power;
-        pulling.pull = chargePull(pulling.pull, dt);
-        player.power = pulling.pull.power;
-        sound.chargeUpdate(player.power);
-        // 지금 떼면 깔끔하게! (끝에 닿고 되돌아오는 길에 초록 칸 위쪽으로 들어설 때도)
-        if (pulling.pull.back ? before > pulling.pull.greenTo && player.power <= pulling.pull.greenTo : before < pulling.pull.greenFrom && player.power >= pulling.pull.greenFrom) sound.play('zone');
-        weeds.tug(pulling.weed, pulling.pull.power);
-        hud.showMeter(pulling.pull.power, { from: pulling.pull.greenFrom, to: pulling.pull.greenTo }, pulling.label);
-        // 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었으면 그대로 끊어진다(실패)
-        if (pulling.pull.over) endPull(true);
-      }
+      if (pulling) updatePull(dt);
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
         : pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting ? null : findTarget();
       updateFun(dt);
@@ -4802,7 +4921,7 @@ function boot() {
     if (guestView) npcs.puppet(visiting.npcs, dt, t);
     else npcs.update(dt, t, focus);
     // 같이 놀기: 같은 마을 친구들은 내가 마을에 있을 때만 보인다(내 움직임은 netTick 이 보낸다)
-    remotes.update(dt, mode === 'play' && !closeup);
+    remotes.update(dt, (mode === 'play' || (mode === 'intro' && !!visiting)) && !closeup); // 친구 마을로 걸어 들어갈 때도 와 있는 친구들이 보인다
     if (mode !== 'play') streaks.setActive(false);
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });

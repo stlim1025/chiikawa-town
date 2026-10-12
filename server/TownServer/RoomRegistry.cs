@@ -5,6 +5,26 @@ using System.Text.RegularExpressions;
 namespace TownServer;
 
 /// <summary>
+/// 너무 자주 오는 메시지를 버리는 양동이: 1초에 perSecond 개씩 차고, 잠깐 몰려오면 burst 개까지 봐준다.
+/// </summary>
+public sealed class TokenBucket
+{
+    private double _tokens = double.MaxValue;
+    private long _refillAt;
+
+    /// <summary>하나를 받아 들여도 되는지(되면 하나 쓴다). now 는 Environment.TickCount64.</summary>
+    public bool Take(long now, double perSecond, double burst)
+    {
+        var refill = (now - _refillAt) / 1000.0 * perSecond;
+        _tokens = Math.Min(burst, _tokens == double.MaxValue ? burst : _tokens + refill);
+        _refillAt = now;
+        if (_tokens < 1) return false;
+        _tokens -= 1;
+        return true;
+    }
+}
+
+/// <summary>
 /// 마을에 들어와 있는 사람 한 명(서버 메모리에만 있다. 저장하지 않는다).
 /// </summary>
 public sealed class Player(string id, string room, string name, JsonElement look, MoveInfo move, bool host)
@@ -27,24 +47,11 @@ public sealed class Player(string id, string room, string name, JsonElement look
     /// <summary>마을 주인인지(주인만 마을 상태를 보낼 수 있고, 주인이 나가면 문이 닫힌다).</summary>
     public bool Host { get; } = host;
 
-    /// <summary>위치를 더 받을 수 있는 남은 개수(시간이 지나면 다시 찬다).</summary>
-    public double MoveTokens { get; set; } = double.MaxValue;
+    /// <summary>위치를 너무 자주 보내면 버리는 양동이.</summary>
+    public TokenBucket Moves { get; } = new();
 
-    /// <summary>MoveTokens 를 마지막으로 채운 시각(Environment.TickCount64).</summary>
-    public long MoveRefillAt { get; set; }
-
-    /// <summary>
-    /// 위치 한 번을 받아 들여도 되는지(1초에 perSecond 개, 잠깐 몰려오면 burst 개까지). 되면 하나 쓴다.
-    /// </summary>
-    public bool TakeMove(long now, double perSecond, double burst)
-    {
-        var refill = (now - MoveRefillAt) / 1000.0 * perSecond;
-        MoveTokens = Math.Min(burst, MoveTokens == double.MaxValue ? burst : MoveTokens + refill);
-        MoveRefillAt = now;
-        if (MoveTokens < 1) return false;
-        MoveTokens -= 1;
-        return true;
-    }
+    /// <summary>행동(손님 → 주인)을 너무 자주 보내면 버리는 양동이.</summary>
+    public TokenBucket Acts { get; } = new();
 
     /// <summary>새로 들어온 사람에게 보낼 모습.</summary>
     public PlayerSnapshot Snapshot() => new(Id, Name, Look, Move, Host);
@@ -78,6 +85,13 @@ public sealed partial class RoomRegistry
 
     /// <summary>연결 id 로 사람을 찾는다(마을에 없으면 null).</summary>
     public Player? Get(string id) => _players.GetValueOrDefault(id);
+
+    /// <summary>그 마을 주인의 연결 id(문이 닫혀 있으면 null).</summary>
+    public string? HostOf(string room)
+    {
+        if (!_rooms.TryGetValue(room, out var r)) return null;
+        lock (r) return r.HostId;
+    }
 
     /// <summary>
     /// 문을 연다(주인으로 들어간다). 그 코드로 이미 문이 열려 있으면 false.

@@ -225,10 +225,23 @@ export function createWeeds(scene, village, random = Math.random) {
   const applyVisibility = (focus) => {
     for (const w of list) w.mesh.visible = !guestOn && !w.hidden && (!focus || Math.hypot(w.x - focus.x, w.z - focus.z) < DRAW_DIST);
   };
-  // 같이 놀기(손님): 친구 마을에 놀러 간 동안은 내 풀을 숨기고(자라지도 않는다) 주인이 보낸 풀을 대신 보여 준다
+  /** 뽑힌 풀 모양을 날려 보낸다(깔끔하게 뽑혔으면 뿌리까지). */
+  function flyOff(m, result) {
+    m.visible = true;
+    m.scale.setScalar(1);
+    m.rotation.z = 0;
+    if (result === 'clean') {
+      const root = toonMesh(GEO.dot, '#c9a27a', { position: [0, -0.05, 0], scale: [0.12, 0.08, 0.12], outline: 0.015, shadow: false });
+      m.add(root);
+    }
+    flying.push({ mesh: m, t: 0, vy: result === 'clean' ? 4.2 : 2.6, vx: (random() - 0.5) * 1.2, spin: (random() - 0.5) * 12 });
+  }
+  // 같이 놀기(손님): 친구 마을에 놀러 간 동안은 내 풀을 숨기고(자라지도 않는다) 주인이 보낸 풀을 대신 보여 주고 뽑게 한다
   let guestOn = false;
-  const guest = new Map(); // '종류:주인 풀 id' → 풀 모양
-  const fly = (mesh, clean) => flying.push({ mesh, t: 0, vy: clean ? 4.2 : 2.6, vx: (random() - 0.5) * 1.2, spin: (random() - 0.5) * 12 });
+  // 주인 풀 id → { id, kind, x, z, stage, flawed, hidden, taken: 다른 사람이 뽑는 중, mesh, guest: true, hold: 내 단계를 믿는 시각 }
+  const guest = new Map();
+  const gone = new Set(); // 내가 뽑아 없앤 주인 풀 id(주인이 아직 모른 채 보낸 모습에 다시 나타나지 않게)
+  const HOLD_MS = 4000; // 내가 한 단계 뽑은 풀: 주인에게 닿기 전에 온 모습보다 내 단계를 믿는 시간
 
   return {
     list,
@@ -244,6 +257,8 @@ export function createWeeds(scene, village, random = Math.random) {
     },
     /** 지금 보이고 뽑을 수 있는 풀인지. */
     usable,
+    /** 지금 뽑을 수 있는 풀들(친구 마을에 놀러 간 동안은 주인 마을 풀). */
+    active() { return guestOn ? guest.values() : list; },
     /** 뽑을 풀 표시: kinds(풀 종류 목록) 위에 화살표를 띄운다. null · [] 이면 모두 지운다. */
     setHint(kinds) {
       const key = (kinds || []).join(',');
@@ -263,39 +278,47 @@ export function createWeeds(scene, village, random = Math.random) {
       weed.stage = stage;
       weed.mesh.position.y = 0.06 * stage;
       weed.mesh.rotation.x = 0.12 * stage * (weed.id % 2 ? 1 : -1);
+      if (weed.guest) weed.hold = performance.now() + HOLD_MS;
     },
     /** 뽑힌 풀을 날려 보낸다. result: 'clean' | 'snapped' */
     remove(weed, result) {
+      if (weed.guest) {
+        // 친구 마을 풀: 내 화면에서 바로 날려 보내고, 주인이 아직 모른 채 보낸 모습에 다시 나타나지 않게 적어 둔다
+        if (guest.get(weed.id) !== weed) return;
+        guest.delete(weed.id);
+        gone.add(weed.id);
+        flyOff(weed.mesh, result);
+        return;
+      }
       const i = list.indexOf(weed);
       if (i < 0) return;
       list.splice(i, 1);
       dropHint(weed);
-      const m = weed.mesh;
-      m.visible = true;
-      m.scale.setScalar(1);
-      m.rotation.z = 0;
-      if (result === 'clean') {
-        const root = toonMesh(GEO.dot, '#c9a27a', { position: [0, -0.05, 0], scale: [0.12, 0.08, 0.12], outline: 0.015, shadow: false });
-        m.add(root);
-      }
-      flying.push({ mesh: m, t: 0, vy: result === 'clean' ? 4.2 : 2.6, vx: (random() - 0.5) * 1.2, spin: (random() - 0.5) * 12 });
+      flyOff(weed.mesh, result);
     },
-    /** 같이 놀기(주인): 놀러 온 친구에게 보낼 마을 울타리 안 풀 [[id, kind, x, z, 뽑힌 단계, 숨었으면 1]]. */
-    snapshot() {
+    /** 같이 놀기(주인): 내 풀을 id 로 찾는다(손님이 뽑았다고 알려 올 때). */
+    byId(id) { return list.find((w) => w.id === id) || null; },
+    /**
+     * 같이 놀기(주인): 놀러 온 친구에게 보낼 마을 울타리 안 풀 [[id, kind, x, z, 뽑힌 단계, 숨었으면 1, 끊긴 적 있으면 1, 뽑는 중]].
+     * busyOf(w): 뽑는 중인 사람(0 아무도 · 1 주인이나 마을 친구 · 손님 연결 id).
+     */
+    snapshot(busyOf = () => 0) {
       const out = [];
-      for (const w of list) if (Math.hypot(w.x, w.z) <= VILLAGE_R + 1) out.push([w.id, w.kind, +w.x.toFixed(2), +w.z.toFixed(2), w.stage, w.hidden ? 1 : 0]);
+      for (const w of list) if (Math.hypot(w.x, w.z) <= VILLAGE_R + 1) out.push([w.id, w.kind, +w.x.toFixed(2), +w.z.toFixed(2), w.stage, w.hidden ? 1 : 0, w.flawed ? 1 : 0, busyOf(w)]);
       return out;
     },
     /**
-     * 같이 놀기(손님): 내 풀은 숨기고 주인 마을의 풀(주인이 보낸 snapshot)을 대신 보여 준다(뽑을 수는 없다).
-     * 지난번에 있다가 없어진 풀은 뽑힌 것이라 날아가게 한다. null 이면 주인 풀을 치우고 내 풀을 다시 보인다.
+     * 같이 놀기(손님): 내 풀은 숨기고 주인 마을의 풀(주인이 보낸 snapshot)을 대신 보여 주고 뽑게 한다(active · remove).
+     * 지난번에 있다가 없어진 풀은 다른 사람이 뽑은 것이라 날아가게 한다. me: 내 연결 id(내가 뽑는 중인 풀은 남이 뽑는 풀로 치지 않게).
+     * null 이면 주인 풀을 치우고 내 풀을 다시 보인다.
      */
-    showGuest(items) {
+    showGuest(items, me = '') {
       if (!items) {
         if (!guestOn) return;
         guestOn = false;
-        for (const m of guest.values()) scene.remove(m);
+        for (const w of guest.values()) scene.remove(w.mesh);
         guest.clear();
+        gone.clear();
         cull = 0; // 다음 update 에서 내 풀을 다시 보인다
         return;
       }
@@ -303,26 +326,32 @@ export function createWeeds(scene, village, random = Math.random) {
         guestOn = true;
         for (const w of list) { w.mesh.visible = false; if (w.hint) w.hint.visible = false; }
       }
-      const keep = new Set();
+      const keep = new Set(), now = performance.now();
       for (const it of items) {
         if (!Array.isArray(it)) continue;
-        const [id, kind, x, z, stage, hidden] = it;
-        if (!Object.hasOwn(WEED_KINDS, kind) || !Object.hasOwn(BUILD, kind) || !Number.isFinite(id) || !Number.isFinite(x) || !Number.isFinite(z)) continue;
-        const key = kind + ':' + id;
-        keep.add(key);
-        let m = guest.get(key);
-        if (!m) {
-          m = weedMesh(kind);
-          m.rotation.y = (id * 2.399) % (Math.PI * 2); // 같은 풀은 늘 같은 쪽을 보게(받을 때마다 돌지 않게)
-          scene.add(m);
-          guest.set(key, m);
+        const [id, kind, x, z, stage, hidden, flawed, busy] = it;
+        if (!Object.hasOwn(WEED_KINDS, kind) || !Object.hasOwn(BUILD, kind) || !Number.isFinite(id) || !Number.isFinite(x) || !Number.isFinite(z) || gone.has(id)) continue;
+        keep.add(id);
+        let w = guest.get(id);
+        if (w && w.kind !== kind) { scene.remove(w.mesh); w = null; }
+        if (!w) {
+          const mesh = weedMesh(kind);
+          mesh.rotation.y = (id * 2.399) % (Math.PI * 2); // 같은 풀은 늘 같은 쪽을 보게(받을 때마다 돌지 않게)
+          scene.add(mesh);
+          w = { id, kind, x, z, stage: 0, flawed: false, hidden: false, taken: false, mesh, guest: true, hold: 0, grow: 1 };
+          guest.set(id, w);
         }
+        w.x = x;
+        w.z = z;
+        w.hidden = !!hidden;
+        w.taken = !!busy && busy !== me;
         const st = Math.max(0, Math.min(4, Math.floor(stage) || 0));
-        m.position.set(x, 0.06 * st, z);
-        m.rotation.x = 0.12 * st * (id % 2 ? 1 : -1);
-        m.visible = !hidden;
+        if (now > w.hold || st > w.stage) { w.stage = st; w.flawed = !!flawed; } // 내가 방금 뽑은 단계는 주인에게 닿을 때까지 그대로
+        w.mesh.position.set(x, 0.06 * w.stage, z);
+        w.mesh.rotation.x = 0.12 * w.stage * (id % 2 ? 1 : -1);
+        w.mesh.visible = !w.hidden;
       }
-      for (const [key, m] of guest) if (!keep.has(key)) { guest.delete(key); m.visible = true; fly(m, true); }
+      for (const [id, w] of guest) if (!keep.has(id)) { guest.delete(id); flyOff(w.mesh, 'clean'); }
     },
     /** 종류별 지금 자라 있는 수(디버그 · 테스트). */
     counts() {

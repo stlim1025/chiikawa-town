@@ -674,9 +674,9 @@ export function createPanels(ui, handlers) {
           lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
             : priceBtn(item.price, s.money, after(() => handlers.buy(item.id)))));
       });
-      // 알바: 슈퍼 알바이터 자격이 있으면 하루 한 번
+      // 알바: 슈퍼 알바이터 자격이 있으면 하루 한 번(친구 마을에 놀러 간 동안은 사 먹기만)
       const work = canWorkRamen(s, s.clock.day);
-      out.push(h('div', { class: 'row' },
+      if (!handlers.visiting?.()) out.push(h('div', { class: 'row' },
         h('div', {}, h('div', { class: 't' }, '알바하기'), chipLine(chip('clock', '', '3시간'), chip('coin', '', `${won(SHIFT_BASE)} + 그릇당 ${won(BOWL_PAY)}~`))),
         work.ok ? h('button', { class: 'btn pink', type: 'button', disabled: s.stamina < 15, onClick: () => { close(true); handlers.workRamen(); } }, s.stamina < 15 ? '기운이 없어요' : '일하기')
           : h('span', { class: 'lic-badge' }, work.reason === 'today' ? '오늘 근무 끝' : '자격증 필요')));
@@ -707,7 +707,8 @@ export function createPanels(ui, handlers) {
         : !info.here ? h('span', { class: 'lic-badge' }, `저녁 ${PUB_HOURS[0]} ~ ${PUB_HOURS[1]}시`)
           : info.cheered ? h('span', { class: 'lic-badge done' }, ico('check'), '오늘 건배함')
             : priceBtn(CHEERS_PRICE, s.money, () => { close(true); handlers.cheers(); }, 'btn pink');
-      out.push(h('div', { class: `row pub-row cheers${info.here ? ' here' : ''}` },
+      // 친구 마을에 놀러 간 동안은 사 마시기만(건배는 내 마을 쿠리만쥬와)
+      if (!handlers.visiting?.()) out.push(h('div', { class: `row pub-row cheers${info.here ? ' here' : ''}` },
         svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg('kurimanju')}</svg>`),
         h('div', {}, h('div', { class: 't' }, '쿠리만쥬와 건배'),
           h('div', { class: 'mon-chips' }, chip('heart', 'gift', '하트 +2'), chip(null, '', `기운 +${CHEERS_STAMINA}`))),
@@ -1164,7 +1165,7 @@ export function createPanels(ui, handlers) {
     /**
      * 마을폰 '같이 놀기': 동물의 숲처럼 내 마을 문을 열면 친구가 내 마을 코드로 놀러 오고, 나도 친구 마을 코드로 놀러 간다.
      * 진행은 각자 기기에 있고, 서버는 움직임 · 한마디와 주인 마을의 모습만 나눈다(서버 주소는 고정이라 보이지 않는다).
-     * handlers.multi = { state(), draft(key, v), open(), shut(), visit(), goHome(), copy(), say(text) }
+     * handlers.multi = { state(), draft(key, v), toggleGate(), visit(), goHome(), copy(), say(text) }
      */
     multi() {
       const M = handlers.multi, st = M.state(), busy = st.status === 'connecting';
@@ -1188,16 +1189,17 @@ export function createPanels(ui, handlers) {
         h('div', { class: 'mp-code' },
           h('b', { class: 'mp-code-text', 'aria-label': `내 마을 코드 ${[...(st.myCode || '')].join(' ')}` }, st.myCode || '------'),
           h('button', { class: 'btn', type: 'button', onClick: () => M.copy() }, '복사')));
+      // 마을 문: 스위치로 열고 닫는다(열려 있으면 놀러 온 친구 · 한마디)
+      const hosting = busy && st.role === 'host', visitingNow = busy && st.role === 'guest';
+      out.push(h('div', { class: 'row opt-row mp-gate' },
+        h('div', {}, h('div', { class: 't' }, '마을 문 열기'),
+          h('div', { class: 'd' }, opened ? '친구가 내 마을 코드로 놀러 올 수 있어요' : hosting ? '문을 여는 중…' : '열면 친구가 내 마을 코드로 놀러 올 수 있어요')),
+        h('button', { class: `switch${opened ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(opened), 'aria-label': '마을 문 열기', disabled: visitingNow, onClick: () => M.toggleGate() },
+          h('i', { 'aria-hidden': 'true' }), h('span', {}, opened ? '열림' : '닫힘'))));
       if (opened) {
-        out.push(h('p', { class: 'phone-note' }, '문이 열려 있어요. 친구가 이 코드로 놀러 올 수 있어요'),
-          h('h3', { class: 'shop-sec' }, '놀러 온 친구'), chips(st.players, '아직 아무도 안 왔어요'),
-          ...says(),
-          h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => M.shut() }, '문 닫기')));
+        out.push(h('h3', { class: 'shop-sec' }, '놀러 온 친구'), chips(st.players, '아직 아무도 안 왔어요'), ...says());
         return out;
       }
-      const hosting = busy && st.role === 'host', visitingNow = busy && st.role === 'guest';
-      out.push(h('p', { class: 'phone-note' }, '문을 열면 친구가 내 마을 코드로 놀러 올 수 있어요'),
-        h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: busy, onClick: () => M.open() }, hosting ? '문 여는 중…' : '문 열기')));
       // 친구 마을 놀러 가기: 친구가 알려 준 마을 코드
       const inp = h('input', { class: 'name-input mp-input', value: st.code || '', placeholder: '예: K7QX2M', maxlength: 6, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': '친구 마을 코드' });
       inp.addEventListener('input', () => M.draft('code', inp.value)); // 다시 그려도 넣던 글이 남게

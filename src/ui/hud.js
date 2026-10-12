@@ -42,12 +42,15 @@ export function createHud(ui, input) {
   // 같이 토벌 중인 친구들 얼굴(돈 · 기운 아래)
   const partyTag = el('div', 'hud-party');
   partyTag.hidden = true;
+  // 같이 놀기: 내 마을에 놀러 온 친구 이름표(주인) · 놀러 와 있는 마을(손님)
+  const visitTag = el('div', 'hud-visit');
+  visitTag.hidden = true;
   const job = el('div', 'hud-job');
   job.hidden = true;
   job.innerHTML = '<b></b><span class="n"></span>';
   // 하는 중인 퀘스트(5단계): 일감 칸 아래에 퀘스트마다 쪽지 한 장씩(화면에 띄운 것이 맨 위)
   const quests = el('div', 'hud-quests');
-  dock.append(status, partyTag, job, quests);
+  dock.append(status, partyTag, visitTag, job, quests);
   const notes = new Map(); // 퀘스트 id → { el, key }
   // 카드가 날아오는 중인 퀘스트(그동안 그 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
   const incoming = new Map(); // id → 날아오는 카드 수
@@ -313,6 +316,28 @@ export function createHud(ui, input) {
         if (nt.key && nt.key !== k && !incoming.has(q.id)) { e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); }
         nt.key = k;
       });
+    },
+    /**
+     * 같이 놀기 꼬리표: { label, names } — 주인은 '놀러 온 친구' 와 친구 이름들, 손님은 놀러 와 있는 마을 이름. null 이면 숨긴다.
+     * 바뀔 때만 새로 그리고 톡 튄다(친구가 새로 오면 눈에 띄게).
+     */
+    setVisitors(info) {
+      visitTag.hidden = !info;
+      const key = info ? info.label + '|' + info.names.join(',') : '';
+      if (visitTag.dataset.k === key) return;
+      visitTag.dataset.k = key;
+      visitTag.replaceChildren();
+      if (!info) return;
+      const ico = el('i', 'vs-ico', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5 12 4l8.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10.5V20h12v-9.5" fill="#fff8ea" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" rx="1" fill="currentColor"/></svg>');
+      const lab = el('span', 'vs-lab');
+      lab.textContent = info.label;
+      visitTag.append(ico, lab);
+      for (const name of info.names) {
+        const chip = el('b', 'vs-name');
+        chip.textContent = name;
+        visitTag.appendChild(chip);
+      }
+      visitTag.classList.remove('got'); void visitTag.offsetWidth; visitTag.classList.add('got');
     },
     /** 행동 버튼 글자. null 이면 숨긴다. */
     /** 같이 토벌 중인 친구들. list: [{ name, svg: 얼굴 그림 }] (비면 숨긴다) */

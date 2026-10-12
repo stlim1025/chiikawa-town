@@ -17,6 +17,12 @@ public sealed class TownOptions
     /// </summary>
     public double MoveBurst { get; set; } = 5;
 
+    /// <summary>손님이 1초에 보낼 수 있는 행동 수(풀 뽑기 · 열매 따기를 주인에게 알린다). 넘치면 버린다.</summary>
+    public double ActsPerSecond { get; set; } = 6;
+
+    /// <summary>행동이 잠깐 몰려와도 봐주는 개수.</summary>
+    public double ActBurst { get; set; } = 12;
+
     /// <summary>접속을 허용할 게임 페이지 출처. "*" 면 어디서든 허용한다.</summary>
     public string[] AllowedOrigins { get; set; } = ["*"];
 }

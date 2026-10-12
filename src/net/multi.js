@@ -64,13 +64,13 @@ const REASON = {
 /**
  * events: {
  *   joined(player, fresh — 방금 들어왔으면 true, 먼저 와 있던 사람이면 false), moved(id, move), left(id, name),
- *   said(id, text), emote(id, name), world(payload — 주인 마을의 모습, 손님만 받는다),
+ *   said(id, text), emote(id, name), world(payload — 주인 마을의 모습, 손님만 받는다), guestAct(id, payload — 손님의 행동, 주인만 받는다),
  *   closed(hostName — 놀러 간 마을의 문이 닫혔다), lost() — 놀러 간 마을과 연결이 끊겼다, cleared(), status()
  * }
  * player = { id, name, look, host, move: { x, z, yaw, anim, area } }
  */
 export function createMulti(events = {}) {
-  let lib = null, conn = null, status = 'off', error = '', room = null, role = null, info = null, hostId = null;
+  let lib = null, conn = null, status = 'off', error = '', room = null, role = null, info = null, hostId = null, you = null;
   let sendT = 0, beatT = 0, lastKey = '';
   const players = new Map(); // id → { name, host }(나 빼고)
   const setStatus = (s, err = '') => { status = s; error = err; events.status?.(); };
@@ -88,6 +88,7 @@ export function createMulti(events = {}) {
     }
     clearPlayers();
     hostId = r.host;
+    you = r.you;
     for (const p of r.players || []) { players.set(p.id, { name: p.name, host: !!p.host }); events.joined?.(p, false); }
     lastKey = '';
     setStatus(role === 'host' ? 'open' : 'visiting');
@@ -128,6 +129,7 @@ export function createMulti(events = {}) {
       c.on('playerSaid', (id, text) => events.said?.(id, text));
       c.on('playerEmote', (id, name) => events.emote?.(id, name));
       c.on('world', (w) => { if (role === 'guest' && status === 'visiting') events.world?.(w); });
+      c.on('guestAct', (id, a) => { if (role === 'host' && status === 'open' && players.has(id)) events.guestAct?.(id, a); });
       c.on('gateClosed', (hostName) => {
         // 놀러 간 마을의 주인이 문을 닫았다: 연결을 끊고 집으로
         if (conn !== c) return;
@@ -168,6 +170,8 @@ export function createMulti(events = {}) {
     get players() { return [...players].map(([id, p]) => ({ id, ...p })); },
     /** 같은 마을 사람 수(나 빼고). */
     get count() { return players.size; },
+    /** 내 연결 id(주인이 보내는 '이 풀은 누가 뽑는 중' 표시에서 나를 알아본다). */
+    get you() { return you; },
     /** 놀러 간 마을 주인의 이름(없으면 ''). */
     get hostName() { const p = hostId && players.get(hostId); return p ? p.name : ''; },
     /** 내 마을 문을 연다. joinInfo = { name, look, x, z, yaw }. 열었으면 true. */
@@ -196,6 +200,10 @@ export function createMulti(events = {}) {
     },
     /** 주인: 내 마을의 모습을 손님들에게 보낸다(손님이 있을 때만). */
     sendWorld(payload) { if (status === 'open' && conn && players.size) conn.send('World', payload).catch(() => {}); },
+    /** 손님: 내 행동(풀 뽑기 · 열매 따기)을 주인에게 알린다. */
+    act(payload) { if (status === 'visiting' && conn) conn.send('Act', payload).catch(() => {}); },
+    /** 같은 마을 사람의 이름(모르면 ''). */
+    nameOf(id) { const p = players.get(id); return p ? p.name : ''; },
     /** 한마디(정해진 말)를 보낸다. */
     say(text) { if (live() && conn) conn.send('Say', text).catch(() => {}); },
     /** 이모트(몸짓 이름)를 보낸다. */
