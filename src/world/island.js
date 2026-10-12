@@ -499,7 +499,7 @@ function buildHut(g, m) {
   const lamp = new THREE.Mesh(GEO.sphere, new THREE.MeshBasicMaterial({ color: '#ffd27a' }));
   lamp.position.set(H.x - 1.7, 2.2, H.z + 1.3); lamp.scale.setScalar(0.18);
   g.add(lamp);
-  const b = textBoard('카레 · 조개', 2.2, 0.6, { bg: '#fff3d6', ink: '#7a3a12', size: 50 });
+  const b = textBoard('카레와 조개', 2.2, 0.6, { bg: '#fff3d6', ink: '#7a3a12', size: 50 });
   b.position.set(H.x, 2.95, H.z + 1.75);
   b.rotation.x = -0.15;
   g.add(b);

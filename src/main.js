@@ -1808,7 +1808,7 @@ function boot() {
     const title = id === 'weed' ? `제초 검정 ${novice ? 5 : s.license.grade}급` : LICENSES[id].name;
     // 카드에 크게 쓰는 두 줄(원작 '草むしり / 3級' 처럼): 제초는 '풀 뽑기 / N급', 나머지는 자격 이름 / 합격
     const big = id === 'weed' ? ['풀 뽑기', novice ? '아직 없어요' : `${s.license.grade}급`] : [LICENSES[id].name, own ? '합격' : '아직 없어요'];
-    if (!own) return { id, title, big, none: true, hint: novice ? `잡초를 뽑아 경험치를 채우면 검정소에서 시험 · ${won(EXAM_FEE[NOVICE])}` : `검정소에서 시험 보기 · 응시료 ${won(LICENSES[id].fee)}` };
+    if (!own) return { id, title, big, none: true, hint: novice ? `잡초를 뽑아 경험치를 채우면 검정소에서 시험을 봐요(${won(EXAM_FEE[NOVICE])})` : `검정소에서 시험을 봐요(응시료 ${won(LICENSES[id].fee)})` };
     // 사진은 딴 그때 모습(예전에 딴 자격증은 기본 모습)
     return { id, title, big, name, photo: playerPortrait(own.look || s.profile.look), fields: [['이름', name], ['발급', cardDate(s, own.day)], ['번호', licenseNumber(name, id, own.day)]] };
   }
@@ -4045,7 +4045,7 @@ function boot() {
     commit(r.state);
     sound.play('done');
     const chip = { rich: { icon: ICO.coin, text: `+${WISH_MONEY}원` }, full: { text: `기운 +${WISH_STAMINA}` }, luck: { icon: TICKET_SVG, text: '추첨권 +1' },
-      friends: r.gained.length ? { icon: ICO.heart, text: r.gained.map(nameOf).join(' · ') } : null }[S.wish];
+      friends: r.gained.length ? { icon: ICO.heart, text: r.gained.map(nameOf).join(', ') } : null }[S.wish];
     S.kinds.forEach((kind, i) => { const n = npcs.byKind(kind); if (n) setTimeout(() => npcs.say(n, lineOf(kind, 'starBye')), 500 + i * 450); });
     // 끝나면 가운데 보상 카드. 별똥별맨은 별똥별 밤마다 또 오니 '이야기 완료'가 아니라 별 조각을 얻은 카드로,
     // 머리핀(별 조각 셋, 포셰트 가게)을 아직 안 만들었으면 몇 개 모았는지도

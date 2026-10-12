@@ -300,7 +300,7 @@ export function createPanels(ui, handlers) {
         'aria-label': `${itemInfo(id).name} ${items[id]}개, 하나에 ${won(sellPrice(id))}`, onClick: () => { sellSel = id === sellSel ? null : id; render(); }
       }, svgSpan('art', itemSvg(id)), h('em', {}, `×${items[id]}`), h('small', { class: 'each' }, won(sellPrice(id)))))),
       sel ? h('div', { class: 'sell-pick' },
-        h('div', { class: 'sell-name' }, h('b', {}, itemInfo(sel).name), h('span', {}, `하나에 ${won(p)} · ${n}개 있어요`)),
+        h('div', { class: 'sell-name' }, h('b', {}, itemInfo(sel).name), h('span', {}, `하나에 ${won(p)}, ${n}개 있어요`)),
         h('div', { class: 'sell-btns' },
           h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.sellItem(sel, 1)) }, '1개 팔기'),
           n > 1 ? h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.sellItem(sel, n)) }, `모두 팔기 ${won(n * p)}`) : null))
@@ -348,10 +348,10 @@ export function createPanels(ui, handlers) {
     handlers.exportSave().then((code) => {
       area.value = code;
       copy.disabled = file.disabled = false;
-      saveMsg(msg, `${s.profile.name} · ${s.clock.day}일째 진행이에요`);
+      saveMsg(msg, `${s.profile.name}의 ${s.clock.day}일째 진행이에요`);
     }, () => saveMsg(msg, '코드를 만들지 못했어요. 인터넷 연결을 확인하고 다시 열어 주세요', true));
     return [appBar('저장 내보내기', null, 'options'),
-      h('p', { class: 'sub' }, '이 코드를 다른 기기(PC · 휴대폰 · 홈 화면 앱)의 마을폰 설정 → 불러오기에 붙여 넣으면 진행이 그대로 옮겨져요.'),
+      h('p', { class: 'sub' }, '이 코드를 다른 기기(PC, 휴대폰, 홈 화면 앱)의 마을폰 설정 → 불러오기에 붙여 넣으면 진행이 그대로 옮겨져요.'),
       area, msg,
       h('div', { class: 'save-io' }, copy, file),
       h('p', { class: 'note warn' }, '홈 화면 앱을 지우면 그 안의 진행도 같이 지워져요. 지우기 전에 코드를 메모나 메신저에 보관해 두세요.')];
@@ -378,8 +378,8 @@ export function createPanels(ui, handlers) {
         yes.textContent = '불러오는 중…';
       });
       check.replaceChildren(
-        h('div', { class: 't' }, `${g.profile.name} · ${g.clock.day}일째`),
-        h('div', { class: 'd' }, `${won(g.money)} · 제초 ${gradeName(g.license.grade)}`),
+        h('div', { class: 't' }, `${g.profile.name}, ${g.clock.day}일째`),
+        h('div', { class: 'd' }, `${won(g.money)}, 제초 ${gradeName(g.license.grade)}`),
         h('p', { class: 'note warn' }, '지금 이 기기의 진행은 이 코드의 진행으로 바뀌어요'),
         yes);
       check.hidden = false;
@@ -499,7 +499,7 @@ export function createPanels(ui, handlers) {
       const LINES = {
         liquor: [test('liquor'), ['hand', '실기 하이볼'], ['book', '쿠리만쥬 강의']],
         arbeiter: [test('arbeiter'), ['hand', '실기 손님 3명, 레시피 북을 봐도 돼요'], ['book', '레시피 북']],
-        hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개 · 몬스터 ${L.hunter.foes.length}마리 · ${L.hunter.hits}번 맞으면 탈락`], ['book', '토벌 안내서']]
+        hunter: [test('hunter'), ['hand', `실기 허수아비 ${L.hunter.dummies}개, 몬스터 ${L.hunter.foes.length}마리(${L.hunter.hits}번 맞으면 탈락)`], ['book', '토벌 안내서']]
       };
       for (const id of ['liquor', 'arbeiter', 'hunter']) {
         const own = hasLicense(s, id);
@@ -573,7 +573,7 @@ export function createPanels(ui, handlers) {
           rule('faint', '기운 0이면 기절', '세 시간 뒤 집 앞에서 깨고 돈을 조금 잃어요'),
           rule('safe', '마을 안은 안전', ''),
           rule('dodge', '빨간 표시는 피하기', ''),
-          rule('shop', '무기는 도구점', '토벌 자격증이 있어야 사요 · 전리품은 노동 접수에서 팔아요')),
+          rule('shop', '무기는 도구점', '토벌 자격증이 있어야 사요. 전리품은 노동 접수에서 팔아요')),
         h('h3', { class: 'shop-sec' }, '몬스터'),
         ...monsterCards(s, false),
         h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onClick: () => show('exam') }, '검정소로'), closeBtn())];
@@ -662,7 +662,7 @@ export function createPanels(ui, handlers) {
         if (item.after && !(s.story || {})[item.after]) return; // 새 메뉴는 소식이 나온 뒤부터
         const lock = item.needs && !hasLicense(s, item.needs), full = !item.item && s.stamina >= MAX_STAMINA; // 포장은 배불러도 산다
         out.push(h('div', { class: 'row pub-row' }, ART[item.id] ? svgSpan('lic-ico', ART[item.id]) : null,
-          h('div', {}, h('div', { class: 't' }, item.name, item.after ? h('span', { class: 'weed-count' }, '새 메뉴') : null), h('div', { class: 'd' }, item.item ? '포장 · 가방에 넣어 가요' : `기운 +${item.stamina}`)),
+          h('div', {}, h('div', { class: 't' }, item.name, item.after ? h('span', { class: 'weed-count' }, '새 메뉴') : null), h('div', { class: 'd' }, item.item ? '포장해서 가방에 넣어 가요' : `기운 +${item.stamina}`)),
           lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
             : priceBtn(item.price, s.money, after(() => handlers.buy(item.id)))));
       });
@@ -1048,14 +1048,14 @@ export function createPanels(ui, handlers) {
         row('제초 검정', `지금 ${gradeName(s.license.grade)}`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
         row('별똥별맨', '바로 보기(미리 보기라 소원은 안 이뤄져요)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.starfall(); } }, '보기')),
-        row('우사기의 집', '바로 시작(밤 9시 광장 · 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
+        row('우사기의 집', '바로 시작(밤 9시 광장, 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
         row('우사기 클럽', '춤만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.club(); } }, '가기')),
-        row('피자호빵 소식', '라멘 로우 새 메뉴 · 우사기 이야기 표시', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pizzaNews(); } }, '띄우기')),
-        row('잠옷 밤나들이', '밤 9시 · 내 집 앞(귀 달린 잠옷 입고)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajama(); } }, '가기')),
-        row('파자마 파티즈', '밤 8시 광장 앞(부탁 받은 채로) · 무대만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty(); } }, '광장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty('show'); } }, '무대')),
-        row('수상한 섬 합숙', '다음 날 아침 선착장 앞 · 장면부터 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island(); } }, '선착장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('cave2'); } }, '동굴'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('battle'); } }, '결전')),
-        row('하치와레 구덩이', '숲 구덩이 앞 · 덩굴풀 3개 들고', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.hachiPit(); } }, '가기')),
-        row('시사의 슈퍼 알바이터', '저녁 공부 · 시험 날 바로', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaStudy(); } }, '공부'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaExam(); } }, '시험')),
+        row('피자호빵 소식', '라멘 로우 새 메뉴와 우사기 이야기 표시', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pizzaNews(); } }, '띄우기')),
+        row('잠옷 밤나들이', '밤 9시, 내 집 앞(귀 달린 잠옷 입고)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajama(); } }, '가기')),
+        row('파자마 파티즈', '밤 8시 광장 앞(부탁 받은 채로), 또는 무대만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty(); } }, '광장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty('show'); } }, '무대')),
+        row('수상한 섬 합숙', '다음 날 아침 선착장 앞, 또는 장면부터 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island(); } }, '선착장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('cave2'); } }, '동굴'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('battle'); } }, '결전')),
+        row('하치와레 구덩이', '숲 구덩이 앞에 덩굴풀 3개 들고', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.hachiPit(); } }, '가기')),
+        row('시사의 슈퍼 알바이터', '저녁 공부 또는 시험 날 바로', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaStudy(); } }, '공부'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaExam(); } }, '시험')),
         ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),
         // 그래픽 진단: 몬스터가 이상하게 보일 때 그 자리에서 복사해 알려 주면 원인을 찾을 수 있다
         row('그래픽 진단', '몬스터 근처에서 복사', h('button', { class: 'btn', type: 'button', onClick: (e) => {

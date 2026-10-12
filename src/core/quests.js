@@ -180,7 +180,7 @@ export const QUESTS = {
     title: '우사기의 피자호빵', giver: 'usagi', side: true, needStory: 'pizzaNews', sameDay: true, hours: [9, 20], needHearts: 1, ask: '우라?',
     offer: ['(라멘 로우 쪽을 가리키며 킁킁…)', '우라…? (침을 꿀꺽)', '(새로 나온 피자호빵이 몹시 궁금한 것 같다…!)'],
     steps: [{
-      type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사다 주자! (라멘 로우 · 60원)',
+      type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사다 주자! (라멘 로우, 60원)',
       // cue: 그 줄에서 연출(한 입 → 얼굴 클로즈업 · 굳기 · 진짜로 울기 · 활짝 웃으며 카메라가 빠진다)
       say: ['(우사기가 피자호빵을 반으로 갈랐다… 치즈가 쭈욱~)', { text: '(한 입 베어 물더니…)', cue: 'pizzaBite' }, '……', { text: '(그대로 굳어 버렸다…?)', cue: 'pizzaFreeze' },
         { text: '…우…우라…(눈물이 주르륵)', cue: 'pizzaCry' }, { who: 'hachiware', text: '우사기가… 울어?! 그렇게 맛있어?!' }, { who: 'chiikawa', text: '…(꿀꺽)' },
@@ -209,7 +209,7 @@ export const QUESTS = {
     title: '하치와레가 구덩이에!', giver: 'hachiware', side: true, noOffer: true, needHearts: 2, ask: '',
     offer: ['(숲 속 구덩이에서 하치와레를 찾았다)'],
     steps: [{
-      type: 'bring', items: { vine: 3 }, goal: '덩굴풀 세 개로 밧줄을 엮어 하치와레를 꺼내 주자! (숲 · 4급부터)', speaker: 'hachiware',
+      type: 'bring', items: { vine: 3 }, goal: '덩굴풀 세 개로 밧줄을 엮어 하치와레를 꺼내 주자! (숲, 4급부터)', speaker: 'hachiware',
       say: ['영차~ 하고 끌어올려 줘서 고마워, {name}!', '구덩이 속에서 하늘만 보고 있으니까 조금 무서웠어~', '이제 발밑 조심할게! 헤헤.']
     }],
     reward: { bond: 4, friends: { chiikawa: 2 }, money: 300 }
@@ -247,7 +247,7 @@ export const QUESTS = {
   // 갑옷 씨들 · 치이카와 · 하치와레까지 따라 부르고 춤추게 된다). 잠옷 밤나들이 다음, 밤 광장 무대에서 공연 · 응원(stories/pajamaidol.js, 노래는 core/idolsong.js 의 원곡)
   pajamaParty: {
     title: '파자마 파티즈', giver: 'pochette', side: true, after: 'pajamaNight', minDay: 8, hours: [9, 18], needHearts: 0, ask: '요즘 잘 팔리는 거 있어요?',
-    offer: ['어서 오세요~! 들어 보세요, {name} 님!', '지난번 그 폭신폭신 잠옷이요, 초록 · 분홍 · 하양 · 보라… 넷이서 색깔별로 사 갔는데요',
+    offer: ['어서 오세요~! 들어 보세요, {name} 님!', '지난번 그 폭신폭신 잠옷이요, 초록, 분홍, 하양, 보라… 넷이서 색깔별로 사 갔는데요',
       '글쎄 그 잠옷을 입고 아이돌을 한대요! 이름하여 『파자마 파티즈』!', '오늘 밤 광장에서 첫 공연이래요. 근데… 손님이 하나도 안 오면 어쩌죠…?',
       { who: 'hachiware', text: '아이돌!? 우리가 보러 가자~! 첫 손님 해 주자!' }, { who: 'chiikawa', text: '…!! (두근두근)' }],
     steps: [{

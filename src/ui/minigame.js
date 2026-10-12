@@ -13,7 +13,7 @@ export function createMinigame(ui) {
   root.className = 'minigame';
   root.hidden = true;
   root.innerHTML = '<div class="mg-lab"></div><div class="mg-track"><span class="mg-zone"></span><span class="mg-fill"></span><span class="mg-needle"></span></div>'
-    + '<div class="mg-pips"></div><div class="mg-judge" aria-live="polite"></div><button type="button" class="mg-btn"></button><div class="mg-hint"><kbd>Space</kbd> · 버튼</div>';
+    + '<div class="mg-pips"></div><div class="mg-judge" aria-live="polite"></div><button type="button" class="mg-btn"></button><div class="mg-hint"><kbd>Space</kbd> 또는 버튼</div>';
   ui.appendChild(root);
   const q = (s) => root.querySelector(s);
   const lab = q('.mg-lab'), zone = q('.mg-zone'), fill = q('.mg-fill'), needle = q('.mg-needle'), pips = q('.mg-pips'), judge = q('.mg-judge'), btn = q('.mg-btn');

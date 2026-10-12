@@ -10,7 +10,7 @@ const APPROACH = 1.7; // 음표가 줄 끝에서 동그라미까지 오는 시�
 const ACORN = '<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="25" rx="11" ry="12" fill="#c98a4b" stroke="#5a3a22" stroke-width="2.4"/><path d="M8 18c0-6 5.4-9 12-9s12 3 12 9c-3.4 1.6-7.6 2.4-12 2.4S11.4 19.6 8 18z" fill="#7a5131" stroke="#5a3a22" stroke-width="2.4" stroke-linejoin="round"/><path d="M20 9V5" stroke="#5a3a22" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="15.5" cy="25" rx="2.4" ry="3.6" fill="#fff" opacity="0.45"/></svg>';
 const WORDS = { perfect: '퍼펙트!', good: '좋아!', miss: '놓침…' };
 const COUNT = ['3', '2', '1', '우라!'];
-const CLUB_TEXT = { label: '손님들 흥', hint: '도토리가 동그라미에 닿을 때 <kbd>Space</kbd> · 탭!', go: '우라!', icon: ACORN };
+const CLUB_TEXT = { label: '손님들 흥', hint: '도토리가 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!', go: '우라!', icon: ACORN };
 
 export function createRhythm(ui) {
   const root = document.createElement('div');
@@ -19,7 +19,7 @@ export function createRhythm(ui) {
   root.innerHTML = '<div class="rh-hype"><b>손님들 흥</b><i><u></u></i></div>'
     + `<div class="rh-lane"><div class="rh-ring">${ACORN}</div><div class="rh-notes"></div></div>`
     + '<div class="rh-judge" aria-live="polite"></div><div class="rh-count"></div><div class="rh-combo"></div>'
-    + '<div class="rh-hint">도토리가 동그라미에 닿을 때 <kbd>Space</kbd> · 탭!</div>';
+    + '<div class="rh-hint">도토리가 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!</div>';
   ui.appendChild(root);
   const lane = root.querySelector('.rh-lane'), notesEl = root.querySelector('.rh-notes'), ring = root.querySelector('.rh-ring');
   const judgeEl = root.querySelector('.rh-judge'), countEl = root.querySelector('.rh-count'), comboEl = root.querySelector('.rh-combo');

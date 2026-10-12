@@ -105,7 +105,7 @@ export function openQuiz(ui, { title, questions, pass, seconds = 0, onDone, soun
       + '<div class="examiner"><span class="ex-name">대장 갑옷 씨</span><p class="ex-say"></p></div></div><div class="actions"><button class="btn primary" type="button"></button></div>';
     s.body.querySelector('.stamp').textContent = passed ? '합격' : '불합격';
     s.body.querySelector('.score-dots').append(...results.map((r) => { const d = document.createElement('i'); d.className = r ? 'on' : 'off'; return d; }));
-    s.body.querySelector('.exam-count').textContent = `${correct} / ${questions.length} · 합격 ${pass}개`;
+    s.body.querySelector('.exam-count').textContent = `${correct} / ${questions.length} (합격 ${pass}개)`;
     s.body.querySelector('.ex-say').textContent = examinerLine(passed);
     const ok = s.body.querySelector('button');
     ok.textContent = passed ? '실기 보러 가기' : '다음에 또 올게요';

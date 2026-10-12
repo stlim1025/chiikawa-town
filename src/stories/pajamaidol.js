@@ -60,7 +60,7 @@ export function createIdolStory(ctx) {
     scenes([
       ['stage', ['(무대 위에서 색색 파자마를 입은 넷이 꼼지락거린다…)', { who: W('idolP'), text: '…와 준 손님이… 셋뿐이야…' },
         { who: W('idolW'), text: '첫 공연인데… (훌쩍)' }, { who: W('idolV'), text: '……(꼼지락꼼지락)' }]],
-      ['crowd', ['(넓은 광장에 손님은 {name} · 치이카와 · 하치와레, 셋뿐…)']],
+      ['crowd', ['(넓은 광장에 손님은 {name}, 치이카와, 하치와레 셋뿐…)']],
       ['stage', [{ who: W('idolG'), text: '괜찮아! 와 준 셋을 위해서 힘껏 부르자! 우리가 즐거우면 다 같이 즐거워져!' },
         { who: W('idolG'), text: '들어 주세요~! 파자마 파티즈의 노래!' }], W('idolG')],
       ['wide', [{ who: H(), text: '{name}, 우리가 첫 손님이야! 노래에 맞춰 응원봉을 흔들자~!' }, { who: C(), text: '…!! (응원봉을 꼭 쥔다)' }], H()]
@@ -73,7 +73,7 @@ export function createIdolStory(ctx) {
     ctx.stage.shot(r === 1 ? 'wide' : 'dance'); // 1절: 관객이 모여드는 게 보이게 · 2절: 무대 위 춤을 가까이
     rhythm.start({
       bpm: IDOL_BPM, chart: idolChart(r), icon: STAR_ICON, go: '파자마!',
-      label: r === 1 ? '무대 응원' : '다 같이 신나게', hint: '별이 동그라미에 닿을 때 <kbd>Space</kbd> · 탭!',
+      label: r === 1 ? '무대 응원' : '다 같이 신나게', hint: '별이 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!',
       onHit: (q, combo) => {
         ctx.stage.cheer();
         S.hits++;
