@@ -8,7 +8,7 @@ import { loadPhotos, savePhotos } from '../core/photostore.js';
  *     → 치이카와 "찍어 줘" → 브이를 하려다 부끄러워 손을 숨긴 치이카와를 찰칵, 안 사라졌다!(원작. 내가 거드는 말 고르기는 게임에서 정함)
  *  2) 우사기가 와서 셋이서: 하치와레가 건넨 카메라로 내가 뷰파인더를 보며 세 장(게임에서 정함). 두 번째는 우사기의 전설의 포즈(원작)
  *  3) 비가 온다: 하치와레가 카메라를 품에 안고 처마 밑으로(원작: 비에 젖으면 안 된다 · 카메라에 행동이 묶인다 · 들고 다니면 조금 무겁다)
- *  4) 다음 날 하치와레에게: 뽑은 사진을 펼쳐 본다. 다 흔들렸고(원작), 치이카와는 사진마다 혀가 살짝(애니 95화)
+ *  4) 다음 날 하치와레에게: 뽑은 사진을 펼쳐 본다. 다 흔들렸고(원작), 치이카와가 하치와레는 찍을 때 가끔 혀를 내민다고 알려 준다(애니 95화)
  * 찍은 사진은 이 브라우저에 남긴다(core/photostore.js): 뽑은 사진 · 흔들린 사진 액자(world/photoframe.js)에 쓴다.
  * ctx: { npcs, village, hud, guide, sound, input, staged, who(kind), narrator, me(), fill(lines), getPlayer, cam, photo(ui/photos.js),
  *        capture({ pos, look, rect }) → data URL | null, setRain(on), shelters() → [{ x, z }], photosChanged() }
@@ -277,8 +277,10 @@ export function createCameraStory(ctx) {
         printing = true;
         ctx.photo.showPrints(urls.length === CAPTIONS.length ? urls : null, CAPTIONS);
         sound.play('chime');
-        say([{ who: 'hachiware', text: '…어라? 다 흔들렸네…' }, { who: 'hachiware', text: '치이카와는 사진마다 혀가 살짝 나와 있어~' },
-          pals ? { who: 'chiikawa', text: '…?! (화들짝)' } : { who: 'hachiware', text: '치이카와한테 보여 줬더니 화들짝 놀라더라~ 헤헤' },
+        // 애니 95화: 사진을 본 치이카와가, 하치와레가 사진 찍을 때 가끔 혀를 내밀고 있다고 알려 줘 하치와레가 놀란다
+        say([{ who: 'hachiware', text: '…어라? 다 흔들렸네…' },
+          ...(pals ? [{ who: 'chiikawa', text: '…하치와레… 사진 찍을 때… 가끔 혀가 쏙 나와 있어…' }, { who: 'hachiware', text: '에엣?! 정말?!' }]
+            : [{ who: 'hachiware', text: '치이카와가 그러는데, 나 사진 찍을 때 가끔 혀가 쏙 나와 있대~ 헤헤' }]),
           { who: 'hachiware', text: '…그래도 흔들린 것도 멋이지~!' }], () => {
           printing = false;
           ctx.photo.hidePrints();
