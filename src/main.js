@@ -407,10 +407,10 @@ function boot() {
   /** 같이 놀기 꼬리표(왼쪽 위): 주인은 놀러 온 친구 이름, 손님은 놀러 와 있는 마을. */
   function updateVisitTag() {
     const party = [...mpParty.values()]; // 같이 토벌 파티
-    if (visiting && !visiting.arriving) hud.setVisitors({ label: `${multi.hostName || '친구'}의 마을에 놀러 왔어요`, names: [], party });
+    if (visiting && !visiting.arriving) hud.setVisitors({ label: `${multi.hostName || '친구'}의 마을에 놀러 왔어요`, short: `${multi.hostName || '친구'}네 마을`, names: [], party });
     else if (!visiting && multi.status === 'open') {
       const guests = multi.players.map((p) => p.name);
-      hud.setVisitors(guests.length ? { label: '놀러 온 친구', names: guests, party } : { label: '마을 문이 열려 있어요', names: [], party });
+      hud.setVisitors(guests.length ? { label: '놀러 온 친구', short: '', names: guests, party } : { label: '마을 문이 열려 있어요', short: '문 열림', names: [], party }); // short: 휴대폰에서 보일 짧은 글
     } else hud.setVisitors(null);
   }
   /**

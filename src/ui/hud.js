@@ -446,7 +446,7 @@ export function createHud(ui, input) {
       visitTag.hidden = !info;
       // 같이 토벌 파티원 [{ name, hp, max }](이름만 오면 기운 막대 없이). 기운만 바뀌면 막대만 고친다
       const party = ((info && info.party) || []).map((p) => (typeof p === 'string' ? { name: p, hp: null, max: 100 } : p));
-      const key = info ? info.label + '|' + info.names.join(',') + '|' + party.map((p) => p.name).join(',') : '';
+      const key = info ? info.label + '|' + (info.short ?? '') + '|' + info.names.join(',') + '|' + party.map((p) => p.name).join(',') : '';
       const bars = () => party.forEach((p, i) => {
         const box = visitTag.querySelectorAll('.vs-mate')[i];
         if (!box) return;
@@ -461,9 +461,11 @@ export function createHud(ui, input) {
       visitTag.replaceChildren();
       if (!info) return;
       const ico = el('i', 'vs-ico', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5 12 4l8.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10.5V20h12v-9.5" fill="#fff8ea" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" rx="1" fill="currentColor"/></svg>');
-      const lab = el('span', 'vs-lab');
+      // short: 휴대폰(터치)에서 대신 보일 짧은 글('' 이면 글 없이 그림 · 이름만) — 긴 글 띠가 화면을 많이 가렸다
+      const lab = el('span', info.short != null ? 'vs-lab full' : 'vs-lab');
       lab.textContent = info.label;
       visitTag.append(ico, lab);
+      if (info.short) { const sl = el('span', 'vs-lab short'); sl.textContent = info.short; visitTag.appendChild(sl); }
       for (const name of info.names) {
         const chip = el('b', 'vs-name');
         chip.textContent = name;
@@ -472,9 +474,10 @@ export function createHud(ui, input) {
       // 같이 토벌 파티: 줄을 바꿔 '같이 토벌' 과 파티 친구 이름
       if (party.length) {
         visitTag.appendChild(el('i', 'vs-br'));
-        const lab2 = el('span', 'vs-lab');
+        const lab2 = el('span', 'vs-lab full'), sl2 = el('span', 'vs-lab short');
         lab2.textContent = '같이 토벌';
-        visitTag.appendChild(lab2);
+        sl2.textContent = '토벌';
+        visitTag.append(lab2, sl2);
         for (const p of party) {
           // 이름 알약 + 기운 막대 · 숫자(같이 토벌 중인 친구가 얼마나 버티는지)
           const box = el('span', 'vs-mate');
