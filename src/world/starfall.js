@@ -109,21 +109,37 @@ function starGeometry() {
 }
 
 // 다른 장면에서 쓰는 별똥별(사이드스토리 '별 세 개 레스토랑'의 붙잡힌 별똥별 셋 등): 얼굴 · 빛 그림은 나눠 쓴다
-let sharedFace = null, sharedGlow = null;
-/** 별똥별 하나: 통통한 별 · 사실적인 얼굴 · (glow 면) 빛무리. 모서리 끝까지 반지름 1. → { group, body, face, halo } */
-export function buildStarman({ glow = true } = {}) {
+let sharedFace = null, sharedGlow = null, sharedDarkFace = null;
+/** 검은 별똥별 얼굴(사이드스토리 '검은 별똥별'): 검은 몸 위에서 보이게 하얀 동그란 눈 · 가는 미소(생김새는 원작에서 확인하지 못해 게임에서 정함). */
+function darkFaceTex() {
+  return canvasTex(256, 256, (g) => {
+    g.fillStyle = '#ffffff';
+    for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(128 + sx * 32, 112, 19, 25, 0, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = '#1a1622';
+    for (const sx of [-1, 1]) { g.beginPath(); g.arc(128 + sx * 32 + 3, 119, 9, 0, Math.PI * 2); g.fill(); }
+    g.strokeStyle = '#d9d2ea';
+    g.lineWidth = 6;
+    g.lineCap = 'round';
+    g.beginPath(); g.moveTo(106, 158); g.quadraticCurveTo(128, 174, 150, 158); g.stroke();
+  });
+}
+/** 별똥별 하나: 통통한 별 · 사실적인 얼굴 · (glow 면) 빛무리. dark 면 검은 별똥별(검은 몸 · 하얀 눈 · 보랏빛 빛무리). 모서리 끝까지 반지름 1. → { group, body, face, halo } */
+export function buildStarman({ glow = true, dark = false } = {}) {
   sharedFace = sharedFace || faceTex();
+  if (dark) sharedDarkFace = sharedDarkFace || darkFaceTex();
   const group = new THREE.Group();
-  const body = new THREE.Mesh(starGeometry(), new THREE.MeshBasicMaterial({ color: '#ffe23a' }));
+  const body = new THREE.Mesh(starGeometry(), new THREE.MeshBasicMaterial({ color: dark ? '#2b2735' : '#ffe23a' }));
   addOutline(body, 0.035, true);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: sharedFace, transparent: true, depthWrite: false }));
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: dark ? sharedDarkFace : sharedFace, transparent: true, depthWrite: false }));
   face.position.z = DEPTH / 2 + BEVEL + 0.004;
   face.scale.setScalar(1.5);
   group.add(body, face);
   let halo = null;
   if (glow) {
     sharedGlow = sharedGlow || glowTex();
-    halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: sharedGlow, color: 0xfff1a0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo = new THREE.Sprite(dark
+      ? new THREE.SpriteMaterial({ map: sharedGlow, color: 0x8f7ad8, transparent: true, opacity: 0.5, depthWrite: false })
+      : new THREE.SpriteMaterial({ map: sharedGlow, color: 0xfff1a0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
     halo.scale.set(3.4, 3.4, 1);
     halo.position.z = -0.3;
     group.add(halo);

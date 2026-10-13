@@ -49,8 +49,10 @@ const APP_ICON = {
   options: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M17.4 5h5.2l.9 4.1a11 11 0 0 1 3 1.7l4-1.3 2.6 4.5-3.1 2.8a11 11 0 0 1 0 3.4l3.1 2.8-2.6 4.5-4-1.3a11 11 0 0 1-3 1.7l-.9 4.1h-5.2l-.9-4.1a11 11 0 0 1-3-1.7l-4 1.3-2.6-4.5 3.1-2.8a11 11 0 0 1 0-3.4l-3.1-2.8 2.6-4.5 4 1.3a11 11 0 0 1 3-1.7z" fill="#fff"/><circle cx="20" cy="20" r="5" fill="#9aa3b5"/></svg>',
   // 퀘스트: 둘둘 만 두루마리
   quests: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="25" rx="3" fill="#fff"/><path d="M7 10a4 4 0 0 1 8 0v20a4 4 0 0 1-8 0zM25 30a4 4 0 0 0 8 0" fill="#fff" stroke="#e8a83e" stroke-width="2"/><path d="M15 15h11M15 20h11M15 25h7" stroke="#e8a83e" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  // 검색(사이드스토리 '검은 별똥별' 동안만): 돋보기
+  search: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="17" cy="17" r="9" fill="#fff"/><circle cx="17" cy="17" r="5.5" fill="#8fc7ee"/><path d="M24 24l8 8" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>',
   // 친구: 하트
-  friends: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33S7 24.6 7 15.4A6.6 6.6 0 0 1 20 12.6a6.6 6.6 0 0 1 13 2.8C33 24.6 20 33 20 33z" fill="#fff"/><path d="M13.5 16a3.4 3.4 0 0 1 3.8-2.6" fill="none" stroke="#f28fb0" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  friends:'<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33S7 24.6 7 15.4A6.6 6.6 0 0 1 20 12.6a6.6 6.6 0 0 1 13 2.8C33 24.6 20 33 20 33z" fill="#fff"/><path d="M13.5 16a3.4 3.4 0 0 1 3.8-2.6" fill="none" stroke="#f28fb0" stroke-width="2.4" stroke-linecap="round"/></svg>',
   // 같이 놀기: 손잡은 두 친구
   multi: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="13" cy="14" r="6" fill="#fff"/><circle cx="27" cy="14" r="6" fill="#fff"/><path d="M5 33q1-11 8-11t8 11zM19 33q1-11 8-11t8 11z" fill="#fff"/><path d="M17 27h6" stroke="#5aa98c" stroke-width="2.6" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
@@ -181,7 +183,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev', 'search'];
   // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
   const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
@@ -1114,6 +1116,14 @@ export function createPanels(ui, handlers) {
           !own ? priceBtn(T.price, s.money, after(() => handlers.buyTool(id)))
             : held ? h('span', { class: 'lic-badge done' }, ico('check'), '장착 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '장착')));
       }
+      // 산소 표백제(사이드스토리 '검은 별똥별'에서 찾아야 할 때만 판다)
+      const bleach = handlers.bleachShop?.();
+      if (bleach) {
+        out.push(h('h3', { class: 'shop-sec' }, '생활'));
+        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', itemSvg('bleach')),
+          h('div', {}, h('div', { class: 't' }, itemInfo('bleach').name), h('div', { class: 'd' }, itemInfo('bleach').note)),
+          bleach.have ? h('span', { class: 'lic-badge done' }, ico('check'), '가방에 있음') : priceBtn(bleach.price, s.money, after(() => handlers.buyBleach()))));
+      }
       // 무기(4단계): 사면 바로 들고, 가진 무기는 바꿔 들거나 넣어 둔다
       // 무기는 토벌 자격증이 있어야 판다(없으면 값 대신 '자격증 필요'). 이미 가진 무기는 그대로 바꿔 든다
       const wp = weaponOf(s), hunter = hasLicense(s, 'hunter');
@@ -1219,10 +1229,21 @@ export function createPanels(ui, handlers) {
           app('friends', APP_ICON.friends, '친구', () => show('friends')),
           app('multi', APP_ICON.multi, '같이 놀기', () => show('multi')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
+          handlers.searchApp?.() ? app('search', APP_ICON.search, '검색', () => show('search')) : null,
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
       ];
+    },
+    // 마을폰 '검색' 앱(사이드스토리 '검은 별똥별' 동안만): 질문 게시판에서 찾은 글 하나 → 산소 표백제
+    search() {
+      return [appBar('검색'),
+        h('div', { class: 'search-box' }, svgSpan('search-ico', APP_ICON.search), h('span', {}, '검은 별똥별 없애는 법')),
+        h('div', { class: 'qa-card' },
+          h('div', { class: 'qa-q' }, h('b', {}, 'Q'), h('span', {}, '자명종에 까만 별똥별이 붙었어요. 밤 12시만 되면 시곗바늘을 거꾸로 돌려서 같은 날만 계속돼요… 어떡하죠?')),
+          h('div', { class: 'qa-a' }, h('b', {}, 'A'), h('span', {}, '산소 표백제를 푼 물에 그 물건을 푹 담가 보세요. 저희 집 시계에 붙었던 것도 그렇게 하니까 떠났어요!')),
+          h('div', { class: 'qa-meta' }, '채택된 답변, 도움돼요 128')),
+        h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.searchFound?.() }, '이거다!'), closeBtn())];
     },
     // 마을폰 '설정' 앱: 효과음 · 배경음악 켜고 끄기, 절전 모드, 저장 안내
     options(s, extra) {

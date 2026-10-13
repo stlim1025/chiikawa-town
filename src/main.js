@@ -117,6 +117,9 @@ import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
 import { createStarDinerStory } from './stories/stardiner.js';
+import { createChiiRoom } from './world/chiiroom.js';
+import { createBlackStarStory } from './stories/blackstar.js';
+import { loopDue, rewind as loopRewind, markLoop as loopMark, startLoop as loopStart, endLoop as loopEnd, loopGate, loopOf, BLEACH_PRICE } from './core/blackstar.js';
 import { createStarGame } from './ui/stargame.js';
 import { createCliff } from './world/cliff.js';
 import { createPit } from './world/pit.js';
@@ -912,6 +915,26 @@ function boot() {
     getState: () => state,
     appNudge: () => appNudge,
     appSeen: (kind) => { if (kind === appNudge) appNudge = null; },
+    // 사이드스토리 '검은 별똥별': 없애는 법을 찾을 차례에만 마을폰 '검색' 앱 · 산소 표백제를 가져갈 차례에만 도구점에서 판다
+    searchApp: () => { const st = state && stepOf(state, 'blackStar'); return !!st && st.type === 'search' && loopGate(state, st); },
+    searchFound: () => {
+      const st = stepOf(state, 'blackStar');
+      if (!st || st.type !== 'search') return;
+      panels.close();
+      const lines = [...st.say];
+      lines.speaker = 'chiikawa';
+      finishQuestStep('blackStar', null, lines);
+    },
+    bleachShop: () => { const st = state && stepOf(state, 'blackStar'); return st && st.type === 'bring' && st.items.bleach ? { price: BLEACH_PRICE, have: countOf(state, 'bleach') > 0 } : null; },
+    buyBleach: () => {
+      const paid = trySpend(state, BLEACH_PRICE);
+      if (!paid.ok) { hud.toast('돈이 모자라요', 2400); return; }
+      const r = addItem(paid.state, 'bleach', 1);
+      if (!r.added) { hud.toast('가방이 꽉 찼어요', 2400); return; }
+      commit(r.state);
+      sound.play('coin');
+      hud.toast('산소 표백제를 샀어요', 2400, { chips: [{ icon: itemSvg('bleach'), text: '산소 표백제' }] });
+    },
     /** 폰 상태 줄 { time, date }: 친구 마을에 놀러 간 동안은 그 마을 시계(아니면 null 이라 내 시계). */
     phoneNow: () => (visiting && visiting.clock ? { time: timeLabel(visiting.clock), date: dateLabel(visiting.startDate || state.startDate, visiting.clock.day) } : null),
     multi: multiPanel,
@@ -1331,6 +1354,8 @@ function boot() {
       islandTrip.reset();
       idolStory.reset();
       starDiner.reset();
+      blackStar.reset();
+      loopRewinding = false;
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -1370,6 +1395,19 @@ function boot() {
     input.setEnabled(false);
     hud.setAction(null);
     sound.play('sleep');
+    // 검은 별똥별: 밤 12시를 넘겨 자면 같은 날 아침(6시 반)으로 — 그사이 친구들이 보낸 시간도, 새날도 없다
+    if (loopDue(state, sleepFor(state.clock))) {
+      const next = loopRewind(sleepStamina(state, how));
+      playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(next.clock), phase: 'morning' },
+        () => { commit(next); villageOvernight(); dark?.(); }, () => sound.play('morning')).then(() => {
+        sleeping = false;
+        if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
+        homeUI.refresh();
+        after?.();
+        hud.toast('…또 같은 날 아침?', 3600);
+      });
+      return;
+    }
     // 아침까지가 아니라 SLEEP_HOURS 시간만 흐른다. 그사이 친구들도 그 시간을 보낸다(저녁 · 밤잠 · 다음 날 아침)
     const to = sleepFor(state.clock), spans = asleepSpans(state.clock, to), wakeHour = hourOf(to);
     const lived = liveWhileAsleep(spans);
@@ -2067,6 +2105,7 @@ function boot() {
     if (mode === 'idol') { if (down && idolStory && !guide.open) idolStory.press(); return; } // 파자마 파티즈 무대: 박자(박자 화면도 스스로 스페이스 · 탭을 받는다)
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
+    if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
@@ -2128,8 +2167,9 @@ function boot() {
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
+  let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2443,6 +2483,7 @@ function boot() {
       else if (step.scene === 'pajamaParty') idolStory.play(done);
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else if (step.scene === 'starDiner') starDiner.play(done);
+      else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
@@ -2534,7 +2575,9 @@ function boot() {
     hud.announce({ kicker: '다 읽었어요!', title: QUESTS.story.title, sub: '대장 갑옷 씨에게 알려요', to: 'quest', id: 'story' });
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
+    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : null;
+  const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
   let questT = 0, bossM = null, questHint = false;
@@ -2589,7 +2632,8 @@ function boot() {
     if (!questScene && !usagiClub.active) for (const id of staleScenes(state)) commit(dropQuest(state, id)); // 장면 도중 새로고침했으면 없던 일로
     for (const id of activeQuests(state)) {
       const step = stepOf(state, id);
-      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || (usagiClub.canPlay(state.clock.day) && !islandTrip.active))) {
+      if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || (usagiClub.canPlay(state.clock.day) && !islandTrip.active))
+        && loopGate(state, step)) { // 검은 별똥별: 되풀이되는 날 · 한 번 더 되돌아온 날 · 쫓아낸 다음 날에만 열리는 단계
         if (step.place === 'lair') commit({ ...state, story: { ...(state.story || {}), bossSeen: true } });
         if (step.with) endBuddy(reportTo(id, step));
         questSceneStep(id);
@@ -3397,6 +3441,29 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
+  // 사이드스토리 '검은 별똥별'(stories/blackstar.js): 치이카와네 방(처음 들어갈 때 만든다) · 같은 날 되풀이(core/blackstar.js)
+  let chiiRoom = null;
+  blackStar = createBlackStarStory({
+    hud, guide, sound, input, npcs, staged, ui, getPlayer: () => player, who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(),
+    get stage() { return chiiRoom || (chiiRoom = createChiiRoom()); }, villageScene: scene, minigame, homeOf: (kind) => homeDoor(kind),
+    startLoop: () => commit(loopStart(state)), markLoop: () => commit(loopMark(state)), endLoop: () => commit(loopEnd(state)),
+    rewindNow: () => { commit(loopRewind(loopMark(state))); afterLoopRewind(); }, // 장면 끝의 되감기: 본 장면을 적어 두고 같은 날 아침으로
+    nudgeSearch: () => { appNudge = 'search'; }
+  });
+  /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
+  function afterLoopRewind() {
+    villageOvernight();
+    if (mode === 'play' || mode === 'chiiroom') { const h = village.spots.home; player.setPosition(h.x, h.z + 1.2); cam.snap(player.position); }
+  }
+  let loopRewinding = false;
+  /** 밤 12시가 지났는데 아직 되풀이 중이면: 시곗바늘이 거꾸로… 같은 날 아침으로(연출 · 대화 중이면 끝난 뒤에). */
+  function loopTick() {
+    if (loopRewinding || sleeping || !state || visiting || !loopDue(state) || blackStar.active || guide.open || questScene) return;
+    loopRewinding = true;
+    input.setEnabled(false);
+    blackStar.rewindFx(() => { commit(loopRewind(state)); afterLoopRewind(); }, () => { loopRewinding = false; if (mode === 'play' || mode === 'home') input.setEnabled(true); });
+  }
   let visit = null; // { kind, lodge }
   const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
   /** 문을 두드린다: 집주인이 안에 있으면 들어가고(낮잠 중이면 반겨 준다), 밤잠 중이면 쫓겨났을 때만 재워 달라고 할 수 있다. */
@@ -5260,7 +5327,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -5347,6 +5414,9 @@ function boot() {
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
+      /** 검은 별똥별 장면 하나를 바로(보상 없음): 'blackWish' · 'blackMorning' · 'blackDejavu' · 'blackWatch' · 'blackSleepover' · 'blackSoak' · 'blackRain'. */
+      blackPlay: (scene) => { if (!blackStar.active) blackStar.play(scene, () => hud.toast('테스트: 장면 끝', 2000)); },
+      black: () => ({ loop: loopOf(state), free: state && state.story ? state.story.blackFree : null, quest: state && state.quests ? state.quests.blackStar : null, phase: blackStar.active, mode, clock: state && state.clock }),
       diner: () => ({ phase: starDiner.phase, mode, rescue: starDiner.rescue && { phase: starDiner.rescue.phase, free: starDiner.rescue.clamps.filter((c) => c.free).length, caught: starDiner.rescue.caught }, front: dinerFront.visible, spot: dinerFront.spot }),
       island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
       /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
@@ -5408,6 +5478,7 @@ function boot() {
     // 집 안: 마을 대신 집 안 장면을 그린다(시간은 흐르고, 마을 친구들도 계속 지낸다)
     if (mode === 'visit' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
+      loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
       newDayCheck();
       villageLife(dt);
       weeds.update(dt, { night: nightNow, focus: player.position });
@@ -5473,6 +5544,16 @@ function boot() {
       return;
     }
     // 별 세 개 레스토랑(사이드스토리): 가게 안 장면. 구출하는 동안 마을 시계 · 친구들은 멈춰 있다
+    // 검은 별똥별(사이드스토리): 치이카와네 방. 방에 있는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'chiiroom' && state) {
+      chiiRoom.resize(aspect);
+      blackStar.tick(dt, t);
+      setCelLight(chiiRoom.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(chiiRoom.scene, chiiRoom.camera);
+      hud.placeLabels([], chiiRoom.camera);
+      return;
+    }
     if (mode === 'diner' && state) {
       dinerStage.resize(aspect);
       starDiner.tick(dt, t);
@@ -5484,6 +5565,7 @@ function boot() {
     }
     if (mode === 'home' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
+      loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
       newDayCheck();
       villageLife(dt);
       weeds.update(dt, { night: nightNow, focus: player.position });
@@ -5566,6 +5648,7 @@ function boot() {
       guestTick(dt); // 친구 마을에 놀러 간 중
     } else if (state && player && mode === 'play') {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 창(노동 접수 · 가게 · 마을폰 …)을 보는 동안에도 시간은 흐른다
+      loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
       panels.tick(state);
       newDayCheck();
       player.update(dt, input);
@@ -5655,7 +5738,7 @@ function boot() {
     hud.setPhoneNudge(!!appNudge); // 새로 생긴 앱(지도)을 열 때까지 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
-    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup);
+    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup || blackStar.cutscene);
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });

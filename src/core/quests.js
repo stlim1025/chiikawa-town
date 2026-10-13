@@ -47,7 +47,10 @@ export const QUEST_ITEMS = {
   // 보스에게 처음 쓰러진 뒤 랏코가 힘내라며 준다(main 의 랏코 조언)
   rakkobento: { name: '랏코의 대나무 도시락', kind: 'food', note: '"우선 기운부터 채워라" 하며 랏코가 건넨 대나무 잎 도시락. 작은 주먹밥 둘이 들어 있다. 먹으면 기운이 40 찬다.', eat: 40 },
   // 레스토랑 '별 세 개'에서 구해 준 별똥별들의 보답
-  omurice: { name: '거대 오므라이스', kind: 'food', note: '구해 준 별똥별들이 고맙다며 건넨 커다란 오므라이스. 셋이 나눠 먹어도 남을 만큼 크다. 먹으면 기운이 60 찬다.', eat: 60 }
+  omurice: { name: '거대 오므라이스', kind: 'food', note: '구해 준 별똥별들이 고맙다며 건넨 커다란 오므라이스. 셋이 나눠 먹어도 남을 만큼 크다. 먹으면 기운이 60 찬다.', eat: 60 },
+  // 사이드스토리 '검은 별똥별': 도구점에서 사는 산소 표백제(자명종을 담근다) · 다 끝나고 하치와레가 챙겨 준 러스크
+  bleach: { name: '산소 표백제', kind: 'quest', note: '물에 풀면 보글보글 거품이 이는 하얀 가루. 검은 별똥별이 붙은 물건을 푹 담그면 떠난대요.' },
+  rusk: { name: '하치와레 러스크', kind: 'food', note: '힘내라며 하치와레가 챙겨 준 바삭바삭 러스크. 먹으면 기운이 20 찬다.', eat: 20 }
 };
 registerItems(QUEST_ITEMS);
 
@@ -61,7 +64,9 @@ export const PLACES = {
   exam: { name: '검정소', r: 3 },
   home: { name: '내 집 앞', r: 2.6 },
   pier: { name: '선착장', r: 3 },
-  diner: { name: '별 세 개', r: 2.8 } // 동쪽 들판 길가(이야기를 받은 동안만 가게가 있다 — world/stardiner.js)
+  diner: { name: '별 세 개', r: 2.8 }, // 동쪽 들판 길가(이야기를 받은 동안만 가게가 있다 — world/stardiner.js)
+  chiiHome: { name: '치이카와네', r: 2.8 }, // 치이카와 집 문 앞
+  starfield: { name: '동쪽 들판', r: 5 } // 동쪽 문 바로 바깥 길가 풀밭(별 보며 풀 뽑기)
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -272,6 +277,36 @@ export const QUESTS = {
       say: ['…하아, 하아… 하마터면 먹힐 뻔했어~', '그래도 무기랑 토벌 증표도 찾고, 별똥별들도 다 구해서 다행이야!', '오므라이스는… 셋이서 나눠 먹자! 헤헤.']
     }],
     reward: { bond: 3, friends: { chiikawa: 3 }, items: { omurice: 1 }, story: 'starDiner' }
+  },
+  // 검은 별똥별(원작: 별밤에 풀을 뽑으며 "이런 날이 계속됐으면 좋겠다" → 치이카와의 새 자명종에 붙은 검은 별똥별이 같은 날을 되풀이시킨다.
+  // 밤 12시에 시곗바늘을 거꾸로 돌린다 · 하치와레 · 우사기랑 지켜도 소용없다 · 인터넷 질문 글에서 찾은 산소 표백제에 담가 쫓아낸다 → 비 오는 '내일').
+  // 되풀이 규칙은 core/blackstar.js, 연출은 stories/blackstar.js. loop · newLoop · afterFree 는 그 단계가 열리는 때(core/blackstar.js 의 loopGate)
+  blackStar: {
+    title: '검은 별똥별', giver: 'hachiware', side: true, minDay: 9, hours: [9, 18], needHearts: 3, ask: '무슨 재밌는 얘기 없어?',
+    offer: ['있잖아 {name}, 「검은 별똥별」 이야기 알아?', '소원을 들어주긴 하는데… 들어주고 나면 왠지 기분이 찜찜해진대~',
+      { who: 'chiikawa', text: '…(부들부들)' }, '헤헤, 그냥 소문이야! 아 참, 치이카와가 새 자명종 샀대! 엄청 크고 소리도 큰 거~',
+      { who: 'chiikawa', text: '…! (뿌듯)' }, '오늘 밤엔 별 보면서 셋이 같이 풀 뽑자! 동쪽 들판에서~'],
+    steps: [
+      { type: 'visit', place: 'starfield', hours: [20, 24], scene: 'blackWish', speaker: 'hachiware', goal: '밤에 동쪽 들판에서 별 보며 같이 풀 뽑자! (밤 8시 ~ 12시)',
+        say: ['오늘 진짜 좋은 밤이었다~', '내일 아침에 치이카와네 새 자명종 구경하러 가자!'] },
+      { type: 'visit', place: 'chiiHome', hours: [7, 12], loop: true, scene: 'blackMorning', speaker: 'hachiware', goal: '아침에 치이카와네 새 자명종 구경하러 가자! (오전 7시 ~ 12시)',
+        say: ['오늘도 좋은 하루가 되겠다~!'] },
+      { type: 'visit', place: 'chiiHome', hours: [7, 12], newLoop: true, scene: 'blackDejavu', speaker: 'chiikawa', goal: '…또 같은 아침? 치이카와네 집 앞으로 가 보자! (오전 7시 ~ 12시)',
+        say: ['…(오늘 밤 12시에 자명종을 지켜보자는 듯, 꼭 고개를 끄덕인다)'] },
+      { type: 'visit', place: 'chiiHome', hours: [22, 24], loop: true, scene: 'blackWatch', speaker: 'chiikawa', goal: '밤 12시 전에 치이카와네서 자명종을 지켜보자! (밤 10시 ~ 12시)',
+        say: ['…(또… 같은 아침이다…)', '…(하치와레랑 우사기한테 털어놓자는 듯 문 쪽을 본다)'] },
+      { type: 'visit', place: 'chiiHome', hours: [20, 24], newLoop: true, scene: 'blackSleepover', speaker: 'hachiware', goal: '하치와레랑 우사기랑 치이카와네서 밤새 지키자! (밤 8시 ~ 12시)',
+        say: ['좋은 아침~! …어? 어젯밤에 같이 잤다고? 무슨 얘기야~?', { who: 'chiikawa', text: '……(털썩)' }] },
+      { type: 'search', newLoop: true, to: 'chiikawa', goal: '마을폰 「검색」으로 검은 별똥별 없애는 법을 찾아보자!',
+        say: ['…!! (산소 표백제…!)', '…(도구점 쪽을 가리킨다)'] },
+      { type: 'bring', items: { bleach: 1 }, to: 'chiikawa', goal: '도구점에서 산소 표백제를 사서 치이카와에게 갖다주자! (100원)',
+        say: ['…(꼬옥 끌어안는다)', '…(오늘 밤… 꼭…)'] },
+      { type: 'visit', place: 'chiiHome', hours: [20, 24], loop: true, scene: 'blackSoak', speaker: 'chiikawa', goal: '밤 12시 전에 치이카와네서 자명종을 담그자! (밤 8시 ~ 12시)',
+        say: ['…(째깍, 째깍… 시곗바늘이 앞으로 간다)'] },
+      { type: 'visit', place: 'chiiHome', hours: [6, 12], afterFree: true, scene: 'blackRain', speaker: 'hachiware', goal: '다음 날 아침, 치이카와네 집 앞으로 가 보자! (오전 6시 ~ 12시)',
+        say: ['비 오네~ 그래도 오늘은… 진짜 오늘이야!', '{name}, 러스크 먹고 힘내! 헤헤.'] }
+    ],
+    reward: { bond: 2, friends: { chiikawa: 4, usagi: 2 }, items: { rusk: 3 }, story: 'blackStar' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
