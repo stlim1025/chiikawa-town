@@ -59,8 +59,8 @@ import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo, MAX_STACK }
 import { storeItem, takeOut } from './core/storage.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf, SALON_PRICE } from './core/wardrobe.js';
-import { sellItem } from './core/market.js';
-import { canGift, giveGift, giftLine } from './core/gifts.js';
+import { sellItem, sellPrice } from './core/market.js';
+import { canGift, giveGift, giftLine, tasteOf } from './core/gifts.js';
 import { openRamenShop } from './ui/ramenshop.js';
 import { itemSvg, accessorySvg } from './ui/itemart.js';
 import { weaponSvg, monsterSvg } from './ui/monsterart.js';
@@ -897,6 +897,9 @@ function boot() {
     const p = player.position, swingable = !target && !downed && weaponNow() && monsters.nearest(p.x, p.z, 6);
     hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
     updateExamPill(); // 친구 마을 검정소에서 본 제초 승급 시험도 그 마을 풀로 이어 간다
+    // 할 일 쪽지(○급 시험을 보자!)도 여기서 걷는다: 내 마을 갱신은 놀러 간 동안 멈춰 있어서, 친구 마을에서 시험을 시작해도 쪽지가 남았다
+    updateExamGoal();
+    if (grade5Shown && !grade5Due()) { grade5Shown = false; guide.setGoal(null); }
     updateDown(dt);
     hud.render(shown);
     const lightMode = lightOf(state);
@@ -4027,8 +4030,11 @@ function boot() {
         onKill: (m) => {
           job.done++;
           tireNpc(n.kind, 8);
-          const s = addKill(state, n.kind, m.species);
-          commit(m.M.drop && Math.random() < 0.6 ? addToPantry(s, n.kind, m.M.drop, 1).state : s, false); // 전리품은 친구 가방에(게시판에서 판다)
+          const s = addKill(state, n.kind, m.species), drop = m.M.drop;
+          // 전리품은 친구 가방에(게시판에서 판다). 싫어하는 전리품(랏코의 말랑 젤리 · 치이카와의 반짝 뿔)은 가방에 넣지 않고
+          // 그 자리에서 노동 접수 값으로 판다 — 가방에 넣으면 싫은 선물처럼 몰래 버리러 다녀서 마을 바닥에 쌓였다
+          const keep = drop && Math.random() < 0.6;
+          commit(!keep ? s : tasteOf(n.kind, drop) === 'hate' ? payVillager(s, n.kind, sellPrice(drop), state.clock.day) : addToPantry(s, n.kind, drop, 1).state, false);
           npcs.say(n, lineOf(n.kind, 'huntCry'));
           rankNews();
         } },
