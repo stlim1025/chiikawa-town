@@ -220,14 +220,15 @@ test('수상한 섬 합숙: 친구 다섯과 하트 2개면 여덟째 날부터 
   for (const k of ['chiikawa', 'hachiware', 'usagi', 'rakko']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
 });
 
-test('위스키 봉봉: 우사기(하트 2)가 열째 날부터 낮에 → 숲길 옆 초콜릿 덩굴 → 숲속 장면 → 위스키 봉봉 · 포셰트 갑옷 씨와도 친해진다', async () => {
+test('위스키 봉봉: 쿠리만쥬(하트 2)가 열째 날부터 낮에 소문 → 숲길 옆 초콜릿 덩굴 → 숲속 장면 → 위스키 봉봉 · 포셰트 갑옷 씨와도 친해진다', async () => {
   const I = await import(G + 'inventory.js');
   const Gf = await import(G + 'gifts.js');
-  const s = withHearts(fresh(10, 12), 'usagi', 2);
+  const s = withHearts(fresh(10, 12), 'kurimanju', 2);
   assert.ok(Q.canOffer(s, 'whiskeyBonbon'));
-  assert.equal(Q.markOf(s, 'usagi'), 'story', '우사기 머리 위에 이야기 표시');
-  assert.ok(!Q.canOffer(withHearts(fresh(9, 12), 'usagi', 2), 'whiskeyBonbon'), '열째 날부터');
-  assert.ok(!Q.canOffer(withHearts(fresh(10, 12), 'usagi', 1), 'whiskeyBonbon'), '우사기와 하트 2개부터');
+  assert.equal(Q.markOf(s, 'kurimanju'), 'story', '쿠리만쥬 머리 위에 이야기 표시');
+  assert.ok(!Q.canOffer(withHearts(fresh(10, 12), 'usagi', 5), 'whiskeyBonbon'), '우사기 하트로는 열리지 않는다');
+  assert.ok(!Q.canOffer(withHearts(fresh(9, 12), 'kurimanju', 2), 'whiskeyBonbon'), '열째 날부터');
+  assert.ok(!Q.canOffer(withHearts(fresh(10, 12), 'kurimanju', 1), 'whiskeyBonbon'), '쿠리만쥬와 하트 2개부터');
   assert.ok(!Q.canOffer({ ...s, clock: at(10, 18) }, 'whiskeyBonbon'), '낮에만');
   const step = Q.QUESTS.whiskeyBonbon.steps[0];
   assert.equal(step.place, 'bonbonVine');

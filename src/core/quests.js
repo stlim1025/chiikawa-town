@@ -291,7 +291,8 @@ export const QUESTS = {
   // 밤 12시에 시곗바늘을 거꾸로 돌린다 · 하치와레 · 우사기랑 지켜도 소용없다 · 인터넷 질문 글에서 찾은 산소 표백제에 담가 쫓아낸다 → 비 오는 '내일').
   // 되풀이 규칙은 core/blackstar.js, 연출은 stories/blackstar.js. loop · newLoop · afterFree 는 그 단계가 열리는 때(core/blackstar.js 의 loopGate)
   blackStar: {
-    title: '검은 별똥별', giver: 'hachiware', side: true, minDay: 9, hours: [9, 18], needHearts: 3, ask: '무슨 재밌는 얘기 없어?',
+    // 치이카와 자명종 이야기라 치이카와 하트 3(권하는 건 하치와레 — 별 세 개의 하치와레 하트 3과 겹치지 않게)
+    title: '검은 별똥별', giver: 'hachiware', side: true, minDay: 9, hours: [9, 18], needHearts: 0, needFriends: { chiikawa: 3 }, ask: '무슨 재밌는 얘기 없어?',
     offer: ['있잖아 {name}, 「검은 별똥별」 이야기 알아?', '소원을 들어주긴 하는데… 들어주고 나면 왠지 기분이 찜찜해진대~',
       { who: 'chiikawa', text: '…(부들부들)' }, '헤헤, 그냥 소문이야! 아 참, 치이카와가 새 자명종 샀대! 엄청 크고 소리도 큰 거~',
       { who: 'chiikawa', text: '…! (뿌듯)' }, '오늘 밤엔 별 보면서 셋이 같이 풀 뽑자! 동쪽 들판에서~'],
@@ -319,18 +320,21 @@ export const QUESTS = {
   },
   // 위스키 봉봉(원작 2025년 1월 연재분: 우사기가 숲에서 찾은 신기한 초콜릿을 셋이 먹고 취한다 → 포셰트 갑옷 씨 "초콜릿이면 세이프!" →
   // 덩굴을 당기자 머리에서 덩굴이 자란 새하얀 큰 뱀 → 셋이 삼켜졌다가 갑옷 씨가 너클 더스터로 구한다). 연출은 stories/bonbon.js
+  // 술꾼 쿠리만쥬가 숲의 '위스키 냄새 나는 초콜릿' 소문을 전해 준다(쿠리만쥬 하트 2 — 우사기 · 하치와레 하트 조건 이야기와 겹치지 않게)
   whiskeyBonbon: {
-    title: '위스키 봉봉', giver: 'usagi', side: true, minDay: 10, hours: [9, 16], needHearts: 2, ask: '우라?',
-    offer: ['(우사기 입가에 초콜릿이 잔뜩 묻어 있다…)', '야하! (숲 쪽을 가리키며 동그란 초콜릿을 내민다)',
-      { who: 'hachiware', text: '우사기가 숲에서 신기한 초콜릿을 찾았대! 따도 따도 또 열린대~' },
-      { who: 'chiikawa', text: '…!! (초콜릿…!)' }, { who: 'hachiware', text: '{name}, 우리 같이 먹으러 가자!' }],
+    title: '위스키 봉봉', giver: 'kurimanju', side: true, minDay: 10, hours: [9, 16], needHearts: 2, ask: '숲에 재밌는 소문 없어?',
+    offer: ['하아~ {name}, 들었어? 서쪽 숲에 초콜릿이 주렁주렁 열리는 덩굴이 있대.', '따도 따도 또 열린다나… 우사기가 입가에 초콜릿을 잔뜩 묻히고 다니더라.',
+      '근데 그 초콜릿, 냄새가 좀… 위스키 냄새 같았어. 하아~ 안주로 딱인데.',
+      { who: 'hachiware', text: '초콜릿?! 우리도 먹으러 가자~! 치이카와랑 우사기도 같이!' }, { who: 'chiikawa', text: '…!! (초콜릿…!)' },
+      '하아~ 조심해서 다녀와. 뭔가… 수상한 냄새도 났거든.'],
     steps: [{
       type: 'visit', place: 'bonbonVine', hours: [10, 17], scene: 'whiskeyBonbon', speaker: 'hachiware',
       goal: '서쪽 숲의 초콜릿 덩굴로 가자! (오전 10시 ~ 오후 5시)',
       say: ['헤헤… 아직도 세상이 빙글빙글 돌아~', '(하치와레가 반들반들해진 뒤꿈치를 자꾸 내려다본다)', { who: 'chiikawa', text: '…(꾸벅꾸벅 졸린 얼굴)' },
-        '우사기는 어디까지 뛰어갔을까~? 다음엔 초콜릿 말고 라멘 먹으러 가자, {name}!', '(주머니를 보니 위스키 봉봉 두 알이 들어 있었다)']
+        '우사기는 어디까지 뛰어갔을까~? 다음엔 초콜릿 말고 라멘 먹으러 가자, {name}!', '(주머니를 보니 위스키 봉봉 두 알이 들어 있었다)',
+        '아 참, 쿠리만쥬가 안주로 딱이랬지~ 하나 갖다줄까?']
     }],
-    reward: { bond: 2, friends: { pochette: 3, chiikawa: 2, hachiware: 2 }, items: { bonbon: 2 }, story: 'bonbonDone' }
+    reward: { bond: 2, friends: { pochette: 3, chiikawa: 2, hachiware: 2, usagi: 2 }, items: { bonbon: 2 }, story: 'bonbonDone' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

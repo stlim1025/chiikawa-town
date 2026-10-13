@@ -45,9 +45,9 @@ test('검은 별똥별: 단계가 열리는 때(되풀이되는 날 · 한 번 �
   assert.ok(!loopGate(s, { loop: true }), '되풀이가 끝나면 loop 단계는 닫힌다');
 });
 
-test('검은 별똥별 퀘스트: 하치와레 하트 3개 사이드스토리 9단계, 표백제는 퀘스트 물건, 러스크 보상', () => {
+test('검은 별똥별 퀘스트: 하치와레가 권하고 치이카와 하트 3개부터인 사이드스토리 9단계, 표백제는 퀘스트 물건, 러스크 보상', () => {
   const Q = QUESTS.blackStar;
-  assert.ok(Q && Q.side && Q.giver === 'hachiware' && Q.needHearts === 3);
+  assert.ok(Q && Q.side && Q.giver === 'hachiware' && !Q.needHearts && Q.needFriends.chiikawa === 3);
   assert.equal(Q.steps.length, 9);
   assert.ok(Q.steps.filter((st) => st.place).every((st) => PLACES[st.place]));
   assert.ok(Q.steps.some((st) => st.type === 'search'));
