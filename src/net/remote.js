@@ -19,6 +19,15 @@ const SNAP = 8;
 const LEAD = 0.15, MAX_V = 8;
 /** 받은 자리로 따라가는 빠르기(클수록 덜 늦고, 작을수록 부드럽다). */
 const FOLLOW = 16;
+/**
+ * 받은 움직임의 손에 든 것(소품 꼬리표를 쉼표로: 'w-star,lantern' 무기와 등불, 'f-ramen' 먹는 음식). 영문 · 숫자 · '-' 만, 넷까지.
+ * 모르는 꼬리표는 모델에 그 소품이 없어 아무것도 안 보인다.
+ */
+const heldOf = (m) => (m && typeof m.h === 'string' ? m.h.split(',').filter((t) => /^[a-zA-Z0-9_-]{1,20}$/.test(t)).slice(0, 4).join(',') : '');
+/** 모습 비교용 글자(같은 모습이면 다시 만들지 않는다). */
+const lookKey = (look) => { try { return JSON.stringify(look || {}); } catch { return ''; } };
+/** 손에 든 등불(빛을 비춘다): 'lantern' | 'flashlight' | null. */
+const lightOfHeld = (held) => (held.includes('flashlight') ? 'flashlight' : held.includes('lantern') ? 'lantern' : null);
 
 /**
  * scene: 그릴 장면. area: 이 장면에 보일 사람의 있는 곳('village' 마을과 바깥 · 'home' 마을 주인의 집 안 — 집 안은 바닥 높이 0).
@@ -33,7 +42,27 @@ export function createRemotePlayers(scene, area = 'village') {
     try { chibi = buildChibi(p.look || {}); } catch { chibi = buildChibi({}); } // 모르는 모습이면 기본 모습
     scene.add(chibi.root);
     const m = p.move || {}, x = m.x || 0, z = m.z || 0, yaw = m.yaw || 0;
-    list.set(p.id, { id: p.id, name: p.name, chibi, x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
+    list.set(p.id, { id: p.id, name: p.name, chibi, lookKey: lookKey(p.look), x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', held: heldOf(m), shownHeld: null, t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
+  }
+  /** 모습이 바뀌었다(옷 · 변신 · 포셰트): 캐릭터를 다시 만든다(같은 모습이면 그대로). */
+  function setLook(id, look) {
+    const p = list.get(id), key = lookKey(look);
+    if (!p || key === p.lookKey) return;
+    let chibi;
+    try { chibi = buildChibi(look || {}); } catch { return; } // 모르는 모습이면 지금 모습 그대로
+    scene.remove(p.chibi.root);
+    chibi.root.visible = p.chibi.root.visible;
+    p.chibi = chibi;
+    p.lookKey = key;
+    p.shownHeld = null; // 새 캐릭터에도 든 것을 다시 쥐여 준다
+    scene.add(chibi.root);
+  }
+  /** 손에 든 것(무기 · 등불 · 음식)을 그 사람 화면과 같게 보인다(내 캐릭터의 showHeld 가 고른 꼬리표 그대로). */
+  function showHeld(p) {
+    if (p.held === p.shownHeld) return;
+    p.shownHeld = p.held;
+    const on = new Set(p.held ? p.held.split(',') : []);
+    for (const [tag, meshes] of Object.entries(p.chibi.props || {})) for (const mesh of meshes) mesh.visible = on.has(tag);
   }
   function move(id, m) {
     const p = list.get(id);
@@ -49,7 +78,7 @@ export function createRemotePlayers(scene, area = 'village') {
     } else { p.vx = 0; p.vz = 0; }
     p.at = now;
     if (m.anim !== p.anim) p.animT = 0; // 휘두르기는 시작부터 다시
-    p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area;
+    p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area; p.held = heldOf(m);
   }
   function say(id, text) { const p = list.get(id); if (p) { p.say = text; p.sayT = SAY_SEC; } }
   function emote(id, name) { const p = list.get(id); if (p && ANIMS.has(name)) { p.emote = name; p.emoteT = 2; } }
@@ -85,6 +114,7 @@ export function createRemotePlayers(scene, area = 'village') {
       p.chibi.root.position.set(p.x, floorY(p.x, p.z), p.z);
       p.chibi.root.rotation.y = p.yaw;
       const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
+      showHeld(p);
       animateChibi(p.chibi, anim, p.t, { phase: p.phase, moving: anim === 'walk', swing });
     }
   }
@@ -103,8 +133,10 @@ export function createRemotePlayers(scene, area = 'village') {
 
   /** 그 사람의 지금 몸짓(없으면 null). */
   function animOf(id) { const p = list.get(id); return p ? p.anim : null; }
-  /** 받은 마지막 자리 · 있는 곳 · 몸짓 [{ id, name, x, z, area, anim }](주인: 몬스터가 노릴 놀러 온 친구들). */
-  function players() { return [...list.values()].map((p) => ({ id: p.id, name: p.name, x: p.tx, z: p.tz, area: p.area, anim: p.anim })); }
+  /** 받은 마지막 자리 · 있는 곳 · 몸짓 · 손에 든 것 [{ id, name, x, z, area, anim, held }](주인: 몬스터가 노릴 놀러 온 친구들). */
+  function players() { return [...list.values()].map((p) => ({ id: p.id, name: p.name, x: p.tx, z: p.tz, area: p.area, anim: p.anim, held: p.held })); }
+  /** 디버그: 그 사람 캐릭터에서 지금 보이는 소품 꼬리표 · 모습. */
+  function debugOf(id) { const p = list.get(id); return p && { shown: Object.entries(p.chibi.props || {}).filter(([, ms]) => ms.some((m) => m.visible)).map(([t]) => t), look: p.lookKey }; }
   /** 지금 보이는 사람 [{ id, name, x, z, anim }](말 걸기 · 깨우기 대상). */
   function visible() {
     const out = [];
@@ -113,6 +145,15 @@ export function createRemotePlayers(scene, area = 'village') {
   }
   /** 쓰러져 깨워 주길 기다리는 사람(보이는 사람만) [{ id, name, x, z }]. */
   function downed() { return visible().filter((p) => p.anim === 'faint'); }
+  /** 등불을 든 사람(보이는 사람만) [{ id, x, z, yaw, mode: 'lantern' | 'flashlight' }] — 그 둘레를 밝힌다. */
+  function lit() {
+    const out = [];
+    for (const p of list.values()) {
+      const mode = p.chibi.root.visible ? lightOfHeld(p.held) : null;
+      if (mode) out.push({ id: p.id, x: p.x, z: p.z, yaw: p.yaw, mode });
+    }
+    return out;
+  }
 
-  return { add, move, say, emote, remove, clear, update, labels, players, visible, downed, animOf, get size() { return list.size; } };
+  return { add, move, say, emote, setLook, remove, clear, update, labels, players, visible, downed, lit, animOf, debugOf, get size() { return list.size; } };
 }

@@ -51,6 +51,23 @@ export function createHud(ui, input) {
   // 하는 중인 퀘스트(5단계): 일감 칸 아래에 퀘스트마다 쪽지 한 장씩(화면에 띄운 것이 맨 위)
   const quests = el('div', 'hud-quests');
   dock.append(status, partyTag, visitTag, job, quests);
+  // 퀘스트 쪽지가 많이 쌓이면 화면 한쪽을 다 가린다: 휴대폰(좁은 화면)에서는 맨 위 하나만, 넓으면 셋까지 보이고 나머지는 단추로 접어 둔다
+  const moreBtn = el('button', 'hud-quest-more');
+  moreBtn.type = 'button';
+  moreBtn.hidden = true;
+  quests.appendChild(moreBtn); // 늘 맨 끝(쪽지는 그 앞에 끼운다)
+  let questsOpen = false;
+  const narrowMq = window.matchMedia('(max-width: 820px), (max-height: 520px)');
+  /** 접힌 상태에 맞춰 쪽지를 숨긴다(날아오는 중인 쪽지는 카드가 꽂힐 자리라 늘 보인다). */
+  function foldQuests() {
+    const items = [...quests.querySelectorAll('.hud-quest')], limit = narrowMq.matches ? 1 : 3;
+    items.forEach((e, i) => { e.hidden = !questsOpen && i >= limit && !e.classList.contains('incoming'); });
+    moreBtn.hidden = items.length <= limit;
+    moreBtn.textContent = questsOpen ? '접기' : `퀘스트 ${items.length - limit}개 더`;
+    moreBtn.setAttribute('aria-expanded', String(questsOpen));
+  }
+  moreBtn.addEventListener('click', () => { questsOpen = !questsOpen; foldQuests(); });
+  narrowMq.addEventListener?.('change', foldQuests);
   const notes = new Map(); // 퀘스트 id → { el, key }
   // 카드가 날아오는 중인 퀘스트(그동안 그 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
   const incoming = new Map(); // id → 날아오는 카드 수
@@ -90,7 +107,13 @@ export function createHud(ui, input) {
   lightBtn.type = 'button';
   lightBtn.hidden = true;
   lightBtn.title = '등불 (F)';
-  zoom.append(lightBtn);
+  // 집으로: 마을 밖에 나가 있을 때만(토벌하고 멀리서 걸어 돌아오지 않게)
+  const recallBtn = el('button', 'icon-btn hud-recall', '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5 12 4l8.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9.5h4.5v-5h3v5H18V10" fill="#ffe7c2" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>');
+  recallBtn.type = 'button';
+  recallBtn.hidden = true;
+  recallBtn.title = '집으로 (H)';
+  recallBtn.setAttribute('aria-label', '집으로 돌아가기');
+  zoom.append(lightBtn, recallBtn);
   const action = el('button', 'hud-action');
   action.type = 'button';
   action.hidden = true;
@@ -219,6 +242,10 @@ export function createHud(ui, input) {
     bagBump() { bagBtn.classList.remove('bump'); void bagBtn.offsetWidth; bagBtn.classList.add('bump'); },
     /** 등불 버튼을 누르면(끔 → 랜턴 → 손전등). */
     onLight(fn) { lightBtn.addEventListener('click', fn); },
+    /** 집으로 버튼을 누르면. */
+    onRecall(fn) { recallBtn.addEventListener('click', fn); },
+    /** 집으로 버튼을 보일지(마을 밖에 있을 때). */
+    setRecall(on) { recallBtn.hidden = !on; },
     /** 등불 버튼 모양. mode 가 null 이면 버튼을 숨긴다(불이 하나도 없을 때). */
     setLight(mode) {
       lightBtn.hidden = mode == null;
@@ -316,6 +343,7 @@ export function createHud(ui, input) {
         if (nt.key && nt.key !== k && !incoming.has(q.id)) { e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); }
         nt.key = k;
       });
+      foldQuests();
     },
     /**
      * 같이 놀기 꼬리표: { label, names } — 주인은 '놀러 온 친구' 와 친구 이름들, 손님은 놀러 와 있는 마을 이름. null 이면 숨긴다.
@@ -440,7 +468,7 @@ export function createHud(ui, input) {
      */
     announce({ kicker, title, sub, to = 'job', id = null, chips = null, target = null, look = null }) {
       const toQuest = to === 'quest' && !target;
-      if (toQuest && id) { incoming.set(id, (incoming.get(id) || 0) + 1); notes.get(id)?.el.classList.add('incoming'); }
+      if (toQuest && id) { incoming.set(id, (incoming.get(id) || 0) + 1); notes.get(id)?.el.classList.add('incoming'); foldQuests(); }
       target?.classList.add('incoming');
       const card = el('div', 'task-card' + (toQuest ? ' quest' : '') + (look ? ' ' + look : ''));
       card.setAttribute('role', 'status');
@@ -461,6 +489,7 @@ export function createHud(ui, input) {
           const left = (incoming.get(id) || 1) - 1, note = notes.get(id)?.el;
           if (left > 0) incoming.set(id, left); else { incoming.delete(id); note?.classList.remove('incoming'); }
           shineQuest(note);
+          setTimeout(foldQuests, 1700); // 반짝임이 끝나면 다시 접는다
           return;
         }
         job.classList.remove('got');

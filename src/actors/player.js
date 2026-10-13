@@ -17,8 +17,15 @@ export function createPlayer(scene, chibi, village) {
   let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
   const knock = { x: 0, z: 0 };
   // 먹는 동안은 음식만 든다(무기 · 손전등은 잠깐 넣어 둔다)
+  let heldTags = ''; // 지금 보이는 소품 꼬리표(쉼표로) — 같이 놀기에서 다른 사람 화면에도 같게
   const showHeld = () => {
-    for (const [tag, meshes] of Object.entries(model.props || {})) for (const m of meshes) m.visible = food ? tag === food : tag === held || !!(weaponShown && weapon && (tag === 'w-' + weapon || (tag === 'wf-' + weapon && engraved.has(weapon))));
+    const on = [];
+    for (const [tag, meshes] of Object.entries(model.props || {})) {
+      const vis = food ? tag === food : tag === held || !!(weaponShown && weapon && (tag === 'w-' + weapon || (tag === 'wf-' + weapon && engraved.has(weapon))));
+      for (const m of meshes) m.visible = vis;
+      if (vis) on.push(tag);
+    }
+    heldTags = on.join(',');
   };
   const stopEat = () => { eatT = 0; if (food) { food = null; showHeld(); } };
 
@@ -61,6 +68,8 @@ export function createPlayer(scene, chibi, village) {
     /** 연출 몸짓을 seconds 초 동안(mode: 'pray' 등, 0 이면 그만). 걷거나 휘두르거나 맞으면 그만둔다. */
     act(mode, seconds) { actMode = mode; actT = mode ? seconds : 0; },
     get swinging() { return swingT > 0; },
+    /** 손에 든 것(보이는 소품 꼬리표를 쉼표로: 'w-star,lantern' · 'f-ramen', 없으면 ''). */
+    get heldTags() { return heldTags; },
     /** 휘두르기 진행(0 → 1, 안 휘두르면 0). */
     get swingK() { return swingT > 0 ? 1 - swingT / api.swingDur : 0; },
     /** 맞았다: 밀려나고, 잠깐 휘청이며 깜빡인다. (vx, vz) 는 밀려나는 거리. */

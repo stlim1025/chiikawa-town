@@ -35,7 +35,7 @@ export function createInput(ui, canvas) {
 
   const pressed = new Set();
   const listeners = [];
-  let touch = null; // { id, x, y, dx, dy }
+  let touch = null; // { id, x, y, dx, dy, at: 잡은 시각 }
   let enabled = true;
   let actionDown = false;
 
@@ -47,6 +47,8 @@ export function createInput(ui, canvas) {
 
   function onDown(e) {
     if (e.pointerType === 'touch') {
+      // 조이스틱을 쥐고 움직이던 중에 닿은 손가락은 확대가 아니라 다른 누름(공격 연타 등)이다. 확대는 두 손가락을 거의 같이 댈 때만
+      if (touch && (performance.now() - touch.at > 250 || Math.hypot(touch.dx, touch.dy) > 12)) return;
       fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (fingers.size === 2) {
         // 두 번째 손가락: 조이스틱을 놓고 확대 · 축소로
@@ -59,7 +61,7 @@ export function createInput(ui, canvas) {
     if (fingers.size >= 2) return;
     // 조이스틱은 터치에서만(PC 에서는 키보드로 움직인다)
     if (e.pointerType === 'mouse' || !enabled || touch || e.clientX > window.innerWidth * 0.5) return;
-    touch = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+    touch = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, at: performance.now() };
     try { canvas.setPointerCapture?.(e.pointerId); } catch { /* 이미 끝난 손가락 */ }
     stick.hidden = false;
     stick.style.left = e.clientX + 'px';
@@ -105,8 +107,38 @@ export function createInput(ui, canvas) {
 
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
-  canvas.addEventListener('pointerup', onUp);
-  canvas.addEventListener('pointercancel', onUp);
+  // 손가락을 뗀 곳이 화면이 아니어도(그새 행동 버튼이 나타나 그 위에서 뗐어도) 놓친 손가락이 남지 않게 창 전체에서 받는다
+  // (남은 손가락이 있으면 다음 터치를 두 손가락 확대로 잘못 알아 화면이 확 커졌다)
+  window.addEventListener('pointerup', onUp, true);
+  window.addEventListener('pointercancel', onUp, true);
+  // 조이스틱을 쥔 채 다른 손가락으로 버튼(가방 · 마을폰 …)을 누르면 휴대폰 브라우저가 두 손가락 몸짓으로 보고 click 을 만들지 않는다.
+  // 다른 손가락이 닿아 있는 동안 버튼에서 짧게 누르고 뗀 손가락은 직접 click 으로 바꿔 준다(브라우저가 그래도 click 을 만들면 하나만)
+  const downTouches = new Set();
+  let tapBtn = null, synth = null; // tapBtn: { id, el, x, y }, synth: { el, until } 직접 누른 버튼
+  window.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const el = e.target && e.target.closest ? e.target.closest('button') : null;
+    tapBtn = el && downTouches.size > 0 && !el.classList.contains('hud-action') ? { id: e.pointerId, el, x: e.clientX, y: e.clientY } : null; // 행동 버튼은 누름 · 뗌을 따로 받는다
+    downTouches.add(e.pointerId);
+  }, true);
+  const liftTouch = (e) => {
+    downTouches.delete(e.pointerId);
+    if (!tapBtn || e.pointerId !== tapBtn.id) return;
+    const { el, x, y } = tapBtn;
+    tapBtn = null;
+    if (e.type !== 'pointerup' || el.disabled || !el.isConnected || Math.hypot(e.clientX - x, e.clientY - y) > 24) return;
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (!under || !el.contains(under)) return;
+    synth = { el, until: performance.now() + 700 };
+    el.click();
+  };
+  window.addEventListener('pointerup', liftTouch, true);
+  window.addEventListener('pointercancel', liftTouch, true);
+  window.addEventListener('click', (e) => {
+    if (!synth || !e.isTrusted) return;
+    if (performance.now() < synth.until && synth.el.contains(e.target)) { e.stopPropagation(); e.preventDefault(); }
+    synth = null;
+  }, true);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);

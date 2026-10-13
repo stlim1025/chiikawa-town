@@ -15,13 +15,18 @@ export const SEND_EVERY = 1 / 15;
 export const FAST_EVERY = 1 / 30;
 
 /**
- * 바로 연결로 받은 움직임을 서버가 하던 것처럼 다듬는다(숫자가 아니면 0, 몸짓 · 있는 곳은 16자까지). 모양이 아니면 null.
+ * 바로 연결로 받은 움직임을 서버가 하던 것처럼 다듬는다(숫자가 아니면 0, 몸짓 · 있는 곳은 16자, 손에 든 것은 48자까지). 모양이 아니면 null.
  */
 export function cleanMove(d) {
   if (!d || typeof d !== 'object') return null;
   const num = (v) => (Number.isFinite(v) ? v : 0);
-  const word = (v, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 16) : fallback);
-  return { x: num(d.x), z: num(d.z), yaw: num(d.yaw), anim: word(d.anim, 'idle'), area: word(d.area, 'village') };
+  const word = (v, fallback, max = 16) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
+  return { x: num(d.x), z: num(d.z), yaw: num(d.yaw), anim: word(d.anim, 'idle'), area: word(d.area, 'village'), h: word(d.h, '', 48) };
+}
+/** 캐릭터 모습(look)이 보낼 만한지: 객체이고 JSON 으로 2048자까지(서버와 같은 한도). */
+export function validLook(look) {
+  if (!look || typeof look !== 'object' || Array.isArray(look)) return false;
+  try { return JSON.stringify(look).length <= 2048; } catch { return false; }
 }
 /** 가만히 있어도 이만큼(초)마다 한 번은 보낸다. */
 const HEARTBEAT = 2;
@@ -79,11 +84,11 @@ const REASON = {
 /**
  * events: {
  *   joined(player, fresh — 방금 들어왔으면 true, 먼저 와 있던 사람이면 false), moved(id, move), left(id, name),
- *   said(id, text), emote(id, name), world(payload — 주인 마을의 모습, 손님만 받는다), guestAct(id, payload — 손님의 행동, 주인만 받는다),
+ *   said(id, text), emote(id, name), look(id, look — 바뀐 모습), world(payload — 주인 마을의 모습, 손님만 받는다), guestAct(id, payload — 손님의 행동, 주인만 받는다),
  *   direct(id, payload — 나에게만 온 것: 맞았다 · 쓰러뜨렸다 · 깨웠다 · 주운 물건),
  *   closed(hostName — 놀러 간 마을의 문이 닫혔다), lost() — 놀러 간 마을과 연결이 끊겼다, cleared(), status()
  * }
- * player = { id, name, look, host, move: { x, z, yaw, anim, area } }
+ * player = { id, name, look, host, move: { x, z, yaw, anim, area, h — 손에 든 것(소품 꼬리표를 쉼표로, 없으면 '') } }
  */
 export function createMulti(events = {}) {
   let lib = null, conn = null, status = 'off', error = '', room = null, role = null, info = null, hostId = null, you = null;
@@ -109,6 +114,7 @@ export function createMulti(events = {}) {
     else if (kind === 'direct') { if (d && typeof d === 'object' && d.t !== 'rtc') events.direct?.(id, d); }
     else if (kind === 'say') { if (typeof d === 'string' && d.trim()) events.said?.(id, d.trim().slice(0, 30)); }
     else if (kind === 'emote') { if (typeof d === 'string' && d.trim()) events.emote?.(id, d.trim().slice(0, 16)); }
+    else if (kind === 'look') { if (validLook(d)) events.look?.(id, d); }
   }
   /** 바로 연결된 사람에게는 바로, 아닌 사람이 있으면 서버로도(서버는 모두에게 나눠 주고, 바로 연결된 사람은 서버 쪽을 버린다). → 서버로 보내야 하면 true */
   function toEveryone(kind, data, fast) {
@@ -171,6 +177,7 @@ export function createMulti(events = {}) {
       });
       c.on('playerSaid', (id, text) => { if (!rtc.live(id)) events.said?.(id, text); });
       c.on('playerEmote', (id, name) => { if (!rtc.live(id)) events.emote?.(id, name); });
+      c.on('playerLook', (id, look) => { if (!rtc.live(id) && players.has(id) && validLook(look)) events.look?.(id, look); });
       c.on('world', (w) => { if (role === 'guest' && status === 'visiting' && !rtc.live(hostId)) events.world?.(w); });
       c.on('guestAct', (id, a) => { if (role === 'host' && status === 'open' && players.has(id)) events.guestAct?.(id, a); });
       c.on('direct', (id, a) => {
@@ -245,7 +252,7 @@ export function createMulti(events = {}) {
       srvT += dt;
       if (sendT < FAST_EVERY) return;
       sendT = 0;
-      const key = `${move.x.toFixed(2)},${move.z.toFixed(2)},${move.yaw.toFixed(2)},${move.anim},${move.area}`;
+      const key = `${move.x.toFixed(2)},${move.z.toFixed(2)},${move.yaw.toFixed(2)},${move.anim},${move.area},${move.h || ''}`;
       let server = false;
       if (key !== lastKey || beatT >= HEARTBEAT) {
         lastKey = key;
@@ -277,6 +284,17 @@ export function createMulti(events = {}) {
     /** 한마디(정해진 말)를 보낸다. */
     say(text) { if (live() && conn && toEveryone('say', text, false)) conn.send('Say', text).catch(() => {}); },
     /** 이모트(몸짓 이름)를 보낸다. */
-    emote(name) { if (live() && conn && toEveryone('emote', name, false)) conn.send('Emote', name).catch(() => {}); }
+    emote(name) { if (live() && conn && toEveryone('emote', name, false)) conn.send('Emote', name).catch(() => {}); },
+    /**
+     * 내 모습이 바뀌었다(옷 · 변신 · 포셰트): 같은 마을 사람들에게 바로 알린다. 서버에도 꼭 보낸다(나중에 들어올 사람이 받을 모습).
+     * 다시 이어질 때 보낼 모습도 이것으로 바꿔 둔다.
+     */
+    look(next) {
+      if (!validLook(next)) return;
+      if (info) info = { ...info, look: next };
+      if (!live() || !conn) return;
+      toEveryone('look', next, false);
+      conn.send('Look', next).catch(() => {});
+    }
   };
 }

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>치이카와 마을 생활</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap">
 <script type="importmap">
@@ -525,6 +525,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
   .guide { width: calc(100% - 24px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 110px); }
 }
 .cinematic .hud-left, .cinematic .hud-timer, .cinematic .hud-clock, .cinematic .hud-phone, .cinematic .hud-zoom, .cinematic .hud-action, .cinematic .hud-meter, .cinematic .stick { display: none !important; }
+/* 이야기 장면(잠옷 밤나들이 별 보기, 별똥별 소원, 얼굴 클로즈업): 화면 글은 거의 다 숨기고, 대화 상자는 작고 살짝 비치게 맨 아래로(장면을 덜 가리게) */
+.cutscene .hud-left, .cutscene .hud-timer, .cutscene .hud-clock, .cutscene .hud-phone, .cutscene .hud-bag, .cutscene .hud-zoom, .cutscene .hud-action, .cutscene .hud-meter, .cutscene .stick, .cutscene .world-label { display: none !important; }
+.cutscene .guide { bottom: max(8px, env(safe-area-inset-bottom)); width: min(560px, calc(100% - 32px)); min-height: 0; padding: 22px 26px 24px; background: color-mix(in srgb, var(--paper) 86%, transparent); }
+.cutscene .guide-text { font-size: 19px; line-height: 1.32; }
 
 /* ---------- 손그림 배경 일러스트(타이틀, 캐릭터 만들기, 세로 안내) ---------- */
 .scenery { position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
@@ -1374,6 +1378,10 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest em { font-style: normal; }
 .hud-quest small { padding: 0 8px 1px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-size: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-quests { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.hud-quest[hidden] { display: none; }
+/* 접어 둔 퀘스트 쪽지 펼치기 · 접기(왼쪽 위 기둥은 눌리지 않게 해 두어서 이 단추만 눌리게) */
+.hud-quest-more { pointer-events: auto; padding: 3px 12px 5px; border: 0; border-radius: 999px; background: #fff6dc; box-shadow: 0 3px 0 #e8c97a; color: #8a5a10; font: inherit; font-size: 14px; }
+.hud-quest-more[hidden] { display: none; }
 .hud-quest, .toast { word-break: keep-all; } /* 한국어는 낱말 단위로 줄바꿈 */
 .hud-quest .q-chips { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
 .hud-quest .q-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 9px 1px 3px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-variant-numeric: tabular-nums; white-space: nowrap; }

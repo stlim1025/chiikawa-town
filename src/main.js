@@ -223,6 +223,13 @@ function boot() {
   let worldT = 0, weedsT = 0; // 주인: 마을 모습을 다시 보낼 때까지 남은 초(시간 · 마을 친구들, 풀)
   // 같은 사람을 마을(바깥 포함)과 주인 집 안에 하나씩: 있는 곳(area)에 맞는 쪽만 보인다(homeRemotes 는 집 안 장면이 생긴 뒤에 만든다)
   const eachRemote = (fn) => { fn(remotes); if (homeRemotes) fn(homeRemotes); };
+  // 등불을 든 친구 둘레도 밝힌다(두 명까지). 처음 필요할 때 만들어 계속 둔다(빛 개수가 바뀌면 화면이 잠깐 멈칫해서 끄기만 한다)
+  const remoteLights = [];
+  function updateRemoteLights() {
+    const lit = mode === 'play' ? remotes.lit().slice(0, 2) : [];
+    while (remoteLights.length < lit.length) remoteLights.push(createPlayerLights(scene));
+    remoteLights.forEach((L, i) => { const r = lit[i]; L.update(r ? r.mode : 'off', r || { x: 0, z: 0 }, r ? r.yaw : 0, nightNow); });
+  }
   const multi = createMulti({
     joined: (p, fresh) => {
       eachRemote((r) => r.add(p));
@@ -237,9 +244,10 @@ function boot() {
       // 같이 토벌하던 친구가 쓰러졌다: 다가가서 깨워 줄 수 있다
       if (m && m.anim === 'faint' && was && was !== 'faint' && m.area === 'village') hud.toast(`${josa(multi.nameOf(id) || '친구', '이/가')} 쓰러졌어요! 다가가서 깨워 주세요`, 3600);
     },
-    left: (id, name) => { eachRemote((r) => r.remove(id)); releaseHolds(id); leaveParty(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
+    left: (id, name) => { eachRemote((r) => r.remove(id)); releaseHolds(id); leaveParty(id); arrivedGuests.delete(id); if (name) hud.toast(`${josa(name, '이/가')} 돌아갔어요`, 2600); },
     said: (id, text) => eachRemote((r) => r.say(id, text)), emote: (id, name) => eachRemote((r) => r.emote(id, name)),
-    cleared: () => { eachRemote((r) => r.clear()); clearParty(); },
+    look: (id, look) => eachRemote((r) => r.setLook(id, look)), // 옷 · 변신 · 포셰트를 바꿨다
+    cleared: () => { eachRemote((r) => r.clear()); clearParty(); arrivedGuests.clear(); },
     world: (w) => takeWorld(w),
     guestAct: (id, a) => takeGuestAct(id, a),
     direct: (id, a) => takeDirect(id, a),
@@ -326,6 +334,7 @@ function boot() {
       intro.start(() => {
         if (visiting !== v) return;
         mode = 'play';
+        v.safeUntil = performance.now() + 4000; // 들어온 직후 잠깐은 맞지 않는다(오는 길에 늦게 온 공격 소식)
         setCinematic(false);
         input.setEnabled(true);
         hud.toast('다 놀았으면 마을폰으로 집에 가요', 3000);
@@ -400,6 +409,16 @@ function boot() {
     if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
     if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r }); // 바깥에서 같이 토벌
     if (Array.isArray(w.g)) visiting.ground = parseGround(w.g);
+    if (Array.isArray(w.e) && !visiting.arriving) {
+      // 주인 마을 소식(광장 공연 같은 일): 처음 받은 것만 알림으로
+      visiting.news = visiting.news || new Set();
+      for (const e of w.e.slice(0, 5)) {
+        if (!Array.isArray(e) || !Number.isFinite(e[0]) || typeof e[1] !== 'string' || visiting.news.has(e[0])) continue;
+        visiting.news.add(e[0]);
+        const kind = typeof e[2] === 'string' && FRIENDS[e[2]] ? e[2] : null;
+        hud.toast(e[1].slice(0, 40), 2600, kind ? { icon: faceIcon(kind) } : null);
+      }
+    }
     if (Array.isArray(w.h)) {
       const house = parseHouse(w.h), key = JSON.stringify(house.placed);
       if (key !== visiting.houseKey) {
@@ -492,13 +511,31 @@ function boot() {
 
   // ---------- 같이 놀기: 같이 토벌 · 쓰러지면 깨워 주기 · 바닥 물건 나눠 줍기 · 주인 집 구경 ----------
   const r2 = (v) => Math.round(v * 100) / 100;
+  /** 같이 놀기: 풀 뽑기 결과 글씨를 같은 마을 사람들 화면에도(열쇠 → [글씨, 모양]). */
+  const FX_TEXT = { clean: ['깔끔!', 'clean'], snap: ['끊어졌다…', 'snap'], poison: ['윽, 독이 튀었다!', 'snap'], long: ['너무 오래 당겼다…', 'snap'] };
+  function shareFx(k, x, z) {
+    if (!multi.count || !(multi.status === 'open' || multi.status === 'visiting')) return;
+    for (const p of multi.players) multi.direct(p.id, { t: 'fx', k, x: r2(x), z: r2(z) });
+  }
+  /** 받은 글씨: 내가 마을(바깥 포함)에 있고 가까우면 그 자리 위에 톡. */
+  function showFx(a) {
+    const f = Object.hasOwn(FX_TEXT, a.k) ? FX_TEXT[a.k] : null;
+    if (!f || mode !== 'play' || !player || !Number.isFinite(a.x) || !Number.isFinite(a.z)) return;
+    if (Math.hypot(a.x - player.position.x, a.z - player.position.z) < 24) hud.floatText({ x: a.x, y: 1.15, z: a.z, text: f[0], kind: f[1] });
+  }
   /** 다른 사람이 보낸 물건 이름이 이 게임에 있는 물건인지(Object 의 속성 이름은 빼고). */
   const okItem = (id) => typeof id === 'string' && !(id in Object.prototype) && !!itemInfo(id);
   /** 손님 무기 한 번에 들어갈 수 있는 가장 큰 피해(랏코와 수련한 날 덤까지). 넘게 오면 깎는다. */
   const GUEST_HIT_MAX = Math.max(...Object.values(WEAPONS).map((W) => W.dmg)) + 3;
-  /** 주인: 몬스터가 노릴 수 있는 놀러 온 친구들(바깥에 있고 쓰러지지 않은 사람). 마을 안이면 safe. */
-  const guestAllies = () => remotes.players().filter((p) => p.area === 'village' && p.anim !== 'faint')
-    .map((p) => ({ kind: 'mp:' + p.id, x: p.x, z: p.z, player: true, safe: Math.hypot(p.x, p.z) < VILLAGE_R + 0.6 }));
+  /**
+   * 주인: 몬스터가 노릴 수 있는 놀러 온 친구들(바깥에 있고 쓰러지지 않은 사람). 마을 안이면 safe.
+   * 숲길 끝에서 걸어 들어오는 동안(아직 마을 안에 한 번도 안 들어온 손님)은 노리지 않는다: 들어오다 맞았다.
+   */
+  const arrivedGuests = new Set();
+  const guestAllies = () => remotes.players().filter((p) => {
+    if (Math.hypot(p.x, p.z) < VILLAGE_R - 1) arrivedGuests.add(p.id);
+    return p.area === 'village' && p.anim !== 'faint' && arrivedGuests.has(p.id);
+  }).map((p) => ({ kind: 'mp:' + p.id, x: p.x, z: p.z, player: true, safe: Math.hypot(p.x, p.z) < VILLAGE_R + 0.6 }));
   /** 주인: 마을 울타리 가까이 나가 있는 손님들의 자리(그 둘레 몬스터 모습을 보낸다). */
   const guestsAfield = () => remotes.players().filter((p) => p.area === 'village' && Math.hypot(p.x, p.z) > VILLAGE_R - 6);
   /** 주인: 몬스터가 놀러 온 친구를 맞혔다 → 그 친구에게 알린다(기운은 그 친구 쪽에서 준다). */
@@ -522,6 +559,7 @@ function boot() {
   function takeDirect(id, a) {
     if (!state || !a || typeof a !== 'object') return;
     if (a.t === 'wake') { wakeUp(multi.nameOf(id)); return; }
+    if (a.t === 'fx') { showFx(a); return; } // 친구가 풀을 뽑았다(깔끔! · 끊어졌다…)
     // 같이 토벌 파티(주인 · 손님 누구끼리든)
     if (a.t === 'invite') { takeInvite(id); return; }
     if (a.t === 'party') {
@@ -801,7 +839,7 @@ function boot() {
       multi.tick(dt, { x: r2(q.x), z: r2(q.z), yaw: r2(interior.playerYaw), anim: interior.playerMoving ? 'walk' : 'idle', area: 'home' });
     } else {
       const p = player.position, outside = visiting ? mode === 'play' || mode === 'intro' : mode === 'play';
-      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away' });
+      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away', h: player.heldTags }); // h: 손에 든 무기 · 등불 · 음식
     }
     sendPartyHp(dt); // 같이 토벌 파티원에게 내 기운
     if (multi.status !== 'open' || !multi.count) return;
@@ -813,6 +851,9 @@ function boot() {
     worldT = afield.length ? 0.1 : 0.2;
     const w = { c: [state.clock.day, +state.clock.t.toFixed(5)], d: state.startDate, n: npcs.snapshot(), m: afield.length ? monsters.snapshot(afield) : [] };
     if (afield.length) { const fx = monsters.fxSnapshot(afield); w.s = fx.shots; w.r = fx.rain; }
+    const now = performance.now();
+    while (hostNews.length && hostNews[0].until < now) hostNews.shift();
+    if (hostNews.length) w.e = hostNews.map((e) => [e.id, e.text, e.kind || '']); // 마을 소식(몇 초 동안 거듭 실어서 빠진 것 없이)
     if (weedsT <= 0) {
       weedsT = 1;
       w.w = weeds.snapshot(weedBusy);
@@ -821,6 +862,13 @@ function boot() {
       w.h = homeOf(state).placed.map((q) => [q.id, q.cx, q.cz, q.rot || 0]); // 내 집 가구(손님이 구경한다)
     }
     multi.sendWorld(w);
+  }
+  /** 같이 놀기(주인): 놀러 온 친구에게도 알릴 마을 소식(광장 공연 같은 일). 4초 동안 마을 모습에 실어 보낸다. */
+  const hostNews = [];
+  let hostNewsId = 0;
+  function shareNews(text, kind = '') {
+    if (multi.status !== 'open' || !multi.count) return;
+    hostNews.push({ id: ++hostNewsId, text, kind, until: performance.now() + 4000 });
   }
   /**
    * 손님: 친구 마을에서 돌아다니며 풀을 뽑고 열매를 따고(내 가방으로) 가게에서 내 돈으로 산다. 마을 밖에서는 같이 토벌한다.
@@ -832,16 +880,23 @@ function boot() {
     player.update(dt, input);
     updateCombat(dt); // 휘두르기 · 맞은 뒤 잠깐 무적
     if (pulling) updatePull(dt);
-    target = pulling || panels.isOpen() || guide.open || sleeping || funBusy() || downed ? null : findGuestTarget();
+    target = pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || downed ? null : findGuestTarget();
     const p = player.position, swingable = !target && !downed && weaponNow() && monsters.nearest(p.x, p.z, 6);
     hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
+    updateExamPill(); // 친구 마을 검정소에서 본 제초 승급 시험도 그 마을 풀로 이어 간다
     updateDown(dt);
     hud.render(shown);
     const lightMode = lightOf(state);
     hud.setLight(hasTool(state, 'lantern') || hasTool(state, 'flashlight') ? lightMode : null);
     player.setHeld(lightMode === 'off' ? null : lightMode);
     lights.update(lightMode, player.position, player.yaw, nightNow);
-    streaks.setActive(false);
+    // 별똥별 밤은 주인 마을 시계로(소원은 내 마을에서 빈다)
+    const vc = shown.clock, starNight = isStarfallNight(vc.day) && isStarHour(hourOf(vc));
+    streaks.setActive(starNight && !panels.isOpen());
+    if (starNight && starNotice !== 'v' + vc.day && !guide.open) {
+      starNotice = 'v' + vc.day;
+      hud.toast('별똥별이 쏟아지는 밤이에요', 3600, { chips: [{ text: `${multi.hostName || '친구'}의 마을 하늘` }] });
+    }
   }
 
   // ---------- 창 ----------
@@ -1364,7 +1419,7 @@ function boot() {
   /** 내 모습 + 멘 포셰트. */
   // 내 모습: 만들 때 고른 몸 · 얼굴에 지금 단 소품과 멘 포셰트(옷장에서 바꾼다)
   const myLook = () => ({ ...state.profile.look, accessory: wardrobeOf(state).wear, pochette: worn(state) });
-  const refreshLook = () => { player.setModel(buildChibi(myLook())); };
+  const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(myLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
 
   /** 내 집 마련! */
   function celebrateHouse() {
@@ -1477,13 +1532,43 @@ function boot() {
     commit(next);
   };
   hud.onLight(() => toggleLight(false));
-  // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불
+  hud.onRecall(() => recallHome());
+  // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불, H 집으로(마을 밖에서)
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || (e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) return;
     if (e.code === 'KeyI' || e.code === 'KeyB') { if (panels.openKind() === 'bag') panels.close(); else openBag(); }
     else if (e.code === 'KeyE') { if (panels.isPhone()) panels.close(); else openPhone(); }
     else if (e.code === 'KeyF') toggleLight(true);
+    else if (e.code === 'KeyH') recallHome();
   });
+  // ---------- 집으로: 마을 밖에서 토벌하다가 커튼 한 번에 집 앞으로(친구 마을이면 친구네 집 앞) ----------
+  let recalling = false;
+  const outsideVillage = () => !!player && Math.hypot(player.position.x, player.position.z) > VILLAGE_R + 1;
+  /** 지금 집으로 버튼을 쓸 수 있는지(마을 밖이고, 다른 일 · 연출 중이 아닐 때). */
+  const canRecall = () => mode === 'play' && !!state && outsideVillage() && !recalling && !fainting && !downed && !hunterExam && !sticker && !pulling && !sleeping
+    && !funBusy() && !panels.isOpen() && !guide.open && !(visiting && (visiting.arriving || visiting.leaving));
+  function recallHome() {
+    if (!canRecall()) return;
+    const p = player.position;
+    // 쫓아오는 몬스터가 가까이 있으면 못 간다(도망치는 수단이 되지 않게). 친구 마을에서는 받은 모습뿐이라 가까이 있으면
+    const chased = monsters.active().some((m) => !m.dead && Math.hypot(m.x - p.x, m.z - p.z) < 9 && (visiting || (m.state !== 'wander' && m.state !== 'return' && !m.foe))); // 쫓기 · 공격 예고 · 공격 · 공격 뒤 숨 고르기
+    if (chased) { hud.toast('몬스터가 쫓아오고 있어서 못 가요', 2600); return; }
+    recalling = true;
+    input.setEnabled(false);
+    hud.setAction(null);
+    hud.curtain(true, '집으로 돌아가는 중…');
+    setTimeout(() => {
+      recalling = false;
+      if (!state || mode !== 'play') { hud.curtain(false); return; }
+      const h = !visiting && isEvicted(state) ? village.spots.plaza : village.spots.home, at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5);
+      player.setPosition(at.x, at.z);
+      player.face(at.x, at.z + 3);
+      cam.snap(player.position);
+      hud.curtain(false);
+      if (!panels.isOpen() && !guide.open) input.setEnabled(true);
+      save();
+    }, 900);
+  }
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoomBy(Math.exp(e.deltaY * 0.001)); }, { passive: false });
   // PC: 마우스 왼쪽 클릭으로 무기를 휘두른다(누른 쪽 · 그 근처 몬스터를 노린다)
   const clickRay = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), clickHit = new THREE.Vector3();
@@ -1615,7 +1700,8 @@ function boot() {
   /** tooLong: 끝까지 갔다가 왼쪽 끝으로 돌아올 때까지 누르고 있었다(그대로 끊어진다). */
   function endPull(tooLong = false) {
     const { weed, pull } = pulling;
-    const pop = (text, kind) => hud.floatText({ x: weed.x, y: 1.15, z: weed.z, text, kind }); // 결과는 위 알림 줄 대신 풀 위에서 톡
+    // 결과는 위 알림 줄 대신 풀 위에서 톡. fx: 같은 마을 사람들 화면에도 띄울 글씨(FX_TEXT)
+    const pop = (text, kind, fx) => { hud.floatText({ x: weed.x, y: 1.15, z: weed.z, text, kind }); if (fx) shareFx(fx, weed.x, weed.z); };
     pulling = null;
     sound.chargeStop();
     player.busy = false;
@@ -1629,8 +1715,8 @@ function boot() {
     if (step === 'none') { if (weed.guest) multi.act({ t: 'drop', id: weed.id }); pop('조금 더 꾹~', 'tip'); return; }
 
     let next = useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
-    if (W.poison && step === 'snapped') pop('윽, 독이 튀었다!', 'snap');
-    else if (tooLong) pop('너무 오래 당겼다…', 'snap');
+    if (W.poison && step === 'snapped') pop('윽, 독이 튀었다!', 'snap', 'poison');
+    else if (tooLong) pop('너무 오래 당겼다…', 'snap', 'long');
     // 여러 번에 나눠 뽑는 풀: 아직 남았으면 조금 올라온 채로 두고 다시 누르게
     const prog = advanceWeed({ stage: weed.stage, flawed: weed.flawed }, weed.kind, step);
     if (!prog.done) {
@@ -1659,7 +1745,7 @@ function boot() {
     weeds.remove(weed, result);
     if (weed.guest) multi.act({ t: 'weed', id: weed.id, done: result }); // 친구 마을 풀: 주인 마을에서도 뽑힌다(얻은 풀은 내 가방에)
     if (first && weed.kind !== 'weed') hud.banner('새 풀!', W.name, 2400);
-    else if (!(W.poison && step === 'snapped') && !tooLong) pop(result === 'clean' ? '깔끔!' : '끊어졌다…', result === 'clean' ? 'clean' : 'snap');
+    else if (!(W.poison && step === 'snapped') && !tooLong) pop(result === 'clean' ? '깔끔!' : '끊어졌다…', result === 'clean' ? 'clean' : 'snap', result === 'clean' ? 'clean' : 'snap');
 
     if (next.exam && examCounts(next.exam, weed.kind)) {
       const exam = examStep(next.exam, result);
@@ -1800,6 +1886,20 @@ function boot() {
     sound.play('job');
     hud.announce({ kicker: '승급 시험!', title: `제초 ${gradeName(state.license.grade - 1)} 시험을 볼 수 있어요!`, sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal',
       chips: [{ icon: ICO.pin, text: '검정소' }, { icon: 'coin', text: won(EXAM_FEE[state.license.grade]) }] });
+  }
+  /**
+   * 제초 승급 시험: 토벌 실기처럼 위 가운데 노란 알약에 진행(깔끔하게 연속 ●○)을 크게. 실기 · 술래잡기가 알약을 쓰는 동안은 비켜 준다.
+   * 시험에 세는 풀은 마을에서 그 풀 위에 노란 화살표, 알약에도 그 풀 그림 · 이름.
+   */
+  function updateExamPill() {
+    const examWeeds = state.exam && !state.exam.done ? examKinds(state.exam) : [];
+    weeds.setHint(examWeeds);
+    if (state.exam && !hunterExam && !tag && !downed) {
+      const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
+      // 세로 휴대폰은 좁아서 풀은 그림만 · 숫자(●○ 와 같은 뜻)는 뺀다(narrow)
+      hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name, narrow: 'icon' })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}`, narrow: 'hide' }]);
+      examPill = true;
+    } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
   }
   /** 시험을 보거나 급수가 오르면 쪽지를 걷고, 불러온 저장에서 이미 알려 준 시험이면 쪽지만 다시 띄운다. */
   function updateExamGoal() {
@@ -2162,6 +2262,7 @@ function boot() {
   }
   // ---------- 우는 얼굴 클로즈업(피자호빵): 카메라가 얼굴로 다가가고, 친구는 카메라 쪽을 보며 진짜로 운다 ----------
   let cryFx = null, closeup = null; // cryFx: { n, t, crying } · closeup: { n, t, a(카메라가 오는 방향), fromPos, fromLook, out, outT }
+  let cutscene = false; // 이야기 장면이라 화면 글을 숨긴 중(body.cutscene)
   /** 대사 줄의 연출 신호. */
   function storyCue(cue) {
     const F = cryFx;
@@ -2558,6 +2659,7 @@ function boot() {
   /** 검정소 시험: (공부 확인) → 응시료 → 필기 → 실기(술: 하이볼, 슈퍼 알바이터: 손님 3명) → 합격하면 자격증. sure: 공부 확인을 이미 했다 */
   function takeLicense(id, sure = false) {
     if (hunterExam) { hud.toast('토벌 실기 중이에요!'); return; }
+    if (visiting && id === 'hunter') { hud.toast('토벌 시험은 내 마을 검정소에서 봐요', 2800); return; } // 실기 몬스터는 내 마을에만 나온다
     if (!sure && !hasLicense(state, id) && state.money >= LICENSES[id].fee && examCheck(id)) return;
     const L = LICENSES[id], r = payFee(state, id);
     if (!r.ok) { hud.toast(r.reason === 'money' ? '응시료가 부족해요' : '이미 있는 자격이에요'); return; }
@@ -2705,7 +2807,7 @@ function boot() {
   /** 몬스터의 들이받기가 닿았다: 기운이 줄고 밀려난다. 잠깐은 다시 안 맞는다. 기운이 0이면 기절. */
   /** 몬스터 공격이 닿았다. hit: { dmg, x, z } — 공격마다 다른 피해와 날아온 자리(탄 · 충격파는 그 자리에서 밀려난다). */
   function onMonsterHit(m, hit = {}) {
-    if (iframe > 0 || fainting || downed || sleeping || mode !== 'play' || !state || (visiting && (visiting.arriving || visiting.leaving))) return;
+    if (iframe > 0 || fainting || downed || sleeping || mode !== 'play' || !state || (visiting && (visiting.arriving || visiting.leaving || performance.now() < (visiting.safeUntil || 0)))) return;
     const dmg = hit.dmg ?? m.M.dmg, next = Math.max(0, state.stamina - dmg);
     commit({ ...state, stamina: next }, false);
     iframe = PLAYER_IFRAME;
@@ -2898,8 +3000,12 @@ function boot() {
     const r = giveGift(state, n.kind, id, state.clock.day);
     if (!r.ok) { sayAs(n, [r.reason === 'today' ? giftLine(n.kind, 'cap') : '…?'], endTalk); return; }
     commit(r.state);
-    sound.play(r.taste === 'hate' ? 'none' : 'job');
-    hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2400, { icon: itemSvg(id) });
+    sound.play(r.taste === 'hate' ? 'none' : r.love ? 'heartUp' : 'job');
+    // 좋아하는지 싫어하는지 한눈에: 알림 꼬리표 + 친구 머리 위 글씨 + 몸짓(좋으면 깡충, 싫으면 갸웃)
+    const TASTE = { love: ['아주 좋아해요!', '좋아해!', 'clean', 'hop'], ok: ['보통이에요', '', '', null], hate: ['싫어하는 것 같아요', '싫어…', 'snap', 'think'] }[r.taste] || ['', '', '', null];
+    hud.toast(`${FRIENDS[n.kind].name}에게 ${josa(itemInfo(id).name, '을/를')} 줬어요`, 2800, { icon: itemSvg(id), chips: [{ text: TASTE[0] }] });
+    if (TASTE[1]) hud.floatText({ x: n.x, y: n.chibi.height + 0.5, z: n.z, text: TASTE[1], kind: TASTE[2] });
+    if (TASTE[3]) npcs.emote(n, TASTE[3], 2.2);
     // 싫어하는 선물: 성격대로 살짝 싫은 티를 낸다(친밀도는 안 오른다). 모몽가 · 우사기는 대화가 끝나자마자 내 앞에서 버리고,
     // 착한 친구들은 일단 받아 두었다가 내가 없을 때 몰래 버린다(lifeDecide · staffTossSecret)
     if (r.taste === 'hate') { sayAs(n, [giftLine(n.kind, 'hate')], () => { endTalk(); if (r.tossNow) tossAway(n, id); }); return; }
@@ -3481,7 +3587,8 @@ function boot() {
         }
         continue;
       }
-      tireNpc(kind, 0.3); // 돌아다니기만 해도 조금씩
+      // 돌아다니기만 해도 조금씩(나랑 같이 다니는 부탁 중에는 빼고: 오후 2시에도 지쳐서 낮잠 자러 가 버렸다)
+      if (!buddies.has(kind)) tireNpc(kind, 0.3);
       if (buddies.has(kind)) { // 일상 부탁으로 같이 다니는 중: 잘 시간 한 시간 전부터 졸리다고 알리고, 잘 시간이 되면 하던 일에 맞게 인사하고 집으로(부탁은 그대로, 내일 이어서)
         const sleepy = isSleepHour(hour);
         if (!sleepy && hour >= BED_HOUR - 1 && !buddyYawned.has(kind)) { buddyYawned.add(kind); npcs.say(n, BUDDY_YAWN[kind] || '하아암… 졸려~'); npcs.emote(n, 'stretch', 1.4); }
@@ -3817,10 +3924,15 @@ function boot() {
     const st = id && stepOf(state, id), act = st ? (st.type === 'together' ? ACTS[st.act] : '산책') : '같이 하던 거';
     return (BUDDY_BED[kind] || '{act은} 내일 마저 하자~').replace('{act은}', josa(act, '은/는')).replace('{act}', act);
   }
+  /** 나랑 같이 다니기 시작할 때 친구 기운을 이만큼까지는 채운다(부탁을 끝까지 함께하게). */
+  const BUDDY_ENERGY = 70;
   /** 친구가 나를 따라나선다(하던 일정은 그만두고). */
   function startBuddy(n) {
     if (!n || n.away || buddies.has(n.kind)) return;
     buddies.add(n.kind);
+    // 같이 하자고 했으니 기운을 낸다: 지친 채로 시작하면 곧 낮잠 자러 가 버려서 부탁을 끝낼 수 없었다
+    const day = state.clock.day, e = villagerOf(state, n.kind, day).energy;
+    if (e < BUDDY_ENERGY) state = villagerEnergy(state, n.kind, BUDDY_ENERGY - e, day);
     npcs.plan(n, []);
     npcs.setFollow(n.kind, true);
     setDoing(n.kind, 'heart', '나랑 같이 다니는 중');
@@ -4160,6 +4272,7 @@ function boot() {
         npcs.say(n, SHOW.start);
         for (const k of Object.keys(VILLAGERS)) if (k !== n.kind) restUntil[k] = Math.min(restUntil[k], lifeClock + Math.random() * 4); // 둘레 친구들이 곧 알아챈다
         if (mode === 'play' && Math.hypot(player.position.x - st.x, player.position.z - st.z) < 24) hud.toast('광장 공연 시작!', 2400, { icon: faceIcon(n.kind) });
+        shareNews('광장 공연 시작!', n.kind); // 놀러 온 친구도 보러 오게
       }
     }, { do: 'act', anim: 'talk', face, time: 2.4, quick: true }];
     for (let i = 0; i < 9; i++) steps.push({ do: 'act', anim: 'dance', face, time: 4.5, say: lyrics[i % lyrics.length], quick: true });
@@ -4671,8 +4784,8 @@ function boot() {
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
   }
-  /** 같이 놀기: 친구 마을에서 내 돈으로 쓸 수 있는 가게(일감 · 시험 · 추첨 · 변신은 내 마을에서). */
-  const GUEST_PLACES = new Set(['ramen', 'furniture', 'pochette', 'books', 'tools', 'pub']);
+  /** 같이 놀기: 친구 마을에서도 쓰는 건물(내 돈 · 내 일감 · 내 자격으로. 토벌 실기만 내 마을 검정소에서). 집은 친구 집이라 따로. */
+  const GUEST_PLACES = new Set(['board', 'exam', 'ramen', 'furniture', 'realty', 'pochette', 'books', 'tools', 'pub', 'factory', 'raffle', 'salon']);
   /** 친구 마을에서 지금 누르면 할 일: 몬스터 치기 · 쓰러진 친구 깨우기 · 바닥 물건 줍기 · 풀 뽑기 · 열매 따기(내 가방으로) · 가게 · 친구 집. */
   function findGuestTarget() {
     const p = player.position, options = [];
@@ -5086,6 +5199,7 @@ function boot() {
       homeTarget: () => homeTarget && homeTarget.type,
       leaveRoom: () => exitVisit(),
       free: (x, z, r) => village.isFree(x, z, r),
+      path: (x0, z0, x1, z1) => village.findPath({ x: x0, z: z0 }, { x: x1, z: z1 }), // 친구 길찾기 확인용
       solids: () => village.obstacles.list.filter((o) => !o.soft).map((o) => ({ x: o.x, z: o.z, r: o.r, box: o.box ? { hx: o.box.hx, hz: o.box.hz } : null })),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
@@ -5093,6 +5207,7 @@ function boot() {
       mode: () => mode,
       // 같이 놀기 확인용: 연결 상태와 놀러 간 마을에서 받은 것
       mp: () => ({ status: multi.status, role: multi.role, players: multi.players.map((p) => p.name), visiting: visiting && { code: visiting.code, npcs: visiting.npcs.length, weeds: visiting.weeds ? visiting.weeds.length : null, clock: visiting.clock, arriving: visiting.arriving } }),
+      remotes: () => remotes, // 같이 놀기 확인용: 다른 사람 캐릭터(든 것 · 등불 · 모습)
       story: () => (usagiClub ? usagiClub.phase : null),
       staged: () => [...staged],
       burrows: () => burrows.spots,
@@ -5324,16 +5439,7 @@ function boot() {
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
       hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
       hud.render(state);
-      // 제초 승급 시험: 토벌 실기처럼 위 가운데 노란 알약에 진행(깔끔하게 연속 ●○)을 크게. 실기 · 술래잡기가 알약을 쓰는 동안은 비켜 준다
-      // 시험에 세는 풀은 마을에서 그 풀 위에 노란 화살표, 알약에도 그 풀 그림 · 이름
-      const examWeeds = state.exam && !state.exam.done ? examKinds(state.exam) : [];
-      weeds.setHint(examWeeds);
-      if (state.exam && !hunterExam && !tag && !downed) {
-        const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
-        // 세로 휴대폰은 좁아서 풀은 그림만 · 숫자(●○ 와 같은 뜻)는 뺀다(narrow)
-        hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name, narrow: 'icon' })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}`, narrow: 'hide' }]);
-        examPill = true;
-      } else if (examPill) { examPill = false; if (!hunterExam && !tag) hud.setTimer(null); }
+      updateExamPill();
       // 별똥별이 쏟아지는 밤: 처음 한 번 알리고, 화면 위쪽에 별똥별이 가끔 지나간다(소원을 빌면 하늘을 올려다본다)
       const starNight = isStarfallNight(state.clock.day) && isStarHour(hourOf(state.clock)) && !tutorialActive(state.tutorial);
       streaks.setActive(starNight && !starShow && !sleeping && !panels.isOpen());
@@ -5389,7 +5495,12 @@ function boot() {
     else npcs.update(dt, t, focus);
     // 같이 놀기: 같은 마을 친구들은 내가 마을에 있을 때만 보인다(내 움직임은 netTick 이 보낸다)
     remotes.update(dt, (mode === 'play' || (mode === 'intro' && !!visiting)) && !closeup); // 친구 마을로 걸어 들어갈 때도 와 있는 친구들이 보인다
+    updateRemoteLights();
+    hud.setRecall(canRecall()); // 마을 밖에 있을 때만 집으로 버튼
     if (mode !== 'play') streaks.setActive(false);
+    // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
+    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup);
+    if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
     if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else { const pp = pajama.camPose(dt); if (pp) cam.set(pp.pos, pp.look); else cam.follow(focus, dt); } }

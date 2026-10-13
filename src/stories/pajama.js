@@ -122,9 +122,10 @@ export function createPajamaStory(ctx) {
       if (!S || S.kind !== 'stars' || !S.from) return null;
       S.t += dt;
       const k = Math.min(1, S.t / 1.6), e = k * k * (3 - 2 * k), p = S.spot;
-      // 통나무 뒤(북쪽)에서: 화면 아래에 나란히 앉은 셋의 뒷모습, 그 너머 바다와 별이 쏟아지는 하늘
+      // 통나무 뒤(북쪽)에서: 나란히 앉은 셋의 뒷모습, 그 너머 바다와 별이 쏟아지는 하늘.
+      // 조금 내려다봐서 셋이 화면 가운데 아래에 온다(맨 아래 대화 상자에 가리지 않게, 하늘은 위쪽 3분의 1 남짓)
       const pos = S.from.pos.clone().lerp(new THREE.Vector3(p.x, 2.0, p.z - 5.6), e);
-      const look = S.from.look.clone().lerp(new THREE.Vector3(p.x, 1.75, p.z + 12), e);
+      const look = S.from.look.clone().lerp(new THREE.Vector3(p.x, 0.2, p.z + 12), e);
       return { pos, look };
     },
     update(dt) {

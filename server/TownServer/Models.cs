@@ -20,7 +20,8 @@ public sealed record JoinInfo(string Name, JsonElement Look, float X, float Z, f
 /// <param name="Yaw">바라보는 방향(라디안).</param>
 /// <param name="Anim">몸짓 이름('idle' · 'walk' · 'pull' …).</param>
 /// <param name="Area">있는 곳('village' 마을 · 'away' 집 안이나 마을 밖).</param>
-public sealed record MoveInfo(float X, float Z, float Yaw, string Anim, string Area);
+/// <param name="H">손에 든 것(소품 꼬리표를 쉼표로: 'w-star,lantern' 무기와 등불 · 'f-ramen' 먹는 음식). 없으면 null.</param>
+public sealed record MoveInfo(float X, float Z, float Yaw, string Anim, string Area, string? H = null);
 
 /// <summary>
 /// 마을 안 사람 한 명의 지금 모습(새로 들어온 사람에게 보내 준다).

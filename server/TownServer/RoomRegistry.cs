@@ -38,8 +38,8 @@ public sealed class Player(string id, string room, string name, JsonElement look
     /// <summary>이름.</summary>
     public string Name { get; } = name;
 
-    /// <summary>캐릭터 모습.</summary>
-    public JsonElement Look { get; } = look;
+    /// <summary>캐릭터 모습(옷을 바꾸면 Look 으로 새 모습이 온다).</summary>
+    public JsonElement Look { get; set; } = look;
 
     /// <summary>마지막 움직임.</summary>
     public MoveInfo Move { get; set; } = move;

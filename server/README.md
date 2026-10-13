@@ -115,7 +115,8 @@ Tailscale Funnel 을 쓰면 **공유기 포트포워딩, 방화벽, 인증서 �
 |---|---|---|
 | `OpenGate` | `code: string`, `info: { name, look, x, z, yaw }` | 내 마을 문을 연다(주인). 돌려주는 값: `JoinResult`. 그 코드로 이미 열려 있으면 `taken` |
 | `Visit` | `code: string`, `info: { name, look, x, z, yaw }` | 친구 마을에 놀러 간다(손님). 돌려주는 값: `JoinResult`. 문이 닫혀 있으면 `closed`, 꽉 찼으면 `full` |
-| `Move` | `{ x, z, yaw, anim, area }` | 위치, 방향, 몸짓. `area`: `village`(마을과 바깥), `home`(주인 집 안, 집 안 자리), `away`(다른 장면). `anim: 'faint'` 는 쓰러져 깨워 주길 기다리는 중 |
+| `Move` | `{ x, z, yaw, anim, area, h }` | 위치, 방향, 몸짓. `area`: `village`(마을과 바깥), `home`(주인 집 안, 집 안 자리), `away`(다른 장면). `anim: 'faint'` 는 쓰러져 깨워 주길 기다리는 중. `h`: 손에 든 것(소품 꼬리표를 쉼표로, 48자까지: `w-star,lantern` 무기와 등불, `f-ramen` 먹는 음식) |
+| `Look` | `look: object`(2048자까지) | 내 모습이 바뀌었다(옷, 변신, 포셰트). 같은 마을 사람들에게 알리고, 나중에 들어올 사람에게 줄 모습도 바꿔 둔다(`Act` 와 같은 양동이로 너무 자주 오면 버린다) |
 | `World` | `{ c, d, n, m, s, r, w, b, g, h }` | 주인만: 마을 모습(아래). 서버는 내용을 해석하지 않고 손님들에게 그대로 보낸다(48KB 까지) |
 | `Act` | `{ t, … }` | 손님만: 내 행동(아래)을 주인에게만 보낸다(512자까지, 너무 자주 오면 버린다) |
 | `Direct` | `to: string`, `{ t, … }` | 같은 마을의 한 사람에게만(아래, 바로 연결 정보 포함). 8KB까지, 너무 자주 오면 버린다 |
@@ -145,6 +146,7 @@ Tailscale Funnel 을 쓰면 **공유기 포트포워딩, 방화벽, 인증서 �
 | `b` | `[[x, z, ready]]` | 열매 덤불(순서가 덤불 번호): 자리, 열매가 열렸으면 1 |
 | `g` | `[[g, id, n, clean, weapon, x, z]]` | 바닥 물건: 번호, 물건, 개수, 깔끔한 수, 무기면 1, 자리 |
 | `h` | `[[id, cx, cz, rot]]` | 주인 집 가구 배치 |
+| `e` | `[[번호, 글, 친구 kind]]` | 마을 소식(광장 공연 시작 같은 일). 생긴 뒤 4초 동안 거듭 실어 보내고, 손님은 처음 받은 번호만 알림으로 띄운다 |
 
 손님은 받은 값을 하나씩 확인해서 쓴다(모르는 풀 종류, 숫자가 아닌 자리는 버린다).
 
@@ -174,13 +176,15 @@ Tailscale Funnel 을 쓰면 **공유기 포트포워딩, 방화벽, 인증서 �
 | `{ t: 'wake' }` | 누구나 → 쓰러진 사람 | 깨워 줬다(기운 30으로 일어난다) |
 | `{ t: 'invite' }` · `{ t: 'party', ok }` · `{ t: 'unparty' }` | 누구나 → 누구나 | 같이 토벌하자 · 대답 · 파티 그만 |
 | `{ t: 'pkill', sp, x, z, clean, n }` | 쓰러뜨린 사람 → 파티 | 같이 잡았다(일감 · 퀘스트를 같이 세고, 점수는 n 명이 나눈다) |
+| `{ t: 'fx', k, x, z }` | 풀을 뽑은 사람 → 같은 마을 모두 | 뽑기 결과 글씨(`k`: `clean` 깔끔, `snap` 끊어짐, `poison` 독, `long` 너무 오래). 가까이 있으면 그 자리 위에 띄운다 |
 
 ### 서버 → 클라이언트
 
 | 이벤트 | 인자 |
 |---|---|
 | `playerJoined` | `{ id, name, look, move, host }` |
-| `playerMoved` | `id`, `{ x, z, yaw, anim, area }` |
+| `playerMoved` | `id`, `{ x, z, yaw, anim, area, h }` |
+| `playerLook` | `id`, `look`(바뀐 모습) |
 | `playerSaid` | `id`, `text` |
 | `playerEmote` | `id`, `name` |
 | `playerLeft` | `id`(손님이 나갔다) |

@@ -6,12 +6,12 @@ namespace TownServer;
 /// <summary>
 /// 같이 놀기 허브(/town): 동물의 숲처럼 주인이 마을 문을 열면(내 마을 코드) 친구가 그 코드로 놀러 온다.
 /// 서버는 같은 마을 사람들에게 받은 것을 나눠 주기만 한다(게임 진행은 각자 기기에, 마을 상태는 주인이 보낸다).
-/// 클라이언트 → 서버: OpenGate · Visit · Move · Say · Emote · World(주인만) · Act(손님만) · Direct(한 사람에게) · Leave.
-/// 서버 → 클라이언트: playerJoined · playerMoved · playerSaid · playerEmote · playerLeft · world · guestAct(주인만) · direct · gateClosed.
+/// 클라이언트 → 서버: OpenGate · Visit · Move · Look · Say · Emote · World(주인만) · Act(손님만) · Direct(한 사람에게) · Leave.
+/// 서버 → 클라이언트: playerJoined · playerMoved · playerLook · playerSaid · playerEmote · playerLeft · world · guestAct(주인만) · direct · gateClosed.
 /// </summary>
 public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<TownHub> log) : Hub
 {
-    private const int MaxName = 8, MaxLook = 2048, MaxWord = 16, MaxSay = 30, MaxWorld = 48 * 1024, MaxAct = 512, MaxDirect = 8 * 1024;
+    private const int MaxName = 8, MaxLook = 2048, MaxWord = 16, MaxHeld = 48, MaxSay = 30, MaxWorld = 48 * 1024, MaxAct = 512, MaxDirect = 8 * 1024;
 
     /// <summary>
     /// 내 마을 문을 연다(이 연결이 그 마을 코드의 주인이 된다). 그 코드로 이미 열려 있으면 'taken'.
@@ -56,8 +56,20 @@ public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<Tow
         var me = rooms.Get(Context.ConnectionId);
         if (me is null) return;
         if (!me.Moves.Take(Environment.TickCount64, options.MovesPerSecond, options.MoveBurst)) return;
-        me.Move = new MoveInfo(Finite(move.X), Finite(move.Z), Finite(move.Yaw), Clip(move.Anim, MaxWord) ?? "idle", Clip(move.Area, MaxWord) ?? "village");
+        me.Move = new MoveInfo(Finite(move.X), Finite(move.Z), Finite(move.Yaw), Clip(move.Anim, MaxWord) ?? "idle", Clip(move.Area, MaxWord) ?? "village", Clip(move.H, MaxHeld));
         await Clients.OthersInGroup(me.Room).SendAsync("playerMoved", me.Id, me.Move);
+    }
+
+    /// <summary>
+    /// 내 모습이 바뀌었다(옷 · 변신 · 포셰트): 같은 마을 사람들에게 알리고, 나중에 들어올 사람에게 줄 모습도 바꿔 둔다.
+    /// </summary>
+    public async Task Look(JsonElement look)
+    {
+        var me = rooms.Get(Context.ConnectionId);
+        if (me is null || !ValidLook(look)) return;
+        if (!me.Acts.Take(Environment.TickCount64, options.ActsPerSecond, options.ActBurst)) return;
+        me.Look = look.Clone();
+        await Clients.OthersInGroup(me.Room).SendAsync("playerLook", me.Id, me.Look);
     }
 
     /// <summary>

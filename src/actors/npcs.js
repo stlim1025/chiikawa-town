@@ -353,10 +353,16 @@ export function createNpcs(scene, village, weeds, berries) {
       const d = Math.hypot(m.x - n.x, m.z - n.z), reach = m.M.size + 0.8;
       if (d > reach) {
         step.tries = (step.tries || 0) + 1;
-        if (step.tries > 14) { step.skip.add(m); step.target = null; step.tries = 0; n.timer = 0.3; return; } // 그 녀석에게는 못 간다
+        if (step.tries > 6) { step.skip.add(m); step.target = null; step.tries = 0; n.timer = 0.3; return; } // 그 녀석에게는 못 간다
         clearRoute(n);
-        n.tx = m.x + ((n.x - m.x) / d) * (reach - 0.3);
-        n.tz = m.z + ((n.z - m.z) / d) * (reach - 0.3);
+        // 다가설 자리: 몬스터 둘레 reach 안쪽을, 길이 몬스터에게 들어가는 쪽에서. 예전엔 나와 몬스터를 곧장 이은 쪽이라
+        // 강 건너 몬스터면 그 자리가 물 위였고, 이쪽 강가(다리 둘레)에서 왔다 갔다 맴돌다 겨우 포기했다
+        const path = village.findPath({ x: n.x, z: n.z }, { x: m.x, z: m.z });
+        const from = path && path.length >= 2 ? path[path.length - 2] : n;
+        let ax = from.x - m.x, az = from.z - m.z, al = Math.hypot(ax, az);
+        if (al < 0.05) { ax = n.x - m.x; az = n.z - m.z; al = d; }
+        n.tx = m.x + (ax / al) * (reach - 0.3);
+        n.tz = m.z + (az / al) * (reach - 0.3);
         n.dash = d > 5; // 마을 밖 먼 길은 뛰어간다
         n.state = 'walk';
         return;
