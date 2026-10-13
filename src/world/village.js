@@ -811,6 +811,8 @@ export function buildVillage(scene) {
     spots,
     /** 친구 집 문 앞: { chiikawa, usagi, kurimanju, momonga, rakko }. */
     homes,
+    /** 나무 자리 [{ x, z, s }](s: 크기 — 잎 그늘은 줄기에서 1m × s 남짓, 높이 1.4m × s 쯤부터). 비 피하기 같은 연출에서 쓴다. */
+    treeSpots: () => trees.map(({ x, z, s }) => ({ x, z, s })),
     /** 월드 묶음(멀리 있는 묶음은 감춘다). */
     zones,
     /** 입장 연출: 마을 밖 출발점, 문 위치, 도착점. */

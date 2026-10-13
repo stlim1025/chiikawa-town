@@ -3640,7 +3640,25 @@ function boot() {
     npcs, village, hud, guide, sound, input, staged, who: (kind) => whoOf({ kind }), narrator: NARRATOR, me: () => meWho(), fill: (lines) => lines.map(fillName),
     getPlayer: () => player, cam, photo: photoUi, capture: capturePhoto,
     setRain: (on) => { weather.setRain(on); sound.rain(on); },
-    shelters: () => ['ramen', 'pub', 'exam', 'tools', 'furniture', 'board'].map((k) => village.spots[k]).filter(Boolean), // 가게 문 앞 처마 밑
+    // 비 피할 곳: 지금 자리에서 가장 가까운 마을 안 큰 나무 밑(가게 처마는 셋이 들어가기엔 좁다). 줄기 남쪽(카메라 쪽) 잎 그늘에
+    // 치이카와 · 하치와레 · 우사기, 나는 그 오른쪽 앞(카메라는 내 뒤에서 보니 셋 중 누구의 바로 앞에도 서지 않게)
+    shelter: () => {
+      const p = player.position, trees = village.treeSpots().filter((t) => Math.hypot(t.x, t.z) < VILLAGE_R - 4);
+      const t = trees.reduce((b, o) => (!b || Math.hypot(o.x - p.x, o.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? o : b), null) || { ...village.spots.plaza, s: 1 };
+      const free = (dx, dz) => village.nearestFree(t.x + dx * t.s, t.z + dz * t.s, 0.3);
+      return { stand: free(1.6, 1.35), spots: [free(-1.0, 0.55), free(-0.1, 1.0), free(0.8, 0.6)] };
+    },
+    // 그 친구를 이야기로 데려온다: 집 안이면 나오게, 같이 토벌 · 같이 다니는 중이면 그만두게, 일과 기록은 지운다(끝나면 일과대로)
+    bring: (kind, x, z) => {
+      const n = npcs.byKind(kind);
+      if (!n) return;
+      if (n.party) partyEnd([kind], null);
+      if (buddies.has(kind)) endBuddy(kind, null);
+      staged.add(kind);
+      npcs.comeOut(n, x, z);
+      delete awayInfo[kind];
+      setDoing(kind, null, null);
+    },
     photosChanged: () => refreshPhotoFrame()
   });
   /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
