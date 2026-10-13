@@ -394,6 +394,7 @@ function boot() {
     berries.showGuest(null);
     monsters.showGuest(null);
     eachRemote((r) => r.clear());
+    if (!starShow && starfall.phase !== 'idle') starfall.clear(); // 주인 마을에 떨어진 별똥별맨 · 구덩이를 내 마을로 가져오지 않는다
     player.walkTo = null;
     player.setPosition(h.x, h.z);
     player.face(h.x + Math.sin(h.yaw), h.z + Math.cos(h.yaw));
@@ -596,6 +597,7 @@ function boot() {
       const M = MONSTERS[a.sp];
       onKill({ species: a.sp, M, x: Number.isFinite(a.x) ? a.x : player.position.x, z: Number.isFinite(a.z) ? a.z : player.position.z, hitPlayer: !a.clean, mesh: { height: M.height || 1 }, remote: true });
     } else if (a.t === 'got') takeGot(a);
+    else if (a.t === 'star') takeStar(a); // 주인이 별똥별에 소원을 빌었다
   }
 
   // 쓰러지기: 같이 노는 친구가 있으면 기운이 다 떨어져도 바로 기절하지 않고 그 자리에 쓰러져 DOWN_WAIT 초 기다린다.
@@ -5200,7 +5202,27 @@ function boot() {
       player.act('pray', 2);
       (S.pals || []).forEach((kind) => { const n = npcs.byKind(kind); if (n && kind !== 'usagi') npcs.act(n, 'pray', { face: north(n), time: 90 }); });
       starfall.drop(new THREE.Vector3(S.p.x - 7, 15, S.p.z - 22), S.land.x, S.land.z, starLanded);
+      shareStar('drop', S);
     }, meWho());
+  }
+  /** 같이 놀기(주인): 별똥별맨 연출을 놀러 온 친구들 화면에도('drop' 같은 자리에 떨어진다, 'leave' 날아간다). */
+  function shareStar(k, S) {
+    if (multi.status !== 'open' || !multi.count) return;
+    const a = k === 'drop' ? { t: 'star', k, x: r2(S.land.x), z: r2(S.land.z), fx: r2(S.p.x - 7), fz: r2(S.p.z - 22) } : { t: 'star', k };
+    for (const p of multi.players) multi.direct(p.id, a);
+  }
+  /** 손님: 주인이 소원을 빌어 별똥별이 떨어졌다, 별똥별맨이 날아간다(소원은 주인 것이라 연출만 본다). */
+  function takeStar(a) {
+    if (starShow) return;
+    if (a.k === 'drop') {
+      if (![a.x, a.z, a.fx, a.fz].every(Number.isFinite)) return;
+      starfall.drop(new THREE.Vector3(a.fx, 15, a.fz), a.x, a.z, () => {
+        if (mode !== 'play' || Math.hypot(a.x - player.position.x, a.z - player.position.z) > 20) return;
+        sound.play('thud');
+        setTimeout(() => sound.play('poof'), 120);
+      });
+      hud.toast(`${josa(multi.hostName || '친구', '이/가')} 별똥별에 소원을 빌었어요`, 3000);
+    } else if (a.k === 'leave' && ['fall', 'rise', 'flail'].includes(starfall.phase)) starfall.leave(() => {});
   }
   /** 쿵! 화면이 흔들리고, 근처 친구들이 달려와 놀란다. 별똥별맨이 다 솟아나면 빤히 쳐다본다. */
   function starLanded() {
@@ -5233,7 +5255,7 @@ function boot() {
     }
     setTimeout(() => {
       if (starShow !== S) return;
-      guide.say(['(별똥별맨이 갑자기 미친 듯이 발광한다!!)', '(부들부들부들부들…!!)'], () => { sound.play('swing'); starfall.leave(starGone); }, STARMAN);
+      guide.say(['(별똥별맨이 갑자기 미친 듯이 발광한다!!)', '(부들부들부들부들…!!)'], () => { sound.play('swing'); starfall.leave(starGone); shareStar('leave'); }, STARMAN);
     }, 2600);
   }
   /** 별똥별맨이 날아갔다: 소원이 시시하게 조금 이루어지고 별 조각이 남는다. */
