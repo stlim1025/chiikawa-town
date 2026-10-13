@@ -7,9 +7,10 @@ import { HOME_GRID } from '../core/home.js';
 const CELL = 1.1;
 const X0 = -(HOME_GRID.cols * CELL) / 2, Z0 = -2.9; // 칸 격자의 왼쪽 안쪽 모서리
 const ROOM_R = 4.4;
-/** 문간(나가기) · 옷장 자리. 깔개와 방석은 밟고 지나갈 수 있다. */
+/** 문간(나가기) · 옷장 · 보관 상자 자리(상자는 옷장 맞은편 벽). 깔개와 방석은 밟고 지나갈 수 있다. */
 const DOOR = { x: 0, z: 2.9 };
 const WARDROBE = { x: -3.2, z: -1.0 };
+const CHEST = { x: 3.25, z: -0.9 };
 const WALKABLE = new Set(['rug', 'cushion']);
 
 /** 칸 (cx, cz) 의 바닥 가운데. */
@@ -160,6 +161,18 @@ export function createInterior() {
     g.add(toonMesh(GEO.box, '#a87b4c', { position: [0, 1.93, 0], scale: [1.4, 0.08, 0.62], shell: true, outline: 0.02 }));
     scene.add(g);
   }
+  // 보관 상자(옷장 맞은편 오른쪽 벽): 나무 상자 + 뚜껑 + 금빛 띠 두 줄 + 자물쇠
+  {
+    const g = new THREE.Group();
+    g.position.set(CHEST.x, 0, CHEST.z);
+    g.rotation.y = -(Math.PI / 2 - 0.35);
+    g.add(toonMesh(GEO.box, '#c08550', { position: [0, 0.27, 0], scale: [0.95, 0.54, 0.6], shell: true, outline: 0.03 }));
+    g.add(toonMesh(GEO.box, '#d49a62', { position: [0, 0.62, 0], scale: [1.0, 0.16, 0.65], shell: true, outline: 0.025 }));
+    [-0.3, 0.3].forEach((x) => g.add(toonMesh(GEO.box, '#e8b84e', { position: [x, 0.36, 0], scale: [0.08, 0.74, 0.67], outline: 0.012 })));
+    g.add(toonMesh(GEO.box, '#f2c94c', { position: [0, 0.5, 0.33], scale: [0.16, 0.18, 0.05], outline: 0.012 }));
+    g.add(toonMesh(GEO.dot, '#5a4431', { position: [0, 0.48, 0.36], scale: [0.03, 0.03, 0.03], outline: false }));
+    scene.add(g);
+  }
   // 대상 발밑의 노란 고리(집 안 행동 안내)
   const cue = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfcd95b, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
   cue.rotation.x = -Math.PI / 2;
@@ -168,6 +181,7 @@ export function createInterior() {
   const blocked = (home, x, z, r) => {
     if (Math.hypot(x, z) > ROOM_R - 0.55) return true;
     if (Math.hypot(x - WARDROBE.x, z - WARDROBE.z) < 0.75 + r) return true;
+    if (Math.hypot(x - CHEST.x, z - CHEST.z) < 0.55 + r) return true;
     return home.placed.some((p) => {
       if (WALKABLE.has(p.id)) return false;
       const c = cellCenter(p.cx, p.cz);
@@ -271,15 +285,16 @@ export function createInterior() {
       }
     },
     /**
-     * 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 문(나가기). { type, x, z, r, label } | null
-     * guest: 같이 놀기로 친구 집에 놀러 왔으면 문(나가기)만.
+     * 지금 할 수 있는 일: 가까운 침대(자기) · 옷장 · 보관 상자 · 문(나가기). { type, x, z, r, label } | null
+     * guest: 같이 놀기로 친구 집에 놀러 왔으면 문(나가기)과 잠긴 친구 상자('chestLocked' — 누르면 못 연다고만 알린다).
      */
     target(home, { guest = false } = {}) {
       const opts = [];
       if (!guest) {
         for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
         opts.push({ type: 'wardrobe', x: WARDROBE.x, z: WARDROBE.z, r: 0.85, label: '옷장', reach: 1.5 });
-      }
+        opts.push({ type: 'chest', x: CHEST.x, z: CHEST.z, r: 0.7, label: '보관 상자', reach: 1.3 });
+      } else opts.push({ type: 'chestLocked', x: CHEST.x, z: CHEST.z, r: 0.7, label: '친구 상자', reach: 1.3 });
       opts.push({ type: 'door', x: DOOR.x, z: DOOR.z, r: 0.6, label: '나가기', reach: 0.9 });
       let best = null, bd = Infinity;
       for (const o of opts) { const d = Math.hypot(o.x - pos.x, o.z - pos.z); if (d < o.reach && d < bd) { bd = d; best = o; } }

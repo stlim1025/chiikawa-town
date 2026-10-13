@@ -54,6 +54,7 @@ import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps,
 import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo, MAX_STACK } from './core/inventory.js';
+import { storeItem, takeOut } from './core/storage.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf, SALON_PRICE } from './core/wardrobe.js';
 import { sellItem } from './core/market.js';
@@ -900,8 +901,11 @@ function boot() {
   }
 
   // ---------- 창 ----------
+  let appNudge = null; // 새로 생긴 마을폰 앱(지도를 막 샀으면 'map'): 그 앱을 열 때까지 마을폰 버튼 · 앱 아이콘이 빛난다
   const panels = createPanels(ui, {
     getState: () => state,
+    appNudge: () => appNudge,
+    appSeen: (kind) => { if (kind === appNudge) appNudge = null; },
     /** 폰 상태 줄 { time, date }: 친구 마을에 놀러 간 동안은 그 마을 시계(아니면 null 이라 내 시계). */
     phoneNow: () => (visiting && visiting.clock ? { time: timeLabel(visiting.clock), date: dateLabel(visiting.startDate || state.startDate, visiting.clock.day) } : null),
     multi: multiPanel,
@@ -1186,7 +1190,11 @@ function boot() {
       const paid = state.money - r.state.money;
       commit(r.state);
       sound.play('coin');
-      hud.toast(id === 'map' ? '마을 지도를 샀어요!' : `${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
+      if (id === 'map') {
+        // 지도는 마을폰 앱으로 본다: 알림으로 어디서 보는지 알려 주고, 지도 앱을 열 때까지 마을폰 버튼과 지도 아이콘이 빛난다
+        appNudge = 'map';
+        hud.toast('마을 지도를 샀어요! 마을폰의 지도 앱에서 볼 수 있어요', 4200);
+      } else hud.toast(`${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
       gotTicket(paid);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
@@ -1230,6 +1238,22 @@ function boot() {
       sound.play('drop');
       const name = sel.type === 'weapon' ? WEAPONS[sel.id].name : itemInfo(sel.id).name;
       hud.toast(`${name}${r.n > 1 ? ` ${r.n}개` : ''} 버렸어요`, 1800, { icon: sel.type === 'weapon' ? weaponSvg(sel.id) : itemSvg(sel.id) });
+    },
+    // 집 보관 상자(core/storage.js): 주머니 → 상자 넣기, 상자 → 주머니 꺼내기
+    storeItem(id, n) {
+      const r = storeItem(state, id, n);
+      if (!r.ok) { hud.toast(r.reason === 'quest' ? '퀘스트 물건은 주머니에 들고 다녀요' : r.reason === 'full' ? `상자에 ${josa(itemInfo(id).name, '이/가')} 가득해요` : '넣을 수 없어요', 2400); return; }
+      commit(r.state);
+      sound.play('drop');
+      hud.toast(`${r.moved > 1 ? `${itemInfo(id).name} ${r.moved}개를` : josa(itemInfo(id).name, '을/를')} 상자에 넣었어요`, 1800, { icon: itemSvg(id) });
+    },
+    takeOut(id, n) {
+      const r = takeOut(state, id, n);
+      if (!r.ok) { hud.toast(r.reason === 'bag' ? '주머니에 더 못 넣어요(한 가지 99개까지)' : '꺼낼 수 없어요', 2400); return; }
+      commit(r.state);
+      sound.play('click');
+      hud.bagBump();
+      hud.toast(`${r.moved > 1 ? `${itemInfo(id).name} ${r.moved}개를` : josa(itemInfo(id).name, '을/를')} 꺼냈어요`, 1800, { icon: itemSvg(id) });
     },
     sellDrops() {
       const r = sellDrops(state);
@@ -1450,6 +1474,7 @@ function boot() {
     },
     sleep: () => doSleep(),
     wardrobe: () => { interior.faceCamera(); panels.openWardrobe(); },
+    storage: () => panels.openStorage(), // 보관 상자(두 번째 주머니)
     onDecor: (on) => { if (mode === 'home') input.setEnabled(!on && !panels.isOpen()); }, // 꾸미기 중에는 걷지 않는다
     exit: () => exitHome(),
     showGrid: (on) => interior.showGrid(on),
@@ -1533,6 +1558,13 @@ function boot() {
   };
   hud.onLight(() => toggleLight(false));
   hud.onRecall(() => recallHome());
+  // 퀘스트 쪽지 압정: 고정하면 접어도 늘 보이고 맨 위로(다시 누르면 풀기). 저장에 남는다
+  hud.onQuestPin((id) => {
+    if (!state || !QUESTS[id]) return;
+    const pins = state.questPins || [], on = pins.includes(id);
+    commit({ ...state, questPins: on ? pins.filter((x) => x !== id) : [...pins.filter((x) => isActive(state, x)), id] }); // 끝난 퀘스트 압정은 이참에 치운다
+    sound.play('click');
+  });
   // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불, H 집으로(마을 밖에서)
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || (e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) return;
@@ -1949,10 +1981,17 @@ function boot() {
       else if (homeTarget.type === 'act') doHomeAct(visit.kind);
       return;
     }
-    if (mode === 'guesthome') { if (down && homeTarget && homeTarget.type === 'door' && !panels.isOpen() && !guide.open) exitHostHome(); return; } // 친구 집: 나가기만
+    // 친구 집: 나가기만(친구 보관 상자는 열 수 없다)
+    if (mode === 'guesthome') {
+      if (!down || !homeTarget || panels.isOpen() || guide.open) return;
+      if (homeTarget.type === 'door') exitHostHome();
+      else if (homeTarget.type === 'chestLocked') { sound.play('none'); hud.toast(`${multi.hostName || '친구'}의 보관 상자는 열 수 없어요`, 2400); }
+      return;
+    }
     if (mode === 'home' && down && homeTarget && state && !sleeping && !panels.isOpen() && !homeUI.decorating && !guide.open) {
       if (homeTarget.type === 'bed') askSleep();
       else if (homeTarget.type === 'wardrobe') { interior.faceCamera(); panels.openWardrobe(); }
+      else if (homeTarget.type === 'chest') { sound.play('click'); panels.openStorage(); }
       else if (homeTarget.type === 'door') exitHome();
       return;
     }
@@ -5447,13 +5486,14 @@ function boot() {
         starNotice = state.clock.day;
         hud.toast('별똥별이 쏟아지는 밤이에요', 3600, { chips: [{ text: '소원을 빌어 봐요' }] });
       }
-      // 하는 중인 퀘스트를 모두(화면에 띄우기로 고른 것이 맨 위)
-      const qt = pickTrack(state), qs = activeQuests(state);
-      hud.setQuests((qt ? [qt, ...qs.filter((id) => id !== qt)] : qs).map((id) => {
+      // 하는 중인 퀘스트를 모두: 고정(압정)한 것 → 화면에 띄우기로 고른 것 → 나머지 차례로(고정한 것은 접어도 보인다)
+      const qt = pickTrack(state), qs = activeQuests(state), pins = (state.questPins || []).filter((id) => qs.includes(id));
+      const order = [...pins, ...(qt && !pins.includes(qt) ? [qt] : []), ...qs.filter((id) => id !== qt && !pins.includes(id))];
+      hud.setQuests(order.map((id) => {
         const g = shortGoal(state, id);
         // 물건 · 몬스터는 그림 꼬리표로(몇 개 남았는지 한눈에)
         const sg = usagiClub.active && usagiClub.questId === id ? usagiClub.goal : null; // 연출 중에는 지금 할 일(몰래 따라가기 · 굴로 들어가기 …)
-        return { id, title: QUESTS[id].title, story: !!QUESTS[id].story, side: !!QUESTS[id].side, goal: sg || g.goal, n: sg ? '' : g.n, chips: sg ? [] : partChips(g) };
+        return { id, title: QUESTS[id].title, story: !!QUESTS[id].story, side: !!QUESTS[id].side, goal: sg || g.goal, n: sg ? '' : g.n, chips: sg ? [] : partChips(g), pinned: pins.includes(id) };
       }));
       // 불: 등불 버튼 모양, 손에 든 모습, 따라다니는 빛
       const lightMode = lightOf(state);
@@ -5497,6 +5537,7 @@ function boot() {
     remotes.update(dt, (mode === 'play' || (mode === 'intro' && !!visiting)) && !closeup); // 친구 마을로 걸어 들어갈 때도 와 있는 친구들이 보인다
     updateRemoteLights();
     hud.setRecall(canRecall()); // 마을 밖에 있을 때만 집으로 버튼
+    hud.setPhoneNudge(!!appNudge); // 새로 생긴 앱(지도)을 열 때까지 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
     const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup);

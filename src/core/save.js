@@ -11,6 +11,7 @@ import { isValidExplored } from './explore.js';
 import { isValidTools } from './tools.js';
 import { isValidWeedLog } from './weeding.js';
 import { isValidBag } from './inventory.js';
+import { isValidStorage } from './storage.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep } from './quests.js';
@@ -55,6 +56,7 @@ export function isValidState(s) {
   if (s.tools !== undefined && !isValidTools(s.tools)) return false;
   if (s.weedLog !== undefined && !isValidWeedLog(s.weedLog)) return false; // 풀 도감(2단계부터)
   if (s.bag !== undefined && !isValidBag(s.bag)) return false; // 가방
+  if (s.storage !== undefined && !isValidStorage(s.storage)) return false; // 집 보관 상자
   if (s.wardrobe !== undefined && !isValidWardrobe(s.wardrobe)) return false; // 꾸미기 소품
   if (s.weapon !== undefined && !isValidWeapon(s.weapon)) return false; // 무기(4단계)
   if (s.hunted !== undefined && !isValidHunted(s.hunted)) return false; // 잡은 몬스터 수
@@ -62,6 +64,7 @@ export function isValidState(s) {
   if (s.acts !== undefined && !isValidActs(s.acts)) return false; // 같이 한 일상 일(일상 부탁)
   if (s.raffle !== undefined && !isValidRaffle(s.raffle)) return false; // 경품 추첨권
   if (s.questTrack !== undefined && s.questTrack !== null && !QUESTS[s.questTrack]) return false;
+  if (s.questPins !== undefined && !(Array.isArray(s.questPins) && s.questPins.every((id) => typeof id === 'string'))) return false; // 고정(압정)한 퀘스트 쪽지
   if (s.story !== undefined && !isValidStory(s.story)) return false;
   if (s.truce !== undefined && !num(s.truce)) return false;
   if (s.ground !== undefined && !isValidGround(s.ground)) return false; // 바닥에 떨어뜨린 물건

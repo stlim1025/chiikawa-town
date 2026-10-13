@@ -1053,6 +1053,11 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .panel-tools { --tab: var(--yellow); }
 .hud-light[aria-pressed="true"] { background: var(--yellow); }
 .app.map .app-ico { background: #7fb6e2; }
+/* 새로 생긴 앱 안내(지도를 샀을 때): 마을폰 버튼과 그 앱 아이콘에 노란 빛이 퍼지고 빨간 점. 그 앱을 열면 사라진다 */
+.hud-phone.nudge, .app.nudge .app-ico { animation: nudge-glow 1.3s ease-in-out infinite; }
+.hud-phone.nudge::after, .app.nudge .app-ico::after { content: ""; position: absolute; top: 0; right: 0; width: 15px; height: 15px; border-radius: 50%; background: #ff5a6e; box-shadow: 0 0 0 2px #fff; }
+@keyframes nudge-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(252, 217, 91, 0), 0 4px 0 rgba(84, 62, 38, 0.18); } 50% { box-shadow: 0 0 0 9px rgba(252, 217, 91, 0.85), 0 4px 0 rgba(84, 62, 38, 0.18); } }
+@media (prefers-reduced-motion: reduce) { .hud-phone.nudge, .app.nudge .app-ico { animation: none; box-shadow: 0 0 0 5px rgba(252, 217, 91, 0.85); } }
 
 /* 풀 도감(마을폰): 급수 머리표 + 풀 칸(그림 · 이름 · 뽑은 수 · 자라는 곳 · 요령). 아직 못 뽑는 급수는 흐리게 */
 .app.weeds .app-ico { background: #8cc46d; }
@@ -1380,7 +1385,19 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quests { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .hud-quest[hidden] { display: none; }
 /* 접어 둔 퀘스트 쪽지 펼치기 · 접기(왼쪽 위 기둥은 눌리지 않게 해 두어서 이 단추만 눌리게) */
-.hud-quest-more { pointer-events: auto; padding: 3px 12px 5px; border: 0; border-radius: 999px; background: #fff6dc; box-shadow: 0 3px 0 #e8c97a; color: #8a5a10; font: inherit; font-size: 14px; }
+/* 퀘스트 더 보기 · 접기: 쪽지(연한 크림색)와 달리 노란 단추 + 화살표로 누르는 것임을 알 수 있게 */
+.hud-quest-more { pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px 5px 14px; border: 2px solid #fff; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.hud-quest-more::after { content: "▾"; font-size: 12px; line-height: 1; }
+.hud-quest-more[aria-expanded="true"]::after { content: "▴"; }
+.hud-quest-more:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
+/* 퀘스트 고정 압정(쪽지 오른쪽 위 모서리): 고정하면 노란 동그라미에 빨간 압정, 쪽지 테두리도 노랗게 */
+.hud-quest-pin { position: absolute; top: -9px; right: -9px; width: 26px; height: 26px; padding: 0; display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%;
+  background: #f3e6c4; color: #b8a27a; box-shadow: 0 2px 0 rgba(120, 88, 48, 0.25); pointer-events: auto; cursor: pointer; }
+.hud-quest-pin svg { width: 14px; height: 14px; transform: rotate(25deg); }
+.hud-quest-pin:active { transform: translateY(1px); }
+.hud-quest.pinned { box-shadow: 0 3px 0 #e8c97a, 0 0 0 2px var(--yellow); }
+.hud-quest.pinned .hud-quest-pin { background: var(--yellow); color: #e0464f; }
+.hud-quest.pinned .hud-quest-pin svg { transform: none; }
 .hud-quest-more[hidden] { display: none; }
 .hud-quest, .toast { word-break: keep-all; } /* 한국어는 낱말 단위로 줄바꿈 */
 .hud-quest .q-chips { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
@@ -1445,7 +1462,20 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 [data-input="desk"] .hud-quest > span { font-size: 18px; }
 
 /* ---------- 주머니(동물의 숲처럼): 동그란 칸 · 개수 · 이름 말풍선 · 할 일 메뉴 ---------- */
-.panel-bag { width: min(760px, 100%); --tab: #f6c453; }
+.panel-bag, .panel-storage { width: min(760px, 100%); --tab: #f6c453; }
+.panel-storage { --tab: #d49a62; }
+/* 보관 상자 탭(꺼내기 · 넣기): 고른 탭은 노랗게 */
+.store-tabs { display: flex; gap: 8px; margin-top: 8px; }
+.store-tab { flex: 1 1 0; padding: 7px 14px 9px; border-radius: 999px; background: var(--paper-2); box-shadow: 0 3px 0 var(--shadow); font-size: 18px; }
+.store-tab.on { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); }
+/* 개수 고르기(버리기 · 넣기 · 꺼내기): − 개수 + 와 끌어서 고르는 막대 */
+.pocket-menu.picking { min-width: 200px; }
+.cnt-pick { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 4px; }
+.cnt-step { width: 40px; height: 40px; border-radius: 50%; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); font-size: 24px; line-height: 1; }
+.cnt-step:disabled { background: #efe6d2; box-shadow: none; color: #b9a78a; }
+.cnt-n { flex: 1 1 auto; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+.cnt-range { width: 100%; margin: 4px 0 6px; accent-color: #ebb546; touch-action: none; }
+.cnt-all[aria-pressed="true"] { background: #fff1c2; }
 .panel-exam { width: min(640px, 100%); }
 /* 값 버튼: 동전 그림 + 값 */
 .price-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 auto; white-space: nowrap; }

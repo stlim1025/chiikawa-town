@@ -4,7 +4,7 @@ import { COIN } from './hud.js';
 const won = (n) => n.toLocaleString('ko-KR') + '원';
 
 /**
- * 집 안 화면의 버튼들. 평소에는 자기 · 옷장 · 꾸미기 · 나가기(집 안을 걸어 다니며 침대 · 옷장 · 문 앞에서 눌러도 된다).
+ * 집 안 화면의 버튼들. 평소에는 자기 · 옷장 · 상자 · 꾸미기 · 나가기(집 안을 걸어 다니며 침대 · 옷장 · 보관 상자 · 문 앞에서 눌러도 된다).
  * 꾸미기 중에는 아래에 가진 가구 목록이 나오고, 목록의 가구를 바닥으로 끌어다 놓거나 고른 뒤 빈 칸을 누르면 놓인다.
  * 놓인 가구를 끌면 다른 칸으로 옮기고, 누르면 돌리거나 넣어 둘 수 있다. 가구는 마을 가구점에서 산다.
  * handlers: { getState, thumb(id) → 그림 URL | undefined, place(id, cx, cz) → { ok, reason }, remove(cx, cz), rotate(cx, cz),
@@ -20,6 +20,7 @@ export function createHomeUI(ui, h) {
     <div class="home-bar">
       <button class="btn" type="button" data-a="sleep">자기</button>
       <button class="btn" type="button" data-a="wardrobe">옷장</button>
+      <button class="btn" type="button" data-a="storage">상자</button>
       <button class="btn pink" type="button" data-a="decor">꾸미기</button>
       <button class="btn primary" type="button" data-a="exit">나가기</button>
     </div>
@@ -145,6 +146,7 @@ export function createHomeUI(ui, h) {
     if (!a) return;
     if (a === 'sleep') h.sleep();
     else if (a === 'wardrobe') h.wardrobe();
+    else if (a === 'storage') h.storage?.(); // 보관 상자(두 번째 주머니)
     else if (a === 'exit') h.exit();
     else if (a === 'decor') setDecor(true);
     else if (a === 'done') setDecor(false);

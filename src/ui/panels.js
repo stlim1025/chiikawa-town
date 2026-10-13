@@ -18,7 +18,8 @@ import { createMapView } from './mapapp.js';
 import { WEED_KINDS, WEED_ORDER, canPullKind, kindsOfGrade, josa } from '../core/weeding.js';
 import { weedSvg } from './weedart.js';
 import { pochetteSvg, itemSvg, accessorySvg, TICKET_SVG } from './itemart.js';
-import { bagOf, itemInfo, countOf } from '../core/inventory.js';
+import { bagOf, itemInfo, countOf, MAX_STACK } from '../core/inventory.js';
+import { storageOf, storedOf, canStore, STORE_STACK } from '../core/storage.js';
 import { pantryOf } from '../core/pantry.js';
 import { sellPrice, sellableIds } from '../core/market.js';
 import { canGift } from '../core/gifts.js';
@@ -191,6 +192,7 @@ export function createPanels(ui, handlers) {
   let phoneExtra = {};
 
   function show(kind, extra) {
+    handlers.appSeen?.(kind); // 새로 생긴 앱 안내(빛나는 아이콘)는 그 앱을 열면 끈다(폰 안에서 옮겨 가도)
     const phone = PHONE_APPS.includes(kind);
     if (phone && extra) phoneExtra = extra;
     // 폰 안에서 화면만 옮길 때: 폰 틀 · 배경은 그대로 두고 화면 내용만 바꾼다(올라오는 움직임을 다시 하지 않게)
@@ -256,12 +258,78 @@ export function createPanels(ui, handlers) {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !current) return;
     e.preventDefault();
-    if (current.kind === 'bag' && current.sel) { current.sel = null; render(); return; }
+    if ((current.kind === 'bag' || current.kind === 'storage') && current.sel) { current.sel = null; render(); return; }
     close();
   });
   // 닫기는 창 오른쪽 위 X 하나로(show): 아래 '닫기' 버튼은 휴대폰에서 스크롤해야 보여서 뺐다. 다른 버튼과 같이 있던 줄은 그 버튼만 남는다
   const closeBtn = () => null;
   const after = (fn) => () => { fn(); if (current) render(); };
+
+  // ---------- 동그란 칸 주머니(주머니 · 보관 상자)가 같이 쓰는 것 ----------
+  /** 칸 자리(주머니 안 좌표): 화면 좌표(getBoundingClientRect)는 창이 톡 커지는 중이면 줄어든 값이라 말풍선이 어긋난다 → 배치 좌표로 잰다. */
+  function slotAt(wrap, el) {
+    let x = 0, y = 0;
+    for (let e = el; e && e !== wrap; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+    return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight };
+  }
+  /** 고른 칸 위에 이름 말풍선, 옆에 할 일 메뉴: 칸 오른쪽 → 왼쪽 → (좁은 화면) 칸 아래, 아래가 모자라면 이름 말풍선 위. */
+  function placePocketMenu(wrap, bubble, menu) {
+    const slot = wrap.querySelector('.pocket-slot.on');
+    if (!slot || !menu) return;
+    const W = { width: wrap.clientWidth, height: wrap.clientHeight }, r = slotAt(wrap, slot);
+    const { left, top } = r;
+    bubble.style.left = `${left + r.width / 2}px`;
+    bubble.style.top = `${top - 12}px`; // 고른 칸은 4px 떠오르고 조금 커져 있다
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    let mx = left + r.width + 8, my = Math.max(4, Math.min(W.height - mh - 4, top + r.height / 2 - mh / 2));
+    if (mx + mw > W.width - 4) {
+      if (left - mw - 8 >= 4) mx = left - mw - 8;
+      else {
+        mx = Math.max(4, Math.min(W.width - mw - 4, left + r.width / 2 - mw / 2));
+        my = top + r.height + 10;
+        if (my + mh > W.height - 4) my = top - mh - 34;
+      }
+    }
+    menu.style.left = `${mx}px`;
+    menu.style.top = `${my}px`;
+    menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
+  }
+  /**
+   * 개수 고르기(버리기 · 상자에 넣기 · 꺼내기): − 개수 + · 끌어서 고르는 막대 · '전체 N개' · 'N개 ○○' 확인 · 그만두기.
+   * 1개부터 max 개까지. 누를 때마다 창을 다시 그리지 않고 글씨만 바꾼다(메뉴가 톡 튀지 않게). → 메뉴에 넣을 요소 목록
+   */
+  function countPicker(max, verb, onOk, onCancel) {
+    let cnt = 1;
+    const label = h('b', { class: 'cnt-n', 'aria-live': 'polite' });
+    const minus = h('button', { class: 'cnt-step', type: 'button', 'aria-label': '하나 덜' }, '−');
+    const plus = h('button', { class: 'cnt-step', type: 'button', 'aria-label': '하나 더' }, '+');
+    const range = h('input', { class: 'cnt-range', type: 'range', min: '1', max: String(max), step: '1', value: '1', 'aria-label': `${verb} 개수` });
+    const all = h('button', { class: 'pocket-act cnt-all', type: 'button' }, `전체 ${max}개`);
+    const ok = h('button', { class: 'pocket-act main', type: 'button' });
+    const set = (v) => {
+      cnt = Math.max(1, Math.min(max, Math.round(Number(v)) || 1));
+      label.textContent = `${cnt}개`;
+      range.value = String(cnt);
+      minus.disabled = cnt <= 1;
+      plus.disabled = cnt >= max;
+      all.setAttribute('aria-pressed', String(cnt === max));
+      ok.textContent = `${cnt}개 ${verb}`;
+    };
+    minus.addEventListener('click', () => set(cnt - 1));
+    plus.addEventListener('click', () => set(cnt + 1));
+    range.addEventListener('input', () => set(range.value));
+    all.addEventListener('click', () => set(max));
+    ok.addEventListener('click', () => onOk(cnt));
+    set(1);
+    return [h('div', { class: 'cnt-pick', role: 'group', 'aria-label': `${verb} 개수` }, minus, label, plus), range, all, ok,
+      h('button', { class: 'pocket-act', type: 'button', onClick: onCancel }, '그만두기')];
+  }
+  /** 주머니 · 상자 칸 차례: 풀 → 먹을 것 → 전리품 → 그 밖(같은 종류는 풀 도감 · 전리품 차례). */
+  function pocketSort(ids) {
+    const KIND_ORDER = { herb: 0, food: 1, drop: 2, quest: 3 };
+    const order = (id) => { const w = WEED_ORDER.indexOf(id); return w >= 0 ? w : 50 + Object.keys(DROPS).indexOf(id); };
+    return ids.sort((a, c) => (KIND_ORDER[itemInfo(a).kind] ?? 9) - (KIND_ORDER[itemInfo(c).kind] ?? 9) || order(a) - order(c));
+  }
   /**
    * 노동 접수 일감 한 줄(장부처럼 줄마다 점선으로 나눈다): 그림 | 이름 + 어디서 | 보수 + 남은 건수 | 받기.
    * 보수는 오른쪽 한 칸에 모아 숫자끼리 줄이 맞게, 남은 건수는 그 밑 작은 글씨로. 다 나가면 흐리게 하고 '마감' 도장.
@@ -881,7 +949,8 @@ export function createPanels(ui, handlers) {
       const same = (a, c) => a && c && a.type === c.type && a.id === c.id;
       if (current.sel && !slots.some((x) => same(x, current.sel))) current.sel = null;
       const sel = current.sel;
-      const pick = (slot) => { current.sel = same(slot, current.sel) ? null : slot; render(); };
+      if (!sel) current.dropPick = null;
+      const pick = (slot) => { current.sel = same(slot, current.sel) ? null : slot; current.dropPick = null; render(); };
       const nameOf = (x) => (x.type === 'weapon' ? WEAPONS[x.id].name : itemInfo(x.id).name);
       const artOf = (x) => (x.type === 'weapon' ? myWeaponArt(s, x.id) : itemSvg(x.id));
       const grid = h('div', { class: 'pocket-grid', role: 'grid', 'aria-label': '주머니 칸' },
@@ -902,15 +971,9 @@ export function createPanels(ui, handlers) {
       const hover = h('div', { class: 'pocket-name hover', 'aria-hidden': 'true' });
       hover.hidden = true;
       const wrap = h('div', { class: 'pocket' }, grid, hover);
-      // 칸 자리(주머니 안 좌표): 화면 좌표(getBoundingClientRect)는 창이 톡 커지는 중이면 줄어든 값이라 말풍선이 어긋난다 → 배치 좌표로 잰다
-      const slotAt = (el) => {
-        let x = 0, y = 0;
-        for (let e = el; e && e !== wrap; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
-        return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight };
-      };
       function showHover(btn, x) {
         if (same(x, current.sel)) { hover.hidden = true; return; } // 고른 칸은 이미 이름이 떠 있다
-        const r = slotAt(btn);
+        const r = slotAt(wrap, btn);
         hover.textContent = nameOf(x);
         hover.style.left = `${r.left + r.width / 2}px`;
         hover.style.top = `${r.top - 6}px`;
@@ -931,39 +994,62 @@ export function createPanels(ui, handlers) {
           if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
           if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('빼기', () => handlers.holdWeapon(null)) : act('장착', () => handlers.holdWeapon(sel.id), { main: true }));
           if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
-          else if (n > 1) { acts.push(act('한 개 버리기', () => handlers.dropItem(sel, 1))); acts.push(act(`모두 버리기 (${n}개)`, () => handlers.dropItem(sel, n))); }
+          // 여러 개면 '버리기…' → 개수 고르기(− / + · 막대 · 전체)로 바뀐다
+          else if (n > 1) acts.push(h('button', { class: 'pocket-act', type: 'button', onClick: () => { current.dropPick = `${sel.type}:${sel.id}`; render(); } }, '버리기…'));
           else acts.push(act('버리기', () => handlers.dropItem(sel, 1)));
         }
         acts.push(act('그만두기', () => {}));
+        const picking = !giftTo && canDrop && n > 1 && current.dropPick === `${sel.type}:${sel.id}`;
+        const items = picking
+          ? countPicker(n, '버리기', (cnt) => { current.sel = null; current.dropPick = null; handlers.dropItem(sel, cnt); if (current) render(); }, () => { current.dropPick = null; render(); })
+          : acts;
         // 이름 말풍선 · 메뉴는 직접 잡아 둔다(같은 모양의 마우스 말풍선 hover 가 먼저 들어 있어서 querySelector 로 찾으면 그쪽이 잡힌다)
-        const bubble = h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), menu = h('div', { class: 'pocket-menu', role: 'menu' }, acts);
+        const bubble = h('div', { class: 'pocket-name', role: 'status' }, nameOf(sel)), menu = h('div', { class: `pocket-menu${picking ? ' picking' : ''}`, role: 'menu' }, items);
         wrap.append(bubble, menu);
-        // 그린 뒤에 말풍선 · 메뉴를 고른 칸 옆에 붙인다(칸 자리를 재야 해서)
-        current.afterRender = () => {
-          const slot = wrap.querySelector('.pocket-slot.on');
-          if (!slot || !menu) return;
-          const W = { width: wrap.clientWidth, height: wrap.clientHeight }, r = slotAt(slot);
-          const { left, top } = r;
-          bubble.style.left = `${left + r.width / 2}px`;
-          bubble.style.top = `${top - 12}px`; // 고른 칸은 4px 떠오르고 조금 커져 있다
-          // 칸 오른쪽 → 왼쪽 → (좁은 화면) 칸 아래, 아래가 모자라면 이름 말풍선 위
-          const mw = menu.offsetWidth, mh = menu.offsetHeight;
-          let mx = left + r.width + 8, my = Math.max(4, Math.min(W.height - mh - 4, top + r.height / 2 - mh / 2));
-          if (mx + mw > W.width - 4) {
-            if (left - mw - 8 >= 4) mx = left - mw - 8;
-            else {
-              mx = Math.max(4, Math.min(W.width - mw - 4, left + r.width / 2 - mw / 2));
-              my = top + r.height + 10;
-              if (my + mh > W.height - 4) my = top - mh - 34;
-            }
-          }
-          menu.style.left = `${mx}px`;
-          menu.style.top = `${my}px`;
-          menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
-        };
+        current.afterRender = () => placePocketMenu(wrap, bubble, menu); // 그린 뒤에 고른 칸 옆에 붙인다(칸 자리를 재야 해서)
       }
       return [head(giftTo ? `${giftTo.name}에게 줄 선물` : '주머니', s.money), wrap,
         h('div', { class: 'actions' }, h('p', { class: 'hint' }, giftTo ? '줄 물건을 골라요(좋아하는 걸 주면 더 기뻐해요)' : `${slots.length} / ${SLOTS}칸`), closeBtn())];
+    },
+    // 집 보관 상자(두 번째 주머니, core/storage.js): '꺼내기'(상자 칸) · '넣기'(주머니 칸) 탭. 칸을 고르면 바로 개수를 골라 옮긴다
+    storage(s) {
+      const tab = current.tab || 'out', box = storageOf(s), b = bagOf(s), src = tab === 'out' ? box : b;
+      const ids = pocketSort(Object.keys(src.items).filter((id) => src.items[id] > 0 && itemInfo(id)));
+      const SLOTS = Math.max(30, Math.ceil(ids.length / 10) * 10);
+      if (current.sel && !ids.includes(current.sel)) current.sel = null;
+      const sel = current.sel;
+      const grid = h('div', { class: 'pocket-grid', role: 'grid', 'aria-label': tab === 'out' ? '보관 상자 칸' : '주머니 칸' },
+        Array.from({ length: SLOTS }, (_, i) => {
+          const id = ids[i];
+          if (!id) return h('span', { class: 'pocket-slot empty', 'aria-hidden': 'true' });
+          const n = src.items[id];
+          return h('button', { class: `pocket-slot${sel === id ? ' on' : ''}`, type: 'button', 'aria-label': `${itemInfo(id).name}${n > 1 ? ` ${n}개` : ''}`, 'aria-pressed': String(sel === id),
+            onClick: () => { current.sel = sel === id ? null : id; render(); } },
+          svgSpan('pocket-ico', itemSvg(id)), n > 1 ? h('b', { class: 'pocket-cnt' }, String(n)) : null);
+        }));
+      const wrap = h('div', { class: 'pocket' }, grid);
+      if (!ids.length) wrap.append(h('p', { class: 'pocket-empty' }, tab === 'out' ? '상자가 비어 있어요' : '주머니가 비어 있어요'));
+      if (sel) {
+        // 옮길 수 있는 만큼: 꺼내기는 주머니 한 가지 99개까지, 넣기는 상자 한 가지 999개까지(퀘스트 물건은 못 넣는다)
+        const n = src.items[sel], verb = tab === 'out' ? '꺼내기' : '넣기';
+        const room = tab === 'out' ? MAX_STACK - countOf(s, sel) : STORE_STACK - storedOf(s, sel), max = Math.min(n, room);
+        const done = (cnt) => { current.sel = null; (tab === 'out' ? handlers.takeOut : handlers.storeItem)(sel, cnt); if (current) render(); };
+        const cancel = () => { current.sel = null; render(); };
+        const why = tab === 'in' && !canStore(sel) ? '퀘스트 물건은 못 넣어요' : max <= 0 ? (tab === 'out' ? '주머니가 가득해요' : '상자가 가득해요') : null;
+        const items = why ? [h('button', { class: 'pocket-act', type: 'button', disabled: true }, why), h('button', { class: 'pocket-act', type: 'button', onClick: cancel }, '그만두기')]
+          : max > 1 ? countPicker(max, verb, done, cancel)
+          : [h('button', { class: 'pocket-act main', type: 'button', onClick: () => done(1) }, verb), h('button', { class: 'pocket-act', type: 'button', onClick: cancel }, '그만두기')];
+        const bubble = h('div', { class: 'pocket-name', role: 'status' }, itemInfo(sel).name), menu = h('div', { class: `pocket-menu${max > 1 && !why ? ' picking' : ''}`, role: 'menu' }, items);
+        wrap.append(bubble, menu);
+        current.afterRender = () => placePocketMenu(wrap, bubble, menu);
+      }
+      const tabBtn = (t, text) => h('button', { class: `store-tab${tab === t ? ' on' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab === t),
+        onClick: () => { if (current.tab === t) return; current.tab = t; current.sel = null; render(); } }, text);
+      const stored = Object.values(box.items).reduce((a, v) => a + v, 0);
+      return [head('보관 상자', s.money),
+        h('div', { class: 'store-tabs', role: 'tablist' }, tabBtn('out', '꺼내기'), tabBtn('in', '넣기')),
+        wrap,
+        h('div', { class: 'actions' }, h('p', { class: 'hint' }, tab === 'out' ? `상자에 ${stored}개 들어 있어요` : '넣을 물건을 골라요(퀘스트 물건은 빼고)'), closeBtn())];
     },
     // 집 옷장: 가진 포셰트 · 소품을 골라 바로 바꿔 단다(집 안의 내 캐릭터가 바로 바뀐다)
     wardrobe(s) {
@@ -1109,7 +1195,9 @@ export function createPanels(ui, handlers) {
     },
     // 설정은 동물의 숲 폰처럼: 동그란 앱 아이콘을 누른다
     settings(s) {
-      const app = (cls, icon, label, onClick) => h('button', { class: `app ${cls}`, type: 'button', onClick },
+      // 새로 생긴 앱(지도를 막 샀을 때)은 아이콘이 빛나고 빨간 점(handlers.appNudge → 앱 이름, 열면 사라진다)
+      const nudge = handlers.appNudge ? handlers.appNudge() : null;
+      const app = (cls, icon, label, onClick) => h('button', { class: `app ${cls}${nudge === cls ? ' nudge' : ''}`, type: 'button', onClick, 'aria-label': nudge === cls ? `${label} (새로 생겼어요)` : null },
         svgSpan('app-ico', icon), h('span', { class: 'app-label' }, label));
       return [
         h('h2', { class: 'phone-title', onClick: () => {
@@ -1245,6 +1333,8 @@ export function createPanels(ui, handlers) {
     /** 친구에게 줄 물건 고르기(주머니를 선물 모드로): giftTo = { kind, name }. 고르면 handlers.giveGift(id). */
     openGift: (giftTo) => show('bag', { giftTo }),
     openWardrobe: () => show('wardrobe'),
+    /** 집 보관 상자(꺼내기 탭부터). */
+    openStorage: () => show('storage'),
     openBooks: () => show('books'),
     openSalon: () => show('salon'),
     openTools: () => show('tools'),
