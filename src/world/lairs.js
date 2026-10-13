@@ -57,14 +57,14 @@ const DECOR = {
 const TERRAIN = {
   kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
   bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e', path: '#c2a882' },
-  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.5, 2.2], path: '#d2b98c' },
+  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9], path: '#d2b98c' },
   elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8], path: '#a89470' }
 };
 /** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
 const FADE_GROUP = 3;
 
 /**
- * 마당 A 의 둘레 · 협곡 양옆 덩어리 자리(마당 가운데 기준): [{ x, z, k(굵기 배율), h(높이), low }].
+ * 마당 A 의 둘레 · 협곡 양옆 덩어리 자리(마당 가운데 기준): [{ x, z, ox · oz(길 · 마당에서 먼 바깥쪽 방향), k(굵기 배율), h(높이), low }].
  * 분지 남쪽(카메라 쪽) 둘레는 낮게(low — 숲은 고목 대신 덤불): 높으면 반투명해져도 화면을 덮어 싸움이 흐려 보였다. 협곡 양옆과 북 · 동 · 서는 높게(숲 협곡만 덤불).
  */
 function massSpots(A, T) {
@@ -76,7 +76,7 @@ function massSpots(A, T) {
   for (let i = 0; i <= n; i++) {
     const a = door + gap + ((Math.PI * 2 - gap * 2) * i) / n, x = Math.sin(a) * R, z = Math.cos(a) * R;
     const low = z > A.r * 0.15;
-    out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (low ? (T.kind === 'tree' ? 0.36 : 0.45) : 1), low });
+    out.push({ x, z, ox: Math.sin(a), oz: Math.cos(a), k: 0.9 + jitter(i) * 0.3, h: height(i) * (low ? (T.kind === 'tree' ? 0.36 : 0.45) : 1), low });
   }
   // 협곡 양옆: 분지 가장자리에서 입구까지
   const side = CANYON.half + T.w * 0.75, from = A.r + ARENA_WALL + T.w * 0.4, to = A.r + ARENA_WALL + len;
@@ -87,7 +87,7 @@ function massSpots(A, T) {
       // 숲 협곡은 덤불 길(고목이면 큰 잎이 카메라 바로 앞을 덮는다). 동서로 뻗은 협곡(강가 · 왕버섯 굴)은 남쪽(카메라 쪽) 벽이
       // 카메라와 내 캐릭터 사이를 막아 들어가기 전부터 화면을 덮었다 → 분지 남쪽 둘레처럼 낮게
       const camSide = -fx * sd > 0.5, low = T.kind === 'tree' || camSide;
-      out.push({ x, z, k: 0.9 + jitter(i) * 0.3, h: height(i) * (T.kind === 'tree' ? 0.36 : camSide ? 0.45 : j === m ? 0.85 : 1), low });
+      out.push({ x, z, ox: fz * sd, oz: -fx * sd, k: 0.9 + jitter(i) * 0.3, h: height(i) * (T.kind === 'tree' ? 0.36 : camSide ? 0.45 : j === m ? 0.85 : 1), low });
     }
   }
   return out;
@@ -98,12 +98,15 @@ function buildMass(T, s, i, mat, add) {
   const c = T.colors[i % T.colors.length], c2 = T.colors[(i + 1) % T.colors.length], w = T.w * s.k;
   const mesh = (geo, color, opts) => add(toonMesh(geo, null, { ...opts, material: mat(color) }));
   if (T.kind === 'hill') {
-    // 풀 언덕: 낮은 둔덕 셋을 겹치고 꼭대기에 작은 덤불(매끈하고 큰 둥근 언덕 하나는 봉분처럼 보였다)
-    const c3 = T.colors[(i + 2) % T.colors.length], j = jitter(i, 5) - 0.5;
-    mesh(GEO.sphere, c, { position: [s.x, -0.3, s.z], scale: [w * 1.2, s.h + 0.3, w * 1.05], outline: 0.045, receive: true });
-    mesh(GEO.sphere, c2, { position: [s.x + w * (0.75 + j * 0.3), -0.2, s.z + w * 0.35], scale: [w * 0.8, s.h * 0.62 + 0.2, w * 0.72], outline: 0.04, receive: true });
-    mesh(GEO.sphere, c3, { position: [s.x - w * (0.7 - j * 0.3), -0.2, s.z - w * 0.3], scale: [w * 0.7, s.h * 0.5 + 0.2, w * 0.66], outline: 0.04, receive: true });
-    mesh(GEO.sphere, T.bush || c2, { position: [s.x + w * 0.25 * j, s.h * 0.88, s.z + w * 0.15], scale: [w * 0.32, w * 0.22, w * 0.3], outline: 0.03 });
+    // 풀 언덕: 작은 둔덕 셋 + 꼭대기 덤불(매끈하고 큰 둥근 언덕 하나는 봉분처럼 보였다).
+    // 둔덕은 모두 길 · 마당에서 먼 바깥쪽(ox, oz)으로 밀어 두어, 안쪽 끝이 걸어 다니는 곳까지 오지 않는다(길가를 걸으면 캐릭터가 언덕에 파묻혔다)
+    const c3 = T.colors[(i + 2) % T.colors.length], j = jitter(i, 5) - 0.5, tx = -s.oz, tz = s.ox; // tx · tz: 길을 따라가는 옆 방향
+    const at = (out, along) => [s.x + s.ox * w * out + tx * w * along, s.z + s.oz * w * out + tz * w * along];
+    const [mx, mz] = at(0.3, 0), [ax, az] = at(0.8, 0.5 + j * 0.2), [bx, bz] = at(0.75, -0.5 + j * 0.2);
+    mesh(GEO.sphere, c, { position: [mx, -0.3, mz], scale: [w * 0.85, s.h + 0.3, w * 0.85], outline: 0.04, receive: true });
+    mesh(GEO.sphere, c2, { position: [ax, -0.2, az], scale: [w * 0.6, s.h * 0.62 + 0.2, w * 0.6], outline: 0.035, receive: true });
+    mesh(GEO.sphere, c3, { position: [bx, -0.2, bz], scale: [w * 0.55, s.h * 0.5 + 0.2, w * 0.55], outline: 0.035, receive: true });
+    mesh(GEO.sphere, T.bush || c2, { position: [mx + tx * w * 0.2 * j, s.h * 0.9, mz + tz * w * 0.2 * j], scale: [w * 0.28, w * 0.2, w * 0.26], outline: 0.03 });
   } else if (T.kind === 'tree' && s.low) {
     // 남쪽 둘레: 고목 대신 낮은 덤불 둘
     mesh(GEO.sphere, c, { position: [s.x, s.h * 0.4, s.z], scale: [w * 1.05, s.h * 0.6, w], outline: 0.045 });
