@@ -128,7 +128,7 @@ import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName, placeItem, MAX_GROUND } from './core/ground.js';
 import { pantryOf, addToPantry, takeFromPantry, snackOf, shareOf, sellPantry, thanksOf, hatedOf, SNACK_ENERGY } from './core/pantry.js';
-import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest, ACTS } from './core/quests.js';
+import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest, ACTS, boardStory } from './core/quests.js';
 
 const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
@@ -925,6 +925,30 @@ function boot() {
       const lines = [...st.say];
       lines.speaker = 'chiikawa';
       finishQuestStep('blackStar', null, lines);
+    },
+    // 사이드스토리 '수상한 섬 합숙': 친구 다섯과 친해지면 게시판에 '보수 100배' 전단지가 붙는다. 떼면 친구들이 모여들어 보고 이야기 시작
+    boardStory: () => (state ? boardStory(state) : null),
+    takeFlyer: () => {
+      const id = boardStory(state);
+      if (!id) return;
+      const Q = QUESTS[id], p = player.position;
+      panels.close();
+      input.setEnabled(false);
+      hud.setAction(null);
+      const kinds = [...new Set(Q.offer.filter((l) => typeof l !== 'string' && l.who).map((l) => l.who))];
+      const SIDE = [[1.2, -0.1], [-1.2, -0.1], [2.2, 0.1], [-2.2, 0.1], [3.1, 0.3], [-3.1, 0.3]]; // 내 양옆으로 한 줄(카메라 앞을 가리지 않게)
+      kinds.forEach((k, i) => {
+        const m = npcs.byKind(k);
+        if (!m || m.away || npcs.busy(m) || staged.has(k) || Math.hypot(m.x - p.x, m.z - p.z) > 18 || !SIDE[i]) return;
+        const at = village.nearestFree(p.x + SIDE[i][0], p.z + SIDE[i][1], 0.4);
+        npcs.plan(m, [{ do: 'walk', x: at.x, z: at.z, run: true }, { do: 'act', anim: 'shy', time: 8, face: { x: p.x, z: p.z } }]);
+      });
+      guide.say(Q.offer.map(fillName), () => {
+        if (mode === 'play') input.setEnabled(true);
+        commit(startQuest(state, id));
+        sound.play('job');
+        hud.announce({ kicker: '사이드스토리 시작!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
+      }, NARRATOR);
     },
     bleachShop: () => { const st = state && stepOf(state, 'blackStar'); return st && st.type === 'bring' && st.items.bleach ? { price: BLEACH_PRICE, have: countOf(state, 'bleach') > 0 } : null; },
     buyBleach: () => {
@@ -2709,6 +2733,11 @@ function boot() {
       const mk = markOf(state, m.kind);
       if (mk === 'story') out.push({ id: 's-' + m.kind, x: m.x, y: m.chibi.height + 0.6, z: m.z, html: STORY_MARK, kind: 'qmark story' }); // 사이드스토리: ! 대신 펼친 책
       else if (mk) out.push({ id: 'q-' + m.kind, x: m.x, y: m.chibi.height + 0.55, z: m.z, text: mk, kind: mk === '?' ? 'qmark report' : 'qmark' });
+    }
+    // 게시판에 붙은 이야기 전단지(수상한 섬 합숙): 게시판 왼쪽 일감 걸이 벽(world/village.js 의 tagWall, 높이 2) 위에 펼친 책.
+    // 간판(높이 3) 위는 게시판 앞에 서면 화면 위로 벗어난다
+    if (boardStory(state) && Math.hypot(boardSign.x - focus.x, boardSign.z - focus.z) <= 26) {
+      out.push({ id: 's-board', x: boardSign.x - 1.85, y: 2.55, z: boardSign.z, html: STORY_MARK, kind: 'qmark story' });
     }
     return out;
   }

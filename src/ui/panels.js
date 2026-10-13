@@ -502,6 +502,16 @@ export function createPanels(ui, handlers) {
       const mult = PAY_MULT[s.license.grade];
       const items = bagOf(s).items, sells = sellableIds(s);
       const out = [head('노동 접수', s.money)];
+      // 이야기 전단지(친구 다섯과 친해지면 붙는 '수상한 섬 합숙'): 일감 위에 비스듬히 붙은 종이, 떼면 이야기 시작
+      const flyerId = !tutorial && handlers.boardStory?.(), fl = flyerId && QUESTS[flyerId].flyer;
+      if (fl) {
+        out.push(h('div', { class: 'board-flyer' },
+          h('i', { class: 'pin', 'aria-hidden': 'true' }),
+          h('div', { class: 'bf-head' }, fl.head),
+          h('div', { class: 'bf-big' }, fl.big),
+          h('div', { class: 'bf-sub' }, fl.sub),
+          h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.takeFlyer() }, '전단지 떼기')));
+      }
       // 오늘 남은 일감: 제목 밑 얇은 막대 한 줄(상자 없이)
       if (!tutorial) {
         const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;

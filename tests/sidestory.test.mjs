@@ -193,13 +193,19 @@ test('잠옷 밤나들이: 포셰트 갑옷 씨에게 이야기 표시(여섯째
   for (const k of ['chiikawa', 'hachiware']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
 });
 
-test('수상한 섬 합숙: 우사기(하트 2)가 여덟째 날부터 오후에 전단지 → 다음 날 아침 선착장 → 섬 장면 → 시마지로의 카레 · 조개국', async () => {
+test('수상한 섬 합숙: 친구 다섯과 하트 2개면 여덟째 날부터 오후에 게시판 전단지 → 다음 날 아침 선착장 → 섬 장면 → 시마지로의 카레 · 조개국', async () => {
   const I = await import(G + 'inventory.js');
-  const s = withHearts(fresh(8, 14), 'usagi', 2);
-  assert.ok(Q.canOffer(s, 'islandCamp'));
-  assert.ok(!Q.canOffer(withHearts(fresh(7, 14), 'usagi', 2), 'islandCamp'), '여덟째 날부터');
-  assert.ok(!Q.canOffer(withHearts(fresh(8, 14), 'usagi', 1), 'islandCamp'), '우사기와 하트 2개부터');
-  assert.ok(!Q.canOffer({ ...s, clock: at(8, 9) }, 'islandCamp'), '부탁은 오후에(떠나는 건 다음 날 아침)');
+  const PALS = ['usagi', 'chiikawa', 'hachiware', 'rakko', 'momonga'];
+  const pals = (s, short) => PALS.reduce((a, k) => withHearts(a, k, k === short ? 1 : 2), s); // short: 그 친구만 하트 1개
+  const s = pals(fresh(8, 14));
+  assert.equal(Q.boardStory(s), 'islandCamp', '게시판에 전단지');
+  assert.ok(!Q.canOffer(s, 'islandCamp') && Q.markOf(s, 'usagi') !== 'story', '우사기가 말로 권하지 않는다');
+  for (const k of PALS) assert.equal(Q.boardStory(pals(fresh(8, 14), k)), null, k + '와도 하트 2개부터');
+  assert.equal(Q.boardStory(pals(fresh(7, 14))), null, '여덟째 날부터');
+  assert.equal(Q.boardStory({ ...s, clock: at(8, 9) }), null, '전단지는 오후에(떠나는 건 다음 날 아침)');
+  assert.equal(Q.boardStory({ ...s, tutorial: 'board' }), null, '첫날 안내 중에는 없다');
+  assert.equal(Q.boardStory(Q.startQuest(s, 'islandCamp')), null, '떼면 사라진다');
+  assert.ok(Q.QUESTS.islandCamp.flyer.big.includes('100배'), '보수 100배 전단지');
   const step = Q.QUESTS.islandCamp.steps[0];
   assert.equal(step.place, 'pier');
   assert.equal(step.scene, 'islandCamp');

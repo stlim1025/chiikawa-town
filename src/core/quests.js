@@ -235,15 +235,21 @@ export const QUESTS = {
     }],
     reward: { bond: 2, friends: { chiikawa: 3, hachiware: 3 } }
   },
+  // 우사기 · 치이카와 · 하치와레 · 랏코 · 모몽가 모두와 하트 2개가 되면 노동 접수 게시판에 '보수 100배' 전단지가 붙는다(board: 친구가 말로 권하지 않고, 게시판에서 전단지를 떼면 시작)
   islandCamp: {
-    title: '수상한 섬 합숙', giver: 'usagi', side: true, minDay: 8, hours: [12, 20], needHearts: 2, ask: '우라?',
+    title: '수상한 섬 합숙', giver: 'usagi', side: true, board: true, minDay: 8, hours: [12, 20], needHearts: 2,
+    needFriends: { chiikawa: 2, hachiware: 2, rakko: 2, momonga: 2 }, ask: '우라?',
+    flyer: { head: '특별한 섬으로 초대합니다!', big: '보수 100배!!', sub: '간단한 토벌만 하면 끝! 섬 한정 라멘과 디저트도 공짜!' }, // 게시판 창에 붙는 전단지
     offer: [
-      '우라!', '(우사기가 구깃구깃한 전단지를 내밀었다…)',
+      '(게시판 한쪽에 처음 보는 전단지가 붙어 있다…)',
       '『특별한 섬으로 초대합니다! 간단한 토벌로 보수가 무려 100배!! 섬 한정 라멘 & 디저트도 공짜!』',
+      '(전단지를 떼어 들고 친구들에게 보여 주었다)',
+      { who: 'usagi', text: '우라! 야하!' },
       { who: 'hachiware', text: '우와~ 섬 합숙이래! 보수 100배에 공짜 라멘이라니~!' },
+      { who: 'momonga', text: '디저트도 공짜래! 나도 갈 거야!' },
       { who: 'chiikawa', text: '…(전단지를 보며 조금 불안한 얼굴)…' },
       { who: 'rakko', text: '…너무 좋은 얘기는 수상한 법이다. 나도 같이 가지.' },
-      '야하! (내일 아침 남쪽 바닷가 선착장으로 오라는 듯 손짓한다)'
+      '(내일 아침 남쪽 바닷가 선착장에 모이기로 했다)'
     ],
     steps: [{
       type: 'visit', place: 'pier', hours: [6, 11], scene: 'islandCamp', speaker: 'hachiware',
@@ -476,10 +482,11 @@ export function openWishes(state) {
 export function canOffer(state, id) {
   return QUESTS[id].daily ? baseOffer(state, id) && openWishes(state).includes(id) : baseOffer(state, id);
 }
-/** 기본 조건: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. */
-function baseOffer(state, id) {
+/** 기본 조건: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. viaBoard: 게시판 전단지로 여는 이야기(board)를 볼 때. */
+function baseOffer(state, id, viaBoard = false) {
   const Q = QUESTS[id], q = questState(state, id);
   if (Q.noOffer) return false; // 말로는 부탁하지 않는 이야기(숲에서 찾아내는 구덩이 같은)
+  if (!!Q.board !== viaBoard) return false; // 게시판 전단지 이야기는 친구가 말로 권하지 않는다
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
   if ((Q.tutorial || Q.daily || Q.side) && state.tutorial && state.tutorial !== 'done') return false; // 일상 부탁 · 사이드스토리도 첫날 안내가 끝난 뒤부터
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
@@ -489,7 +496,12 @@ function baseOffer(state, id) {
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
   if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;
   if (isStorySide(id) && sideBusy(state)) return false;
+  if (Q.needFriends && Object.entries(Q.needFriends).some(([k, n]) => hearts(friendOf(state, k)) < n)) return false; // 여럿과 다 친해야 열리는 이야기
   return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
+}
+/** 노동 접수 게시판에 지금 붙어 있는 이야기 전단지(board 사이드스토리 id, 없으면 null). */
+export function boardStory(state) {
+  return QUEST_ORDER.find((id) => QUESTS[id].board && baseOffer(state, id, true)) || null;
 }
 /** 그 친구에게 지금 할 수 있는 퀘스트 일: { offer: [id], report: [id](끝낼 수 있는 것), waiting: [id](알려야 하지만 아직 덜 한 것) } */
 export function questsFor(state, kind) {
@@ -699,6 +711,7 @@ export function checkQuestData() {
     if (R.weapon && !WEAPONS[R.weapon]) errs.push(id + ': weapon');
     if (R.furniture && !FURNITURE[R.furniture]) errs.push(id + ': furniture');
     if (R.friends) for (const k of Object.keys(R.friends)) if (!FRIENDS[k]) errs.push(id + ': friend ' + k);
+    if (Q.needFriends) for (const k of Object.keys(Q.needFriends)) if (!FRIENDS[k]) errs.push(id + ': needFriends ' + k);
     if (Q.after && !QUESTS[Q.after]) errs.push(id + ': after');
     if (Q.start && Q.start.accessory && !ACCESSORY_ITEMS[Q.start.accessory]) errs.push(id + ': start accessory');
     for (const L of Q.offer || []) if (typeof L !== 'string' && !(L && L.text && (!L.who || FRIENDS[L.who]))) errs.push(id + ': offer line');
