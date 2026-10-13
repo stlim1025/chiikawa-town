@@ -44,7 +44,7 @@ body { margin: 0; background: var(--sky); color: var(--ink); font-family: var(--
 /* 누를 수 없는 표시(왼쪽 위 기둥, 시계, 알림)와 집 안 화면 전체 틀은 화면 누름을 통과시킨다(집 안에서는 바닥을 눌러 가구를 놓는다).
    보기만 하는 장식(별똥별 줄무늬 · 완료 카드 · 큰 소식 · 새 일감 쪽지 · 하트 카드 · 마을 이름)도 뺀다: 이 규칙(id)이 그 장식들의 pointer-events: none 을
    이겨서, 별똥별 밤에는 화면을 덮은 줄무늬가 누름을 다 가로채 조이스틱이 나오지 않았다 */
-#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui):not(.star-streaks):not(.quest-done):not(.hud-banner):not(.task-card):not(.heart-card):not(.village-title) { pointer-events: auto; }
+#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui):not(.star-streaks):not(.quest-done):not(.hud-banner):not(.task-card):not(.heart-card):not(.village-title):not(.cam-flash):not(.viewfinder):not(.prints) { pointer-events: auto; }
 button { font-family: var(--hand); font-weight: 700; color: var(--ink); cursor: pointer; background: none; border: none; padding: 0; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep); outline-offset: 3px; }
 @keyframes pop { from { scale: 0.7; opacity: 0; } to { scale: 1; opacity: 1; } }
@@ -1418,9 +1418,10 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 [data-input="touch"] .minigame .mg-hint { display: none; }
 @media (prefers-reduced-motion: reduce) { .minigame .mg-judge.pop, .minigame .mg-btn.hit { animation-duration: 0.01s; } }
 /* 하치와레의 카메라(ui/photos.js): 찰칵 번쩍 · 뷰파인더(틀 밖은 살짝 어둡게, 틀 안이 사진에 담긴다) · 뽑은 사진(흔들리게) */
-.photo-flash { position: absolute; inset: 0; z-index: 30; background: #fff; opacity: 0; pointer-events: none; }
-.photo-flash.on { animation: photo-flash 0.45s ease-out; }
-@keyframes photo-flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.cam-flash { position: absolute; inset: 0; z-index: 30; background: #fff; opacity: 0; pointer-events: none; }
+.cam-flash.on { animation: cam-flash 0.45s ease-out; }
+@keyframes cam-flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.prints[hidden], .viewfinder[hidden] { display: none; }
 .viewfinder { position: absolute; inset: 0; z-index: 12; pointer-events: none; overflow: hidden; font-family: var(--hand); color: #fff; text-align: center; }
 .viewfinder .vf-lab { position: absolute; left: 16px; right: 16px; top: max(14px, env(safe-area-inset-top)); z-index: 1; font-size: 19px; text-shadow: 0 2px 0 #1f3550, 0 0 10px rgba(0, 0, 0, 0.35); }
 .viewfinder .vf-frame { position: absolute; left: 50%; top: 46%; width: min(calc(100vw - 32px), 640px, calc(58vh * 4 / 3)); aspect-ratio: 4 / 3; transform: translate(-50%, -50%); border-radius: 6px; box-shadow: 0 0 0 100vmax rgba(20, 24, 32, 0.38); }
@@ -1446,7 +1447,7 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .prints figcaption { margin-top: 4px; font-family: var(--hand); font-size: 13px; color: #5a4a3a; text-align: center; }
 @keyframes print-in { from { opacity: 0; transform: translateY(-24px) rotate(0deg); } }
 @media (max-width: 520px) { .prints .print { width: calc(50% - 14px); max-width: 170px; } }
-@media (prefers-reduced-motion: reduce) { .photo-flash.on, .prints .print, .viewfinder .vf-roll img, .viewfinder .vf-btn.hit { animation-duration: 0.01s; } }
+@media (prefers-reduced-motion: reduce) { .cam-flash.on, .prints .print, .viewfinder .vf-roll img, .viewfinder .vf-btn.hit { animation-duration: 0.01s; } }
 /* 섬에서 직접 걸을 때(축제 · 밤의 정글 · 동굴 구출): 터치면 조이스틱 · 행동 버튼, 그리고 목표 글을 보인다(다른 HUD 는 숨긴 채) */
 [data-input="touch"] .cinematic.in-roam .hud-action:not([hidden]) { display: block !important; }
 [data-input="touch"] .cinematic.in-roam .stick:not([hidden]) { display: block !important; }

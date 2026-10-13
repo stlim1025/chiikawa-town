@@ -9,7 +9,7 @@
  */
 export function createPhotoUi(ui) {
   const flashEl = document.createElement('div');
-  flashEl.className = 'photo-flash';
+  flashEl.className = 'cam-flash'; // '검은 별똥별'의 photo-flash(잠깐 붙였다 떼는 것)와 이름이 겹치지 않게
   const vf = document.createElement('div');
   vf.className = 'viewfinder';
   vf.hidden = true;
