@@ -3123,12 +3123,27 @@ function boot() {
    * 토벌 자격증 실기: 검정소 앞마당에 허수아비가 먼저 서고, 다 쓰러뜨리면 쫓아와 공격하는 몬스터(LICENSES.hunter.foes)가
    * 나온다(여럿이면 앞 몬스터를 쓰러뜨릴 때마다 한 마리씩 차례로). 정해진 시간 안에 모두 쓰러뜨리면 합격, 시간이 다 되거나 L.hits 번 맞으면(기절해도) 불합격.
    */
+  /**
+   * 실기 몬스터가 나올 자리: 내 왼쪽 위나 오른쪽 위(화면 안). 카메라가 남쪽에서 북쪽을 보니 아래(+z)에 생기면 화면 밖이라
+   * 안 보이는 데서 갑자기 덤볐다. 후보 자리를 지금 카메라로 비춰 보고 화면 안쪽에 들어오는 첫 자리로:
+   * 넓은 화면은 옆으로 넉넉히, 좁은 휴대폰 세로 화면은 안쪽 · 위쪽으로 당긴다.
+   */
+  const examFoeV = new THREE.Vector3();
+  function examFoeSpot() {
+    const p = player.position, side = Math.random() < 0.5 ? -1 : 1;
+    for (const [dx, dz] of [[3.0, -2.6], [2.4, -3.0], [1.8, -3.4], [1.2, -3.8]]) {
+      const at = village.nearestFree(p.x + side * dx, p.z + dz, 0.5);
+      examFoeV.set(at.x, 0.4, at.z).project(cam.camera);
+      if (Math.abs(examFoeV.x) < 0.8 && examFoeV.y > -0.6 && examFoeV.y < 0.85) return at;
+    }
+    return village.nearestFree(p.x + side * 1.2, p.z - 3.8, 0.5);
+  }
   function startHunterPractical(pass, fail) {
     const L = LICENSES.hunter, ex = village.spots.exam;
     endOverlay();
     const at = ([dx, dz]) => village.nearestFree(ex.x + dx, ex.z + dz, 0.5);
     const dummies = [[-2.4, 1.6], [2.4, 1.6], [0, 3.0]].slice(0, L.dummies).map(at);
-    const foes = [[0, 6.4], [-3.4, 5.4], [3.4, 5.4]].slice(0, L.foes.length).map(at); // 한 마리면 정면에서
+    const foes = L.foes.map(() => null); // 나올 자리는 차례가 될 때 내 둘레에서 정한다(examFoeSpot)
     dummies.forEach((sp) => monsters.spawnAt('dummy', sp.x, sp.z, { exam: true }));
     // 몬스터는 허수아비를 다 쓰러뜨린 뒤에 한 마리씩(foes.in: 다음 몬스터가 나오기까지 초, null 이면 아직 차례가 아니다)
     hunterExam = { t: L.practical, left: dummies.length + foes.length, hits: 0, pass, fail, foes: { at: foes, next: 0, in: null } };
@@ -3218,7 +3233,7 @@ function boot() {
       hunterExam.t -= dt;
       const F = hunterExam.foes;
       if (F.in != null && (F.in -= dt) <= 0) { // 차례가 된 몬스터 한 마리
-        const i = F.next++, sp = F.at[i];
+        const i = F.next++, sp = examFoeSpot();
         monsters.spawnAt(LICENSES.hunter.foes[i], sp.x, sp.z, { exam: true });
         F.in = null;
         sound.play('growl');
