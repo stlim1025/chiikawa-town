@@ -377,7 +377,7 @@ export function createHud(ui, input) {
         e.classList.toggle('story', !!q.story);
         e.classList.toggle('side', !!q.side && !q.story);
         e.classList.toggle('incoming', incoming.has(q.id));
-        const tag = e.querySelector('i'); if (q.side && !q.story) { if (!tag.querySelector('svg')) tag.innerHTML = SIDE_BOOK_SVG; tag.title = '사이드스토리'; } else { tag.textContent = q.story ? '이야기' : '부탁'; tag.removeAttribute('title'); } // 사이드스토리는 책 그림 하나로 작게
+        const tag = e.querySelector('i'); if (q.side && !q.story) { if (!tag.querySelector('svg')) tag.innerHTML = SIDE_BOOK_SVG; tag.title = '사이드스토리'; } else { tag.textContent = q.story ? '이야기' : q.chain ? '연계' : '부탁'; tag.removeAttribute('title'); } // 사이드스토리는 책 그림 하나로 작게, 연계 퀘스트는 '연계'
         e.querySelector('b').textContent = q.title;
         e.querySelector('em').textContent = q.goal;
         const sm = e.querySelector('small');

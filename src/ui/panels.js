@@ -676,7 +676,7 @@ export function createPanels(ui, handlers) {
         const Q = QUESTS[id], st = questState(s, id), p = kind === 'active' ? progressOf(s, id) : null;
         return h('div', { class: `row q-card ${kind}${Q.story ? ' story' : ''}${id === track ? ' tracked' : ''}` }, face(Q.giver),
           h('div', {},
-            h('div', { class: 't' }, Q.title, Q.story || Q.side ? h('span', { class: 'weed-count' + (Q.side ? ' side' : '') }, Q.side ? '사이드스토리' : '이야기') : null),
+            h('div', { class: 't' }, Q.title, Q.story || Q.side || Q.chain ? h('span', { class: 'weed-count' + (Q.side ? ' side' : '') }, Q.side ? '사이드스토리' : Q.chain ? '연계' : '이야기') : null),
             kind === 'active' ? h('div', { class: 'd' }, shortGoal(s, id).goal) : null,
             // 단계 · 진행 · 어디서(괄호 속 안내)는 꼬리표로
             kind === 'active' ? h('div', { class: 'mon-chips' },

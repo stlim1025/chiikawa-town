@@ -2441,7 +2441,7 @@ function boot() {
       }
       if (Q.steps[0].type === 'scene') { questSceneStep(id); return; } // 받자마자 장면(우사기랑 클럽 가기)
       if (isBuddyStep(Q.steps[0])) startBuddy(n); // 일상 부탁: 같이 하자며 따라나선다
-      hud.announce({ kicker: Q.side ? '사이드스토리 시작!' : Q.story ? '이야기 시작!' : Q.daily ? '일상 부탁!' : '새 부탁!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
+      hud.announce({ kicker: Q.side ? '사이드스토리 시작!' : Q.story ? '이야기 시작!' : Q.chain ? '연계 퀘스트 시작!' : Q.daily ? '일상 부탁!' : '새 부탁!', title: Q.title, sub: shortGoal(state, id).goal, to: 'quest', id });
     }));
   }
   /** 지금 단계를 끝냈다고 알린다(bring 이면 건넨다). */
@@ -2599,6 +2599,20 @@ function boot() {
       }
       sound.play('heartUp');
     }
+    if (step.speaker === 'rakko' && step.place === 'dojo') {
+      // 랏코의 수련 2부: 저녁 수련장에서 대련(랏코가 수련장 앞에 나와 마주 서서 목검을 휘두른다)
+      const r = npcs.byKind('rakko'), d = village.spots.dojo, at = village.nearestFree(d.x + 1.3, d.z + 2.2, 0.45);
+      if (r) {
+        if (r.away) npcs.comeOut(r, at.x, at.z);
+        else { r.x = at.x; r.z = at.z; }
+        npcs.hold(r, true);
+        r.yaw = Math.atan2(player.position.x - r.x, player.position.z - r.z);
+        npcs.emote(r, 'train', 6);
+        player.face(r.x, r.z);
+        setTimeout(() => npcs.hold(r, false), 9000);
+      }
+      sound.play('swing');
+    }
     finishQuestStep(id, null, lines);
   }
   /** 부탁을 다 들어줬다: 보상과 축하. 이야기의 끝이면 마을 친구들이 다 같이 기뻐한다. */
@@ -2650,7 +2664,8 @@ function boot() {
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
-    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : null;
+    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot
+    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
@@ -5802,7 +5817,7 @@ function boot() {
         const g = shortGoal(state, id);
         // 물건 · 몬스터는 그림 꼬리표로(몇 개 남았는지 한눈에)
         const sg = usagiClub.active && usagiClub.questId === id ? usagiClub.goal : null; // 연출 중에는 지금 할 일(몰래 따라가기 · 굴로 들어가기 …)
-        return { id, title: QUESTS[id].title, story: !!QUESTS[id].story, side: !!QUESTS[id].side, goal: sg || g.goal, n: sg ? '' : g.n, chips: sg ? [] : partChips(g), pinned: pins.includes(id) };
+        return { id, title: QUESTS[id].title, story: !!QUESTS[id].story, side: !!QUESTS[id].side, chain: !!QUESTS[id].chain, goal: sg || g.goal, n: sg ? '' : g.n, chips: sg ? [] : partChips(g), pinned: pins.includes(id) };
       }));
       // 불: 등불 버튼 모양, 손에 든 모습, 따라다니는 빛
       const lightMode = lightOf(state);
