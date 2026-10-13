@@ -117,6 +117,8 @@ import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
 import { createStarDinerStory } from './stories/stardiner.js';
+import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
+import { createBonbonStory } from './stories/bonbon.js';
 import { createChiiRoom } from './world/chiiroom.js';
 import { createWeather } from './world/weather.js';
 import { createBlackStarStory } from './stories/blackstar.js';
@@ -1096,6 +1098,16 @@ function boot() {
         const p = at === 'wish' ? STAR_FIELD : homeDoor('chiikawa');
         player.setPosition(p.x + 3, p.z + 3);
         cam.snap(player.position);
+      },
+      /** 위스키 봉봉: show 면 숲속 빈터 장면만 바로(보상 없음), 아니면 부탁을 받은 채 오전 11시 숲길 옆 덩굴 앞(걸어 들어가면 시작 · 보상까지). */
+      whiskeyBonbon(show) {
+        if (bonbonStory.active) return;
+        if (show) { bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.whiskeyBonbon;
+        commit({ ...startQuest({ ...state, quests: qs }, 'whiskeyBonbon'), clock: { day: Math.max(10, state.clock.day), t: (11 - 6) / 24 } });
+        player.setPosition(bonbonFront.spot.x + 3, bonbonFront.spot.z + 3);
+        cam.snap(player.position);
       }
     },
     toggleSound: (kind) => sound.toggle(kind),
@@ -1411,6 +1423,7 @@ function boot() {
       idolStory.reset();
       starDiner.reset();
       blackStar.reset();
+      bonbonStory.reset();
       loopRewinding = false;
       weather.setRain(false);
       sound.rain(false);
@@ -2162,6 +2175,7 @@ function boot() {
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
     if (mode === 'idol') { if (down && idolStory && !guide.open) idolStory.press(); return; } // 파자마 파티즈 무대: 박자(박자 화면도 스스로 스페이스 · 탭을 받는다)
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
+    if (mode === 'bonbon') { if (down && bonbonStory && !guide.open) bonbonStory.press(); return; } // 위스키 봉봉 숲속 빈터: 배 두드리기(박자 · 펀치 화면도 스스로 받는다)
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
@@ -2225,9 +2239,10 @@ function boot() {
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
+  let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2541,6 +2556,7 @@ function boot() {
       else if (step.scene === 'pajamaParty') idolStory.play(done);
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else if (step.scene === 'starDiner') starDiner.play(done);
+      else if (step.scene === 'whiskeyBonbon') bonbonStory.play(done);
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
@@ -2634,7 +2650,7 @@ function boot() {
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
-    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : null;
+    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : null;
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
@@ -3514,6 +3530,17 @@ function boot() {
     rewindNow: () => { commit(loopRewind(loopMark(state))); afterLoopRewind(); }, // 장면 끝의 되감기: 본 장면을 적어 두고 같은 날 아침으로
     nudgeSearch: () => { appNudge = 'search'; },
     setRain: (on) => { weather.setRain(on); sound.rain(on); }
+  });
+  // 사이드스토리 '위스키 봉봉'(stories/bonbon.js): 서쪽 숲길 옆 초콜릿 덩굴(이야기를 받은 동안만) · 숲속 빈터 장면(처음 들어갈 때 만든다)
+  const bonbonFront = createBonbonFront(scene, village);
+  let bonbonGlade = null;
+  bonbonStory = createBonbonStory({
+    hud, guide, sound, input, rhythm, minigame, get stage() { return bonbonGlade || (bonbonGlade = createBonbonGlade()); }, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(), front: bonbonFront,
+    // 같이 마을로 돌아온 친구: 내 옆에 세워 두고(일과는 잠시 미룬다), 이야기가 끝나면 놓아준다
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
   /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
   function afterLoopRewind() {
@@ -5395,7 +5422,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -5482,6 +5509,8 @@ function boot() {
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
+      bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
+      bonbon: () => ({ phase: bonbonStory.phase, mode, swallowed: bonbonGlade ? bonbonGlade.swallowed : null, drunk: bonbonGlade ? bonbonGlade.drunkLevel : null }),
       /** 검은 별똥별 장면 하나를 바로(보상 없음): 'blackWish' · 'blackMorning' · 'blackDejavu' · 'blackWatch' · 'blackSleepover' · 'blackSoak' · 'blackRain'. */
       blackPlay: (scene) => { if (!blackStar.active) blackStar.play(scene, () => hud.toast('테스트: 장면 끝', 2000)); },
       black: () => ({ loop: loopOf(state), free: state && state.story ? state.story.blackFree : null, quest: state && state.quests ? state.quests.blackStar : null, phase: blackStar.active, mode, clock: state && state.clock }),
@@ -5622,6 +5651,16 @@ function boot() {
       hud.placeLabels([], chiiRoom.camera);
       return;
     }
+    // 위스키 봉봉(사이드스토리): 숲속 빈터. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'bonbon' && state) {
+      bonbonGlade.resize(aspect);
+      bonbonStory.tick(dt, t);
+      setCelLight(bonbonGlade.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(bonbonGlade.scene, bonbonGlade.camera);
+      hud.placeLabels([], bonbonGlade.camera);
+      return;
+    }
     if (mode === 'diner' && state) {
       dinerStage.resize(aspect);
       starDiner.tick(dt, t);
@@ -5691,6 +5730,9 @@ function boot() {
     glows.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza, picked: state ? pickedTonight(state) : [], guest: !!visiting });
     // 별 세 개 레스토랑 가게: 이야기를 받은 동안만 들판 길가에 있다(친구 마을에서는 안 보인다)
     dinerFront.visible = !!state && !visiting && isActive(state, 'starDiner');
+    // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
+    bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
+    bonbonFront.update(dt, t);
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 · 쓰러짐 중에는 멈칫). 내 마을에 놀러 온 친구도 노린다
@@ -5728,6 +5770,7 @@ function boot() {
       pajama.update(dt);
       idolStory.update(dt);
       starDiner.update(dt, t);
+      bonbonStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);

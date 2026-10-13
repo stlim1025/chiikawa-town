@@ -50,7 +50,9 @@ export const QUEST_ITEMS = {
   omurice: { name: '거대 오므라이스', kind: 'food', note: '구해 준 별똥별들이 고맙다며 건넨 커다란 오므라이스. 셋이 나눠 먹어도 남을 만큼 크다. 먹으면 기운이 60 찬다.', eat: 60 },
   // 사이드스토리 '검은 별똥별': 도구점에서 사는 산소 표백제(자명종을 담근다) · 다 끝나고 하치와레가 챙겨 준 러스크
   bleach: { name: '산소 표백제', kind: 'quest', note: '물에 풀면 보글보글 거품이 이는 하얀 가루. 검은 별똥별이 붙은 물건을 푹 담그면 떠난대요.' },
-  rusk: { name: '하치와레 러스크', kind: 'food', note: '힘내라며 하치와레가 챙겨 준 바삭바삭 러스크. 먹으면 기운이 20 찬다.', eat: 20 }
+  rusk: { name: '하치와레 러스크', kind: 'food', note: '힘내라며 하치와레가 챙겨 준 바삭바삭 러스크. 먹으면 기운이 20 찬다.', eat: 20 },
+  // 사이드스토리 '위스키 봉봉': 숲속 덩굴(큰 뱀 머리 위)에 열리는 초콜릿
+  bonbon: { name: '위스키 봉봉', kind: 'food', note: '숲속 덩굴에 열리는 동그란 초콜릿. 속에 위스키가 들어 있다(초콜릿이면 세이프!). 먹으면 기운이 10 찬다.', eat: 10 }
 };
 registerItems(QUEST_ITEMS);
 
@@ -66,7 +68,8 @@ export const PLACES = {
   pier: { name: '선착장', r: 3 },
   diner: { name: '별 세 개', r: 2.8 }, // 동쪽 들판 길가(이야기를 받은 동안만 가게가 있다 — world/stardiner.js)
   chiiHome: { name: '치이카와네', r: 2.8 }, // 치이카와 집 문 앞
-  starfield: { name: '동쪽 들판', r: 5 } // 동쪽 문 바로 바깥 길가 풀밭(별 보며 풀 뽑기)
+  starfield: { name: '동쪽 들판', r: 5 }, // 동쪽 문 바로 바깥 길가 풀밭(별 보며 풀 뽑기)
+  bonbonVine: { name: '초콜릿 덩굴', r: 2.8 } // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -313,6 +316,21 @@ export const QUESTS = {
         say: ['비 오네~ 그래도 오늘은… 진짜 오늘이야!', '{name}, 러스크 먹고 힘내! 헤헤.'] }
     ],
     reward: { bond: 2, friends: { chiikawa: 4, usagi: 2 }, items: { rusk: 3 }, story: 'blackStar' }
+  },
+  // 위스키 봉봉(원작 2025년 1월 연재분: 우사기가 숲에서 찾은 신기한 초콜릿을 셋이 먹고 취한다 → 포셰트 갑옷 씨 "초콜릿이면 세이프!" →
+  // 덩굴을 당기자 머리에서 덩굴이 자란 새하얀 큰 뱀 → 셋이 삼켜졌다가 갑옷 씨가 너클 더스터로 구한다). 연출은 stories/bonbon.js
+  whiskeyBonbon: {
+    title: '위스키 봉봉', giver: 'usagi', side: true, minDay: 10, hours: [9, 16], needHearts: 2, ask: '우라?',
+    offer: ['(우사기 입가에 초콜릿이 잔뜩 묻어 있다…)', '야하! (숲 쪽을 가리키며 동그란 초콜릿을 내민다)',
+      { who: 'hachiware', text: '우사기가 숲에서 신기한 초콜릿을 찾았대! 따도 따도 또 열린대~' },
+      { who: 'chiikawa', text: '…!! (초콜릿…!)' }, { who: 'hachiware', text: '{name}, 우리 같이 먹으러 가자!' }],
+    steps: [{
+      type: 'visit', place: 'bonbonVine', hours: [10, 17], scene: 'whiskeyBonbon', speaker: 'hachiware',
+      goal: '서쪽 숲의 초콜릿 덩굴로 가자! (오전 10시 ~ 오후 5시)',
+      say: ['헤헤… 아직도 세상이 빙글빙글 돌아~', '(하치와레가 반들반들해진 뒤꿈치를 자꾸 내려다본다)', { who: 'chiikawa', text: '…(꾸벅꾸벅 졸린 얼굴)' },
+        '우사기는 어디까지 뛰어갔을까~? 다음엔 초콜릿 말고 라멘 먹으러 가자, {name}!', '(주머니를 보니 위스키 봉봉 두 알이 들어 있었다)']
+    }],
+    reward: { bond: 2, friends: { pochette: 3, chiikawa: 2, hachiware: 2 }, items: { bonbon: 2 }, story: 'bonbonDone' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

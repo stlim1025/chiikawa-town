@@ -2,8 +2,9 @@
  * 섬 편 놀이 화면: 연타(mash) · 타이밍(timing). 박자 화면(ui/rhythm.js)처럼 자기 버튼과 스페이스 · 엔터로 누른다
  * (시네마틱 화면에서는 평소 행동 버튼 · 게이지가 숨겨지므로 따로 그린다). 실패해서 끝나는 일은 없다.
  * mash({ label, button, gain, decay, onTick(p), onDone() }): 누를 때마다 gain 만큼 차고, 가만히 있으면 초당 decay 만큼 준다. 다 차면 끝.
- * timing({ label, button, need, zone: [from, to], speed, grow, onTick(p), onHit(n), onMiss(), onDone(misses) }):
+ * timing({ label, button, need, zone: [from, to], speed, grow, wobble, onTick(p), onHit(n), onMiss(), onDone(misses) }):
  *   바늘이 왔다 갔다 하는 동안 초록 칸에서 누른다. need 번 맞히면 끝. 빗나가면 칸이 grow 만큼 넓어진다.
+ *   wobble(0 ~ 1, 없으면 0): 바늘이 취한 듯 빨라졌다 느려졌다 한다(위스키 봉봉의 취권 펀치).
  * update(dt) · stop() · active
  */
 const WORDS = { good: '좋아!', miss: '빗나감…' };
@@ -56,8 +57,8 @@ export function createMinigame(ui) {
       pips.replaceChildren();
       draw();
     },
-    timing({ label, button = '지금!', need = 3, zone: z = [0.42, 0.58], speed = 0.9, grow = 0.04, ...cb }) {
-      run = { kind: 'timing', p: 0, ph: 0, speed, zone: [...z], grow, need, hits: 0, misses: 0, cb, lock: 0 };
+    timing({ label, button = '지금!', need = 3, zone: z = [0.42, 0.58], speed = 0.9, grow = 0.04, wobble = 0, ...cb }) {
+      run = { kind: 'timing', p: 0, ph: 0, speed, zone: [...z], grow, need, hits: 0, misses: 0, cb, lock: 0, wobble, wt: 0 };
       show(label, button, 'timing');
       draw();
     },
@@ -92,7 +93,8 @@ export function createMinigame(ui) {
       if (run.kind === 'mash') run.p = Math.max(0.02, run.p - run.decay * dt);
       else {
         run.lock = Math.max(0, run.lock - dt);
-        run.ph += dt * run.speed * Math.PI;
+        run.wt += dt;
+        run.ph += dt * run.speed * Math.PI * (1 + run.wobble * Math.sin(run.wt * 2.7)); // wobble: 취한 듯 빨라졌다 느려졌다
         run.p = (1 - Math.cos(run.ph)) / 2;
       }
       run.cb.onTick?.(run.p);
