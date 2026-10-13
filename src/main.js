@@ -1041,6 +1041,37 @@ function boot() {
         commit({ ...startQuest({ ...state, quests: qs }, 'islandCamp'), clock: { day: Math.max(8, state.clock.day), t: (8 - 6) / 24 } });
         player.setPosition(pier.spot.x - 3, pier.spot.z - 5);
         cam.snap(player.position);
+      },
+      /** 별 세 개: show 면 가게 안 장면만 바로(보상 없음), 아니면 부탁을 받은 채 저녁 7시 가게 앞(걸어 들어가면 시작 · 보상까지). */
+      starDiner(show) {
+        if (starDiner.active) return;
+        if (show) { starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.starDiner;
+        commit({ ...startQuest({ ...state, quests: qs }, 'starDiner'), clock: { day: Math.max(5, state.clock.day), t: (19 - 6) / 24 } });
+        player.setPosition(dinerFront.spot.x, dinerFront.spot.z + 4);
+        cam.snap(player.position);
+      },
+      /**
+       * 검은 별똥별: 부탁을 받은 채 그 단계 앞으로(시각 · 장소 · 되풀이 상태까지 맞춰서, 걸어 들어가면 시작 · 보상까지).
+       * at: 'wish' 들판 별밤 · 'dejavu' 되돌아온 같은 아침 · 'watch' 밤 12시 전 · 'soak' 표백제 담그기 · 'rain' 비 오는 다음 날 아침.
+       */
+      blackStar(at) {
+        if (blackStar.active) return;
+        const step = { wish: 0, dejavu: 2, watch: 3, soak: 7, rain: 8 }[at], hour = { wish: 21, dejavu: 8, watch: 22.5, soak: 21, rain: 8 }[at];
+        const qs = { ...(state.quests || {}) };
+        delete qs.blackStar;
+        let s = startQuest({ ...state, quests: qs }, 'blackStar');
+        const day = Math.max(9, s.clock.day), story = { ...(s.story || {}) };
+        delete story.blackLoop;
+        delete story.blackFree;
+        if (at === 'dejavu' || at === 'watch' || at === 'soak') story.blackLoop = { day, n: 1, mark: 0 }; // 한 번 되돌아온 같은 날
+        if (at === 'rain') story.blackFree = day - 1; // 어젯밤에 쫓아냈다
+        s = { ...s, story, quests: { ...s.quests, blackStar: { ...s.quests.blackStar, step } }, clock: { day, t: (hour - 6) / 24 } };
+        commit(s);
+        const p = at === 'wish' ? STAR_FIELD : homeDoor('chiikawa');
+        player.setPosition(p.x + 3, p.z + 3);
+        cam.snap(player.position);
       }
     },
     toggleSound: (kind) => sound.toggle(kind),

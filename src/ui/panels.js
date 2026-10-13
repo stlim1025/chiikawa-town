@@ -183,7 +183,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev', 'search'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
   // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
   const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
@@ -1153,14 +1153,7 @@ export function createPanels(ui, handlers) {
         row('제초 검정', `지금 ${gradeName(s.license.grade)}`, b('올리기', () => handlers.dev.grade(1)), b('내리기', () => handlers.dev.grade(-1))),
         row('시각', timeLabel(s.clock), b('아침', () => handlers.dev.hour(8)), b('밤', () => handlers.dev.hour(22))),
         row('별똥별맨', '바로 보기(미리 보기라 소원은 안 이뤄져요)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.starfall(); } }, '보기')),
-        row('우사기의 집', '바로 시작(밤 9시 광장, 몰래 따라가기부터)', h('button', { class: 'btn primary', type: 'button', onClick: () => { close(true); handlers.dev.usagiHome(); } }, '시작')),
-        row('우사기 클럽', '춤만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.club(); } }, '가기')),
-        row('피자호빵 소식', '라멘 로우 새 메뉴와 우사기 이야기 표시', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pizzaNews(); } }, '띄우기')),
-        row('잠옷 밤나들이', '밤 9시, 내 집 앞(귀 달린 잠옷 입고)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajama(); } }, '가기')),
-        row('파자마 파티즈', '밤 8시 광장 앞(부탁 받은 채로), 또는 무대만 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty(); } }, '광장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.pajamaParty('show'); } }, '무대')),
-        row('수상한 섬 합숙', '다음 날 아침 선착장 앞, 또는 장면부터 바로(보상 없음)', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island(); } }, '선착장'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('cave2'); } }, '동굴'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.island('battle'); } }, '결전')),
-        row('하치와레 구덩이', '숲 구덩이 앞에 덩굴풀 3개 들고', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.hachiPit(); } }, '가기')),
-        row('시사의 슈퍼 알바이터', '저녁 공부 또는 시험 날 바로', h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaStudy(); } }, '공부'), h('button', { class: 'btn', type: 'button', onClick: () => { close(true); handlers.dev.shisaExam(); } }, '시험')),
+        row('사이드스토리', '이야기마다 바로 시작하기', h('button', { class: 'btn primary', type: 'button', onClick: () => show('devStories') }, '열기')),
         ...['liquor', 'arbeiter', 'hunter'].map((id) => { const has = hasLicense(s, id); return row(LICENSES[id].name, has ? '있음' : '없음', b(has ? '없애기' : '따기', () => handlers.dev.license(id, !has), has ? 'btn' : 'btn primary')); }),
         // 그래픽 진단: 몬스터가 이상하게 보일 때 그 자리에서 복사해 알려 주면 원인을 찾을 수 있다
         row('그래픽 진단', '몬스터 근처에서 복사', h('button', { class: 'btn', type: 'button', onClick: (e) => {
@@ -1171,6 +1164,25 @@ export function createPanels(ui, handlers) {
           btn.closest('.row').after(h('pre', { class: 'diag-text' }, text));
         } }, '복사')),
         h('p', { class: 'note' }, '마을폰 제목을 다시 다섯 번 누르면 이 앱이 숨어요.')];
+    },
+    // 테스트 앱 안의 '사이드스토리' 메뉴: 이야기마다 바로 시작하기(원작 순서). 부탁을 받은 채 그 자리 근처로 가면 보상까지, '장면만'은 보상 없이
+    devStories() {
+      const row = (t, d, ...btns) => h('div', { class: 'row dev-row' }, h('div', {}, h('div', { class: 't' }, t), h('div', { class: 'd' }, d)), h('div', { class: 'dev-btns' }, ...btns));
+      const go = (label, fn, cls = 'btn') => h('button', { class: cls, type: 'button', onClick: () => { close(true); fn(); } }, label);
+      const D = handlers.dev;
+      return [appBar('사이드스토리', '테스트', 'dev'),
+        h('p', { class: 'sub' }, '부탁을 받은 채로 그 자리 근처에 세워 줘요. 걸어 들어가면 보상까지, 장면만 보기는 보상 없이 바로.'),
+        row('우사기의 집', '밤 9시 광장, 몰래 따라가기부터', go('시작', () => D.usagiHome(), 'btn primary')),
+        row('우사기랑 클럽', '되풀이 이야기, 클럽 춤만 바로(보상 없음)', go('가기', () => D.club())),
+        row('우사기의 피자호빵', '라멘 로우 새 메뉴 소식과 우사기 이야기 표시', go('띄우기', () => D.pizzaNews())),
+        row('시사의 슈퍼 알바이터', '저녁 공부 또는 시험 날 검정소 앞', go('공부', () => D.shisaStudy()), go('시험', () => D.shisaExam())),
+        row('하치와레가 구덩이에!', '숲 구덩이 앞에 덩굴풀 3개 들고', go('가기', () => D.hachiPit())),
+        row('잠옷 밤나들이', '밤 9시 내 집 앞, 귀 달린 잠옷 입고', go('가기', () => D.pajama())),
+        row('수상한 섬 합숙', '다음 날 아침 선착장 앞, 또는 동굴과 결전 장면부터(보상 없음)', go('선착장', () => D.island()), go('동굴', () => D.island('cave2')), go('결전', () => D.island('battle'))),
+        row('파자마 파티즈', '밤 8시 광장 앞, 또는 무대만 바로(보상 없음)', go('광장', () => D.pajamaParty()), go('무대', () => D.pajamaParty('show'))),
+        row('별 세 개', '저녁 7시 가게 앞, 또는 가게 안 장면만(보상 없음)', go('가게 앞', () => D.starDiner()), go('장면만', () => D.starDiner('show'))),
+        row('검은 별똥별', '그 단계 앞에 시각과 되풀이 상태까지 맞춰서: 별밤 들판, 되돌아온 같은 아침, 밤 12시 전, 표백제 담그기, 비 오는 아침',
+          go('들판', () => D.blackStar('wish')), go('같은 아침', () => D.blackStar('dejavu')), go('밤 12시', () => D.blackStar('watch')), go('담그기', () => D.blackStar('soak')), go('비', () => D.blackStar('rain')))];
     },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
     weeds(s) {
