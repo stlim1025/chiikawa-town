@@ -62,7 +62,36 @@ export function createHud(ui, input) {
   const moreBtn = el('button', 'hud-quest-more');
   moreBtn.type = 'button';
   moreBtn.hidden = true;
-  quests.appendChild(moreBtn); // 늘 맨 끝(쪽지는 그 앞에 끼운다)
+  // 퀘스트 쪽지를 왼쪽으로 통째로 숨기기 · 꺼내기: 숨기면 쪽지 수만 적힌 작은 단추가 남는다(고른 것은 이 브라우저에 기억)
+  const STOW_KEY = 'chiikawa-town-quests-stowed';
+  let stowed = false;
+  try { stowed = localStorage.getItem(STOW_KEY) === '1'; } catch { /* 저장이 막혀 있으면 늘 펼친 채로 */ }
+  const stowBtn = el('button', 'hud-quest-stow');
+  stowBtn.type = 'button';
+  const qbar = el('div', 'hud-quest-bar');
+  qbar.hidden = true;
+  qbar.append(moreBtn, stowBtn);
+  quests.appendChild(qbar); // 늘 맨 끝(쪽지는 그 앞에 끼운다)
+  function applyStow() {
+    quests.classList.toggle('stowed', stowed);
+    const n = quests.querySelectorAll('.hud-quest').length;
+    stowBtn.textContent = stowed ? `퀘스트 ${n}` : '숨기기';
+    stowBtn.title = stowed ? '퀘스트 쪽지 꺼내기' : '퀘스트 쪽지를 왼쪽으로 숨기기';
+    stowBtn.setAttribute('aria-pressed', String(stowed));
+  }
+  stowBtn.addEventListener('click', () => {
+    const shown = [...quests.querySelectorAll('.hud-quest')].filter((e) => !e.hidden);
+    const slide = (on) => { stowed = on; try { localStorage.setItem(STOW_KEY, on ? '1' : '0'); } catch { /* 기억 못 해도 지금은 바뀐다 */ } applyStow(); foldQuests(); };
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!stowed && shown.length && !still && shown[0].animate) {
+      // 왼쪽으로 쓱 빠진 뒤 숨긴다
+      shown.forEach((e) => e.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateX(-110%)', opacity: 0 }], { duration: 220, easing: 'ease-in', fill: 'forwards' }));
+      setTimeout(() => { slide(true); shown.forEach((e) => e.getAnimations().forEach((a) => a.cancel())); }, 220);
+      return;
+    }
+    slide(!stowed);
+    if (!stowed && !still) [...quests.querySelectorAll('.hud-quest')].filter((e) => !e.hidden).forEach((e) => e.animate?.([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'ease-out' }));
+  });
   let questsOpen = false;
   let questsPeek = 0; // 새 퀘스트 카드가 날아오는 동안 접힌 목록을 잠깐 펼쳐 둔 수(다 꽂히면 다시 접는다)
   const narrowMq = window.matchMedia('(max-width: 820px), (max-height: 520px)');
@@ -80,7 +109,9 @@ export function createHud(ui, input) {
       e.hidden = !show;
       if (!show) hidden++;
     });
-    moreBtn.hidden = items.length - pinned <= room; // 접어도 숨을 쪽지가 없으면 단추도 없다
+    moreBtn.hidden = stowed || items.length - pinned <= room; // 접어도 숨을 쪽지가 없으면 단추도 없다(통째로 숨겼으면 꺼내기 단추만)
+    qbar.hidden = !items.length;
+    applyStow();
     moreBtn.textContent = questsOpen ? '접기' : `퀘스트 ${hidden}개 더`;
     moreBtn.setAttribute('aria-expanded', String(questsOpen));
   }
@@ -390,13 +421,17 @@ export function createHud(ui, input) {
         if (cs.dataset.k !== ck) {
           cs.dataset.k = ck;
           cs.replaceChildren(...(q.chips || []).map((c) => {
-            const ch = el('span', 'q-chip' + (c.done ? ' done' : ''));
+            const ch = el('span', 'q-chip' + (c.done ? ' done' : '') + (c.text.length <= 1 ? ' one' : '')); // 한 마리 · 한 개면 그림만(다 하면 ✓)
             ch.innerHTML = c.icon + '<span class="q-n"></span>';
             ch.querySelector('.q-n').textContent = c.text;
             return ch;
           }));
         }
         cs.hidden = !(q.chips && q.chips.length);
+        // 꼬리표가 여럿이면 목표 글 아래 칸(쪽지의 다음 줄)으로: 글 옆에 붙이면 쪽지 폭이 글과 꼬리표를 한 줄로 늘어놓은 만큼 커졌다
+        const row = !!q.chips && q.chips.length >= 2, host = row ? e : e.querySelector('span');
+        if (cs.parentNode !== host) host.insertBefore(cs, row ? pin : null);
+        cs.classList.toggle('row', row);
         const k = q.goal + '|' + (q.n || '') + '|' + ck;
         if (nt.key && nt.key !== k && !incoming.has(q.id)) { e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); }
         nt.key = k;
@@ -526,7 +561,8 @@ export function createHud(ui, input) {
      */
     announce({ kicker, title, sub, to = 'job', id = null, chips = null, target = null, look = null }) {
       const toQuest = to === 'quest' && !target;
-      if (toQuest && id) {
+      if (toQuest && stowed) target = stowBtn; // 쪽지를 숨겨 두었으면 꺼내기 단추로 날아가 반짝인다
+      if (toQuest && id && !stowed) {
         incoming.set(id, (incoming.get(id) || 0) + 1);
         notes.get(id)?.el.classList.add('incoming');
         if (!questsOpen || questsPeek) { questsPeek++; questsOpen = true; } // 접혀 있었으면 카드가 날아와 꽂히는 동안만 목록을 펼친다

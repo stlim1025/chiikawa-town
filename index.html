@@ -1494,7 +1494,19 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest .q-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 9px 1px 3px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-quest .q-chip svg { width: 24px; height: 24px; margin: -4px 0; flex: 0 0 auto; }
 .hud-quest .q-chip.done { background: #c9eccf; color: #2f6b3c; }
+.hud-quest .q-chip.one { padding: 0 5px 1px 3px; }
+.hud-quest > .q-chips { grid-column: -2 / -1; margin-top: 3px; } /* 꼬리표가 여럿이면 목표 글 아래 칸 */
 .hud-quests:empty { display: none; }
+/* 퀘스트 쪽지 아래 단추 줄: 더 보기 · 접기, 숨기기(◂). 숨기면 쪽지는 모두 빠지고 '퀘스트 N ▸' 꺼내기 단추만 */
+.hud-quest-bar { display: flex; align-items: center; gap: 6px; }
+.hud-quest-stow { pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px 5px 10px; border: 2px solid #fff; border-radius: 999px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); color: var(--ink-soft); font: inherit; font-size: 14px; cursor: pointer; position: relative; }
+.hud-quest-stow::before { content: "◂"; font-size: 12px; line-height: 1; }
+.hud-quest-stow:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+.hud-quests.stowed .hud-quest-stow { padding: 3px 10px 5px 14px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); }
+.hud-quests.stowed .hud-quest-stow::before { content: none; }
+.hud-quests.stowed .hud-quest-stow::after { content: "▸"; font-size: 12px; line-height: 1; }
+.hud-quests.stowed > .hud-quest { display: none !important; }
+.hud-quest-stow.shine { animation: q-shine 1.4s ease-out; }
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
   .hud-quest { grid-template-columns: 1fr; padding: 4px 12px 6px 10px; }

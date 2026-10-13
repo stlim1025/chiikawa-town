@@ -2338,7 +2338,8 @@ function boot() {
   };
   const sayAs = (n, lines, then) => guide.say(lines.map(fillName), then, whoOf(n));
   /** 퀘스트 물건 · 몬스터 꼬리표: 그림 + 모은 수 / 필요한 수(다 모으면 초록). */
-  const partChips = (g) => g.parts.map((pt) => ({ icon: pt.kind === 'monster' ? monsterSvg(pt.id) : itemSvg(pt.id), text: `${pt.have}/${pt.need}`, done: pt.have >= pt.need }));
+  // 한 마리 · 한 개짜리는 0/1 대신 그림만(다 하면 ✓) — 구역 보스 셋처럼 꼬리표가 많으면 쪽지가 너무 커졌다
+  const partChips = (g) => g.parts.map((pt) => ({ icon: pt.kind === 'monster' ? monsterSvg(pt.id) : itemSvg(pt.id), text: pt.need === 1 ? (pt.have >= 1 ? '✓' : '') : `${pt.have}/${pt.need}`, done: pt.have >= pt.need }));
   /** '부탁 다시 듣기' 대사 한 줄: 목표 한 문장 + 꼬리표(모은 수, 어디서 · 언제). */
   const goalLine = (id) => {
     const t = goalText(state, id), g = shortGoal(state, id), chips = partChips(g);
