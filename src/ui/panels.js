@@ -29,7 +29,7 @@ import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
-import { charSvg } from './art.js';
+import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
 import { PRIZES, RAFFLE_PRICE, DAILY_TICKETS, raffleOf } from '../core/raffle.js';
 import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
@@ -669,7 +669,7 @@ export function createPanels(ui, handlers) {
     // 마을폰 '퀘스트' 앱: 하는 중인 부탁(화면에 띄울 것 고르기) · 끝낸 부탁
     quests(s) {
       const track = pickTrack(s);
-      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko'].includes(kind)
+      const face = (kind) => (hasCharArt(kind)
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
       const card = (id, kind) => {
@@ -702,7 +702,7 @@ export function createPanels(ui, handlers) {
       const hourLabel = (hr) => { const hh = Math.floor(hr); return `${hh < 12 ? '오전' : '오후'} ${((hh + 11) % 12) + 1}시`; };
       const total = kinds.reduce((a, k) => a + hearts(friendOf(s, k)), 0);
       const HEART = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17.5S2.5 12.8 2.5 7.6A4 4 0 0 1 10 5.4a4 4 0 0 1 7.5 2.2c0 5.2-7.5 9.9-7.5 9.9z"/></svg>';
-      const face = (kind) => (['chiikawa', 'hachiware', 'usagi', 'momonga', 'kurimanju', 'rakko'].includes(kind)
+      const face = (kind) => (hasCharArt(kind) // 그림이 없는 친구만 이름표 색 동그라미에 첫 글자
         ? svgSpan('q-face', `<svg viewBox="-6 -8 76 76" aria-hidden="true">${charSvg(kind)}</svg>`)
         : h('span', { class: 'q-face mono', style: `--tag:${FRIENDS[kind].tag};--ink:${FRIENDS[kind].ink}` }, FRIENDS[kind].name.slice(0, 1)));
       const out = [appBar('친구', `하트 ${total}개`)];

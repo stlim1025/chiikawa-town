@@ -208,10 +208,69 @@ const ART = {
     const dots = [[84, 121], [80, 127], [116, 121], [120, 127]].map(([x, y]) => E(x, y, 1.6, 1.6, LINE, 0)).join('');
     return cape + hilt + P(body, FUR) + ticks + ears + scarf + paws + star + eyes(108, 23, 6, 5.4) +
       E(100, 117, 5, 3.6, LINE, 0) + mouth(123, 6) + dots + cheeks(124, 46, 12, 8);
+  },
+
+  // ---------- 마을 사람(마을폰 친구 앱 · 지도 얼굴): 3D 모델(actors/models.js)과 같은 색 ----------
+  shisa() {
+    const Y = '#f7cf5e', MANE = '#e8833a';
+    // 머리 둘레로 주황 갈기(동글동글 곱슬)가 빙 둘러 있고, 이마에도 곱슬 셋
+    let mane = '';
+    for (let i = 0; i <= 12; i++) {
+      const a = Math.PI * (0.98 + i * 0.087), x = 100 + 80 * Math.cos(a), y = 104 + 72 * Math.sin(a);
+      if (y > 150) continue;
+      mane += E(x.toFixed(1), y.toFixed(1), 16, 15, MANE);
+    }
+    const body = bodyPath('mochi', { r: 'out', l: 'down' });
+    const curls = E(84, 42, 10, 9, MANE) + E(100, 37, 10, 9, MANE) + E(116, 42, 10, 9, MANE);
+    return mane + P(body, Y) + curls + eyes(112, 24, 6, 7.5) + cheeks(124, 47) + mouth(127, 7);
+  },
+
+  kani() {
+    const K = '#fbd1d8', K2 = '#f297a6', CLAW = '#ef6f7f';
+    // 분홍 몸, 머리 윗부분은 진한 분홍, 머리 위에 빨간 집게 둘(V 자로 벌어졌다). 눈썹이 있고 이를 드러내고 웃는다
+    const body = bodyPath('mochi', { r: 'out', l: 'out' });
+    const top = P('M31.8 74A76 68 0 0 1 168.2 74Q100 90 31.8 74Z', K2, 0);
+    const claw = (x, rot) => `<g transform="rotate(${rot} ${x} 40)">` +
+      P(`M${x - 13} 50Q${x - 20} 26 ${x - 7} 12L${x - 1} 28L${x + 6} 12Q${x + 20} 26 ${x + 13} 50Z`, CLAW) + '</g>';
+    const brows = P('M68 96L86 101', null, 3.4) + P('M132 96L114 101', null, 3.4);
+    return claw(66, -16) + claw(134, 16) + P(body, K) + top + P(body, null) + brows + eyes(112, 22, 6, 7.5) + cheeks(124, 47) +
+      P('M88 124Q100 136 112 124Z', WHITE, FACE) + P('M94 125.5V129.5M100 126V131M106 125.5V129.5', null, 1.8);
+  },
+
+  captain() {
+    // 대장 갑옷 씨: 금빛 갑옷, 투구 위 빨간 깃털, 등에 빨간 망토
+    const RED = '#e0524f';
+    return knightArt('#e9c24c', '#b8892b', P('M60 106L140 106L160 198L40 198Z', RED),
+      P('M100 30C92 6 122 -4 136 10C122 9 110 15 106 30Z', RED));
+  },
+  ramen() {
+    // 라멘 갑옷 씨(사부님): 연노랑 갑옷에 흰 수건을 머리에 둘렀다
+    return knightArt('#e3d08a', '#b49e55', '', E(100, 50, 42, 8, WHITE, 3.6) + E(143, 54, 8, 6, WHITE, 3) + E(146, 63, 5, 8, WHITE, 3, 20));
+  },
+  labor() {
+    // 노동 갑옷 씨: 회갈색 갑옷, 오른손에 노란 고깔
+    return knightArt('#b3a797', '#857a6c', '', P('M150 178L163 146L176 178Z', '#efc75e') + P('M152 172H174', null, 3));
+  },
+  pochette() {
+    // 포셰트 갑옷 씨: 은빛 갑옷에 분홍 포셰트를 비스듬히 멨다
+    return knightArt('#cdd2d8', '#9aa1aa', '', tube('M64 110L128 152', '#f7a8c4', 5) + `<rect x="120" y="146" width="32" height="24" rx="7"${paint('#f7a8c4', W)}/>` + P('M126 154H146', null, 2.4));
   }
 };
 
-/** 그 캐릭터 그림이 있는지(마을 친구 여섯만 있다). */
+/**
+ * 갑옷 씨(마을 일꾼들): 얼굴 대신 눈구멍 틈이 난 동그란 투구, 투구 위 볏, 넓은 어깨와 허리띠, 굵은 팔다리.
+ * armor 갑옷 색, trim 테두리 색, back 몸 뒤에 그릴 것(망토), front 맨 위에 그릴 것(깃털 · 수건 · 소품).
+ */
+function knightArt(armor, trim, back, front) {
+  const legs = E(80, 182, 15, 17, armor) + E(120, 182, 15, 17, armor) + E(78, 195, 19, 8, trim) + E(122, 195, 19, 8, trim);
+  const arms = E(46, 140, 13, 27, armor, W, 14) + E(154, 140, 13, 27, armor, W, -14) + E(41, 165, 11, 10, trim) + E(159, 165, 11, 10, trim);
+  const body = E(100, 142, 47, 43, armor) + P('M55 156Q100 170 145 156L145 166Q100 181 55 166Z', trim) +
+    E(62, 112, 19, 15, armor) + E(138, 112, 19, 15, armor);
+  const helm = E(100, 72, 42, 46, armor) + `<rect x="66" y="66" width="68" height="13" rx="5" fill="#2f2a2c"/>` + E(100, 32, 6, 13, trim);
+  return back + legs + arms + body + helm + front;
+}
+
+/** 그 캐릭터 그림이 있는지(마을 친구 여섯 + 마을 사람 여섯: 시사 · 카니 · 갑옷 씨 넷). */
 export const hasCharArt = (kind) => typeof ART[kind] === 'function';
 /** 캐릭터 그림 조각(<g> 안에 넣는 SVG 문자열). 좌표계는 64x64, 발끝이 y≈61. */
 export function charSvg(kind) {
