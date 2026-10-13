@@ -114,11 +114,11 @@ test('story chain steps & visit', () => {
   assert.ok(S.isValidState(s));
 });
 test('weapon reward falls back to money', () => {
-  let s = withHearts({ ...fresh(), licenses: { hunter: { day: 1 } }, weapon: { owned: ['hammer'], held: 'hammer' } }, 'rakko', 2);
+  let s = withHearts({ ...fresh(), licenses: { hunter: { day: 1 } }, weapon: { owned: ['sword'], held: 'sword' } }, 'rakko', 2);
   s = Q.startQuest(s, 'training');
   s = { ...s, hunted: { fluff: 3 } };
   const r = Q.completeStep(s, 'training', 1);
-  assert.equal(r.state.money, 1000 + 300 + Math.round(C.WEAPONS.hammer.price / 2));
+  assert.equal(r.state.money, 1000 + 300 + Math.round(C.WEAPONS.sword.price / 2));
 });
 test('save rejects bad quests', () => {
   assert.ok(!S.isValidState({ ...fresh(), quests: { nope: { step: 0, base: 0 } } }));
