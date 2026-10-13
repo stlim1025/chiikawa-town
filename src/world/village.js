@@ -95,11 +95,12 @@ export function buildVillage(scene) {
   const ground = new THREE.Mesh(groundGeo, toonMaterial('#ffffff', { vertexColors: true }));
   ground.receiveShadow = true;
   world.add(ground);
-  // 월드 끝 너머의 보스 마당(두더지 굴밭) 둘레 땅: 같은 색 계산으로 이어 깐다(맵 끝 땅보다 아주 조금 아래 — 겹치는 띠에서 깜빡이지 않게)
+  // 월드 끝 너머의 보스 마당(동쪽 두더지 굴밭 · 북쪽 왕버섯 굴) 둘레 땅: 같은 색 계산으로 이어 깐다(맵 끝 땅보다 아주 조금 아래 — 겹치는 띠에서 깜빡이지 않게)
   for (const A of ARENAS) {
-    const x0 = WORLD_HALF + 3.5, x1 = A.x + A.r + 48;
-    if (A.x + A.r + ARENA_WALL <= WORLD_HALF) continue;
-    const z0 = A.z - A.r - 40, z1 = A.z + A.r + 30;
+    let x0, x1, z0, z1;
+    if (A.x + A.r + ARENA_WALL > WORLD_HALF) { x0 = WORLD_HALF + 3.5; x1 = A.x + A.r + 48; z0 = A.z - A.r - 40; z1 = A.z + A.r + 30; }
+    else if (A.z - A.r - ARENA_WALL < -WORLD_HALF) { x0 = A.x - A.r - 40; x1 = A.x + A.r + 40; z0 = A.z - A.r - 48; z1 = -WORLD_HALF - 3.5; } // 카메라가 북쪽을 보니 뒤로 더 멀리
+    else continue;
     const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.ceil((x1 - x0) / 1.6), Math.ceil((z1 - z0) / 1.6)).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, -0.006, (z0 + z1) / 2);
     const p = geo.attributes.position, c = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++) { groundColor(p.getX(i), p.getZ(i), tmp); c.set([tmp.r, tmp.g, tmp.b], i * 3); }
@@ -721,7 +722,9 @@ export function buildVillage(scene) {
   for (let h = 0; h < 26; h++) {
     const a = (h / 26) * Math.PI * 2 + rand() * 0.3, d = 104 + rand() * 10, w = 10 + rand() * 5;
     if (Math.cos(a) > 0.6) continue; // 남쪽은 바다: 수평선이 트이게(바다 절벽에서 별 볼 때)
-    world.add(toonMesh(GEO.sphere, h % 2 ? '#aee08f' : '#95d488', { position: [Math.sin(a) * d, -0.6, Math.cos(a) * d], scale: [w, 4 + rand() * 4, w], outline: false, shadow: false }));
+    const hx = Math.sin(a) * d, hz = Math.cos(a) * d, hh = 4 + rand() * 4;
+    if (ARENAS.some((A) => Math.hypot(hx - A.x, hz - A.z) < w + 18)) continue; // 월드 끝 너머 보스 마당(왕버섯 굴 · 두더지 굴밭)에 겹치는 언덕은 뺀다(난수는 그대로)
+    world.add(toonMesh(GEO.sphere, h % 2 ? '#aee08f' : '#95d488', { position: [hx, -0.6, hz], scale: [w, hh, w], outline: false, shadow: false }));
   }
   for (let c = 0; c < 10; c++) {
     const g = new THREE.Group();
@@ -757,12 +760,13 @@ export function buildVillage(scene) {
   let nightK = -1;
 
   // ---------- 길찾기: 월드 전체 0.5 칸 격자(칸마다 처음 볼 때 그때까지 놓인 단단한 장애물 · 물로 정한다) ----------
-  // 동쪽은 월드 끝 너머의 보스 마당(두더지 굴밭)까지 늘린다: 같이 토벌하는 친구도 따라 들어온다
-  const NAV = 0.5, NAV_N = Math.ceil((WORLD_HALF * 2) / NAV), NAV_R = 0.38;
+  // 동쪽 · 북쪽은 월드 끝 너머의 보스 마당(두더지 굴밭 · 왕버섯 굴)까지 늘린다: 같이 토벌하는 친구도 따라 들어온다
+  const NAV = 0.5, NAV_R = 0.38;
   const NAV_EAST = Math.max(WORLD_HALF, ...ARENAS.map((A) => A.x + A.r + ARENA_WALL + 2)), NAV_NX = Math.ceil((NAV_EAST + WORLD_HALF) / NAV);
+  const NAV_NORTH = Math.max(WORLD_HALF, ...ARENAS.map((A) => -(A.z - A.r - ARENA_WALL - 2))), NAV_N = Math.ceil((NAV_NORTH + WORLD_HALF) / NAV);
   const nav = new Uint8Array(NAV_NX * NAV_N); // 0 아직 모름 · 1 열림 · 2 막힘
-  const navPos = (i, j) => [-WORLD_HALF + (i + 0.5) * NAV, -WORLD_HALF + (j + 0.5) * NAV];
-  const navCell = (x, z) => [Math.min(NAV_NX - 1, Math.max(0, Math.floor((x + WORLD_HALF) / NAV))), Math.min(NAV_N - 1, Math.max(0, Math.floor((z + WORLD_HALF) / NAV)))];
+  const navPos = (i, j) => [-WORLD_HALF + (i + 0.5) * NAV, -NAV_NORTH + (j + 0.5) * NAV];
+  const navCell = (x, z) => [Math.min(NAV_NX - 1, Math.max(0, Math.floor((x + WORLD_HALF) / NAV))), Math.min(NAV_N - 1, Math.max(0, Math.floor((z + NAV_NORTH) / NAV)))];
   function navBlocked(i, j) {
     const k = j * NAV_NX + i;
     if (!nav[k]) { const [x, z] = navPos(i, j); nav[k] = isFree(x, z, NAV_R) ? 1 : 2; }

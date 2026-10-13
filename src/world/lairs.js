@@ -131,13 +131,13 @@ function fences(A, obstacles) {
   for (let along = R - 0.4; along <= to; along += 1) for (const sd of [-1, 1]) push(fx * along + fz * side * sd, fz * along - fx * side * sd);
 }
 
-/** 월드 동쪽 끝(WORLD_HALF) 너머에 있는 마당(두더지 굴밭): 입구만 맵 끝자락에 나와 있다. */
-const beyondEdge = (A) => A.x + A.r + ARENA_WALL > WORLD_HALF;
+/** 월드 동쪽 · 북쪽 끝(WORLD_HALF) 너머에 있는 마당(두더지 굴밭 · 왕버섯 굴): 입구만 맵 끝자락에 나와 있다. */
+const beyondEdge = (A) => A.x + A.r + ARENA_WALL > WORLD_HALF || A.z - A.r - ARENA_WALL < -WORLD_HALF;
 const MOUND = ['#aee08f', '#95d488'];
 
 /**
  * 월드 끝 너머 마당 A 둘레의 큰 둔덕(월드 좌표, 아니면 빈 배열): [{ x, z, s(반지름), h(높이), wall(울타리로도 막는지) }].
- *  협곡 입구 양옆은 맵 끝 둔덕만 하게 셋씩(outdoors.js 가 협곡 자리 맵 끝 둔덕을 비운다 · 그 자리 나무 · 꽃도 이걸 보고 비운다),
+ *  협곡 입구 양옆은 맵 끝 둔덕 · 절벽 바위만 하게 셋씩(outdoors.js 가 협곡 자리 맵 끝 둔덕 · 절벽을 비운다 · 그 자리 나무 · 꽃 · 바위도 이걸 보고 비운다),
  *  분지 뒤(협곡 반대쪽 반 바퀴 남짓)는 더 큰 언덕을 둘러 세워 맵 너머 빈 땅이 보이지 않게. 카메라 쪽(남쪽)은 낮게.
  */
 export function edgeMounds(A) {
@@ -174,9 +174,10 @@ export function buildLairs({ zones, obstacles, labels, fader }) {
       buildMass(T, s, i, f ? (c) => f.mat(c) : (c) => toonMaterial(c), (mesh) => { g.add(mesh); if (f) f.add(mesh); return mesh; });
       obstacles.push({ x: A.x + s.x, z: A.z + s.z, r: T.w * s.k * 0.8 });
     });
-    // 월드 끝 너머 마당: 입구 양옆 · 분지 뒤 큰 둔덕
+    // 월드 끝 너머 마당: 입구 양옆 · 분지 뒤 큰 둔덕(들판) · 절벽 바위(바위산 — 북쪽 끝 절벽처럼)
     edgeMounds(A).forEach((m, i) => {
-      g.add(toonMesh(GEO.sphere, MOUND[i % 2], { position: [m.x - A.x, -0.8, m.z - A.z], scale: [m.s, m.h, m.s], outline: 0.06, receive: true }));
+      if (T.kind === 'rock') g.add(toonMesh(GEO.sphereMid, T.colors[i % T.colors.length], { position: [m.x - A.x, 0, m.z - A.z], rotation: [0, i * 1.3, 0], scale: [m.s * 1.05, m.h * 1.3, m.s * 0.95], outline: 0.06, receive: true }));
+      else g.add(toonMesh(GEO.sphere, MOUND[i % 2], { position: [m.x - A.x, -0.8, m.z - A.z], scale: [m.s, m.h, m.s], outline: 0.06, receive: true }));
       if (m.wall) obstacles.push({ x: m.x, z: m.z, r: m.s * 0.95 });
     });
     if (DECOR[A.id]) DECOR[A.id](g, A.r);

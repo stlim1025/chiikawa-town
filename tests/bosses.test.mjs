@@ -55,8 +55,8 @@ test('보스 마당 넷(구역 보스 셋 + 왕버섯 굴): 서로 · 마을과 
   }
   const K = Lay.KING_LAIR;
   assert.equal(Lay.regionAt(K.x, K.z), 'mountain', '왕버섯 굴은 바위산');
-  const a = Lay.doorAngle(K), R = K.r + Lay.ARENA_WALL;
-  assert.ok(Lay.roadDist(K.x + Math.sin(a) * R, K.z + Math.cos(a) * R) < 1.5, '왕버섯 굴 입구는 오솔길 위');
+  const e = Lay.canyonMouth(K, K.lead);
+  assert.ok(Lay.roadDist(e.x, e.z) < 1.5, '왕버섯 굴 입구 흙길은 오솔길 끝에서 이어진다');
 });
 
 test('두더지 굴밭은 월드 동쪽 끝 너머: 입구만 맵 끝자락, 마당 · 협곡은 걸어 들어갈 수 있다', () => {
@@ -65,6 +65,14 @@ test('두더지 굴밭은 월드 동쪽 끝 너머: 입구만 맵 끝자락, 마
   assert.ok(m.x < Lay.WALK_HALF && m.x > Lay.WALK_HALF - 8, `입구는 맵 끝자락(${m.x.toFixed(1)})`);
   assert.ok(Lay.lairReach(A.x, A.z) && Lay.lairReach(Lay.WALK_HALF + 3, A.z), '마당 가운데 · 맵 끝 너머 협곡');
   assert.ok(!Lay.lairReach(Lay.WALK_HALF + 3, A.z + 10), '협곡 옆은 아니다');
+});
+
+test('왕버섯 굴은 월드 북쪽 끝 너머: 입구만 맵 끝자락, 마당 · 협곡은 걸어 들어갈 수 있다', () => {
+  const K = Lay.ARENAS.find((x) => x.id === 'kingcap'), m = Lay.canyonMouth(K);
+  assert.ok(K.z + K.r < -Lay.WORLD_HALF, '마당은 월드 끝 너머');
+  assert.ok(m.z > -Lay.WALK_HALF && m.z < -Lay.WALK_HALF + 12, `입구는 맵 끝자락(${m.z.toFixed(1)})`);
+  assert.ok(Lay.lairReach(K.x, K.z) && Lay.lairReach(K.x, -Lay.WALK_HALF - 3), '마당 가운데 · 맵 끝 너머 협곡');
+  assert.ok(!Lay.lairReach(K.x + 10, -Lay.WALK_HALF - 3), '협곡 옆은 아니다');
 });
 
 test('남쪽 보스 자리는 선착장 · 절벽과 겹치지 않는다', () => {

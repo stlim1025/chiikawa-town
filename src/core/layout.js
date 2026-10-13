@@ -60,8 +60,11 @@ export const BOSS_LAIRS = {
   elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터', door: { x: -67, z: -6 }, len: 11 },
   bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭', door: { x: -4, z: 58 } }
 };
-/** 이야기 속 왕버섯 굴: 바위산 오솔길이 끝나는 곳(북쪽 절벽 바위에 끼지 않게 조금 남쪽). 입구는 오솔길 쪽. */
-export const KING_LAIR = { x: -24, z: -58, r: 7, door: { x: -10, z: -48 } };
+/**
+ * 이야기 속 왕버섯 굴: 월드 북쪽 끝 너머(두더지 굴밭처럼 입구만 맵 끝자락). 북쪽 절벽 사이로 남쪽을 향해 길게 뻗은 협곡으로 들어가고,
+ * 입구에서 바위산 오솔길 끝(-22, -58)까지 흙길(lead)로 이어진다. 오솔길(ROADS)은 그대로 둔다(바꾸면 바위산 바위 자리가 줄줄이 바뀐다).
+ */
+export const KING_LAIR = { x: -22, z: -90.4, r: 7, door: { x: -22, z: -66.5 }, len: 16, lead: 8.5 };
 /**
  * 보스 마당(world/lairs.js): 높은 지형(절벽 · 언덕 · 고목)에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡(길이 len, 기본 CANYON.len) 하나로만 들어간다.
  * 구역 보스 셋 + 왕버섯 굴. 일반 몬스터는 분지 · 협곡에 못 들어오고 근처에 생기지도 않으며, 보스 · 부하는 분지 밖으로 못 나간다(world/monsters.js).
@@ -91,7 +94,7 @@ export function canyonMouth(A, extra = 0) {
   const a = doorAngle(A), d = A.r + ARENA_WALL + canyonLen(A) + extra;
   return { x: A.x + Math.sin(a) * d, z: A.z + Math.cos(a) * d };
 }
-/** 보스 마당(울타리까지) · 협곡 안인지: 월드 끝(WALK_HALF) 너머에 있는 마당(두더지 굴밭)도 여기는 걸어 들어갈 수 있다. */
+/** 보스 마당(울타리까지) · 협곡 안인지: 월드 끝(WALK_HALF) 너머에 있는 마당(두더지 굴밭 · 왕버섯 굴)도 여기는 걸어 들어갈 수 있다. */
 export const lairReach = (x, z) => !!(arenaAt(x, z, ARENA_WALL) || canyonAt(x, z, 0.6));
 /** 협곡 입구 밖으로 이어 깐 흙길(lead) 위인지. 이 길에는 꽃 · 나무를 두지 않는다. */
 export function onLairLead(x, z, pad = 0) {

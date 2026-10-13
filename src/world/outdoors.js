@@ -70,13 +70,14 @@ export function buildOutdoors(ctx) {
     const x = (rand() - 0.5) * 152, z = -VILLAGE_R - 4 - rand() * 40;
     if (rand() < 0.75 || Math.abs(x) > Math.abs(z) + 4 || roadDist(x, z) < 2 || Math.hypot(x - CAVE.x, z - CAVE.z) < 8) continue;
     const s = 0.5 + rand() * 1.2, mat = m4(x, 0, z, s * (1 + rand() * 0.4), s * (0.6 + rand() * 0.3), s, rand() * 6);
-    if (arenaClear(x, z)) continue; // 왕버섯 굴 마당 · 입구 앞(난수는 위에서 다 썼다 — 뒤 바위 자리가 바뀌지 않게)
+    if (arenaClear(x, z) || onLairLead(x, z, 2.5) || underEdge(x, z)) continue; // 왕버섯 굴 협곡 · 입구 앞 흙길 · 둘레 절벽(난수는 위에서 다 썼다 — 뒤 바위 자리가 바뀌지 않게)
     addInstance('rock' + (k % 3), GEO.sphereMid, ROCK[k % 3], { outline: 0.045, receive: true }, x, z, mat);
     obstacles.push({ x, z, r: s * 1.05 });
   }
-  // 북쪽 끝 절벽: 큰 바위를 이어 붙인다
+  // 북쪽 끝 절벽: 큰 바위를 이어 붙인다. 왕버섯 굴 협곡이 지나가는 자리는 비운다(난수는 그대로 · 빈 곳 양옆은 world/lairs.js 가 절벽 바위로 메운다)
   for (let x = -WORLD_HALF; x <= WORLD_HALF; x += 4.5) {
     const z = -72 - rand() * 3, s = 3.2 + rand() * 1.6;
+    if (canyonAt(x, z, s * 1.2 + 1)) continue;
     addInstance('cliff', GEO.sphereMid, '#8f8174', { outline: 0.06, receive: true }, x, z, m4(x, 0, z, s * 1.2, s * 1.6, s));
     obstacles.push({ x, z, r: s * 1.1 });
   }
