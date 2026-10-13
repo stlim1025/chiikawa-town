@@ -17,11 +17,18 @@ const SKY_ICON = {
 SKY_ICON.day = SKY_ICON.morning;
 // 새 일감 쪽지 그림(게시판에 꽂힌 메모 + 압정)
 const NOTE = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="9" width="32" height="34" rx="5" fill="#fffaeb" stroke="#5a4431" stroke-width="2.6"/><path d="M15 21h18M15 28h18M15 35h11" stroke="#d6c08e" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="9" r="5" fill="#f2768f" stroke="#5a4431" stroke-width="2.4"/><circle cx="22.4" cy="7.6" r="1.4" fill="#fff"/></svg>';
+// 등불 버튼 그림(가방 · 마을폰처럼 색을 칠한 그림): 꺼진 랜턴(빈 유리 · 초) · 켠 랜턴(노란 유리 · 주황 불꽃) · 손전등(빛줄기)
+const LANTERN_FRAME = '<path d="M13 9q0-5 7-5t7 5" fill="none" stroke="#8a5a30" stroke-width="2.6" stroke-linecap="round"/>'
+  + '<rect x="10" y="8.5" width="20" height="5" rx="2" fill="#c98a4b" stroke="#5a4431" stroke-width="2.2"/>'
+  + '<rect x="10" y="31" width="20" height="5" rx="2" fill="#c98a4b" stroke="#5a4431" stroke-width="2.2"/>';
 const LIGHT_ICON = {
-  off: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M9 4v3l-2 3v9h10v-9l-2-3V4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
-  lantern: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M9 4v3l-2 3v9h10v-9l-2-3V4" fill="#ffe08a" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="14" r="2.4" fill="#ff9d3c"/></svg>',
-  flashlight: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h7l4-3v12l-4-3H5z" fill="#cfe6f7" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M18 8l3-2M18 12h3M18 16l3 2" stroke="#ffb02e" stroke-width="2.2" stroke-linecap="round"/></svg>'
+  off: `<svg viewBox="0 0 40 40" aria-hidden="true">${LANTERN_FRAME}<rect x="9" y="13.5" width="22" height="17.5" rx="6" fill="#e3ecf1" stroke="#5a4431" stroke-width="2.4"/><rect x="16.5" y="21" width="7" height="8" rx="2" fill="#fff6e0" stroke="#5a4431" stroke-width="1.8"/><path d="M20 21v-2" stroke="#5a4431" stroke-width="1.6" stroke-linecap="round"/><path d="M13 17v9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/></svg>`,
+  lantern: `<svg viewBox="0 0 40 40" aria-hidden="true">${LANTERN_FRAME}<rect x="9" y="13.5" width="22" height="17.5" rx="6" fill="#ffe08a" stroke="#5a4431" stroke-width="2.4"/><rect x="16.5" y="23" width="7" height="6" rx="2" fill="#fff6e0" stroke="#5a4431" stroke-width="1.8"/><path d="M20 15.5c3.2 3 3.4 5.6 0 7c-3.4-1.4-3.2-4 0-7z" fill="#ff9d3c" stroke="#5a4431" stroke-width="1.6" stroke-linejoin="round"/><path d="M20 18.5c1 1.2 1 2.2 0 2.8c-1-0.6-1-1.6 0-2.8z" fill="#fff3b0"/><path d="M13 17v9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/></svg>`,
+  // 켜면 버튼이 노래지니 빛줄기는 흰색에 노란 테두리(배경에 묻히지 않게)
+  flashlight: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M25 13.5l13-6.5v26l-13-6.5z" fill="#fffdf0" stroke="#e8a23a" stroke-width="1.8" stroke-linejoin="round"/><path d="M29 16.5l6-2M29 23.5l6 2" stroke="#ffd45e" stroke-width="1.8" stroke-linecap="round"/><rect x="2.5" y="14.5" width="16" height="11" rx="4" fill="#7fc4e8" stroke="#5a4431" stroke-width="2.4"/><path d="M18 12h5a2.5 2.5 0 0 1 2.5 2.5v11a2.5 2.5 0 0 1-2.5 2.5h-5z" fill="#4f9cc9" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><circle cx="9.5" cy="20" r="2.4" fill="#fff" stroke="#5a4431" stroke-width="1.4"/><path d="M5.5 17.2h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/></svg>'
 };
+/** 집으로 버튼 그림: 마을의 하얀 동그란 내 집(분홍 문 · 둥근 창). */
+const HOME_ICON = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 33a15 15 0 0 1 30 0z" fill="#fff8ea" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><path d="M9.5 24.5q4-9 13-11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.9"/><path d="M17 33v-5.5a3.5 3.5 0 0 1 7 0v5.5" fill="#f2a7bb" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><circle cx="27.5" cy="25.5" r="2.8" fill="#bfe3f2" stroke="#5a4431" stroke-width="1.8"/><path d="M3 33h34" stroke="#5a4431" stroke-width="2.4" stroke-linecap="round"/><path d="M33.5 33c0-2.5 1-4.2 3-5" fill="none" stroke="#6fb15a" stroke-width="2.2" stroke-linecap="round"/></svg>';
 
 function el(tag, cls, html) {
   const e = document.createElement(tag);
@@ -142,7 +149,7 @@ export function createHud(ui, input) {
   lightBtn.hidden = true;
   lightBtn.title = '등불 (F)';
   // 집으로: 마을 밖에 나가 있을 때만(토벌하고 멀리서 걸어 돌아오지 않게)
-  const recallBtn = el('button', 'icon-btn hud-recall', '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5 12 4l8.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9.5h4.5v-5h3v5H18V10" fill="#ffe7c2" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>');
+  const recallBtn = el('button', 'icon-btn hud-recall', HOME_ICON);
   recallBtn.type = 'button';
   recallBtn.hidden = true;
   recallBtn.title = '집으로 (H)';
@@ -613,7 +620,7 @@ export function createHud(ui, input) {
       t.textContent = text;
       e.appendChild(t);
       mount(e);
-      fx.push({ x, y, z, el: e, until: performance.now() + ({ drop: 1300, note: 1400, clean: 1200, snap: 1100, tip: 1300, pick: 1200 }[kind] || 900) });
+      fx.push({ x, y, z, el: e, until: performance.now() + ({ drop: 1300, note: 1400, clean: 1200, snap: 1100, tip: 1300, pick: 1200, mini: 1100 }[kind] || 900) });
     },
     /** 화면 가운데에 크게 찍히는 도장(노동 완료처럼 꼭 봐야 하는 소식). */
     /**
