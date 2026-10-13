@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
 import { astar, smoothPath } from '../core/pathfind.js';
 import { createObstacleIndex, slideMove } from '../core/obstacles.js';
-import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, roadDist, shoreDist, doorSpot, lotRadius, lampSpots } from '../core/layout.js';
+import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, roadDist, shoreDist, doorSpot, lotRadius, lampSpots, bridgeCenterX } from '../core/layout.js';
 import { createZones } from './zones.js';
 import { buildOutdoors } from './outdoors.js';
 import { DESIGNS } from './buildings.js';
@@ -848,7 +848,13 @@ export function buildVillage(scene) {
       if (!cells) return null;
       const pts = [[from.x, from.z], ...cells.slice(1).map(([i, j]) => navPos(i, j))];
       if (isFree(to.x, to.z, 0.3)) pts.push([to.x, to.z]);
-      return smoothPath(pts, clearLine).slice(1).map(([x, z]) => ({ x, z }));
+      const path = smoothPath(pts, clearLine).slice(1);
+      // 다리를 건널 때는 꺾이는 점을 다리 한가운데 줄로(폭 끝 칸을 지나면 강둑에 걸려 맴돌았다). 마지막 목적지는 그대로
+      for (let k = 0; k < path.length - 1; k++) {
+        const bx = bridgeCenterX(path[k][0], path[k][1]);
+        if (bx !== path[k][0] && isFree(bx, path[k][1], NAV_R)) path[k] = [bx, path[k][1]];
+      }
+      return path.map(([x, z]) => ({ x, z }));
     },
     /** 밤 정도(0 낮 ~ 1 밤): 가로등과 집 창문에 불을 켜고, 바깥 구역의 빛나는 것(버섯)을 밝힌다. */
     setNight(k) {

@@ -104,6 +104,15 @@ export function shoreDist(x, z) {
 }
 export const isWater = (x, z) => shoreDist(x, z) < 0;
 
+/**
+ * 다리를 건너는 길의 꺾이는 점(다리 양 끝 · 위)이면 다리 한가운데 줄의 x, 아니면 x 그대로.
+ * 길찾기 칸이 다리 폭 끝(난간 쪽)에 붙어 있으면 그 점에 거의 다 와서 다음 점으로 가려다 강둑에 걸려 옆으로 미끄러지고 맴돌았다(우사기 버벅거림).
+ */
+export function bridgeCenterX(x, z) {
+  for (const B of BRIDGES) if (Math.abs(x - B.x) < B.half + 1.2 && Math.abs(z - riverZ(B.x)) < RIVER.half + 2.2) return B.x;
+  return x;
+}
+
 /** 다리 판: 길이(강 폭 + 양쪽 1.2) · 윗면 높이 · 양 끝 비탈 길이. */
 export const BRIDGE_LEN = RIVER.half * 2 + 2.4, BRIDGE_TOP = 0.2, BRIDGE_RAMP = 0.9;
 /** 발 디딜 높이: 다리 위면 판 높이(양 끝은 비탈을 따라 내려온다), 아니면 땅(0). 캐릭터 · 몬스터가 판에 파묻히지 않게. */
