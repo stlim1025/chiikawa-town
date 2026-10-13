@@ -115,6 +115,9 @@ import { createHachiPit } from './stories/hachipit.js';
 import { createPajamaStory } from './stories/pajama.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
+import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
+import { createStarDinerStory } from './stories/stardiner.js';
+import { createStarGame } from './ui/stargame.js';
 import { createCliff } from './world/cliff.js';
 import { createPit } from './world/pit.js';
 import { eatStyle } from './core/eating.js';
@@ -1327,6 +1330,7 @@ function boot() {
       pajama.reset();
       islandTrip.reset();
       idolStory.reset();
+      starDiner.reset();
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -2062,6 +2066,7 @@ function boot() {
     if (mode === 'club') { if (down && usagiClub && !guide.open) usagiClub.press(); return; } // 우사기 클럽: 박자 맞추기
     if (mode === 'idol') { if (down && idolStory && !guide.open) idolStory.press(); return; } // 파자마 파티즈 무대: 박자(박자 화면도 스스로 스페이스 · 탭을 받는다)
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
+    if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
@@ -2122,8 +2127,9 @@ function boot() {
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
+  let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2436,6 +2442,7 @@ function boot() {
       else if (step.scene === 'pajamaNight') pajama.play(done);
       else if (step.scene === 'pajamaParty') idolStory.play(done);
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
+      else if (step.scene === 'starDiner') starDiner.play(done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
@@ -2527,7 +2534,7 @@ function boot() {
     hud.announce({ kicker: '다 읽었어요!', title: QUESTS.story.title, sub: '대장 갑옷 씨에게 알려요', to: 'quest', id: 'story' });
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : null;
+  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot : null;
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
   let questT = 0, bossM = null, questHint = false;
@@ -3377,6 +3384,18 @@ function boot() {
     hud, guide, sound, input, rhythm, get stage() { return idolStage || (idolStage = createIdolStage()); }, cam, getPlayer: () => player,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook()
+  });
+  // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js): 들판 길가 가게 겉모습(이야기를 받은 동안만) · 가게 안 장면(처음 들어갈 때 만든다) · 쇠고랑 단추
+  const dinerFront = createDinerFront(scene, village);
+  let dinerStage = null;
+  starDiner = createStarDinerStory({
+    hud, guide, sound, input, get stage() { return dinerStage || (dinerStage = createStarDiner()); }, game: createStarGame(ui), cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName), ui,
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(),
+    front: dinerFront, villageScene: scene, makeTrio: () => buildStarTrio(),
+    // 같이 도망 나온 친구: 내 옆에 세워 두고(일과는 잠시 미룬다), 이야기가 끝나면 놓아준다
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
   let visit = null; // { kind, lodge }
   const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
@@ -5229,6 +5248,8 @@ function boot() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
   window.addEventListener('pagehide', save);
   const signLabels = village.labels.map((l, i) => ({ id: 'sign-' + i, ...l, key: l.text, html: signHtml(l.text), kind: 'sign' }));
+  // 별 세 개 레스토랑 간판(가게가 보이는 동안만 — 이야기를 받은 동안)
+  const dinerSign = { id: 'sign-diner', ...dinerFront.sign, text: '별 세 개', key: '별 세 개', html: signHtml('별 세 개'), kind: 'sign' };
   const SIGN_SEE = 34, SIGN_CLEAR = 16; // 간판은 이만큼 안에서만, 가까운 것(SIGN_CLEAR 안)만 또렷하게 · 먼 것은 작고 흐리게
   const homeSign = signLabels.find((l) => l.text === '내 집'); // 사기 전에는 '빌린 집'
 
@@ -5239,7 +5260,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -5324,6 +5345,9 @@ function boot() {
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
       idol: () => ({ phase: idolStory.phase, round: idolStory.round, rhythm: rhythm.active, guide: guide.open, fans: idolStage ? idolStage.fans : 0, mode }),
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
+      /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
+      dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
+      diner: () => ({ phase: starDiner.phase, mode, rescue: starDiner.rescue && { phase: starDiner.rescue.phase, free: starDiner.rescue.clamps.filter((c) => c.free).length, caught: starDiner.rescue.caught }, front: dinerFront.visible, spot: dinerFront.spot }),
       island: () => ({ phase: islandTrip.phase, rhythm: rhythm.active, mini: minigame.active, guide: guide.open, siren: isle.sirenState, roam: islandTrip.roamInfo() }),
       /** 수상한 섬을 그 장면부터(보상 없음): 헤드리스 시험용. */
       islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
@@ -5448,6 +5472,16 @@ function boot() {
       hud.placeLabels(islandTrip.labels(), isle.camera);
       return;
     }
+    // 별 세 개 레스토랑(사이드스토리): 가게 안 장면. 구출하는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'diner' && state) {
+      dinerStage.resize(aspect);
+      starDiner.tick(dt, t);
+      setCelLight(dinerStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(dinerStage.scene, dinerStage.camera);
+      hud.placeLabels([], dinerStage.camera);
+      return;
+    }
     if (mode === 'home' && state) {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) };
       newDayCheck();
@@ -5505,6 +5539,8 @@ function boot() {
     berries.update(dt);
     // 빛나는 버섯: 밤이면 숨 쉬듯 빛나고 갓 위에 반짝 털뭉치(이번 밤에 뗀 것 빼고). 친구 마을에서는 털뭉치가 그 마을 주인 몫이라 안 보인다
     glows.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza, picked: state ? pickedTonight(state) : [], guest: !!visiting });
+    // 별 세 개 레스토랑 가게: 이야기를 받은 동안만 들판 길가에 있다(친구 마을에서는 안 보인다)
+    dinerFront.visible = !!state && !visiting && isActive(state, 'starDiner');
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 · 쓰러짐 중에는 멈칫). 내 마을에 놀러 온 친구도 노린다
@@ -5540,6 +5576,7 @@ function boot() {
       hachiPit.update(dt);
       pajama.update(dt);
       idolStory.update(dt);
+      starDiner.update(dt, t);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);
@@ -5663,7 +5700,7 @@ function boot() {
     if (prompt) bubbles.push(prompt);
     // 간판은 가까운 것만(넓어진 월드에서 먼 간판까지 계산하지 않게), 먼 간판은 작고 흐리게
     const near = [];
-    for (const l of signLabels) {
+    for (const l of dinerFront.visible ? [...signLabels, dinerSign] : signLabels) {
       const d = Math.hypot(l.x - focus.x, l.z - focus.z);
       if (d < SIGN_SEE) { l.far = d > SIGN_CLEAR; near.push(l); }
     }

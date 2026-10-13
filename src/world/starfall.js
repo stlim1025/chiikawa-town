@@ -108,6 +108,37 @@ function starGeometry() {
   return g;
 }
 
+// 다른 장면에서 쓰는 별똥별(사이드스토리 '별 세 개 레스토랑'의 붙잡힌 별똥별 셋 등): 얼굴 · 빛 그림은 나눠 쓴다
+let sharedFace = null, sharedGlow = null;
+/** 별똥별 하나: 통통한 별 · 사실적인 얼굴 · (glow 면) 빛무리. 모서리 끝까지 반지름 1. → { group, body, face, halo } */
+export function buildStarman({ glow = true } = {}) {
+  sharedFace = sharedFace || faceTex();
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(starGeometry(), new THREE.MeshBasicMaterial({ color: '#ffe23a' }));
+  addOutline(body, 0.035, true);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: sharedFace, transparent: true, depthWrite: false }));
+  face.position.z = DEPTH / 2 + BEVEL + 0.004;
+  face.scale.setScalar(1.5);
+  group.add(body, face);
+  let halo = null;
+  if (glow) {
+    sharedGlow = sharedGlow || glowTex();
+    halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: sharedGlow, color: 0xfff1a0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.scale.set(3.4, 3.4, 1);
+    halo.position.z = -0.3;
+    group.add(halo);
+  }
+  return { group, body, face, halo };
+}
+/** buildStarman 별의 모서리 끝 다섯(위에서부터 시계 반대 방향, 별 기준 좌표 { x, y, a: 방향 각 }). 별은 위아래 가운데로 맞춰져 있다. */
+export function starTips() {
+  const cy = (1 + Math.sin(Math.PI / 2 + (4 * Math.PI) / 5)) / 2; // 위 끝(1)과 아래 끝(−0.81)의 가운데만큼 내려와 있다
+  return Array.from({ length: 5 }, (_, k) => {
+    const a = Math.PI / 2 + (k * 2 * Math.PI) / 5;
+    return { x: Math.cos(a) * STAR_R, y: Math.sin(a) * STAR_R - cy, a };
+  });
+}
+
 export function createStarfall(scene) {
   const glow = glowTex(), streak = streakTex();
   const additive = (map, color, opacity = 1) => new THREE.SpriteMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });

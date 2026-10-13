@@ -1354,6 +1354,36 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .rhythm .rh-hint kbd { padding: 0 6px 1px; border-radius: 6px; font-family: var(--hand); color: var(--ink); background: var(--paper); }
 [data-input="touch"] .rhythm .rh-hint kbd { display: none; }
 @media (prefers-reduced-motion: reduce) { .rhythm .rh-judge.pop, .rhythm .rh-ring.hit { animation-duration: 0.01s; } }
+/* 레스토랑 별 세 개 구출 놀이(ui/stargame.js): 다른 놀이(섬 놀이 · 응원)처럼 흰 테두리 동그라미 · 노란 고리 · 아래 가운데 글.
+   3D 쇠고랑마다 '꾹' 단추(둘레 노란 고리가 차오른다, 다음 차례는 종이색으로 둥실), 아래에 주방 상태 · 구한 별똥별 별 셋 · 도움말 */
+.stargame { position: absolute; inset: 0; z-index: 11; font-family: var(--hand); color: #fff; pointer-events: none; transition: opacity 0.35s; }
+.stargame.done { opacity: 0; }
+.sg-clamp { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; padding: 0; display: grid; place-items: center; border-radius: 50%; pointer-events: auto; touch-action: none;
+  background: rgba(255, 250, 235, 0.25); box-shadow: 0 0 0 3px #fff, 0 3px 0 3px rgba(58, 42, 26, 0.25); color: #fff; font-size: 16px; text-shadow: 0 2px 0 #3a2a1a; transition: transform 0.08s; }
+.sg-clamp[hidden] { display: none; }
+.sg-clamp .sg-ring { position: absolute; inset: -3px; border-radius: 50%; background: conic-gradient(var(--yellow) calc(var(--p, 0) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 21px, #000 22px); mask: radial-gradient(circle, transparent 21px, #000 22px); }
+.sg-clamp span { position: relative; }
+.sg-clamp.next { background: var(--paper); color: var(--ink); text-shadow: none; box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--yellow), 0 4px 0 6px rgba(58, 42, 26, 0.2); animation: sg-bob 1.1s ease-in-out infinite; }
+.sg-clamp.on { transform: scale(0.9); animation: none; }
+@keyframes sg-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+.stargame[data-phase="peek"] .sg-clamp { background: rgba(255, 176, 176, 0.45); box-shadow: 0 0 0 3px #ffd0d0, 0 3px 0 3px rgba(58, 42, 26, 0.25); color: #fff; animation: none; }
+.sg-flash { position: absolute; left: 0; right: 0; bottom: 150px; font-size: 28px; font-weight: 700; text-align: center; color: #ffe45f; text-shadow: 0 3px 0 #3a2a1a, 0 0 12px rgba(0, 0, 0, 0.35); opacity: 0; }
+.sg-flash.bad { color: #ffc0c0; }
+.sg-flash.pop { animation: sg-flash 1.3s ease-out; }
+@keyframes sg-flash { 0% { opacity: 0; transform: translateY(8px) scale(0.8); } 18% { opacity: 1; transform: translateY(0) scale(1.12); } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.sg-panel { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); width: min(460px, calc(100% - 32px)); transform: translateX(-50%); text-align: center; }
+.sg-lab { font-size: 18px; text-shadow: 0 2px 0 #3a2a1a, 0 0 10px rgba(0, 0, 0, 0.35); }
+.stargame[data-phase="warn"] .sg-lab { color: #ffe45f; animation: sg-shake 0.25s linear infinite; }
+.stargame[data-phase="peek"] .sg-lab { color: #ffc0c0; }
+@keyframes sg-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.sg-pips { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.sg-pips svg { width: 26px; height: 26px; fill: rgba(255, 255, 255, 0.3); stroke: #fff; stroke-width: 2; stroke-linejoin: round; filter: drop-shadow(0 2px 0 rgba(58, 42, 26, 0.3)); transition: fill 0.2s; }
+.sg-pips svg.on { fill: #ffe45f; }
+.sg-hint { margin-top: 6px; font-size: 14px; text-shadow: 0 2px 0 #3a2a1a; }
+.sg-hint kbd { padding: 0 6px 1px; border-radius: 6px; font-family: var(--hand); color: var(--ink); background: var(--paper); text-shadow: none; }
+[data-input="touch"] .sg-hint kbd { display: none; }
+@media (prefers-reduced-motion: reduce) { .stargame[data-phase="warn"] .sg-lab, .sg-clamp.next { animation: none; } .sg-flash.pop { animation-duration: 0.01s; } }
 /* 섬 편 놀이(연타 · 타이밍): 박자 화면처럼 화면 아래 가운데. 시네마틱 화면에서도 보인다 */
 .minigame { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 12; width: min(460px, calc(100% - 32px)); transform: translateX(-50%); font-family: var(--hand); color: #fff; text-align: center; transition: opacity 0.4s ease; }
 .minigame.done { opacity: 0; }

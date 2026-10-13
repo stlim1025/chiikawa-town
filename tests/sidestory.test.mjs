@@ -159,7 +159,7 @@ test('하치와레가 구덩이에!: 말로는 시작 안 함(숲에서 발견) 
   let s = withHearts(fresh(5, 12), 'hachiware', 2);
   const g4 = { ...s, license: { ...(s.license || {}), grade: 4 } };
   assert.ok(!Q.canOffer(g4, 'hachiPit'), '말 걸어서는 시작하지 않는다');
-  assert.notEqual(Q.markOf(g4, 'hachiware'), 'story');
+  assert.ok(!Q.questsFor(g4, 'hachiware').offer.includes('hachiPit'), '이야기 표시로 부르지 않는다(별 세 개 레스토랑은 따로)');
   assert.ok(Q.pitDue(g4), '4급 · 하트 2 · 낮 · 넷째 날부터');
   assert.ok(!Q.pitDue({ ...g4, license: { ...g4.license, grade: 5 } }), '5급이면 덩굴풀을 못 뽑는다');
   assert.ok(!Q.pitDue({ ...g4, clock: at(5, 20) }), '밤에는 아니다');

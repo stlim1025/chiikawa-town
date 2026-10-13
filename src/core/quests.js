@@ -45,7 +45,9 @@ export const QUEST_ITEMS = {
   katsucurry: { name: '시마지로 카츠카레', kind: 'food', note: '섬 정글의 시마지로가 싸 준 바삭한 카츠카레. 살짝 맵다! 먹으면 기운이 45 찬다.', eat: 45 },
   shellsoup: { name: '섬 조개국', kind: 'food', note: '시마지로의 레시피로 끓인 뜨끈한 조개국. 먹으면 기운이 30 찬다.', eat: 30 },
   // 보스에게 처음 쓰러진 뒤 랏코가 힘내라며 준다(main 의 랏코 조언)
-  rakkobento: { name: '랏코의 대나무 도시락', kind: 'food', note: '"우선 기운부터 채워라" 하며 랏코가 건넨 대나무 잎 도시락. 작은 주먹밥 둘이 들어 있다. 먹으면 기운이 40 찬다.', eat: 40 }
+  rakkobento: { name: '랏코의 대나무 도시락', kind: 'food', note: '"우선 기운부터 채워라" 하며 랏코가 건넨 대나무 잎 도시락. 작은 주먹밥 둘이 들어 있다. 먹으면 기운이 40 찬다.', eat: 40 },
+  // 레스토랑 '별 세 개'에서 구해 준 별똥별들의 보답
+  omurice: { name: '거대 오므라이스', kind: 'food', note: '구해 준 별똥별들이 고맙다며 건넨 커다란 오므라이스. 셋이 나눠 먹어도 남을 만큼 크다. 먹으면 기운이 60 찬다.', eat: 60 }
 };
 registerItems(QUEST_ITEMS);
 
@@ -58,7 +60,8 @@ export const PLACES = {
   plaza: { name: '광장', r: 4.5 },
   exam: { name: '검정소', r: 3 },
   home: { name: '내 집 앞', r: 2.6 },
-  pier: { name: '선착장', r: 3 }
+  pier: { name: '선착장', r: 3 },
+  diner: { name: '별 세 개', r: 2.8 } // 동쪽 들판 길가(이야기를 받은 동안만 가게가 있다 — world/stardiner.js)
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -257,6 +260,18 @@ export const QUESTS = {
       say: ['공연 봤어요!? 제가 만든 잠옷이 무대 위에서 반짝반짝…!', '파·자·마·파·티~♪ …어라, 저도 모르게 흥얼거리네요. 귀에서 안 떠나요~!']
     }],
     reward: { bond: 2, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, story: 'pajamaParty' }
+  },
+  // 레스토랑 '별 세 개'(원작: 목욕시키고 빵 옷을 입혀 커다란 오크 괴물이 먹으려 한다 → 도망치다 두고 온 무기 · 토벌 증표를 가지러 되돌아가
+  // 벽에 붙잡힌 별똥별 셋의 모서리를 쇠고랑에서 빼내 다 같이 탈출). 저녁에 들판 길가의 가게로(stories/stardiner.js). 보답 오므라이스는 게임에서 정한 것
+  starDiner: {
+    title: '별 세 개', giver: 'hachiware', side: true, minDay: 5, hours: [9, 18], needHearts: 1, ask: '요즘 재밌는 소문 있어?',
+    offer: ['있잖아 {name}, 동쪽 들판 길가에 레스토랑이 새로 생겼대!', '가게 이름이 별 세 개래~ 별이 세 개면 엄청 맛있는 집이잖아!',
+      { who: 'chiikawa', text: '…!! (침을 꿀꺽)' }, '오늘 저녁에 셋이서 가 보자! 엄청 맛있는 게 나올지도~'],
+    steps: [{
+      type: 'visit', place: 'diner', hours: [18, 23], scene: 'starDiner', speaker: 'hachiware', goal: '저녁에 동쪽 들판 길가의 레스토랑 별 세 개로! (저녁 6시 ~ 11시)',
+      say: ['…하아, 하아… 하마터면 먹힐 뻔했어~', '그래도 무기랑 토벌 증표도 찾고, 별똥별들도 다 구해서 다행이야!', '오므라이스는… 셋이서 나눠 먹자! 헤헤.']
+    }],
+    reward: { bond: 3, friends: { chiikawa: 3 }, items: { omurice: 1 }, story: 'starDiner' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
