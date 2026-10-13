@@ -260,7 +260,9 @@ export function createSound(storage) {
     splash: () => { noise({ dur: 0.5, vol: 0.2, freq: 900, sweepTo: 250, q: 0.6, type: 'lowpass' }); noise({ start: 0.05, dur: 0.35, vol: 0.08, freq: 3000, q: 0.8 }); },
     wave: () => [0, 0.35, 0.7].forEach((st, i) => noise({ start: st, dur: 0.9 - i * 0.15, vol: 0.06, freq: 700 - i * 120, sweepTo: 300, q: 0.5, type: 'lowpass' })),
     chime: () => { tone({ freq: 1568, type: 'sine', dur: 0.35, vol: 0.08 }); tone({ freq: 2349, type: 'sine', start: 0.02, dur: 0.25, vol: 0.04 }); },
-    can: () => { tone({ freq: 1900, slideTo: 1500, type: 'square', dur: 0.05, vol: 0.05 }); noise({ dur: 0.06, vol: 0.08, freq: 4200, q: 3 }); }
+    can: () => { tone({ freq: 1900, slideTo: 1500, type: 'square', dur: 0.05, vol: 0.05 }); noise({ dur: 0.06, vol: 0.08, freq: 4200, q: 3 }); },
+    // 하치와레의 카메라: 셔터가 열리고 닫히는 찰-칵(짧은 딸깍 둘)
+    shutter: () => { noise({ dur: 0.03, vol: 0.14, freq: 3400, q: 1.4 }); tone({ freq: 1700, slideTo: 1100, type: 'square', dur: 0.025, vol: 0.03 }); noise({ start: 0.08, dur: 0.045, vol: 0.12, freq: 2300, q: 1.2 }); }
   };
 
   // ---------- 배경음악 ----------

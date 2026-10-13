@@ -30,6 +30,7 @@ import { VILLAGERS, villagerOf, BED_HOUR } from './villagers.js';
  * 사이드스토리(side): 원작 에피소드를 따라가는 이야기. 머리 위에 ! 대신 펼친 책(이야기 표시)이 뜨고, 한 번에 하나만,
  *   하나를 끝내면 SIDE_GAP 일 동안은 다음 이야기가 열리지 않는다(일상 부탁처럼 되풀이하는 daily 사이드는 따로).
  *   needStory: state.story[그 이름] 에 적힌 날 다음 날부터(본 일이 있어야) · after: 그 퀘스트를 끝낸 뒤 · hours: 그 시각에만 부탁한다.
+ *   talk 단계에 nextDay 가 있으면 그 단계를 받은 다음 날부터 알릴 수 있다(state.quests[id].at = 받은 날).
  *   reward.friends: { 친구: 점수 } 같이 한 친구들 친밀도도.
  * 연계 퀘스트(chain): 여러 친구를 거쳐 구역 보스까지 가는 긴 부탁. 사이드스토리와 따로 한 번에 하나만,
  *   하나를 끝내면 CHAIN_GAP 일 동안은 다음 연계가 열리지 않는다(토벌 자격을 따자마자 한꺼번에 몰리지 않게).
@@ -420,6 +421,24 @@ export const QUESTS = {
     }],
     reward: { bond: 2, friends: { pochette: 3, chiikawa: 2, hachiware: 2, usagi: 2 }, items: { bonbon: 2 }, story: 'bonbonDone' }
   },
+  // 하치와레의 카메라(원작 2020년 12월 연재분 · 애니 78 ~ 81화 · 95화): 오래 갖고 싶던 카메라를 사서 떨릴 만큼 기뻐하고, 보호 필름은 못 떼고,
+  // 흠집을 찾고는 "멀리서 보면 모르고, 멋이지". 첫 장은 예전 지팡이 카메라(찍은 꽃 · 나무가 사라졌다) 생각에 망설이다 치이카와 덕분에 찍는다.
+  // 우사기의 다리 사이로 보기 포즈, 비가 와서 카메라를 지키고, 뽑은 사진은 다 흔들렸다. 연출은 stories/camera.js
+  // 하치와레가 돈을 모아 도구점에서 카메라를 산 날(core/goals.js 의 돈 모으기 목표) 이야기가 열린다
+  hachiCamera: {
+    title: '하치와레의 카메라', giver: 'hachiware', side: true, needStory: 'hachiCamera', sameDay: true, hours: [9, 17], needHearts: 1, ask: '그거 뭐야?!',
+    offer: ['{name}! {name}~!! 이것 좀 봐!!', '(하치와레가 반짝반짝 새 카메라를 두 손으로 꼭 쥐고, 기뻐서 부들부들 떨고 있다)',
+      '나… 카메라 샀어…!! 계속계속 갖고 싶었거든~!', '열심히 일해서 모은 돈으로 샀어! 헤헤…', '보호 필름은… 아까워서 아직 못 뗐어~',
+      '(…앗, 카메라 모서리에 작은 흠집이…?)', '어?! …아, 먼지였다~ 휴우…', '…여기도…? …이건… 진짜 흠집이네…',
+      '…그래도 멀리서 보면 모르고~ 이것도 멋이지!', '있잖아, 광장에서 같이 사진 찍자! 치이카와도 부를게~'],
+    steps: [
+      { type: 'visit', place: 'plaza', hours: [10, 17], scene: 'hachiCamera', speaker: 'hachiware', goal: '낮에 광장에서 하치와레랑 사진을 찍자! (오전 10시 ~ 오후 5시)',
+        say: ['오늘 찍은 사진, 뽑아서 내일 보여 줄게!', '기대해~! 헤헤'] },
+      { type: 'talk', nextDay: true, hours: [9, 19], fx: 'cameraPrints', ask: '사진 보러 왔어!', goal: '다음 날 하치와레에게 뽑은 사진을 보러 가자! (오전 9시 ~ 오후 7시)',
+        say: ['이건 {name} 거야! 액자에 넣어서 집에 둬~', '다음에 또 같이 찍자~!'] }
+    ],
+    reward: { bond: 4, friends: { chiikawa: 2, usagi: 2 }, furniture: 'photo' }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
@@ -545,7 +564,11 @@ export function progressOf(state, id) {
 export function stepReady(state, id) {
   const step = stepOf(state, id);
   if (!step) return false;
-  if (step.type === 'talk') return !step.hours || !state.clock || inHours(hourOf(state.clock), step.hours); // 시각이 정해진 이야기(저녁 공부)는 그때에만
+  if (step.type === 'talk') {
+    const q = questState(state, id);
+    if (step.nextDay && state.clock && q && q.at != null && state.clock.day <= q.at) return false; // 다음 날부터(뽑은 사진 보기)
+    return !step.hours || !state.clock || inHours(hourOf(state.clock), step.hours); // 시각이 정해진 이야기(저녁 공부)는 그때에만
+  }
   if (step.type === 'license') return hasLicense(state, step.id);
   if (step.type === 'visit' || step.type === 'boss' || step.type === 'scene') return false;
   const p = progressOf(state, id);
@@ -715,7 +738,7 @@ export function completeStep(state, id, day) {
     return { state: reward.state, finished: true, next: null, reward };
   }
   const next = Q.steps[nextI];
-  s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: snapshot(s, next, id) } } };
+  s = { ...s, quests: { ...questsOf(s), [id]: { step: nextI, base: snapshot(s, next, id), ...(next.nextDay ? { at: day } : {}) } } }; // at: 다음 날부터 하는 단계를 받은 날
   return { state: s, finished: false, next, reward: null };
 }
 
@@ -795,7 +818,7 @@ export const isEveningHour = EVENING;
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 export function isValidQuests(qs) {
   if (!qs || typeof qs !== 'object' || Array.isArray(qs)) return false;
-  return Object.entries(qs).every(([id, q]) => QUESTS[id] && q && num(q.step) && q.step >= 0 && q.step <= QUESTS[id].steps.length && num(q.base) && (q.done === undefined || num(q.done)));
+  return Object.entries(qs).every(([id, q]) => QUESTS[id] && q && num(q.step) && q.step >= 0 && q.step <= QUESTS[id].steps.length && num(q.base) && (q.done === undefined || num(q.done)) && (q.at === undefined || num(q.at)));
 }
 /** 같이 한 일상 일 기록(state.acts) 모양 검사. */
 export function isValidActs(a) {

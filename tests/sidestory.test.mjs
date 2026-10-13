@@ -252,6 +252,35 @@ test('위스키 봉봉: 쿠리만쥬(하트 2)가 새 안주 뒤 열째 날부�
   assert.equal(Gf.tasteOf('kurimanju', 'bonbon'), 'love', '술꾼 쿠리만쥬가 좋아한다');
 });
 
+test('하치와레의 카메라: 카메라를 산 날 이야기 표시 → 낮에 광장 → 다음 날 뽑은 사진 → 흔들린 사진 액자', async () => {
+  const Hm = await import(G + 'home.js');
+  let s = withHearts(fresh(6, 12), 'hachiware', 1);
+  assert.ok(!Q.canOffer(s, 'hachiCamera'), '카메라를 사기 전에는 없다');
+  s = { ...s, story: { hachiCamera: 6 } };
+  assert.ok(Q.canOffer(s, 'hachiCamera'), '산 그날부터');
+  assert.equal(Q.markOf(s, 'hachiware'), 'story');
+  assert.ok(!Q.canOffer({ ...s, clock: at(6, 18) }, 'hachiCamera'), '낮에만');
+  assert.ok(!Q.canOffer(withHearts(s, 'hachiware', 0), 'hachiCamera'), '하치와레와 하트 1개부터');
+  s = Q.startQuest(s, 'hachiCamera');
+  const shoot = Q.stepOf(s, 'hachiCamera');
+  assert.equal(shoot.scene, 'hachiCamera');
+  assert.ok(Q.arrived(shoot, { x: 0, z: 0 }, 1, 1, 11) && !Q.arrived(shoot, { x: 0, z: 0 }, 1, 1, 18), '낮에 광장');
+  s = Q.completeStep(s, 'hachiCamera', 6).state;
+  assert.ok(!Q.stepReady(s, 'hachiCamera'), '뽑은 사진은 다음 날');
+  assert.equal(Q.markOf(s, 'hachiware'), null);
+  assert.ok(Q.isValidQuests(s.quests), '받은 날(at)도 저장할 수 있다');
+  const back = S.deserialize(S.serialize(s));
+  assert.ok(back.ok && back.state.quests.hachiCamera.at === 6);
+  const next = { ...s, clock: at(7, 10) };
+  assert.ok(Q.stepReady(next, 'hachiCamera'));
+  assert.equal(Q.markOf(next, 'hachiware'), '?');
+  const r = Q.completeStep(next, 'hachiCamera', 7);
+  assert.ok(r.finished);
+  assert.equal(Hm.homeOf(r.state).owned.photo, 1, '흔들린 사진 액자');
+  assert.ok(Hm.FURNITURE.photo.gift, '가구점에서는 안 판다');
+  for (const k of ['hachiware', 'chiikawa', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
+});
+
 test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, 말하는 사람 · 연출 · 놀이 · 사람 · 하늘이 모두 알려진 것', async () => {
   const { BEATS, GATHER, CHORUS, BATTLE, ROAMS } = await import('../src/stories/islandscript.js');
   const ids = BEATS.map((b) => b.id);

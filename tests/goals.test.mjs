@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GOALS, goalOf, canBuy, buyGoal, npcPower } from '../src/core/goals.js';
+import { GOALS, goalOf, canBuy, buyGoal, npcPower, CAMERA_PRICE } from '../src/core/goals.js';
 import { chooseActivity } from '../src/core/brain.js';
 import { liveOffscreen } from '../src/core/offscreen.js';
 import { VILLAGERS, MAX_JOBS_PER_DAY, villagerOf, payVillager, villagerSpend, villagerTakesJob, villagerEnergy, isValidVillagers } from '../src/core/villagers.js';
@@ -22,7 +22,7 @@ test('친구마다 차례로 이루고 싶은 목표가 있고, 값은 가게 �
     if (kind === 'momonga') { assert.deepEqual(list, []); continue; }
     assert.ok(list.length >= 1, `${kind} 목표`);
     for (const g of list) {
-      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : FURNITURE[g.item].price;
+      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : g.kind === 'camera' ? CAMERA_PRICE : FURNITURE[g.item].price;
       assert.equal(g.cost, want, `${kind} ${g.label}`);
       assert.ok(g.label && g.id, `${kind} 목표 이름`);
     }
@@ -45,6 +45,20 @@ test('자격증을 따거나 물건을 사면 다음 목표로 넘어간다', ()
   assert.notEqual(goalOf(r.state, 'chiikawa').id, g.id, '다음 목표로');
   assert.equal(r.goal.id, g.id);
   assert.equal(goalOf(fresh(), 'momonga'), null);
+});
+
+test('하치와레는 토벌 자격증 다음에 오래 갖고 싶던 카메라를 모으고, 산 날 이야기가 열린다', () => {
+  let s = licensedAs(withMoney(fresh(), 'hachiware', 0, { bought: ['f-rug'] }), 'hachiware');
+  const g = goalOf(s, 'hachiware');
+  assert.equal(g.id, 'camera');
+  assert.ok(savingLine('hachiware', g, 0).includes('카메라'), '대화로 카메라를 모은다는 걸 알게 된다');
+  assert.ok(!canBuy(withMoney(s, 'hachiware', CAMERA_PRICE - 1, { bought: ['f-rug'] }), 'hachiware', 3));
+  const r = buyGoal(withMoney(s, 'hachiware', CAMERA_PRICE, { bought: ['f-rug'] }), 'hachiware', 3);
+  assert.ok(r.ok);
+  assert.equal(r.state.story.hachiCamera, 3, '산 날을 적어 둔다');
+  assert.notEqual(goalOf(r.state, 'hachiware').id, 'camera', '다음 목표로');
+  const other = buyGoal(withMoney(fresh(), 'kurimanju', 999), 'kurimanju', 3);
+  assert.ok(other.ok && !(other.state.story || {}).hachiCamera, '다른 목표는 이야기를 적지 않는다');
 });
 
 test('무기를 사면 토벌 힘이 그만큼 세진다(원래 힘보다 약한 무기는 그대로)', () => {

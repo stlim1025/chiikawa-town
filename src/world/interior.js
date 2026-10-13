@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
 import { HOME_GRID } from '../core/home.js';
+import { photoFrameTexture } from './photoframe.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
 const CELL = 1.1;
@@ -71,6 +72,18 @@ export function furnitureModel(id) {
       m(GEO.box, '#3a3236', { position: [0.55, 0.32, 0], scale: [0.26, 0.64, 0.3], shell: true });
       [0.2, 0.46].forEach((y) => m(GEO.cylinder, '#8f8174', { position: [0.55, y, 0.16], scale: [0.08, 0.02, 0.08], rotation: [Math.PI / 2, 0, 0], outline: 0.01 }));
       break;
+    case 'photo': {
+      // 흔들린 사진 액자(하치와레의 카메라): 낮은 나무 장 위에 비스듬히 세운 액자, 사진은 그날 찍은 단체 사진(world/photoframe.js)
+      m(GEO.box, '#c49a6c', { position: [0, 0.18, 0], scale: [0.56, 0.36, 0.36], shell: true });
+      const fr = new THREE.Group();
+      fr.position.set(0, 0.6, 0.02);
+      fr.rotation.set(-0.16, 0, 0, 'YXZ');
+      fr.add(toonMesh(GEO.box, '#e8b86a', { position: [0, 0, 0], scale: [0.52, 0.42, 0.05], shell: true, shadow: false, outline: 0.015 }));
+      fr.add(toonMesh(new THREE.PlaneGeometry(1, 1), '#ffffff', { material: new THREE.MeshBasicMaterial({ map: photoFrameTexture() }), position: [0, 0, 0.027], scale: [0.44, 0.33, 1], outline: false, shadow: false }));
+      g.add(fr);
+      m(GEO.box, '#a77d5a', { position: [0, 0.52, -0.14], scale: [0.05, 0.3, 0.04], rotation: [0.55, 0, 0], outline: 0.01 }); // 뒤 받침대
+      break;
+    }
     case 'doll': {
       const doll = buildNpc('chiikawa');
       doll.root.scale.setScalar(0.42);

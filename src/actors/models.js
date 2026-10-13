@@ -408,7 +408,7 @@ export const NPC_KINDS = Object.keys(DEFS);
  * 손에 쥔 소품을 적는 오른팔 자세. animateChibi 의 그 몸짓과 맞춘다.
  * 수련(train)만은 팔을 살짝 든 자세에서 칼끝이 앞을 보게 적어서, 팔을 내리면 칼끝이 조금 숙이고 내지르면 위로 선다.
  */
-const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0], read: [-1.0, 0, -0.35] };
+const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0], read: [-1.0, 0, -0.35], snap: [-1.35, 0, -0.5] };
 
 /**
  * 손에 쥔 소품 부품을 팔 마디에 단다. 부품은 pose 자세일 때 손끝에서 잰 위치 · 방향(p · r)으로 적고,
@@ -502,6 +502,14 @@ const PROP_PARTS = {
   mic: (def) => held(def, 'armR', HOLD.dance, [
     { m: 'cylinder', c: '#3a3236', p: [-0.024, -0.032, 0.05], r: [0, 0, -0.64], s: [0.022, 0.15, 0.022] },
     { m: 'sphere', c: '#b9bec6', p: [0.1, 0.136, 0.05], s: [0.05, 0.05, 0.05] }
+  ]),
+  // 하치와레의 카메라(사이드스토리 '하치와레의 카메라'): 두 손 사이 눈앞에 든 검은 몸통 · 은색 윗판 · 앞으로 나온 렌즈 · 분홍 셔터 단추
+  camera: (def) => held(def, 'armR', HOLD.snap, [
+    { m: 'box', c: '#3a3a40', p: [-0.12, 0, 0.07], s: [0.27, 0.16, 0.1] },
+    { m: 'box', c: '#d9d4c8', p: [-0.12, 0.06, 0.07], s: [0.272, 0.045, 0.102], o: false },
+    { m: 'cylinder', c: '#2a2a30', p: [-0.12, -0.005, 0.11], r: [Math.PI / 2, 0, 0], s: [0.055, 0.07, 0.055] },
+    { m: 'dot', c: '#8fc0ec', p: [-0.12, -0.005, 0.185], s: [0.036, 0.036, 0.012], o: false },
+    { m: 'box', c: '#e85d75', p: [-0.215, 0.095, 0.07], s: [0.045, 0.025, 0.045], o: false }
   ])
 };
 
@@ -560,7 +568,7 @@ const WEAPON_PARTS = {
 export const PROP_FOR = {
   kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, pochette: { read: 'sewing' }, // 노동 갑옷 씨: 게시판 앞 정리 · 포셰트 갑옷 씨: 바느질
   rakko: { train: 'sword', drink: 'bowl' }, usagi: { train: 'stick', drink: 'bowl' },
-  hachiware: { dance: 'mic', drink: 'bowl', train: 'fork' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
+  hachiware: { dance: 'mic', drink: 'bowl', train: 'fork', snap: 'camera', hug: 'camera' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };
 
 // 누구나 같은 것을 드는 몸짓: 라멘 로우에서 후루룩 먹을 때는 그릇과 젓가락
@@ -1370,6 +1378,22 @@ function basePose(mode, t, opts) {
     a.armL = [-1.25, 0, 0.62]; a.armR = [-1.25, 0, -0.62];
     a.head = [0.24 + Math.sin(t * 2.2 + phase) * 0.03, 0, 0];
     bob = Math.sin(t * 2.2 + phase) * 0.008;
+  } else if (mode === 'snap') {
+    // 사진 찍기(하치와레의 카메라): 두 손으로 카메라를 눈앞에 들고 살짝 숙여 들여다본다
+    a.armL = [-1.35, 0, 0.5]; a.armR = [-1.35, 0, -0.5];
+    a.head = [0.06, 0, 0];
+  } else if (mode === 'hug') {
+    // 카메라를 품에 꼭 안기(비에 젖지 않게): 두 팔을 가슴 앞에 모으고 웅크린 채 고개를 숙인다
+    a.armL = [-0.95, 0, 0.55]; a.armR = [-0.95, 0, -0.55];
+    a.head = [0.26, 0, Math.sin(t * 4 + phase) * 0.05];
+    lean = 0.1; bob = -0.02;
+  } else if (mode === 'peek') {
+    // 우사기의 전설의 포즈(원작: 뒤돌아 다리를 벌리고 숙여 다리 사이로 내다보기). 둥근 몸에 맞게 거꾸로 서서
+    // 다리를 V 자로 벌리고, 두 팔로 땅을 짚은 채 거꾸로 된 얼굴로 이쪽을 본다(등을 카메라 쪽으로 두면 얼굴이 카메라를 본다)
+    a.legL = [0, 0, -0.75]; a.legR = [0, 0, 0.75];
+    a.armL = [0, 0, -2.75]; a.armR = [0, 0, 2.75];
+    a.head = [-0.2, 0, Math.sin(t * 5 + phase) * 0.08];
+    lean = Math.PI - 0.22; bob = 1.12 + Math.sin(t * 5 + phase) * 0.02;
   } else if (mode === 'flail') {
     // 발광: 팔다리를 마구 휘두르며 들썩들썩(별똥별맨 따라 하기)
     a.armL = [-1 + Math.sin(t * 19 + phase) * 1.4, 0, -1.2 + Math.sin(t * 13 + phase) * 0.8];
@@ -1390,8 +1414,11 @@ function basePose(mode, t, opts) {
   }
   // 손에 든 무기(내 캐릭터만): 평소에는 바깥 위로 비스듬히 든다(휘두를 때는 attackPose 가 손목까지 잡는다)
   a.weapon = mode === 'walk' ? [-0.75 + s * 0.12, 0.6, 0] : [-0.8, 0.6, 0];
-  const ear = mode === 'walk' ? -0.25 - Math.abs(s) * 0.25 : mode === 'pull' ? -0.4 : -0.1;
-  a.earL = [ear, 0, -0.08]; a.earR = [ear, 0, 0.08];
+  // peek(거꾸로 서기): 긴 귀가 땅에 묻히지 않게 양옆 위로 활짝 벌리고(몸을 뒤집으면 귀가 안쪽으로 모이므로 평소와 반대 방향),
+  // 얼굴 쪽(카메라 쪽)으로 조금 숙여 머리 뒤에 가리지 않게 한다
+  const ear = mode === 'walk' ? -0.25 - Math.abs(s) * 0.25 : mode === 'pull' ? -0.4 : mode === 'peek' ? 0.6 : -0.1;
+  const spread = mode === 'peek' ? -(1.9 + Math.sin(t * 5 + phase) * 0.08) : 0.08;
+  a.earL = [ear, 0, -spread]; a.earR = [ear, 0, spread];
   return { a, bob, lean, waddle, spin, push: 0, squash: 0 };
 }
 

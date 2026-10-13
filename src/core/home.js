@@ -14,7 +14,8 @@ export const FURNITURE = {
   shelf: { id: 'shelf', name: '책장', price: 180 },
   stove: { id: 'stove', name: '작은 난로', price: 260 },
   doll: { id: 'doll', name: '먼작귀 인형', price: 220 },
-  djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true } // 사이드스토리 '우사기의 집' 선물(가게에서는 안 판다)
+  djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true }, // 사이드스토리 '우사기의 집' 선물(가게에서는 안 판다)
+  photo: { id: 'photo', name: '흔들린 사진 액자', price: 0, gift: true } // 사이드스토리 '하치와레의 카메라' 선물: 그날 찍은 사진(world/photoframe.js)
 };
 
 /** 새 집: 침대 하나가 안쪽 가운데에 놓여 있다. */

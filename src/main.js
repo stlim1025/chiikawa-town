@@ -119,6 +119,9 @@ import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardi
 import { createStarDinerStory } from './stories/stardiner.js';
 import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
 import { createBonbonStory } from './stories/bonbon.js';
+import { createCameraStory } from './stories/camera.js';
+import { createPhotoUi } from './ui/photos.js';
+import { refreshPhotoFrame } from './world/photoframe.js';
 import { createChiiRoom } from './world/chiiroom.js';
 import { createWeather } from './world/weather.js';
 import { createBlackStarStory } from './stories/blackstar.js';
@@ -1113,6 +1116,25 @@ function boot() {
         commit({ ...startQuest({ ...state, quests: qs }, 'whiskeyBonbon'), clock: { day: Math.max(10, state.clock.day), t: (11 - 6) / 24 } });
         player.setPosition(bonbonFront.spot.x + 3, bonbonFront.spot.z + 3);
         cam.snap(player.position);
+      },
+      /**
+       * 하치와레의 카메라: 'plaza' 부탁을 받은 채 오전 11시 광장 남쪽(걸어 들어가면 시작 · 보상까지),
+       * 'prints' 사진을 찍은 다음 날 오전 10시 하치와레 옆(말을 걸면 뽑은 사진 · 보상), 'show' 광장 장면만(보상 없음).
+       */
+      hachiCamera(at) {
+        if (cameraStory.active) return;
+        const pl = village.spots.plaza;
+        if (at === 'show') { cameraStory.play(() => hud.toast('테스트: 사진 찍기 끝', 2400)); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.hachiCamera;
+        let s = startQuest({ ...state, quests: qs }, 'hachiCamera');
+        const day = s.clock.day;
+        s = at === 'prints' ? { ...s, quests: { ...s.quests, hachiCamera: { step: 1, base: 0, at: day - 1 } }, clock: { day, t: (10 - 6) / 24 } } : { ...s, clock: { day, t: (11 - 6) / 24 } };
+        commit(s);
+        const h = npcs.byKind('hachiware');
+        if (at === 'prints' && h) { npcs.comeOut(h, pl.x + 1.2, pl.z); player.setPosition(pl.x + 1.2, pl.z + 2); }
+        else player.setPosition(pl.x, pl.z + 8);
+        cam.snap(player.position);
       }
     },
     toggleSound: (kind) => sound.toggle(kind),
@@ -1429,6 +1451,7 @@ function boot() {
       starDiner.reset();
       blackStar.reset();
       bonbonStory.reset();
+      cameraStory.reset();
       loopRewinding = false;
       weather.setRain(false);
       sound.rain(false);
@@ -2253,8 +2276,9 @@ function boot() {
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
   let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
+  let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2320,7 +2344,7 @@ function boot() {
     const opts = [];
     // 퀘스트(5단계): 알리러 왔으면 맨 위, 새 부탁이 있으면 그다음, 아직 덜 했으면 다시 듣기
     const qs = questsFor(state, n.kind);
-    qs.report.forEach((id) => { const st = stepOf(state, id); opts.push(['qreport:' + id, st.type === 'bring' ? '부탁한 거 가져왔어!' : st.type === 'talk' ? (QUESTS[id].story ? `「${QUESTS[id].title}」 이야기` : '이야기 들으러 왔어') : '다 했어!']); });
+    qs.report.forEach((id) => { const st = stepOf(state, id); opts.push(['qreport:' + id, st.ask || (st.type === 'bring' ? '부탁한 거 가져왔어!' : st.type === 'talk' ? (QUESTS[id].story ? `「${QUESTS[id].title}」 이야기` : '이야기 들으러 왔어') : '다 했어!')]); }); // st.ask: 그 단계만의 말(뽑은 사진 보러 왔어!)
     qs.offer.forEach((id) => opts.push(['qoffer:' + id, QUESTS[id].ask || '무슨 고민 있어?']));
     qs.waiting.forEach((id) => opts.push(isBuddyStep(stepOf(state, id)) && !n.follow ? ['qwith:' + id, '같이 가자!'] : ['qhint:' + id, '부탁이 뭐였더라?']));
     activeQuests(state).forEach((id) => { const st = stepOf(state, id); if (st.type === 'visit' && st.with && reportTo(id, st) === n.kind && !n.follow) opts.push(['qwith:' + id, '같이 가자!']); });
@@ -2467,6 +2491,7 @@ function boot() {
   /** 퀘스트 단계 연출: 건네받은 친구가 먹고 · 울고, 둘레 친구들이 모여든다. */
   const STEP_FX = {
     shisaQuiz(n, finish) { shisaStory.quiz(finish); return true; },
+    cameraPrints(n, finish) { cameraStory.prints(finish); return true; }, // 하치와레의 카메라: 뽑은 사진을 펼쳐 본다
     pizzaCry(n) {
       cryFx = { n, t: 0, crying: false }; // 대사 줄 신호(storyCue)로: 한 입 → 클로즈업 → 굳기 → 울기 → 활짝
       ['hachiware', 'chiikawa'].forEach((kind, i) => {
@@ -2569,6 +2594,7 @@ function boot() {
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else if (step.scene === 'starDiner') starDiner.play(done);
       else if (step.scene === 'whiskeyBonbon') bonbonStory.play(done);
+      else if (step.scene === 'hachiCamera') cameraStory.play(done);
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
@@ -3584,6 +3610,39 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
+  // 사이드스토리 '하치와레의 카메라'(stories/camera.js): 광장에서 사진 찍기(뷰파인더 · 찍은 사진은 이 브라우저에) · 다음 날 뽑은 사진
+  const photoUi = createPhotoUi(ui);
+  /**
+   * 지금 장면을 사진으로: pos · look 이 있으면 그 자리에서 본 모습, rect(화면 사각형 — 뷰파인더 틀)가 있으면 그만큼 오려 낸다(없으면 가운데 4:3).
+   * 그리자마자 같은 순간에 옮겨 그려서(그림판이 아직 지워지기 전) 화면 글 · 말풍선 없이 장면만 담긴다. → JPEG data URL | null
+   */
+  function capturePhoto({ pos = null, look = null, rect = null } = {}) {
+    const c = cam.camera, keepPos = c.position.clone(), keepQuat = c.quaternion.clone();
+    try {
+      if (pos) { c.position.copy(pos); c.lookAt(look); c.updateMatrixWorld(); }
+      gfx.render(c);
+      const cv = gfx.renderer.domElement, box = cv.getBoundingClientRect(), kx = cv.width / box.width, ky = cv.height / box.height;
+      let sx, sy, sw, sh;
+      if (rect) { sx = (rect.left - box.left) * kx; sy = (rect.top - box.top) * ky; sw = rect.width * kx; sh = rect.height * ky; }
+      else { sh = Math.min(cv.height, cv.width * 0.75); sw = sh / 0.75; sx = (cv.width - sw) / 2; sy = (cv.height - sh) / 2; }
+      const out = document.createElement('canvas');
+      out.width = 240;
+      out.height = 180;
+      out.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, 240, 180);
+      return out.toDataURL('image/jpeg', 0.82);
+    } catch {
+      return null; // 그림을 못 옮기는 기기면 사진 없이(뽑은 사진은 그림으로)
+    } finally {
+      if (pos) { c.position.copy(keepPos); c.quaternion.copy(keepQuat); c.updateMatrixWorld(); }
+    }
+  }
+  cameraStory = createCameraStory({
+    npcs, village, hud, guide, sound, input, staged, who: (kind) => whoOf({ kind }), narrator: NARRATOR, me: () => meWho(), fill: (lines) => lines.map(fillName),
+    getPlayer: () => player, cam, photo: photoUi, capture: capturePhoto,
+    setRain: (on) => { weather.setRain(on); sound.rain(on); },
+    shelters: () => ['ramen', 'pub', 'exam', 'tools', 'furniture', 'board'].map((k) => village.spots[k]).filter(Boolean), // 가게 문 앞 처마 밑
+    photosChanged: () => refreshPhotoFrame()
+  });
   /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
   function afterLoopRewind() {
     villageOvernight();
@@ -4454,9 +4513,9 @@ function boot() {
   /** 모은 돈으로 목표(무기는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
   function npcShop(n) {
-    const g = goalOf(state, n.kind), door = g && (g.kind === 'weapon' ? village.spots.tools : village.spots.furniture);
+    const tools = g && (g.kind === 'weapon' || g.kind === 'camera'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레)도 도구점에서
     if (!door) { restHere(n.kind, 5); return; }
-    setDoing(n.kind, 'star', `${g.kind === 'weapon' ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
+    setDoing(n.kind, 'star', `${tools ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
     npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
       do: 'call',
       fn: () => {
@@ -5576,6 +5635,7 @@ function boot() {
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
       bonbon: () => ({ phase: bonbonStory.phase, mode, swallowed: bonbonGlade ? bonbonGlade.swallowed : null, drunk: bonbonGlade ? bonbonGlade.drunkLevel : null }),
+      camera: () => ({ phase: cameraStory.phase, shooting: photoUi.shooting, mode }), // 하치와레의 카메라 진행(뷰파인더가 셔터를 기다리는지)
       /** 검은 별똥별 장면 하나를 바로(보상 없음): 'blackWish' · 'blackMorning' · 'blackDejavu' · 'blackWatch' · 'blackSleepover' · 'blackSoak' · 'blackRain'. */
       blackPlay: (scene) => { if (!blackStar.active) blackStar.play(scene, () => hud.toast('테스트: 장면 끝', 2000)); },
       black: () => ({ loop: loopOf(state), free: state && state.story ? state.story.blackFree : null, quest: state && state.quests ? state.quests.blackStar : null, phase: blackStar.active, mode, clock: state && state.clock }),
@@ -5833,6 +5893,7 @@ function boot() {
       shisaStory.update(dt);
       hachiPit.update(dt);
       pajama.update(dt);
+      cameraStory.update(dt);
       idolStory.update(dt);
       starDiner.update(dt, t);
       bonbonStory.update(dt);
@@ -5914,7 +5975,7 @@ function boot() {
     hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
-    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup || blackStar.cutscene);
+    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup || blackStar.cutscene || cameraStory.cutscene);
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
@@ -5922,7 +5983,7 @@ function boot() {
       if (starShow) starCamera(dt);
       else if (closeup) closeupCamera(dt);
       else {
-        const pp = pajama.camPose(dt);
+        const pp = pajama.camPose(dt) || cameraStory.camPose(); // 이야기 카메라(별 보기 · 뷰파인더)
         if (pp) { cam.set(pp.pos, pp.look); storyCam = true; }
         else {
           // 이야기 카메라가 끝나면 따라가기 카메라를 바로 내 자리에 붙인다(연출 전 자리 — 마을 — 에서 날아오지 않게)

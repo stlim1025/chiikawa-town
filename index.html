@@ -1417,6 +1417,36 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .minigame .mg-hint kbd { padding: 0 6px 1px; border-radius: 6px; font-family: var(--hand); color: var(--ink); background: var(--paper); }
 [data-input="touch"] .minigame .mg-hint { display: none; }
 @media (prefers-reduced-motion: reduce) { .minigame .mg-judge.pop, .minigame .mg-btn.hit { animation-duration: 0.01s; } }
+/* 하치와레의 카메라(ui/photos.js): 찰칵 번쩍 · 뷰파인더(틀 밖은 살짝 어둡게, 틀 안이 사진에 담긴다) · 뽑은 사진(흔들리게) */
+.photo-flash { position: absolute; inset: 0; z-index: 30; background: #fff; opacity: 0; pointer-events: none; }
+.photo-flash.on { animation: photo-flash 0.45s ease-out; }
+@keyframes photo-flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.viewfinder { position: absolute; inset: 0; z-index: 12; pointer-events: none; overflow: hidden; font-family: var(--hand); color: #fff; text-align: center; }
+.viewfinder .vf-lab { position: absolute; left: 16px; right: 16px; top: max(14px, env(safe-area-inset-top)); z-index: 1; font-size: 19px; text-shadow: 0 2px 0 #1f3550, 0 0 10px rgba(0, 0, 0, 0.35); }
+.viewfinder .vf-frame { position: absolute; left: 50%; top: 46%; width: min(calc(100vw - 32px), 640px, calc(58vh * 4 / 3)); aspect-ratio: 4 / 3; transform: translate(-50%, -50%); border-radius: 6px; box-shadow: 0 0 0 100vmax rgba(20, 24, 32, 0.38); }
+.viewfinder .vf-c { position: absolute; width: 28px; height: 28px; border: 0 solid #fff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)); }
+.viewfinder .vf-c.tl { left: -2px; top: -2px; border-left-width: 4px; border-top-width: 4px; border-top-left-radius: 9px; }
+.viewfinder .vf-c.tr { right: -2px; top: -2px; border-right-width: 4px; border-top-width: 4px; border-top-right-radius: 9px; }
+.viewfinder .vf-c.bl { left: -2px; bottom: -2px; border-left-width: 4px; border-bottom-width: 4px; border-bottom-left-radius: 9px; }
+.viewfinder .vf-c.br { right: -2px; bottom: -2px; border-right-width: 4px; border-bottom-width: 4px; border-bottom-right-radius: 9px; }
+.viewfinder .vf-rec { position: absolute; left: 12px; top: 8px; font-size: 15px; color: #ff6b6b; text-shadow: 0 1px 0 #1f3550; }
+.viewfinder .vf-roll, .viewfinder .vf-btn, .viewfinder .vf-hint { position: absolute; left: 0; right: 0; width: max-content; margin-inline: auto; }
+.viewfinder .vf-roll { bottom: calc(max(28px, env(safe-area-inset-bottom)) + 74px); display: flex; gap: 6px; }
+.viewfinder .vf-roll img { width: 52px; height: 39px; object-fit: cover; border: 3px solid #fff; border-radius: 3px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); animation: rh-pop 0.35s ease-out; }
+.viewfinder .vf-btn { bottom: max(28px, env(safe-area-inset-bottom)); min-width: 150px; padding: 12px 26px; border-radius: 999px; font-family: var(--hand); font-size: 22px; color: var(--ink); background: var(--paper); box-shadow: 0 4px 0 #b9a27c, 0 0 0 3px #fff; pointer-events: auto; touch-action: manipulation; }
+.viewfinder .vf-btn.hit { animation: mg-hit 0.15s ease-out; }
+.viewfinder .vf-hint { bottom: max(6px, env(safe-area-inset-bottom)); font-size: 13px; text-shadow: 0 2px 0 #1f3550; }
+.viewfinder .vf-hint kbd { padding: 0 6px 1px; border-radius: 6px; font-family: var(--hand); color: var(--ink); background: var(--paper); }
+[data-input="touch"] .viewfinder .vf-hint { display: none; }
+.prints { position: absolute; left: 0; right: 0; top: max(14px, env(safe-area-inset-top)); z-index: 12; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px; padding: 0 16px; pointer-events: none; }
+.prints .print { box-sizing: border-box; margin: 0; width: clamp(104px, 19vw, 180px); padding: 7px 7px 6px; border-radius: 3px; background: #fffdf6; box-shadow: 0 6px 14px rgba(40, 30, 20, 0.28); transform: rotate(var(--r)); animation: print-in 0.55s ease-out both; animation-delay: var(--d); }
+.prints .ph { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #d9d4c8; }
+.prints .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(0.7px); }
+.prints .ph img.ghost { opacity: 0.42; transform: translate(4%, -3%); filter: blur(1.1px); }
+.prints figcaption { margin-top: 4px; font-family: var(--hand); font-size: 13px; color: #5a4a3a; text-align: center; }
+@keyframes print-in { from { opacity: 0; transform: translateY(-24px) rotate(0deg); } }
+@media (max-width: 520px) { .prints .print { width: calc(50% - 14px); max-width: 170px; } }
+@media (prefers-reduced-motion: reduce) { .photo-flash.on, .prints .print, .viewfinder .vf-roll img, .viewfinder .vf-btn.hit { animation-duration: 0.01s; } }
 /* 섬에서 직접 걸을 때(축제 · 밤의 정글 · 동굴 구출): 터치면 조이스틱 · 행동 버튼, 그리고 목표 글을 보인다(다른 HUD 는 숨긴 채) */
 [data-input="touch"] .cinematic.in-roam .hud-action:not([hidden]) { display: block !important; }
 [data-input="touch"] .cinematic.in-roam .stick:not([hidden]) { display: block !important; }

@@ -13,10 +13,13 @@ import { villagerOf, villagerSpend, updateVillager } from './villagers.js';
 const license = () => ({ id: 'license', kind: 'license', label: LICENSES.hunter.name, cost: LICENSES.hunter.fee });
 const weapon = (item) => ({ id: `w-${item}`, kind: 'weapon', item, label: WEAPONS[item].name, cost: WEAPONS[item].price });
 const furniture = (item) => ({ id: `f-${item}`, kind: 'furniture', item, label: FURNITURE[item].name, cost: FURNITURE[item].price });
+/** 하치와레가 오래 갖고 싶던 카메라(원작). 도구점에서 사고, 산 날 사이드스토리 '하치와레의 카메라'가 열린다(state.story.hachiCamera = 산 날). */
+export const CAMERA_PRICE = 500;
+const camera = () => ({ id: 'camera', kind: 'camera', label: '카메라', cost: CAMERA_PRICE, story: 'hachiCamera' });
 
 export const GOALS = {
   chiikawa: [license(), weapon('fork'), furniture('doll'), furniture('lamp'), weapon('sword')],
-  hachiware: [furniture('rug'), license(), weapon('fork'), furniture('stove'), weapon('sword')],
+  hachiware: [furniture('rug'), license(), camera(), weapon('fork'), furniture('stove'), weapon('sword')],
   usagi: [license(), weapon('sword'), weapon('hammer')],
   kurimanju: [furniture('stove'), furniture('shelf'), license(), weapon('sword')],
   rakko: [weapon('star')], // 이미 이름난 랭커: 가장 센 반짝 검을 노린다
@@ -37,13 +40,15 @@ export function canBuy(state, kind, day) {
   return !!g && g.kind !== 'license' && villagerOf(state, kind, day).money >= g.cost;
 }
 
-/** 목표를 산다: 돈을 내고 이룬 목표에 적는다(무기는 들고 다닌다). → { ok, state, goal } */
+/** 목표를 산다: 돈을 내고 이룬 목표에 적는다(무기는 들고 다닌다). 이야기가 걸린 목표(카메라)면 산 날도 적는다. → { ok, state, goal } */
 export function buyGoal(state, kind, day) {
   if (!canBuy(state, kind, day)) return { ok: false, state, goal: null };
   const g = goalOf(state, kind);
   const paid = villagerSpend(state, kind, g.cost, day);
   const patch = { bought: [...boughtOf(paid, kind), g.id], ...(g.kind === 'weapon' ? { weapon: g.item } : {}) };
-  return { ok: true, state: updateVillager(paid, kind, day, patch), goal: g };
+  let s = updateVillager(paid, kind, day, patch);
+  if (g.story) s = { ...s, story: { ...(s.story || {}), [g.story]: day } };
+  return { ok: true, state: s, goal: g };
 }
 
 /** 토벌할 때 한 번에 깎는 힘: 타고난 힘과 산 무기의 힘 중 큰 쪽. */
