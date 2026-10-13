@@ -4528,10 +4528,10 @@ function boot() {
   const JOY = { chiikawa: ['cheer', 'hop', 'shy', 'clap'], hachiware: ['wave', 'clap', 'sway', 'cheer'], usagi: ['hop', 'spin', 'cheer'], kurimanju: ['clap', 'sway', 'wave'], rakko: ['think', 'clap', 'wave'], momonga: ['pose', 'spin', 'hop'] };
   const STAFF_JOY = ['clap', 'wave', 'cheer'];
   const joyAnim = (kind) => pickLine(JOY[kind] || STAFF_JOY);
-  /** 모은 돈으로 목표(무기는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
+  /** 모은 돈으로 목표(무기 · 카메라는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
   function npcShop(n) {
-    const tools = g && (g.kind === 'weapon' || g.kind === 'camera'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레)도 도구점에서
+    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레)도 도구점에서
     if (!door) { restHere(n.kind, 5); return; }
     setDoing(n.kind, 'star', `${tools ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
     npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {

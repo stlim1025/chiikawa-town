@@ -928,7 +928,7 @@ export function createMonsters(scene, village, random = Math.random) {
 
   /** 쫓기: 공격 방식마다 알맞은 거리까지 다가가고(멀리서 쏘는 몬스터는 거리를 지킨다), 닿으면 예고를 시작한다. */
   function chase(m, dt, dp, canSee) {
-    if (!canSee) { m.state = m.M.boss ? 'return' : 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; } // 보스는 제자리로 돌아가 체력을 채운다
+    if (!canSee) { m.state = m.M.boss ? 'return' : 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; } // 보스는 제자리로 돌아간다(체력은 그대로: 멀리 떠나야 다시 찬다)
     if (m.stun > 0) return false;
     const M = m.M, A = attackOf(m, dp), kind = A.kind;
     turnTo(m, P.x, P.z, dt, 9);
@@ -1617,6 +1617,8 @@ export function createMonsters(scene, village, random = Math.random) {
         if (dNear > ACTIVE_DIST && !m.exam) {
           root.visible = false;
           if (m.state === 'wind' || m.state === 'act' || m.state === 'recover') { cancel(m); m.state = 'wander'; m.under = false; }
+          // 보스: 내가 멀리 떠났으면(싸움을 그만뒀다) 그제야 체력을 다시 채운다
+          if (M.boss && m.hp < M.hp) { m.hp = M.hp; m.hitPlayer = false; m.rage = 0; m.engaged = false; if (m.state === 'chase') m.state = 'return'; }
           if (m.mound) m.mound.visible = false;
           continue;
         }
@@ -1696,9 +1698,12 @@ export function createMonsters(scene, village, random = Math.random) {
           else if (m.state === 'recover') {
             m.rec -= dt;
             if (m.rec <= 0) m.state = 'chase';
+          } else if (m.state === 'return' && M.boss && canSee) {
+            m.state = 'chase'; m.engaged = true; // 보스: 돌아가던 중에 내가 다시 마당에 보이면(창을 닫았다 · 마당으로 돌아왔다) 곧바로 다시 덤빈다
           } else if (m.state === 'return') {
             const hx = m.home.x - m.x, hz = m.home.z - m.z, hd = Math.hypot(hx, hz);
-            if (hd < 1) { m.state = 'wander'; m.engaged = false; m.hp = M.hp; m.hitPlayer = false; m.rage = 0; m.nextAtk = null; m.bossPick = null; }
+            // 제자리에 오면 쉰다. 보통 몬스터는 체력을 채우지만, 보스는 잠깐 나를 놓친 것뿐이라(가방을 열었다 · 마당 가장자리로 피했다) 깎인 체력 그대로
+            if (hd < 1) { m.state = 'wander'; m.engaged = false; if (!M.boss) { m.hp = M.hp; m.hitPlayer = false; m.rage = 0; } m.nextAtk = null; m.bossPick = null; }
             else {
               const step = M.speed * 0.9 * dt;
               turnTo(m, m.home.x, m.home.z, dt, 6);
