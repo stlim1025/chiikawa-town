@@ -5,7 +5,7 @@ import { trySpend } from './state.js';
  * state.tools = { owned: [도구 id], light: 'off' | 'lantern' | 'flashlight' }
  */
 export const TOOLS = {
-  map: { name: '마을 지도', price: 200, shop: 'books', note: '다녀온 곳이 다 보여요' }, // 처음부터 부담 없이 사게(예전 500원)
+  map: { name: '마을 지도', price: 300, shop: 'books', note: '다녀온 곳이 다 보여요' }, // 처음부터 부담 없이 사게(예전 500원 → 200원 → 300원)
   lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 밝혀요' },
   flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '둘레는 넓게, 앞은 멀리 밝혀요' }
 };

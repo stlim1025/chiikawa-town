@@ -1088,19 +1088,19 @@ export function createPanels(ui, handlers) {
     // 경품 추첨(원작의 가라가라): 구슬 색마다 상품 · 추첨권(가게에서 물건을 사면 한 장) · 돌리기
     raffle(s) {
       const r = raffleOf(s), left = DAILY_TICKETS - (r.day === s.clock.day ? r.got : 0);
+      // 돌리기 단추는 추첨권 줄에 붙여 상품 목록 위에(휴대폰에서 스크롤하지 않아도 바로 누르게)
       return [head('경품 추첨', s.money),
         h('p', { class: 'sub' }, '손잡이를 돌려 나온 구슬 색으로 상품을 받아요!'),
+        h('div', { class: 'row pochette' }, svgSpan('pochette-art', TICKET_SVG),
+          h('div', {}, h('div', { class: 't' }, `추첨권 ${r.tickets}장`), h('div', { class: 'd' }, left > 0 ? `가게에서 물건을 사면 한 장(오늘 ${left}장 더)` : '오늘 받을 추첨권은 다 받았어요')),
+          r.tickets > 0 ? h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.raffleDraw() }, '추첨권으로 돌리기')
+            : h('button', { class: 'btn primary', type: 'button', disabled: s.money < RAFFLE_PRICE, onClick: () => handlers.raffleDraw() }, s.money < RAFFLE_PRICE ? `${won(RAFFLE_PRICE)} 부족` : `돌리기 ${won(RAFFLE_PRICE)}`)),
         h('div', { class: 'prize-list' }, PRIZES.map((P) => h('div', { class: 'prize-row' },
           h('i', { class: 'prize-ball', style: `background:${P.ball}` }),
           h('b', { class: 'prize-rank' }, P.rank),
           svgSpan('prize-art', itemSvg(P.item)),
           h('span', { class: 'prize-name' }, itemInfo(P.item).name)))),
-        h('div', { class: 'row pochette' }, svgSpan('pochette-art', TICKET_SVG),
-          h('div', {}, h('div', { class: 't' }, `추첨권 ${r.tickets}장`), h('div', { class: 'd' }, left > 0 ? `가게에서 물건을 사면 한 장(오늘 ${left}장 더)` : '오늘 받을 추첨권은 다 받았어요'))),
-        h('div', { class: 'actions' },
-          r.tickets > 0 ? h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.raffleDraw() }, '추첨권으로 돌리기')
-            : h('button', { class: 'btn primary', type: 'button', disabled: s.money < RAFFLE_PRICE, onClick: () => handlers.raffleDraw() }, s.money < RAFFLE_PRICE ? `${won(RAFFLE_PRICE)} 부족` : `돌리기 ${won(RAFFLE_PRICE)}`),
-          closeBtn())];
+        h('div', { class: 'actions' }, closeBtn())];
     },
     tools(s) {
       const out = [head('도구점', s.money), h('h3', { class: 'shop-sec' }, '불')];
