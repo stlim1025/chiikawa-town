@@ -99,7 +99,8 @@ export function createGlowShrooms(scene, village, random = seeded(20251010)) {
   }
 
   let t = 0;
-  const pulse = (s) => 0.5 + 0.5 * Math.sin((t / PERIOD) * Math.PI * 2 + s.off);
+  // 빛 세기: 일정한 빠르기로 밝아졌다 어두워진다(삼각파 — 사인파는 양 끝에서 오래 머물러 끝에 걸린 초록 칸이 쉬웠다)
+  const pulse = (s) => { const u = (t / PERIOD + s.off / (Math.PI * 2)) % 1; return 1 - Math.abs(2 * u - 1); };
 
   return {
     list,

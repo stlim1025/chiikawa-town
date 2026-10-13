@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GLOW_CLEAN, GLOW_OK, glowResult, glowNight, pickedTonight, markPicked, isValidGlowfluff } from '../src/core/glowfluff.js';
+import { GLOW_WIDTH, GLOW_NEAR, glowZone, glowResult, glowNight, pickedTonight, markPicked, isValidGlowfluff } from '../src/core/glowfluff.js';
 import { JOB_TYPES, availableJobs, recordPull, isComplete, acceptJob } from '../src/core/jobs.js';
 import { DAILY_JOBS } from '../src/core/villagers.js';
 import { itemInfo } from '../src/core/inventory.js';
@@ -15,13 +15,25 @@ const fresh = () => ({ ...createState({ name: '나', look: {} }), player: { x: 0
 // 이 게임의 하루는 아침 6시에 시작한다: at(5, 26) = 5일째 밤의 새벽 2시
 const at = (day, hour) => ({ day, t: (hour - 6) / 24 });
 
-test('반짝 털뭉치: 빛이 가장 밝을 때 깔끔하게, 적당하면 그냥, 어두우면 움찔', () => {
-  assert.equal(glowResult(1), 'clean');
-  assert.equal(glowResult(GLOW_CLEAN), 'clean');
-  assert.equal(glowResult(GLOW_CLEAN - 0.01), 'ok');
-  assert.equal(glowResult(GLOW_OK), 'ok');
-  assert.equal(glowResult(GLOW_OK - 0.01), 'startle');
-  assert.equal(glowResult(0), 'startle');
+test('반짝 털뭉치: 초록 칸 빛에서 떼면 깔끔하게, 가까우면 그냥, 멀면 움찔', () => {
+  const z = { from: 0.5, to: 0.5 + GLOW_WIDTH };
+  assert.equal(glowResult(0.5, z), 'clean');
+  assert.equal(glowResult(z.to, z), 'clean');
+  assert.equal(glowResult(0.49, z), 'ok');
+  assert.equal(glowResult(z.to + 0.01, z), 'ok');
+  assert.equal(glowResult(z.from - GLOW_NEAR - 0.01, z), 'startle');
+  assert.equal(glowResult(z.to + GLOW_NEAR + 0.01, z), 'startle');
+  assert.equal(glowResult(1, z), 'startle', '가장 밝다고 깔끔한 게 아니다');
+});
+
+test('반짝 털뭉치: 초록 칸 자리는 손을 뻗을 때마다 바뀌고, 늘 게이지 안쪽에 같은 폭', () => {
+  const lo = glowZone(() => 0), hi = glowZone(() => 0.999), mid = glowZone(() => 0.5);
+  for (const z of [lo, hi, mid]) {
+    assert.ok(z.from >= 0.3 && z.to <= 0.97, `칸 ${z.from.toFixed(2)} ~ ${z.to.toFixed(2)}`);
+    assert.ok(Math.abs(z.to - z.from - GLOW_WIDTH) < 1e-9);
+  }
+  assert.ok(hi.from - lo.from > 0.5, '왼쪽부터 오른쪽까지 고루');
+  assert.ok(GLOW_WIDTH <= 0.15, '좁은 칸(위험한 풀만큼 어렵게)');
 });
 
 test('반짝 털뭉치: 저녁부터 다음 날 아침까지가 한 밤이고, 다음 밤에는 다시 앉는다', () => {

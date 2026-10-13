@@ -46,7 +46,7 @@ import { createGuide } from './ui/guide.js';
 import { playSleep } from './ui/sleepfx.js';
 import { createBerries } from './world/berries.js';
 import { createGlowShrooms } from './world/glowshrooms.js';
-import { GLOW_CLEAN, glowResult, pickedTonight, markPicked } from './core/glowfluff.js';
+import { glowZone, glowResult, pickedTonight, markPicked } from './core/glowfluff.js';
 import { openSticker } from './ui/sticker.js';
 import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
@@ -1828,12 +1828,13 @@ function boot() {
 
   /**
    * 반짝 털뭉치 따기(밤, 서쪽 숲 빛나는 버섯 — core/glowfluff.js): 풀 뽑기처럼 행동 버튼을 꾹 누르면 손을 뻗고(멈춰 서서) 버섯 빛 게이지가 뜬다.
-   * 손을 떼는 순간 빛이 가장 밝으면 깔끔하게, 적당히 밝으면 그냥 떼어지고, 어두우면 털뭉치가 움찔해서 못 뗀다(기운은 안 든다).
+   * 손을 뻗을 때마다 초록 칸(그 털뭉치가 놓아주는 밝기) 자리가 바뀐다. 손을 떼는 순간 빛이 초록 칸이면 깔끔하게, 가까우면 그냥 떼어지고,
+   * 멀면 털뭉치가 움찔해서 못 뗀다(기운은 안 든다). 움찔해서 빛이 사그라든 동안은 늘 움찔.
    * 일감이면 일감에, 아니면 가방에.
    */
   function beginGlow(s) {
     if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
-    glowTry = { s };
+    glowTry = { s, zone: glowZone() };
     player.face(s.x, s.z);
     player.busy = true; // 손을 뻗는 동안은 멈춰 선다
   }
@@ -1844,14 +1845,14 @@ function boot() {
     hud.hideMeter();
   }
   function endGlow() {
-    const s = glowTry.s;
+    const { s, zone } = glowTry;
     cancelGlow();
-    pickGlow(s);
+    pickGlow(s, zone);
   }
-  function pickGlow(s) {
+  function pickGlow(s, zone) {
     const top = { x: s.x, y: 1.45, z: s.z };
     player.face(s.x, s.z);
-    const res = glowResult(glows.glowOf(s));
+    const res = s.dim > 0 ? 'startle' : glowResult(glows.glowOf(s), zone);
     if (res === 'startle') {
       glows.startle(s);
       sound.play('none');
@@ -2525,7 +2526,7 @@ function boot() {
   let cryFx = null, closeup = null; // cryFx: { n, t, crying } · closeup: { n, t, a(카메라가 오는 방향), fromPos, fromLook, out, outT }
   let cutscene = false; // 이야기 장면이라 화면 글을 숨긴 중(body.cutscene)
   let storyCam = false; // 이야기 카메라(잠옷 밤나들이 별 보기)를 쓰는 중: 끝나면 따라가기 카메라를 내 자리에 바로 붙인다
-  let glowTry = null; // 털뭉치 따기: 행동 버튼을 꾹 누르고 손을 뻗은 중 { s: 버섯 무더기 } — 손을 떼면 그때 빛으로 판정
+  let glowTry = null; // 털뭉치 따기: 행동 버튼을 꾹 누르고 손을 뻗은 중 { s: 버섯 무더기, zone: 이번 초록 칸 } — 손을 떼면 그때 빛으로 판정
   /** 대사 줄의 연출 신호. */
   function storyCue(cue) {
     const F = cryFx;
@@ -5925,10 +5926,10 @@ function boot() {
       // 무기를 들고 몬스터가 근처에 있으면(닿지 않아도) 휘두르기 버튼을 띄운다(휴대폰)
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
       hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : glowTry ? '따는 중' : target ? target.label : swingable ? '휘두르기' : null);
-      // 털뭉치 따기(꾹 누르고 있는 동안): 버섯 빛을 게이지로 — 바늘이 노란 칸(가장 밝을 때)에 왔을 때 손을 뗀다. 풀 뽑기 게이지와 같은 자리
+      // 털뭉치 따기(꾹 누르고 있는 동안): 버섯 빛을 게이지로 — 바늘이 초록 칸(손을 뻗을 때마다 자리가 바뀐다)에 왔을 때 손을 뗀다. 풀 뽑기 게이지와 같은 자리
       if (glowTry) {
         if (!glowTry.s.has) cancelGlow(); // 그새 날이 밝았다
-        else hud.showMeter(glows.glowOf(glowTry.s), { from: GLOW_CLEAN, to: 1 }, [{ icon: itemSvg('glowfluff'), text: '가장 밝을 때 손을 떼요' }]);
+        else hud.showMeter(glows.glowOf(glowTry.s), glowTry.zone, [{ icon: itemSvg('glowfluff'), text: '초록 칸에서 손을 떼요' }]);
       }
       hud.render(state);
       updateExamPill();
