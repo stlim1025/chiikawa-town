@@ -18,7 +18,7 @@ const hachiwareSays = (lines, where) => {
 };
 
 test('첫날 안내는 하치와레 말투로 짧고 깔끔하다', () => {
-  assert.deepEqual(Object.keys(TUTORIAL_LINES).sort(), ['board', 'boardAgain', 'hello', 'house', 'houseTour', 'pull', 'report', 'tips']);
+  assert.deepEqual(Object.keys(TUTORIAL_LINES).sort(), ['board', 'boardAgain', 'hello', 'house', 'houseTour', 'phone', 'phoneTour', 'pull', 'report', 'tips']);
   for (const [step, lines] of Object.entries(TUTORIAL_LINES)) hachiwareSays(lines, step);
 });
 

@@ -8,7 +8,9 @@ import { isComplete } from './jobs.js';
  *  board  → 노동 접수에서 일감 받기
  *  pull   → 풀 뽑기(꾹 눌렀다 초록에서 떼기)
  *  report → 노동 접수에서 보수 받기
- *  tips   → 기운 회복과 승급(검정소) 이야기 (대화를 읽으면 done)
+ *  tips   → 기운 회복과 승급(검정소) 이야기 (대화를 읽으면 phone)
+ *  phone  → 마을폰 열어 보기(오른쪽 위 폰 버튼 · E 키). 폰을 열었다 닫으면 phoneTour
+ *  phoneTour → 마을폰으로 볼 수 있는 것 이야기 (대화를 읽으면 done)
  *  done   → 끝. 예전 저장처럼 값이 없어도 끝난 것으로 본다.
  */
 export const TUTORIAL_LINES = {
@@ -50,7 +52,21 @@ export const TUTORIAL_LINES = {
     '첫 보수 축하해~! ♪',
     '기운이 없으면 라멘 먹거나 푹 자면 돼~',
     '잡초를 뽑다 보면 제초 5급도 딸 수 있어!',
-    '시험 볼 때가 되면 내가 알려 줄게~',
+    '시험 볼 때가 되면 내가 알려 줄게~'
+  ],
+  // 마을폰 열어 보기(오른쪽 위 폰 버튼 · E 키)
+  phone: [
+    '아 참! 마을폰도 알려 줄게~',
+    '오른쪽 위에 동그란 폰 버튼 보이지?',
+    '한번 눌러서 열어 봐~! E 키로도 돼!'
+  ],
+  // 마을폰을 열었다 닫으면
+  phoneTour: [
+    '어때~ 마을폰 편하지?',
+    '퀘스트랑 풀 도감도 거기서 볼 수 있어!',
+    '친구 하트랑 지금 하는 일도 볼 수 있어~',
+    '설정에서 소리도 끄고 켤 수 있어!',
+    '저장 코드도 거기서 받아 둘 수 있어~',
     '그럼 힘내~! 궁금한 거 있으면 언제든 말 걸어 ♪'
   ]
 };
@@ -61,8 +77,8 @@ export function tutorialActive(step) {
 }
 
 /**
- * 목표를 이루었으면 다음 단계(대화 단계 hello · houseTour · tips 는 대화를 다 읽어야 넘어가므로 그대로).
- * ctx.nearHome: 내 캐릭터가 집 앞에 왔는지(위치는 화면 쪽에서 알려 준다).
+ * 목표를 이루었으면 다음 단계(대화 단계 hello · houseTour · tips · phoneTour 는 대화를 다 읽어야 넘어가므로 그대로).
+ * ctx.nearHome: 내 캐릭터가 집 앞에 왔는지(위치는 화면 쪽에서 알려 준다), ctx.phoneOpened: 마을폰을 열어 봤는지.
  */
 export function tutorialNext(step, state, ctx = {}) {
   switch (step) {
@@ -72,6 +88,7 @@ export function tutorialNext(step, state, ctx = {}) {
     case 'report':
       if (state.job) return isComplete(state.job) ? step : 'pull';
       return state.money > 0 ? 'tips' : 'board';
+    case 'phone': return ctx.phoneOpened ? 'phoneTour' : step; // ctx.phoneOpened: 이 단계에서 마을폰을 열어 봤는지(닫은 뒤에 넘어간다)
     default: return step;
   }
 }

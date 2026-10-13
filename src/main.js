@@ -1667,7 +1667,11 @@ function boot() {
   const openBag = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
   hud.onBag(openBag);
   // 마을폰: 마을에서도, 집 · 친구 집 안에서도(꾸미는 중만 빼고) 연다. 오른쪽 위 버튼 또는 E 키
-  const openPhone = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy()) panels.openSettings({ storage: store.available }); };
+  const openPhone = () => {
+    if (!(state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy())) return;
+    panels.openSettings({ storage: store.available });
+    if (state.tutorial === 'phone') tutPhoneOpened = true; // 첫날 안내: 열어 봤으니 닫으면 하치와레가 마을폰 이야기를 한다
+  };
   hud.onSettings(openPhone);
   input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
   // 등불: 가진 불만 끔 → 랜턴 → 손전등. 버튼 또는 F 키(아직 불이 없으면 어디서 사는지 알려 준다)
@@ -1990,9 +1994,10 @@ function boot() {
   }
 
   // ---------- 하치와레의 첫날 안내 ----------
-  const GOALS = { house: '하치와레를 따라가자!', board: '노동 접수에서 일감을 받자!', pull: '풀을 뽑아 보자!', report: '보수를 받으러 가자!' };
+  const GOALS = { house: '하치와레를 따라가자!', board: '노동 접수에서 일감을 받자!', pull: '풀을 뽑아 보자!', report: '보수를 받으러 가자!', phone: '마을폰을 열어 보자!' };
   // 할 일 카드 밑줄: 설명서 말투 말고 하치와레가 옆에서 말하듯
-  const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '하치와레가 게시판에서 기다려!' };
+  const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '하치와레가 게시판에서 기다려!', phone: '오른쪽 위 폰 버튼을 톡!' };
+  let tutPhoneOpened = false; // 안내 'phone' 단계에서 마을폰을 열어 봤는지(닫으면 하치와레가 마을폰 이야기를 한다)
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
   const boardLead = { x: village.spots.board.x + 1.4, z: village.spots.board.z + 0.2 }; // 노동 접수 게시판 옆(내가 서는 게시판 앞자리는 비워 둔다)
@@ -2016,7 +2021,9 @@ function boot() {
     npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : step === 'board' || step === 'report' ? boardLead : null);
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
-    else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => { enterTutorial('done', 'tips'); hud.toast('안내 끝!', 2400); });
+    else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => enterTutorial('phone', 'tips'));
+    else if (step === 'phone') { tutPhoneOpened = false; sayGuide(TUTORIAL_LINES.phone, () => announceGoal(step)); }
+    else if (step === 'phoneTour') sayGuide(TUTORIAL_LINES.phoneTour, () => { enterTutorial('done', 'phoneTour'); hud.toast('안내 끝!', 2400); });
     else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board, () => announceGoal(step));
     else if (TUTORIAL_LINES[step]) sayGuide(TUTORIAL_LINES[step], () => announceGoal(step));
     else announceGoal(step);
@@ -5862,7 +5869,7 @@ function boot() {
       }
       // 안내: 목표를 이루면(창을 닫고 손을 뗀 뒤에) 다음 단계로
       if (tutorialActive(state.tutorial) && !guide.open && !panels.isOpen() && !pulling) {
-        const next = tutorialNext(state.tutorial, state, { nearHome: nearHome() });
+        const next = tutorialNext(state.tutorial, state, { nearHome: nearHome(), phoneOpened: tutPhoneOpened });
         if (next !== state.tutorial) enterTutorial(next, state.tutorial);
         // 말이 다른 대화에 끊겨 할 일 카드를 못 띄웠으면(쪽지가 숨은 채로 남았으면) 지금 띄운다
         else if (guide.goalEl.classList.contains('incoming') && performance.now() - goalCardAt > 4000) announceGoal(state.tutorial);
@@ -5882,7 +5889,7 @@ function boot() {
     remotes.update(dt, (mode === 'play' || (mode === 'intro' && !!visiting)) && !closeup); // 친구 마을로 걸어 들어갈 때도 와 있는 친구들이 보인다
     updateRemoteLights();
     hud.setRecall(canRecall()); // 마을 밖에 있을 때만 집으로 버튼
-    hud.setPhoneNudge(!!appNudge); // 새로 생긴 앱(지도)을 열 때까지 마을폰 버튼이 빛난다
+    hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
     const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup || blackStar.cutscene);
