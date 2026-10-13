@@ -85,8 +85,8 @@ test('hunt jobs need hunter license; payout not multiplied', () => {
   assert.equal(lic.filter((j) => j.hunt).length, 5);
   for (const j of lic.filter((j) => j.hunt)) { assert.ok(C.MONSTERS[j.kind], j.id); assert.ok(V.DAILY_JOBS[j.id] > 0, j.id); }
   const job = { ...J.acceptJob('huntFluff'), count: 4, clean: 2 };
-  assert.equal(J.payout(job, 1), 320 + 40);
-  assert.equal(J.payout(job, 5), 320 + 40);
+  assert.equal(J.payout(job, 1), 160 + 20);
+  assert.equal(J.payout(job, 5), 160 + 20);
   assert.ok(Lc.LICENSES.hunter);
   // 토벌 일감은 가방의 전리품을 대신 내지 않는다
   let s = { ...fresh(), job: J.acceptJob('huntFluff') };

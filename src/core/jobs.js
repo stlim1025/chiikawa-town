@@ -22,11 +22,12 @@ export const JOB_TYPES = {
   giant2: { id: 'giant2', title: '왕잡초 2개 뽑기', kind: 'giantweed', target: 2, base: 420, cleanBonus: 30, needGrade: 1, where: '서쪽 숲 깊은 곳' },
   poison3: { id: 'poison3', title: '독풀 3개 뽑기', kind: 'poisonweed', target: 3, base: 450, cleanBonus: 25, needGrade: 1, where: '북쪽 바위산 깊은 곳' },
   // 4단계: 토벌 일감(토벌 자격증이 있어야 받는다, 제초 급수와 상관없이). 하나도 안 맞고 잡으면 '깔끔하게'
-  huntFluff: { id: 'huntFluff', title: '풀뭉치 4마리 토벌', kind: 'fluff', target: 4, base: 320, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '동쪽 들판' },
-  huntSlime: { id: 'huntSlime', title: '물방울 슬라임 4마리 토벌', kind: 'slime', target: 4, base: 340, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '남쪽 강가' },
-  huntBeetle: { id: 'huntBeetle', title: '도토리 뿔벌레 3마리 토벌', kind: 'beetle', target: 3, base: 380, cleanBonus: 25, needGrade: 5, needLicense: 'hunter', hunt: true, where: '서쪽 숲' },
-  huntTurtle: { id: 'huntTurtle', title: '이끼 거북 2마리 토벌', kind: 'turtle', target: 2, base: 520, cleanBonus: 40, needGrade: 5, needLicense: 'hunter', hunt: true, where: '북쪽 바위산' },
-  huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 480, cleanBonus: 30, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' }
+  // 잡은 몬스터의 전리품은 따로 팔 수 있어서, 보수는 전리품까지 더해 4급 ~ 3급 풀 일감 사이가 되게 잡는다(급수가 오르면 풀 일감이 따라잡는다)
+  huntFluff: { id: 'huntFluff', title: '풀뭉치 4마리 토벌', kind: 'fluff', target: 4, base: 160, cleanBonus: 10, needGrade: 5, needLicense: 'hunter', hunt: true, where: '동쪽 들판' },
+  huntSlime: { id: 'huntSlime', title: '물방울 슬라임 4마리 토벌', kind: 'slime', target: 4, base: 180, cleanBonus: 10, needGrade: 5, needLicense: 'hunter', hunt: true, where: '남쪽 강가' },
+  huntBeetle: { id: 'huntBeetle', title: '도토리 뿔벌레 3마리 토벌', kind: 'beetle', target: 3, base: 205, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '서쪽 숲' },
+  huntTurtle: { id: 'huntTurtle', title: '이끼 거북 2마리 토벌', kind: 'turtle', target: 2, base: 300, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '북쪽 바위산' },
+  huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 255, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' }
 };
 
 /** 풀을 뽑는 일감인지. */
