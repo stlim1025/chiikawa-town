@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
-import { ARENAS, ARENA_WALL, CANYON, canyonLen, doorAngle, canyonMouth } from '../core/layout.js';
+import { WORLD_HALF, ARENAS, ARENA_WALL, CANYON, canyonLen, doorAngle, canyonMouth } from '../core/layout.js';
 
 /**
  * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 높은 지형에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡 하나.
@@ -52,12 +52,12 @@ const DECOR = {
 
 /**
  * 둘러싼 지형: kind(rock 절벽 바위 · hill 풀 언덕 · tree 고목), 색 셋(번갈아), w 덩어리 반지름, h 높이 [낮게, 높게](카메라 쪽은 더 낮게),
- * cap 꼭대기 이끼(바위), path 협곡 바닥 흙길 색(바위산은 오솔길이 이미 지나간다).
+ * cap 꼭대기 이끼(바위), path 협곡 바닥 흙길 색(바위산은 오솔길이 이미 지나간다 · 들판은 땅 색으로 칠한다).
  */
 const TERRAIN = {
   kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
   bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e', path: '#c2a882' },
-  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9], path: '#d2b98c' },
+  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9] }, // 협곡 바닥은 들판 길을 땅 색으로 이어 칠한다(core/layout.js 의 lairPathDist)
   elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8], path: '#a89470' }
 };
 /** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
@@ -131,6 +131,32 @@ function fences(A, obstacles) {
   for (let along = R - 0.4; along <= to; along += 1) for (const sd of [-1, 1]) push(fx * along + fz * side * sd, fz * along - fx * side * sd);
 }
 
+/** 월드 동쪽 끝(WORLD_HALF) 너머에 있는 마당(두더지 굴밭): 입구만 맵 끝자락에 나와 있다. */
+const beyondEdge = (A) => A.x + A.r + ARENA_WALL > WORLD_HALF;
+const MOUND = ['#aee08f', '#95d488'];
+
+/**
+ * 월드 끝 너머 마당 A 둘레의 큰 둔덕(월드 좌표, 아니면 빈 배열): [{ x, z, s(반지름), h(높이), wall(울타리로도 막는지) }].
+ *  협곡 입구 양옆은 맵 끝 둔덕만 하게 셋씩(outdoors.js 가 협곡 자리 맵 끝 둔덕을 비운다 · 그 자리 나무 · 꽃도 이걸 보고 비운다),
+ *  분지 뒤(협곡 반대쪽 반 바퀴 남짓)는 더 큰 언덕을 둘러 세워 맵 너머 빈 땅이 보이지 않게. 카메라 쪽(남쪽)은 낮게.
+ */
+export function edgeMounds(A) {
+  if (!beyondEdge(A)) return [];
+  const out = [], door = doorAngle(A), fx = Math.sin(door), fz = Math.cos(door), mouth = A.r + ARENA_WALL + canyonLen(A);
+  [1.5, 6.5, 11.5].forEach((back, j) => {
+    for (const sd of [-1, 1]) {
+      const i = j * 2 + (sd > 0 ? 1 : 0), cam = -fx * sd > 0.5, along = mouth - back, side = 8.6 + jitter(i, 7) * 0.8;
+      out.push({ x: A.x + fx * along + fz * side * sd, z: A.z + fz * along - fx * side * sd, s: 4.6 + jitter(i, 8) * 0.6, h: cam ? 2.2 + jitter(i, 9) * 0.4 : 3.4 + jitter(i, 9) * 1.2, wall: true });
+    }
+  });
+  const from = door + 1.1, span = Math.PI * 2 - 2.2, n = Math.round(span / 0.44);
+  for (let k = 0; k <= n; k++) {
+    const a = from + (span * k) / n, D = A.r + ARENA_WALL + 8 + jitter(k, 10) * 1.5, cam = Math.cos(a) > 0.3;
+    out.push({ x: A.x + Math.sin(a) * D, z: A.z + Math.cos(a) * D, s: 5.5 + jitter(k, 11), h: cam ? 2.2 + jitter(k, 12) * 0.5 : 4.2 + jitter(k, 12) * 1.8, wall: false });
+  }
+  return out;
+}
+
 export function buildLairs({ zones, obstacles, labels, fader }) {
   for (const A of ARENAS) {
     const T = TERRAIN[A.id], g = new THREE.Group();
@@ -147,6 +173,11 @@ export function buildLairs({ zones, obstacles, labels, fader }) {
       const f = groupOf.get(s);
       buildMass(T, s, i, f ? (c) => f.mat(c) : (c) => toonMaterial(c), (mesh) => { g.add(mesh); if (f) f.add(mesh); return mesh; });
       obstacles.push({ x: A.x + s.x, z: A.z + s.z, r: T.w * s.k * 0.8 });
+    });
+    // 월드 끝 너머 마당: 입구 양옆 · 분지 뒤 큰 둔덕
+    edgeMounds(A).forEach((m, i) => {
+      g.add(toonMesh(GEO.sphere, MOUND[i % 2], { position: [m.x - A.x, -0.8, m.z - A.z], scale: [m.s, m.h, m.s], outline: 0.06, receive: true }));
+      if (m.wall) obstacles.push({ x: m.x, z: m.z, r: m.s * 0.95 });
     });
     // 협곡 바닥 흙길(바위산은 오솔길이 이미 지나간다)
     if (T.path) {

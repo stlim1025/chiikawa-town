@@ -494,9 +494,11 @@ const PROP_PARTS = {
   ]),
   // 치이카와 · 하치와레의 사스마타(토벌 나갈 때)
   fork: (def) => held(def, 'armR', HOLD.train, forkParts()),
-  // 우사기의 막대
+  // 우사기의 봉: 키만 한 주황 봉, 양 끝에 하얀 마개
   stick: (def) => held(def, 'armR', HOLD.train, [
-    { m: 'box', c: '#b07a45', p: [0, 0, 0.255], s: [0.04, 0.04, 0.75] }
+    { m: 'box', c: '#f2a65a', p: [0, 0, 0.28], s: [0.055, 0.055, 1.16] },
+    { m: 'box', c: '#fffaf0', p: [0, 0, 0.88], s: [0.064, 0.064, 0.12] },
+    { m: 'box', c: '#fffaf0', p: [0, 0, -0.32], s: [0.064, 0.064, 0.12] }
   ]),
   // 하치와레의 마이크: 번쩍 든 팔 끝에서 바깥 위로
   mic: (def) => held(def, 'armR', HOLD.dance, [

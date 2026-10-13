@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, CANYON, canyonLen, canyonCoords, riverZ, roadDist, shoreDist } from '../core/layout.js';
-import { buildLairs } from './lairs.js';
+import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, CANYON, canyonLen, canyonCoords, canyonAt, onLairLead, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { buildLairs, edgeMounds } from './lairs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const m4 = (x, y, z, sx, sy, sz, yaw = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
@@ -38,6 +38,8 @@ export function buildOutdoors(ctx) {
   }
 
   const ELDER = BOSS_LAIRS.elder;
+  /** 월드 끝 너머 마당(두더지 굴밭) 둘레 큰 둔덕 자리(world/lairs.js 가 짓는다): 그 밑에는 나무 · 꽃을 두지 않는다. */
+  const EDGE = ARENAS.flatMap(edgeMounds), underEdge = (x, z, pad = 0) => EDGE.some((m) => Math.hypot(x - m.x, z - m.z) < m.s + pad);
   const inLair = (x, z, pad = 0) => Object.values(BOSS_LAIRS).some((L) => Math.hypot(x - L.x, z - L.z) < L.r + pad);
   /** 보스 마당 자리(분지 + 둘레 절벽)와 협곡(+ 양옆 절벽 · 입구 앞): 나무 · 바위를 비운다(world/lairs.js 가 그 자리에 지형을 짓는다). */
   const arenaClear = (x, z) => ARENAS.some((A) => {
@@ -108,16 +110,20 @@ export function buildOutdoors(ctx) {
     const x = VILLAGE_R + 8 + rand() * 38, z = (rand() - 0.5) * 100;
     if (Math.abs(z) > x - 4 || roadDist(x, z) < 3 || shoreDist(x, z) < 2 || obstacles.hits(x, z, 1.5)) continue;
     made++;
-    tree(x, z, 1.05 + rand() * 0.3, made % 3 ? '#6cc77e' : '#ffb6cd', zones.groupAt(x, z));
+    const s = 1.05 + rand() * 0.3;
+    if (onLairLead(x, z, 3) || canyonAt(x, z, 3) || underEdge(x, z, 1.2)) rand(); // 두더지 굴밭 입구 흙길 · 협곡 · 둘레 큰 둔덕: 나무는 빼되 난수(나무 방향)는 그대로 써서 뒤 자리가 바뀌지 않게
+    else tree(x, z, s, made % 3 ? '#6cc77e' : '#ffb6cd', zones.groupAt(x, z));
   }
+  // 동쪽 끝 둔덕(지나갈 수 없는 월드 끝). 두더지 굴밭 협곡이 지나가는 자리는 비운다(난수는 그대로 — 뒤 꽃 · 갈대 자리가 바뀌지 않게). 빈 곳 양옆은 world/lairs.js 가 큰 둔덕으로 메운다
   for (let z = -WORLD_HALF; z <= WORLD_HALF; z += 9) {
-    const x = 74 + rand() * 4, s = 6 + rand() * 3;
-    addInstance('mound' + (Math.abs(z) % 18 ? 0 : 1), GEO.sphere, Math.abs(z) % 18 ? '#aee08f' : '#95d488', { outline: 0.06, receive: true }, x, z, m4(x, -0.8, z, s, 3 + rand() * 2, s));
+    const x = 74 + rand() * 4, s = 6 + rand() * 3, h = 3 + rand() * 2;
+    if (canyonAt(x, z, s + 3)) continue; // 협곡 벽 언덕까지 덮는 큰 둔덕도 뺀다
+    addInstance('mound' + (Math.abs(z) % 18 ? 0 : 1), GEO.sphere, Math.abs(z) % 18 ? '#aee08f' : '#95d488', { outline: 0.06, receive: true }, x, z, m4(x, -0.8, z, s, h, s));
     obstacles.push({ x, z, r: s * 0.95 });
   }
   for (let k = 0; k < 3200; k++) {
     const x = VILLAGE_R + 2 + rand() * (WORLD_HALF - VILLAGE_R - 6), z = (rand() - 0.5) * 150;
-    if (Math.abs(z) > x || roadDist(x, z) < 0.4 || shoreDist(x, z) < 0.6 || obstacles.hits(x, z, 0.05, true) || inLair(x, z)) continue; // 보스 자리 흙바닥에는 꽃이 안 난다
+    if (Math.abs(z) > x || roadDist(x, z) < 0.4 || shoreDist(x, z) < 0.6 || obstacles.hits(x, z, 0.05, true) || inLair(x, z) || onLairLead(x, z) || canyonAt(x, z) || underEdge(x, z)) continue; // 보스 자리 흙바닥 · 입구 흙길에는 꽃이 안 난다
     const c = FLOWER[k % FLOWER.length];
     addInstance('flower' + c, GEO.speck, c, { outline: false, shadow: false }, x, z, m4(x, 0.07, z, 0.09, 0.07, 0.09));
   }

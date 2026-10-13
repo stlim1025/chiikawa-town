@@ -51,11 +51,12 @@ export const CLIFF = { cove: { x0: 19, x1: 33, z1: 82, y: -3 }, log: { x: 26, z:
 export const CAVE = { x: 8, z: -47, r: 3, door: { x: 8, z: -42.6 } };
 /**
  * 구역 보스(core/bosses.js)가 사는 자리: 가운데, 싸울 마당 반지름 r(숲은 이만큼 나무를 비운다 · world/lairs.js 가 둘레를 꾸민다), 이름표.
- * 셋 다 마을 가운데서 60 넘게(왕버섯 굴만큼) 떨어진 구역 끝: 동쪽 들판은 길(z 0 둘레)에서 떨어진 너른 풀밭, 서쪽 숲은 길에서 20 넘게 들어간 숲속,
- * 남쪽은 강 건너 남서쪽 끝 호수와 바다 사이 — 선착장(PIER)에서 20 넘게, 절벽(CLIFF)에서는 반대쪽.
+ * 셋 다 마을 가운데서 60 넘게(왕버섯 굴만큼) 떨어진 구역 끝: 동쪽 들판은 월드 동쪽 끝 너머(입구만 맵 끝자락, 들판 길 끝에서 흙길로 이어진다),
+ * 서쪽 숲은 길에서 20 넘게 들어간 숲속, 남쪽은 강 건너 남서쪽 끝 호수와 바다 사이 — 선착장(PIER)에서 20 넘게, 절벽(CLIFF)에서는 반대쪽.
+ * lead: 협곡 입구 밖으로 이어 까는 흙길 길이(입구가 길 끝에서 떨어져 있을 때).
  */
 export const BOSS_LAIRS = {
-  bigmole: { x: 56, z: -22, r: 7, place: '두더지 굴밭', door: { x: 50, z: -2 }, len: 11 },
+  bigmole: { x: 90.4, z: 3, r: 7, place: '두더지 굴밭', door: { x: 70.5, z: 3 }, len: 12, lead: 8.5 },
   elder: { x: -60, z: -26, r: 7.5, place: '고목 빈터', door: { x: -67, z: -6 }, len: 11 },
   bigcrab: { x: -20, z: 61, r: 6.5, place: '강가 진흙밭', door: { x: -4, z: 58 } }
 };
@@ -89,6 +90,29 @@ export const canyonAt = (x, z, pad = 0) => ARENAS.find((A) => {
 export function canyonMouth(A, extra = 0) {
   const a = doorAngle(A), d = A.r + ARENA_WALL + canyonLen(A) + extra;
   return { x: A.x + Math.sin(a) * d, z: A.z + Math.cos(a) * d };
+}
+/** 보스 마당(울타리까지) · 협곡 안인지: 월드 끝(WALK_HALF) 너머에 있는 마당(두더지 굴밭)도 여기는 걸어 들어갈 수 있다. */
+export const lairReach = (x, z) => !!(arenaAt(x, z, ARENA_WALL) || canyonAt(x, z, 0.6));
+/** 협곡 입구 밖으로 이어 깐 흙길(lead) 위인지. 이 길에는 꽃 · 나무를 두지 않는다. */
+export function onLairLead(x, z, pad = 0) {
+  return ARENAS.some((A) => {
+    if (!A.lead) return false;
+    const { along, side } = canyonCoords(A, x, z), from = A.r + ARENA_WALL + canyonLen(A);
+    return along >= from - pad && along <= from + A.lead + pad && side < CANYON.half + pad;
+  });
+}
+/**
+ * 흙길(lead)을 이어 깐 마당의 길 가장자리까지의 거리(분지 가장자리 → 협곡 → 입구 밖 흙길 끝, 들판 길과 같은 폭 · 없으면 99).
+ * 이 길은 땅 색으로 칠한다(world/village.js — 따로 깐 갈색 판은 들판 길과 따로 놀아 보였다).
+ */
+export function lairPathDist(x, z) {
+  let best = 99;
+  for (const A of ARENAS) {
+    if (!A.lead) continue;
+    const a = canyonMouth(A, -(ARENA_WALL + canyonLen(A))), b = canyonMouth(A, A.lead + 0.5);
+    best = Math.min(best, segDist(x, z, a.x, a.z, b.x, b.z) - 0.65);
+  }
+  return best;
 }
 
 export const riverZ = (x) => RIVER.z + RIVER.amp * Math.sin(x * RIVER.freq);
