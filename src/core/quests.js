@@ -264,7 +264,7 @@ export const QUESTS = {
   // 레스토랑 '별 세 개'(원작: 목욕시키고 빵 옷을 입혀 커다란 오크 괴물이 먹으려 한다 → 도망치다 두고 온 무기 · 토벌 증표를 가지러 되돌아가
   // 벽에 붙잡힌 별똥별 셋의 모서리를 쇠고랑에서 빼내 다 같이 탈출). 저녁에 들판 길가의 가게로(stories/stardiner.js). 보답 오므라이스는 게임에서 정한 것
   starDiner: {
-    title: '별 세 개', giver: 'hachiware', side: true, minDay: 5, hours: [9, 18], needHearts: 1, ask: '요즘 재밌는 소문 있어?',
+    title: '별 세 개', giver: 'hachiware', side: true, minDay: 5, hours: [9, 18], needHearts: 3, ask: '요즘 재밌는 소문 있어?',
     offer: ['있잖아 {name}, 동쪽 들판 길가에 레스토랑이 새로 생겼대!', '가게 이름이 별 세 개래~ 별이 세 개면 엄청 맛있는 집이잖아!',
       { who: 'chiikawa', text: '…!! (침을 꿀꺽)' }, '오늘 저녁에 셋이서 가 보자! 엄청 맛있는 게 나올지도~'],
     steps: [{

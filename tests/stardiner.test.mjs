@@ -57,6 +57,7 @@ test('별 세 개 레스토랑: 다 빼내면 done 한 번, 그 뒤로는 아무
 test('별 세 개 레스토랑 퀘스트: 하치와레 사이드스토리, 저녁에 가게로, 보상은 거대 오므라이스(먹는 몸짓도)', () => {
   const Q = QUESTS.starDiner;
   assert.ok(Q && Q.side && Q.giver === 'hachiware');
+  assert.equal(Q.needHearts, 3, '하치와레 하트 3개부터');
   assert.equal(Q.steps[0].scene, 'starDiner');
   assert.ok(PLACES[Q.steps[0].place]);
   assert.equal(itemInfo('omurice').name, '거대 오므라이스');
