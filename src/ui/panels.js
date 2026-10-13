@@ -1146,7 +1146,7 @@ export function createPanels(ui, handlers) {
         else if (!on) btn = h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.holdWeapon(id)) }, '장착');
         else btn = h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.holdWeapon(null)) }, '빼기');
         out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', myWeaponArt(s, id)),
-          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(W.dmg)), on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, W.note)),
+          h('div', {}, h('div', { class: 't' }, W.name, h('span', { class: 'power' }, '힘 ', '★'.repeat(Math.floor(W.dmg)), W.dmg % 1 ? h('span', { class: 'half' }, '★') : null), on ? h('span', { class: 'weed-count' }, '장착 중') : null), h('div', { class: 'd' }, W.note)),
           btn));
       }
       out.push(h('div', { class: 'actions' }, closeBtn()));

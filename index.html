@@ -44,7 +44,7 @@ body { margin: 0; background: var(--sky); color: var(--ink); font-family: var(--
 /* 누를 수 없는 표시(왼쪽 위 기둥, 시계, 알림)와 집 안 화면 전체 틀은 화면 누름을 통과시킨다(집 안에서는 바닥을 눌러 가구를 놓는다).
    보기만 하는 장식(별똥별 줄무늬 · 완료 카드 · 큰 소식 · 새 일감 쪽지 · 하트 카드 · 마을 이름)도 뺀다: 이 규칙(id)이 그 장식들의 pointer-events: none 을
    이겨서, 별똥별 밤에는 화면을 덮은 줄무늬가 누름을 다 가로채 조이스틱이 나오지 않았다 */
-#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui):not(.star-streaks):not(.quest-done):not(.hud-banner):not(.task-card):not(.heart-card):not(.village-title):not(.cam-flash):not(.viewfinder):not(.prints) { pointer-events: auto; }
+#ui > *:not(.stick):not(.hud-toasts):not(.hud-left):not(.hud-clock):not(.hud-timer):not(.home-ui):not(.star-streaks):not(.quest-done):not(.hud-banner):not(.task-card):not(.heart-card):not(.village-title):not(.cam-flash):not(.viewfinder):not(.prints):not(.guide-goal) { pointer-events: auto; }
 button { font-family: var(--hand); font-weight: 700; color: var(--ink); cursor: pointer; background: none; border: none; padding: 0; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep); outline-offset: 3px; }
 @keyframes pop { from { scale: 0.7; opacity: 0; } to { scale: 1; opacity: 1; } }
@@ -521,6 +521,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 /* 할 일 쪽지(왼쪽 위 기둥 맨 아래) */
 .guide-goal { display: flex; align-items: center; gap: 8px; padding: 4px 14px 6px 6px; border-radius: 16px 18px 16px 14px; background: var(--butter); box-shadow: 0 3px 0 var(--shadow); font-size: 19px; line-height: 1.25; }
 .guide-goal::before { content: "할 일"; flex: 0 0 auto; padding: 0 9px 2px; border-radius: 999px; background: var(--yellow-deep); color: #ffffff; font-size: 15px; }
+/* 검정소 시험 쪽지: 화면 위 가운데(놀이 타이머 자리). 그동안 알림은 그 아래로, 타이머가 뜨면 쪽지는 잠깐 숨는다 */
+.guide-goal.top { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); transform-origin: center; width: max-content; max-width: min(440px, calc(100% - 24px)); z-index: 2; }
+.guide-goal.top[hidden], #ui:has(.hud-timer:not([hidden])) .guide-goal.top, #ui:has(.backdrop) .guide-goal.top, .cinematic .guide-goal.top, .cutscene .guide-goal.top { display: none; }
+#ui:has(.guide-goal.top:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 52px); }
+/* 세로 휴대폰은 위쪽이 돈 · 가방 · 마을폰 버튼으로 꽉 차서 시계 위(아래 가운데)에. 대화 상자가 열리면 숨는다 */
+@media (orientation: portrait) and (max-width: 640px) {
+  .guide-goal.top { top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 96px); max-width: calc(100% - 24px); }
+  #ui:has(.guide-goal.top:not([hidden])) .hud-toasts { top: 42%; }
+  #ui:has(.guide:not([hidden])) .guide-goal.top { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { .guide, .guide-next { animation: none; } }
 @media (orientation: portrait) and (max-width: 640px) {
   .guide { width: calc(100% - 24px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 110px); }
@@ -1283,6 +1293,7 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
   .panel .row.mon-card .mon-ico { width: 50px; height: 50px; }
 }
 .panel .t .power { margin-left: 8px; font-size: 14px; color: #d98a2b; letter-spacing: 1px; }
+.panel .t .power .half { display: inline-block; width: 0.5em; overflow: clip; } /* 반 개(반짝 검 힘 3.5). hidden 이면 글자 기준선이 바닥으로 내려가 별이 처졌다 */
 .app.monsters .app-ico { background: #a58bd0; }
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */
 .app.friends .app-ico { background: #ee7489; }

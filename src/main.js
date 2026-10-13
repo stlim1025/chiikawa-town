@@ -426,6 +426,11 @@ function boot() {
     if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
     if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r }); // 바깥에서 같이 토벌
     if (Array.isArray(w.g)) visiting.ground = parseGround(w.g);
+    if (Array.isArray(w.z) && Number.isFinite(w.z[0]) && w.z[0] !== visiting.slept && !visiting.arriving && !visiting.leaving
+      && Number.isFinite(w.z[1]) && Number.isFinite(w.z[2]) && ['morning', 'day', 'evening', 'night'].includes(w.z[3])) {
+      visiting.slept = w.z[0];
+      guestSleep({ day: Math.max(1, Math.floor(w.z[1])), t: Math.min(0.99999, Math.max(0, w.z[2])) }, w.z[3]);
+    }
     if (Array.isArray(w.e) && !visiting.arriving) {
       // 주인 마을 소식(광장 공연 같은 일): 처음 받은 것만 알림으로
       visiting.news = visiting.news || new Set();
@@ -446,6 +451,26 @@ function boot() {
     }
   }
   /**
+   * 손님: 놀러 간 마을 주인이 잠들었다 — 나도 같은 잠 연출(그 마을 날짜 · 깨는 시각)을 보고, 친구 집에서 잔 것처럼 기운이 찬다.
+   * 내 마을 시간은 놀러 가 있는 동안 멈춰 있으니 그대로 둔다.
+   */
+  function guestSleep(clock, phase) {
+    if (sleeping || !state || !visiting || fainting || downed) return;
+    sleeping = true;
+    cancelPull();
+    if (panels.isOpen()) panels.close();
+    input.setEnabled(false);
+    hud.setAction(null);
+    sound.play('sleep');
+    const light = phase === 'morning' || phase === 'day', host = multi.hostName || '친구';
+    playSleep(ui, { dateText: dateLabel(visiting.startDate || state.startDate || todayISO(), clock.day), timeText: timeLabel(clock), phase },
+      () => commit(sleepStamina(state, 'lodge')), () => { if (light) sound.play('morning'); }).then(() => {
+      sleeping = false;
+      if (mode === 'play' || mode === 'guesthome') input.setEnabled(true);
+      hud.toast(`${host}의 마을에서 같이 푹 잤어요!`, 3400);
+    });
+  }
+  /**
    * 주인: 손님의 행동을 내 마을에 반영한다(받은 값은 하나씩 확인한다). 바뀐 풀 · 덤불은 다음 마을 모습으로 바로 모두에게 간다.
    * { t: 'grab' | 'drop', id }: 그 풀을 뽑기 시작했다 · 그만뒀다(그동안 나와 마을 친구들은 그 풀을 건드리지 않는다)
    * { t: 'weed', id, stage, flawed }: 한 단계 뽑았다, { t: 'weed', id, done: 'clean' | 'snapped' }: 다 뽑았다
@@ -458,7 +483,7 @@ function boot() {
       // 몬스터 치기: 손님 무기가 닿았다(내가 친 것처럼 밀리고, 그 손님에게 덤비기도 한다)
       const m = Number.isFinite(a.id) ? monsters.byId(a.id) : null;
       if (!m || m.exam || m === bossM || !Number.isFinite(a.x) || !Number.isFinite(a.z) || Math.hypot(a.x - m.x, a.z - m.z) > m.M.size + 6) return;
-      const dmg = Math.max(1, Math.min(GUEST_HIT_MAX, Math.round(a.dmg) || 1));
+      const dmg = Math.max(1, Math.min(GUEST_HIT_MAX, Math.round(a.dmg * 2) / 2 || 1)); // 0.5 단위(반짝 검 3.5)
       const killed = monsters.playerHit(m, { x: a.x, z: a.z, dmg, knock: Math.max(0, Math.min(3, Number(a.knock) || 1)), by: 'mp:' + id });
       hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${dmg}`, kind: 'dmg' });
       if (killed) guestKilled(id, m);
@@ -872,6 +897,7 @@ function boot() {
     const now = performance.now();
     while (hostNews.length && hostNews[0].until < now) hostNews.shift();
     if (hostNews.length) w.e = hostNews.map((e) => [e.id, e.text, e.kind || '']); // 마을 소식(몇 초 동안 거듭 실어서 빠진 것 없이)
+    if (hostSleep && hostSleep.until > now) w.z = [hostSleep.id, hostSleep.day, +hostSleep.t.toFixed(5), hostSleep.phase]; // 내가 잠들었다(손님도 같은 잠 연출)
     if (weedsT <= 0) {
       weedsT = 1;
       w.w = weeds.snapshot(weedBusy);
@@ -887,6 +913,12 @@ function boot() {
   function shareNews(text, kind = '') {
     if (multi.status !== 'open' || !multi.count) return;
     hostNews.push({ id: ++hostNewsId, text, kind, until: performance.now() + 4000 });
+  }
+  /** 같이 놀기(주인): 내가 잠들면 놀러 온 친구 화면에도 같은 잠 연출(깨는 시각 clock · 그때 하늘 phase). 4초 동안 마을 모습에 실어 보낸다. */
+  let hostSleep = null;
+  function shareSleep(clock, phase) {
+    if (multi.status !== 'open' || !multi.count) return;
+    hostSleep = { id: Date.now(), day: clock.day, t: clock.t, phase, until: performance.now() + 4000 };
   }
   /**
    * 손님: 친구 마을에서 돌아다니며 풀을 뽑고 열매를 따고(내 가방으로) 가게에서 내 돈으로 산다. 마을 밖에서는 같이 토벌한다.
@@ -1497,6 +1529,7 @@ function boot() {
     // 검은 별똥별: 밤 12시를 넘겨 자면 같은 날 아침(6시 반)으로 — 그사이 친구들이 보낸 시간도, 새날도 없다
     if (loopDue(state, sleepFor(state.clock))) {
       const next = loopRewind(sleepStamina(state, how));
+      shareSleep(next.clock, 'morning');
       playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(next.clock), phase: 'morning' },
         () => { commit(next); villageOvernight(); dark?.(); }, () => sound.play('morning')).then(() => {
         sleeping = false;
@@ -1522,6 +1555,7 @@ function boot() {
       dark?.();
     };
     const light = phase === 'morning' || phase === 'day';
+    shareSleep(to, phase); // 놀러 온 친구도 같이 잔다
     playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(to), phase }, onDark, () => { if (light) sound.play('morning'); }).then(() => {
       sleeping = false;
       if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
@@ -2080,7 +2114,7 @@ function boot() {
       return;
     }
     // 이미 알려 줬으면(저장을 불러와도) 할 일 쪽지만 계속
-    if (seen('guide-grade5')) { if (!grade5Shown && !grade5Call) { grade5Shown = true; guide.setGoal(GRADE5_GOAL); } return; }
+    if (seen('guide-grade5')) { if (!grade5Shown && !grade5Call) { grade5Shown = true; guide.setGoal(GRADE5_GOAL, { top: true }); } return; }
     const n = npcs.byKind('hachiware');
     if (grade5Call) {
       // 달려오는 중: 가까이 오면(또는 오래 걸리면) 말을 건다. 그새 바빠지면 기다렸다가
@@ -2109,7 +2143,7 @@ function boot() {
       if (n) { endTalk(); npcs.lead('hachiware', examLead); } // 검정소 문 옆까지 앞장서서 기다린다
       if (!grade5Due()) return;
       grade5Shown = true;
-      guide.setGoal(GRADE5_GOAL, { hold: true });
+      guide.setGoal(GRADE5_GOAL, { hold: true, top: true });
       sound.play('job');
       hud.announce({ kicker: '할 일!', title: '제초 5급을 따자!', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
     });
@@ -2122,7 +2156,7 @@ function boot() {
   const examDue = () => !!state && state.license.grade < NOVICE && canTakeExam(state.license) && !state.exam;
   function announceExam() {
     examGoal = examGoalText();
-    guide.setGoal(examGoal, { hold: true }); // 쪽지는 카드가 날아와 꽂힐 때 나타난다
+    guide.setGoal(examGoal, { hold: true, top: true }); // 쪽지는 카드가 날아와 꽂힐 때 나타난다(화면 위 가운데)
     sound.play('job');
     hud.announce({ kicker: '승급 시험!', title: `제초 ${gradeName(state.license.grade - 1)} 시험을 볼 수 있어요!`, sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal',
       chips: [{ icon: ICO.pin, text: '검정소' }, { icon: 'coin', text: won(EXAM_FEE[state.license.grade]) }] });
@@ -2144,7 +2178,7 @@ function boot() {
   /** 시험을 보거나 급수가 오르면 쪽지를 걷고, 불러온 저장에서 이미 알려 준 시험이면 쪽지만 다시 띄운다. */
   function updateExamGoal() {
     if (!examDue() || tutorialActive(state.tutorial)) { if (examGoal) { examGoal = null; guide.setGoal(null); } return; }
-    if (!examGoal && seen('exam-' + state.license.grade)) { examGoal = examGoalText(); guide.setGoal(examGoal); }
+    if (!examGoal && seen('exam-' + state.license.grade)) { examGoal = examGoalText(); guide.setGoal(examGoal, { top: true }); }
   }
   /** 첫 자격(견습 → 5급)을 따면 곁의 하치와레가 축하한다. */
   function cheerGrade5() {

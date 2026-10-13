@@ -185,11 +185,18 @@ export function createGuide(ui, { onLine, dock, onCue } = {}) {
       choicesEl.scrollTop = 0;
       select(0);
     },
-    /** 할 일 쪽지. null 이면 숨긴다. hold: 자리만 두고 숨겨 둔다(가운데 할 일 카드가 날아와 꽂힐 때 hud.announce 가 드러낸다). */
-    setGoal(t, { hold = false } = {}) {
+    /**
+     * 할 일 쪽지. null 이면 숨긴다. hold: 자리만 두고 숨겨 둔다(가운데 할 일 카드가 날아와 꽂힐 때 hud.announce 가 드러낸다).
+     * top: 왼쪽 위 기둥 대신 화면 위 가운데에 띄운다(검정소 시험 쪽지 — 왼쪽 기둥이 길어져 퀘스트 쪽지를 밀어냈다).
+     */
+    setGoal(t, { hold = false, top = false } = {}) {
       goal.hidden = !t;
       if (t) goal.textContent = t;
       goal.classList.toggle('incoming', !!t && hold);
+      if (!t) return;
+      const home = top ? ui : dock || ui;
+      if (goal.parentNode !== home) home.append(goal);
+      goal.classList.toggle('top', top);
     },
     /** 할 일 쪽지 칸(hud.announce 의 target). */
     goalEl: goal,

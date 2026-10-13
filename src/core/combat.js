@@ -17,8 +17,8 @@ export const WEAPONS = {
   // 사스마타(가장 기본 무기): 긴 분홍 자루 끝에 가시 돋친 둥근 U자 갈래. 휘두르지 않고 앞으로 찌른다 — 폭은 좁지만 멀리 닿고 밀어낸다
   fork: { name: '사스마타', price: 200, dmg: 1, range: 2.15, cool: 0.5, knock: 1.5, thrust: true, arc: 0.66, note: '멀리서 찔러 밀어내요' },
   hammer: { name: '돌 망치', price: 4500, dmg: 3, range: 1.45, cool: 0.8, knock: 1.6, note: '느리지만 세게 밀어내요' },
-  // 반짝 검: 힘은 돌 망치와 같고 빠르고 멀리 닿는다(힘 4 였을 때는 거의 다 한 방이라 돈이 너무 빨리 모였다)
-  star: { name: '반짝 검', price: 12000, dmg: 3, range: 2.0, cool: 0.45, note: '가장 빠르고 멀리 닿는 반짝이는 검' }
+  // 반짝 검: 돌 망치보다 조금 세고(3.5) 빠르고 멀리 닿는다(힘 4 였을 때는 거의 다 한 방이라 돈이 너무 빨리 모였다)
+  star: { name: '반짝 검', price: 12000, dmg: 3.5, range: 2.0, cool: 0.45, note: '가장 빠르고 멀리 닿는 반짝이는 검' }
 };
 /** 도구점에서 파는 무기(사스마타가 가장 기본). 나무 막대기는 예전에 산 사람만 가지고 있다. */
 export const WEAPON_ORDER = ['fork', 'sword', 'hammer', 'star'];
