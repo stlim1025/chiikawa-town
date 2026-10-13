@@ -57,7 +57,7 @@ const DECOR = {
 const TERRAIN = {
   kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
   bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e', path: '#c2a882' },
-  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], w: 2.4, h: [2.4, 3.3], path: '#d2b98c' },
+  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.5, 2.2], path: '#d2b98c' },
   elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8], path: '#a89470' }
 };
 /** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
@@ -98,7 +98,12 @@ function buildMass(T, s, i, mat, add) {
   const c = T.colors[i % T.colors.length], c2 = T.colors[(i + 1) % T.colors.length], w = T.w * s.k;
   const mesh = (geo, color, opts) => add(toonMesh(geo, null, { ...opts, material: mat(color) }));
   if (T.kind === 'hill') {
-    mesh(GEO.sphere, c, { position: [s.x, -0.35, s.z], scale: [w * 1.25, s.h + 0.35, w * 1.15], outline: 0.05, receive: true });
+    // 풀 언덕: 낮은 둔덕 셋을 겹치고 꼭대기에 작은 덤불(매끈하고 큰 둥근 언덕 하나는 봉분처럼 보였다)
+    const c3 = T.colors[(i + 2) % T.colors.length], j = jitter(i, 5) - 0.5;
+    mesh(GEO.sphere, c, { position: [s.x, -0.3, s.z], scale: [w * 1.2, s.h + 0.3, w * 1.05], outline: 0.045, receive: true });
+    mesh(GEO.sphere, c2, { position: [s.x + w * (0.75 + j * 0.3), -0.2, s.z + w * 0.35], scale: [w * 0.8, s.h * 0.62 + 0.2, w * 0.72], outline: 0.04, receive: true });
+    mesh(GEO.sphere, c3, { position: [s.x - w * (0.7 - j * 0.3), -0.2, s.z - w * 0.3], scale: [w * 0.7, s.h * 0.5 + 0.2, w * 0.66], outline: 0.04, receive: true });
+    mesh(GEO.sphere, T.bush || c2, { position: [s.x + w * 0.25 * j, s.h * 0.88, s.z + w * 0.15], scale: [w * 0.32, w * 0.22, w * 0.3], outline: 0.03 });
   } else if (T.kind === 'tree' && s.low) {
     // 남쪽 둘레: 고목 대신 낮은 덤불 둘
     mesh(GEO.sphere, c, { position: [s.x, s.h * 0.4, s.z], scale: [w * 1.05, s.h * 0.6, w], outline: 0.045 });
