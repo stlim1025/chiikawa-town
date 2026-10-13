@@ -34,6 +34,24 @@ function groundColor(x, z, out) {
   return out;
 }
 
+/**
+ * 땅 판(PlaneGeometry, 칸 gx × gy)의 칸마다 색이 비슷한 꼭짓점끼리 잇는 대각선으로 삼각형을 다시 나눈다.
+ * 칸은 늘 같은 대각선으로 나뉘어서, 그 대각선을 가로지르는 쪽으로 비스듬한 길(바위산 오솔길)은 칠한 흙색이 톱니처럼 지그재그로 보였다.
+ */
+function alignDiagonals(geo, gx, gy) {
+  const idx = geo.index.array, col = geo.attributes.color.array, n = gx + 1;
+  const diff = (i, j) => Math.abs(col[i * 3] - col[j * 3]) + Math.abs(col[i * 3 + 1] - col[j * 3 + 1]) + Math.abs(col[i * 3 + 2] - col[j * 3 + 2]);
+  let k = 0;
+  for (let iy = 0; iy < gy; iy++) {
+    for (let ix = 0; ix < gx; ix++) {
+      const a = ix + n * iy, b = ix + n * (iy + 1), c = ix + 1 + n * (iy + 1), d = ix + 1 + n * iy;
+      if (diff(a, c) < diff(b, d)) { idx[k++] = a; idx[k++] = b; idx[k++] = c; idx[k++] = a; idx[k++] = c; idx[k++] = d; } // 대각선 a-c
+      else { idx[k++] = a; idx[k++] = b; idx[k++] = d; idx[k++] = b; idx[k++] = c; idx[k++] = d; } // 대각선 b-d(원래 나누는 쪽)
+    }
+  }
+  geo.index.needsUpdate = true;
+}
+
 /** 지붕(박공) 도형: 바닥 1x1, 용마루는 x 방향, 높이 1. */
 function roofGeometry() {
   const A = [-0.5, 0, -0.5], B = [0.5, 0, -0.5], Cc = [0.5, 0, 0.5], D = [-0.5, 0, 0.5], R1 = [-0.5, 1, 0], R2 = [0.5, 1, 0];
@@ -92,6 +110,7 @@ export function buildVillage(scene) {
     colors.set([tmp.r, tmp.g, tmp.b], i * 3);
   }
   groundGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  alignDiagonals(groundGeo, 200, 200);
   const ground = new THREE.Mesh(groundGeo, toonMaterial('#ffffff', { vertexColors: true }));
   ground.receiveShadow = true;
   world.add(ground);
@@ -101,10 +120,12 @@ export function buildVillage(scene) {
     if (A.x + A.r + ARENA_WALL > WORLD_HALF) { x0 = WORLD_HALF + 3.5; x1 = A.x + A.r + 48; z0 = A.z - A.r - 40; z1 = A.z + A.r + 30; }
     else if (A.z - A.r - ARENA_WALL < -WORLD_HALF) { x0 = A.x - A.r - 40; x1 = A.x + A.r + 40; z0 = A.z - A.r - 48; z1 = -WORLD_HALF - 3.5; } // 카메라가 북쪽을 보니 뒤로 더 멀리
     else continue;
-    const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.ceil((x1 - x0) / 1.6), Math.ceil((z1 - z0) / 1.6)).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, -0.006, (z0 + z1) / 2);
+    const gx = Math.ceil((x1 - x0) / 1.6), gy = Math.ceil((z1 - z0) / 1.6);
+    const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, gx, gy).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, -0.006, (z0 + z1) / 2);
     const p = geo.attributes.position, c = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++) { groundColor(p.getX(i), p.getZ(i), tmp); c.set([tmp.r, tmp.g, tmp.b], i * 3); }
     geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    alignDiagonals(geo, gx, gy);
     const far = new THREE.Mesh(geo, ground.material);
     far.receiveShadow = true;
     world.add(far);
