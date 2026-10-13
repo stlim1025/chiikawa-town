@@ -1355,7 +1355,8 @@ function boot() {
       else if (mode === 'home') input.setEnabled(true);
     }, BED);
   }
-  function doSleep(how = 'home', after = null) {
+  /** after: 잠 연출이 다 끝난 뒤, dark: 화면이 깜깜한 동안(친구들이 제자리로 간 다음 — 이야기 장면이 아침 자리를 미리 잡는다). */
+  function doSleep(how = 'home', after = null, dark = null) {
     if (sleeping) return;
     sleeping = true;
     cancelPull();
@@ -1374,6 +1375,7 @@ function boot() {
         villageOvernight(); // 밤잠: 각자 집에서 자고
         if (spans.morning) villageAfterNap(lived.morning, (k) => wakeHourOf(k) <= wakeHour); // 이미 일어날 때가 지난 친구는 나와서 지내는 중
       }
+      dark?.();
     };
     const light = phase === 'morning' || phase === 'day';
     playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(to), phase }, onDark, () => { if (light) sound.play('morning'); }).then(() => {
@@ -2302,6 +2304,7 @@ function boot() {
   // ---------- 우는 얼굴 클로즈업(피자호빵): 카메라가 얼굴로 다가가고, 친구는 카메라 쪽을 보며 진짜로 운다 ----------
   let cryFx = null, closeup = null; // cryFx: { n, t, crying } · closeup: { n, t, a(카메라가 오는 방향), fromPos, fromLook, out, outT }
   let cutscene = false; // 이야기 장면이라 화면 글을 숨긴 중(body.cutscene)
+  let storyCam = false; // 이야기 카메라(잠옷 밤나들이 별 보기)를 쓰는 중: 끝나면 따라가기 카메라를 내 자리에 바로 붙인다
   /** 대사 줄의 연출 신호. */
   function storyCue(cue) {
     const F = cryFx;
@@ -3282,8 +3285,8 @@ function boot() {
   pajama = createPajamaStory({
     npcs, village, hud, guide, input, staged, who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     getPlayer: () => player, cam, cliff, get starfall() { return starfall; }, // starfall 은 아래에서 만든다(그때그때 읽는다)
-    wear: (chibi, kind, on) => wearPajama(chibi, on, PAJAMA_COLORS[kind]),
-    sleepHere: (after) => doSleep('home', after),
+    wear: (chibi, kind, on) => wearPajama(chibi, on, PAJAMA_COLORS[kind], { ownEars: true }), // 후드 귀는 그 친구 귀 모양 그대로
+    sleepHere: (after, dark) => doSleep('home', after, dark), // dark: 화면이 깜깜한 동안(아침 자리로 옮겨 두기)
     wakeBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); delete awayInfo[kind]; setDoing(kind, null, null); }
   });
   usagiClub = createUsagiClub({
@@ -5544,7 +5547,19 @@ function boot() {
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
-    if (mode === 'play') { if (starShow) starCamera(dt); else if (closeup) closeupCamera(dt); else { const pp = pajama.camPose(dt); if (pp) cam.set(pp.pos, pp.look); else cam.follow(focus, dt); } }
+    if (mode === 'play') {
+      if (starShow) starCamera(dt);
+      else if (closeup) closeupCamera(dt);
+      else {
+        const pp = pajama.camPose(dt);
+        if (pp) { cam.set(pp.pos, pp.look); storyCam = true; }
+        else {
+          // 이야기 카메라가 끝나면 따라가기 카메라를 바로 내 자리에 붙인다(연출 전 자리 — 마을 — 에서 날아오지 않게)
+          if (storyCam) { storyCam = false; cam.snap(focus); }
+          cam.follow(focus, dt);
+        }
+      }
+    }
     else if (mode === 'title') {
       // 타이틀: 마을 위를 천천히 돈다
       const a = t * 0.07;
@@ -5562,7 +5577,7 @@ function boot() {
       if (homeSign.text !== tx) { homeSign.text = tx; homeSign.html = signHtml(tx, homeSign.key); }
     }
     // 타이틀 · 처음 마을에 들어오는 장면에서는 간판 · 말풍선을 띄우지 않는다(마을에 들어온 뒤부터 톡톡 나타난다)
-    if (mode !== 'play' || closeup || pajama.phase === 'stars') { cue.visible = false; hud.placeLabels([], cam.camera); return; } // 얼굴 클로즈업 · 별 보기 동안은 간판 · 말풍선도 숨긴다
+    if (mode !== 'play' || closeup || pajama.phase === 'stars' || pajama.phase === 'sleep') { cue.visible = false; hud.placeLabels([], cam.camera); return; } // 얼굴 클로즈업 · 별 보기 동안은 간판 · 말풍선도 숨긴다
     const bubbles = npcs.labels(), mark = visiting ? null : tutorialMarker();
     if (mark) bubbles.push(mark);
     bubbles.push(...monsters.labels(focus)); // 몬스터 이름 · 체력 줄(친구 마을에서는 그 마을 몬스터)

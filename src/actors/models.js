@@ -1074,8 +1074,9 @@ export function buildNpc(kind) {
 /**
  * 귀 달린 잠옷(잠옷 밤나들이 · 옷장의 '귀 달린 잠옷'): 몸통 · 팔다리를 잠옷 색 껍질로 감싸고, 얼굴만 트인 후드와 동그란 귀,
  * 배에 단추 셋. 원래 귀(머리 위로 솟은 부품)는 후드 속으로 숨긴다. on = false 면 벗긴다. 어떤 캐릭터 모델에나(가장 큰 부품을 기준으로).
+ * ownEars: 후드 귀를 그 캐릭터 귀 모양 그대로(원래 귀를 잠옷 천으로 감싼다 — 하치와레 뾰족귀 · 우사기 긴 귀). 마을 친구들이 입을 때.
  */
-export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
+export function wearPajama(chibi, on, color = PAJAMA_COLORS.me, { ownEars = false } = {}) {
   const P = chibi.pivots || {};
   if (chibi.pajama) {
     chibi.pajama.forEach((m) => m.parent && m.parent.remove(m));
@@ -1110,15 +1111,33 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me) {
     const sh = put(P[k], m.geometry, mat, m.position, m.scale.clone().multiplyScalar(1.16));
     sh.rotation.copy(m.rotation);
   }));
-  // 후드: 머리 부품보다 살짝 크게, 얼굴 쪽은 트였다. 머리 위로 솟은 원래 귀는 숨기고 동그란 귀 둘
+  // 귀 모양 그대로 잠옷 천을 씌운다(ownEars): 원래 귀는 숨기고, 같은 모양을 조금 크게(부품 가운데를 기준으로 — 합친 덩어리는 자리가 꼭짓점에 들어 있다)
+  const earShell = (parent, m) => {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const s = 1.1, c = m.geometry.boundingBox.getCenter(new THREE.Vector3());
+    const at = m.position.clone().add(c.multiply(m.scale).applyEuler(m.rotation).multiplyScalar(1 - s));
+    const sh = put(parent, m.geometry, mat, at, m.scale.clone().multiplyScalar(s), 0.018);
+    sh.rotation.copy(m.rotation);
+  };
+  // 후드: 머리 부품보다 살짝 크게, 얼굴 쪽은 트였다. 머리 위로 솟은 원래 귀는 숨기고 동그란 귀 둘(ownEars 면 그 귀 모양 그대로)
   const head = biggest(P.head);
   if (head) {
-    P.head.children.forEach((m) => { if (m !== head && m.isMesh && m.visible && (m.userData.headTop || m.position.y > head.position.y + head.scale.y * 0.55)) { m.visible = false; hidden.push(m); } });
-    ['earL', 'earR'].forEach((k) => { if (P[k] && P[k].visible) { P[k].visible = false; hidden.push(P[k]); } }); // 토끼 귀처럼 따로 노는 귀
+    P.head.children.forEach((m) => {
+      if (m === head || !m.isMesh || !m.visible || !(m.userData.headTop || m.position.y > head.position.y + head.scale.y * 0.55)) return;
+      m.visible = false;
+      hidden.push(m);
+      if (ownEars) earShell(P.head, m);
+    });
+    // 토끼 귀처럼 따로 노는 귀: 그 관절째 숨기거나(동그란 귀) 관절은 두고 귀 부품마다 잠옷을 씌운다(귀가 같이 쫑긋거린다)
+    ['earL', 'earR'].forEach((k) => {
+      if (!P[k] || !P[k].visible) return;
+      if (!ownEars) { P[k].visible = false; hidden.push(P[k]); return; }
+      P[k].children.filter((m) => m.isMesh && m.visible).forEach((m) => { m.visible = false; hidden.push(m); earShell(P[k], m); });
+    });
     const sc = head.scale.clone().multiplyScalar(1.09);
     put(P.head, hoodGeo.back, mat, head.position, sc);
     put(P.head, hoodGeo.brow, mat, head.position, sc, 0);
-    [-1, 1].forEach((sd) => {
+    if (!ownEars) [-1, 1].forEach((sd) => {
       const at = new THREE.Vector3(head.position.x + sd * head.scale.x * 0.6, head.position.y + head.scale.y * 0.86, head.position.z - head.scale.z * 0.08);
       put(P.head, partGeometry('sphere', 0.1), mat, at, new THREE.Vector3(head.scale.x * 0.27, head.scale.y * 0.3, head.scale.z * 0.2));
     });

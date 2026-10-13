@@ -8,7 +8,7 @@ import * as THREE from 'three';
  *  3) 별똥별이 쓱 → 꾸벅꾸벅 졸다가 그대로 밖에서 잠든다(진짜 잠: 날이 바뀌고 집세 · 친구들 밤도 그대로)
  *  4) 아침, 셋이 나란히 일어난다 → 마무리 대사 · 보상(퀘스트)
  * ctx: { npcs, village, hud, guide, input, staged, who(kind), narrator, fill(lines), getPlayer, cam, starfall, cliff(world/cliff.js),
- *        sleepHere(after), wakeBeside(kind, x, z), wear(chibi, kind, on) }
+ *        sleepHere(after, dark) (dark: 잠 연출로 화면이 깜깜한 동안), wakeBeside(kind, x, z), wear(chibi, kind, on) }
  */
 const PALS = [['chiikawa', -1.15], ['hachiware', 1.15]];
 
@@ -76,12 +76,17 @@ export function createPajamaStory(ctx) {
       setTimeout(() => {
         if (!S) return;
         ctx.starfall.setSky(false);
-        ctx.sleepHere(morning);
+        ctx.sleepHere(morning, wakeUp);
       }, 900);
     });
   }
-  function morning() {
-    if (!S) return;
+  /**
+   * 화면이 깜깜한 동안(잠 연출 가운데) 아침 자리로 옮겨 둔다: 별 보기 카메라를 그만두고(main 이 따라가기 카메라를 내 자리에 바로 붙인다)
+   * 셋이 통나무 앞에 나란히. 밝아지면 처음부터 셋을 비춘다(밤 하늘 쪽이나 마을 쪽에서 카메라가 날아오지 않게).
+   */
+  function wakeUp() {
+    if (!S || S.kind !== 'sleep') return;
+    S.kind = 'morning';
     // 통나무에서 내려와 바다 앞에서 일어난다(절벽 위 아침)
     P().lift = 0;
     P().act(null, 0);
@@ -94,6 +99,11 @@ export function createPajamaStory(ctx) {
       const n = npcs.byKind(k);
       if (n) { n.sink = 0; ctx.wear(n.chibi, k, true); npcs.act(n, k === 'hachiware' ? 'stretch' : 'sit', { face: { x: at.x, z: at.z + 6 }, time: 9999 }); }
     });
+  }
+  /** 잠 연출이 끝나 밝아진 뒤: (깜깜할 때 못 옮겼으면 지금) 아침 대사 → 마무리. */
+  function morning() {
+    if (!S) return;
+    wakeUp();
     input.setEnabled(false);
     setTimeout(() => {
       if (!S) return;
@@ -117,9 +127,9 @@ export function createPajamaStory(ctx) {
     get phase() { return S ? S.kind : null; },
     /** 시작(밤에 내 집 앞에 왔을 때). done: 마무리 대사 · 보상. */
     play(done) { if (!S) meet(done); },
-    /** 별을 올려다보는 동안의 카메라(없으면 null): 앉은 자리 뒤에서 하늘로. */
+    /** 별을 올려다보다 꾸벅꾸벅 잠들 때까지의 카메라(없으면 null): 앉은 자리 뒤에서 하늘로. 아침에 일어나면 null(따라가기 카메라로). */
     camPose(dt) {
-      if (!S || S.kind !== 'stars' || !S.from) return null;
+      if (!S || (S.kind !== 'stars' && S.kind !== 'sleep') || !S.from) return null;
       S.t += dt;
       const k = Math.min(1, S.t / 1.6), e = k * k * (3 - 2 * k), p = S.spot;
       // 통나무 뒤(북쪽)에서: 나란히 앉은 셋의 뒷모습, 그 너머 바다와 별이 쏟아지는 하늘.

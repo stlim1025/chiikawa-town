@@ -196,7 +196,7 @@ export function createIdolStage() {
   PALS.forEach((k, i) => {
     const c = buildNpc(k);
     hideProps(c);
-    wearPajama(c, true, PAJAMA_COLORS[k]);
+    wearPajama(c, true, PAJAMA_COLORS[k], { ownEars: true }); // 후드 귀는 그 친구 귀 모양 그대로(하치와레 뾰족귀 · 우사기 긴 귀)
     if (k !== 'usagi') giveGlow(c, GLOW[i + 1]);
     scene.add(c.root);
     pals[k] = { c, from: new THREE.Vector3(), to: new THREE.Vector3(), t: 1, sec: 1, onStage: false };

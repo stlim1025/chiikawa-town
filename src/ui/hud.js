@@ -77,7 +77,28 @@ export function createHud(ui, input) {
     moreBtn.textContent = questsOpen ? '접기' : `퀘스트 ${hidden}개 더`;
     moreBtn.setAttribute('aria-expanded', String(questsOpen));
   }
-  const PIN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3h7l-1.2 5.2 3.2 3.3V14h-11v-2.5l3.2-3.3z" fill="currentColor"/><path d="M12 14v7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  /**
+   * 가운데 큰 카드(부탁 · 이야기 완료, 큰 소식): ms 뒤에 저절로 사라지고, 그 전에 화면 어디를 누르거나 Space · Enter · Esc 를 누르면 바로 넘긴다.
+   * 카드는 누름을 통과시키므로(조이스틱을 막지 않게) 누름은 그대로 게임에도 간다. 막 뜬 뒤 잠깐(delay)은 넘기지 않는다(누르던 손가락에 바로 꺼지지 않게).
+   */
+  function skippable(card, ms, delay = 450) {
+    const shownAt = performance.now();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pointerdown', onTap, true);
+      window.removeEventListener('keydown', onKey, true);
+      card.classList.add('out');
+      setTimeout(() => card.remove(), 400);
+    };
+    const onTap = () => { if (performance.now() - shownAt >= delay) finish(); };
+    const onKey = (e) => { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') onTap(); };
+    window.addEventListener('pointerdown', onTap, true);
+    window.addEventListener('keydown', onKey, true);
+    setTimeout(finish, Math.max(0, ms - 400));
+  }
+  const PIN_SVG ='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3h7l-1.2 5.2 3.2 3.3V14h-11v-2.5l3.2-3.3z" fill="currentColor"/><path d="M12 14v7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   const questPinFns = [];
   moreBtn.addEventListener('click', () => { questsOpen = !questsOpen; questsPeek = 0; foldQuests(); }); // 직접 고른 것은 카드 연출이 끝나도 그대로
   narrowMq.addEventListener?.('change', foldQuests);
@@ -605,7 +626,7 @@ export function createHud(ui, input) {
     questDone({ title, sub, chips = [], ms = 4800 }) {
       const card = el('div', 'quest-done');
       card.setAttribute('role', 'status');
-      card.innerHTML = '<i class="qd-ribbon"></i><b class="qd-sub"></b><div class="qd-chips"></div>';
+      card.innerHTML = '<i class="qd-ribbon"></i><b class="qd-sub"></b><div class="qd-chips"></div><small class="qd-skip">눌러서 넘기기</small>';
       card.querySelector('.qd-ribbon').textContent = title;
       card.querySelector('.qd-sub').textContent = sub || '';
       const row = card.querySelector('.qd-chips');
@@ -631,8 +652,7 @@ export function createHud(ui, input) {
       }
       card.appendChild(burst);
       ui.appendChild(card);
-      setTimeout(() => card.classList.add('out'), ms - 400);
-      setTimeout(() => card.remove(), ms);
+      skippable(card, ms);
     },
     banner(title, sub, ms = 2600, chips = null) {
       const b = el('div', 'hud-banner' + (chips && chips.length ? ' has-chips' : ''));
@@ -651,8 +671,7 @@ export function createHud(ui, input) {
         b.appendChild(row);
       }
       ui.appendChild(b);
-      setTimeout(() => b.classList.add('out'), ms - 400);
-      setTimeout(() => b.remove(), ms);
+      skippable(b, ms);
     },
     /**
      * 꼭 봐야 하는 소식(청약 발표 같은): 화면 가운데 큰 카드에 도장을 쾅 찍어 보여 주고, 확인을 눌러야 닫힌다.

@@ -1,7 +1,7 @@
 import { press as pressNote, sweep, result, chartBeats } from '../core/rhythm.js';
 
 /**
- * 박자 맞추기 화면(우사기 클럽의 춤): 도토리 음표가 오른쪽에서 동그라미로 다가오고, 닿는 순간 누르면(스페이스 · 행동 버튼 · 줄을 탭) 퍼펙트.
+ * 박자 맞추기 화면(우사기 클럽의 춤): 도토리 음표가 오른쪽에서 동그라미로 다가오고, 닿는 순간 누르면(스페이스 · 행동 버튼 · 화면 아무 데나 탭) 퍼펙트.
  * 실패해서 끝나는 일은 없다. 시계는 화면이 직접 잰다(performance.now) — 박자 소리도 이 시계(time)에 맞춰 친다.
  * start({ bpm, chart, onHit(q, combo), onMiss(), onEnd(result), label?, hint?, go?, icon? }) · press() · update() · stop()
  * label · hint · go · icon: 다른 장면에서 쓸 때 흥 막대 이름 · 아래 안내 · 마지막 카운트 · 음표 그림(없으면 클럽 그대로).
@@ -109,7 +109,14 @@ export function createRhythm(ui) {
     },
     stop() { run = null; root.hidden = true; }
   };
-  lane.addEventListener('pointerdown', (e) => { e.preventDefault(); api.press(); });
+  // 박자 동안은 화면 어디를 눌러도 친다(전에는 줄만 눌렸다). 단추(행동 버튼 · 창)는 제 일을 하게 둔다 — 행동 버튼은 스스로 박자를 친다(두 번 치지 않게)
+  window.addEventListener('pointerdown', (e) => {
+    if (!run || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.target && e.target.closest && e.target.closest('button, a, input, .panel, .guide')) return;
+    if (e.cancelable) e.preventDefault();
+    e.stopPropagation(); // 화면(조이스틱 · 휘두르기)까지는 가지 않게
+    api.press();
+  }, true);
   window.addEventListener('keydown', (e) => {
     if (!run || e.repeat || !(e.code === 'Space' || e.code === 'Enter' || e.key === ' ')) return;
     e.preventDefault();
