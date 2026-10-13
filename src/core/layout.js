@@ -101,16 +101,31 @@ export function onLairLead(x, z, pad = 0) {
     return along >= from - pad && along <= from + A.lead + pad && side < CANYON.half + pad;
   });
 }
+/** (x, z) 에서 가장 가까운 길(ROADS) 위의 점. */
+function nearestRoadPoint(x, z) {
+  let best = { x, z }, bd = Infinity;
+  for (const r of ROADS) {
+    for (let k = 1; k < r.pts.length; k++) {
+      const [ax, az] = r.pts[k - 1], [bx, bz] = r.pts[k], dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+      const u = len2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2)) : 0, px = ax + dx * u, pz = az + dz * u, d = Math.hypot(x - px, z - pz);
+      if (d < bd) { bd = d; best = { x: px, z: pz }; }
+    }
+  }
+  return best;
+}
+let lairPaths = null;
 /**
- * 흙길(lead)을 이어 깐 마당의 길 가장자리까지의 거리(분지 가장자리 → 협곡 → 입구 밖 흙길 끝, 들판 길과 같은 폭 · 없으면 99).
- * 이 길은 땅 색으로 칠한다(world/village.js — 따로 깐 갈색 판은 들판 길과 따로 놀아 보였다).
+ * 보스 마당으로 들어가는 흙길 가장자리까지의 거리(들판 길과 같은 폭): 분지 가장자리 → 협곡 → 입구 → 가장 가까운 길까지 이어진다
+ * (두더지 굴밭은 입구 밖 흙길 lead 를 따라 들판 길 끝까지). 이 길은 땅 색으로 칠한다(world/village.js — 따로 깐 갈색 판은 길과 따로 놀아 보였다).
  */
 export function lairPathDist(x, z) {
+  if (!lairPaths) lairPaths = ARENAS.map((A) => {
+    const rim = canyonMouth(A, -(ARENA_WALL + canyonLen(A))), mouth = canyonMouth(A), road = nearestRoadPoint(mouth.x, mouth.z);
+    return [rim, mouth, road];
+  });
   let best = 99;
-  for (const A of ARENAS) {
-    if (!A.lead) continue;
-    const a = canyonMouth(A, -(ARENA_WALL + canyonLen(A))), b = canyonMouth(A, A.lead + 0.5);
-    best = Math.min(best, segDist(x, z, a.x, a.z, b.x, b.z) - 0.65);
+  for (const [rim, mouth, road] of lairPaths) {
+    best = Math.min(best, segDist(x, z, rim.x, rim.z, mouth.x, mouth.z) - 0.65, segDist(x, z, mouth.x, mouth.z, road.x, road.z) - 0.65);
   }
   return best;
 }

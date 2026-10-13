@@ -4,7 +4,7 @@ import { WORLD_HALF, ARENAS, ARENA_WALL, CANYON, canyonLen, doorAngle, canyonMou
 
 /**
  * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 높은 지형에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡 하나.
- *  바위산 · 강가는 절벽 바위, 들판은 풀 언덕, 숲은 고목이 빙 둘러서고, 협곡 양옆도 같은 지형이다. 협곡 바닥엔 흙길(바위산은 원래 오솔길).
+ *  바위산 · 강가는 절벽 바위, 들판은 풀 언덕, 숲은 고목이 빙 둘러서고, 협곡 양옆도 같은 지형이다. 협곡 바닥엔 길과 이어진 흙길(땅 색으로 칠한다, core/layout.js 의 lairPathDist · 바위산은 원래 오솔길).
  *  카메라(남쪽) 쪽 덩어리는 셋씩 묶어 집처럼 내 캐릭터를 가리면 반투명해진다(village.js 의 fader). 나머지는 마을 정적 배칭이 한 덩어리로 묶는다.
  *  덩어리 아래로 촘촘한 울타리(장애물)를 둘러 사이로 못 지나가고, 협곡 끝(입구)에 이름표.
  * 구역 보스 자리는 분지 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙)과 소품 몇 개도. 공유 난수를 쓰지 않는다(앞서 지은 숲 · 들판 자리가 바뀌지 않게).
@@ -52,13 +52,13 @@ const DECOR = {
 
 /**
  * 둘러싼 지형: kind(rock 절벽 바위 · hill 풀 언덕 · tree 고목), 색 셋(번갈아), w 덩어리 반지름, h 높이 [낮게, 높게](카메라 쪽은 더 낮게),
- * cap 꼭대기 이끼(바위), path 협곡 바닥 흙길 색(바위산은 오솔길이 이미 지나간다 · 들판은 땅 색으로 칠한다).
+ * cap 꼭대기 이끼(바위). 협곡 바닥 흙길은 따로 깔지 않고 땅 색으로 칠한다(core/layout.js 의 lairPathDist).
  */
 const TERRAIN = {
   kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
-  bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e', path: '#c2a882' },
-  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9] }, // 협곡 바닥은 들판 길을 땅 색으로 이어 칠한다(core/layout.js 의 lairPathDist)
-  elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8], path: '#a89470' }
+  bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e' },
+  bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9] },
+  elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8] }
 };
 /** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
 const FADE_GROUP = 3;
@@ -179,11 +179,6 @@ export function buildLairs({ zones, obstacles, labels, fader }) {
       g.add(toonMesh(GEO.sphere, MOUND[i % 2], { position: [m.x - A.x, -0.8, m.z - A.z], scale: [m.s, m.h, m.s], outline: 0.06, receive: true }));
       if (m.wall) obstacles.push({ x: m.x, z: m.z, r: m.s * 0.95 });
     });
-    // 협곡 바닥 흙길(바위산은 오솔길이 이미 지나간다)
-    if (T.path) {
-      const len = canyonLen(A) + ARENA_WALL + 0.6, mid = A.r + len / 2 - 0.3, a = doorAngle(A);
-      g.add(toonMesh(GEO.box, T.path, { position: [Math.sin(a) * mid, 0.008, Math.cos(a) * mid], rotation: [0, a, 0], scale: [CANYON.half * 2 - 0.3, 0.02, len], outline: false, shadow: false, receive: true }));
-    }
     if (DECOR[A.id]) DECOR[A.id](g, A.r);
     // 이름표: 협곡 입구 위(어디로 들어가는지 보이게, 마을폰 지도에도 뜬다). 왕버섯 굴은 이야기 속 비밀이라 없다
     if (A.place) { const m = canyonMouth(A, 0.6); labels.push({ x: m.x, y: 2.2, z: m.z, text: A.place }); }
