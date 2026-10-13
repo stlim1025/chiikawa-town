@@ -21,6 +21,7 @@ export const NPC_LINES = {
     jobFail: '…히잉 다 못 했어…',
     eat: '(후루룩…) …♪',
     napWake: '…개운해…!',
+    questLater: '…응… 다음에…',
     examGo: '(덜덜) …시험…',
     examPass: '…붙었다…!! 우와아앙…',
     examFail: '…히잉… 또 떨어졌다…',
@@ -72,6 +73,7 @@ export const NPC_LINES = {
     jobFail: '다 못 했다~ 일감은 돌려놓을게',
     eat: '역시 라멘이 최고야~',
     napWake: '푹 잤다~ 다시 힘내자!',
+    questLater: '그래~ 마음 바뀌면 또 말해 줘!',
     examGo: '공부한 대로만 하자~!',
     examPass: '해냈다~! 토벌 자격증이다!',
     examFail: '아깝다~ 다음엔 붙을 거야!',
@@ -120,6 +122,7 @@ export const NPC_LINES = {
     jobFail: '하아…',
     eat: '(후루루루룩!)',
     napWake: '후랏!',
+    questLater: ['하아…? (귀가 축 처진다)', '우라… (시무룩)'],
     examGo: '(끄적끄적) …우라?',
     examPass: '우라~!! 우라!!',
     examFail: '하아?!',
@@ -168,6 +171,7 @@ export const NPC_LINES = {
     jobFail: '하아~ 오늘은 여기까지…',
     eat: '하아~ 라멘엔 맥주인데…',
     napWake: '하아~ 개운하다…',
+    questLater: '하아~ 그래, 생각나면 또 와~',
     examGo: '하아~ 시험 끝나면 한 잔이다',
     examPass: '하아~ 붙었다… 축하주다!',
     examFail: '하아~ 한 잔 하고 잊자…',
@@ -215,6 +219,7 @@ export const NPC_LINES = {
     jobFail: '…수련이 부족했다',
     eat: '…맛있군',
     napWake: '…다시 수련이다',
+    questLater: '…그런가 마음이 서면 다시 와라',
     examGo: '…집중한다',
     examPass: '…당연하다',
     examFail: '…다시 온다',
@@ -255,12 +260,15 @@ export const NPC_LINES = {
   momonga: {
     eat: '맛있어! 더 줘!',
     napWake: '흥 잘 잤어',
+    questLater: '흥! 나중에 후회하지 마!',
     gift: '흥! 남아서 주는 거야!',
     starShock: ['뭐야 저거! 무서워!', '흥! 난 하나도 안 무섭거든!'],
     starBye: '흥 별 거 아니네'
   },
-  shisa: { gift: '사부님 몰래 주는 선물이에요~!' },
-  kani: { gift: '딱딱! 이거… 선물이야…' }
+  shisa: { gift: '사부님 몰래 주는 선물이에요~!', questLater: '앗 그래요…? 언제든 말해 주세요!' },
+  kani: { gift: '딱딱! 이거… 선물이야…', questLater: '…알았어 다음에…' },
+  captain: { questLater: '흠… 마음이 정해지면 다시 오게' },
+  pochette: { questLater: '앗 그래요? 그럼 다음에요~' }
 };
 /** 같이 놀기 대사(가위바위보 · 술래잡기 · 춤): 같이 노는 친구는 모두 자기 말투로 갖고 있다. */
 export const PLAY_KEYS = ['playAsk', 'rpsGo', 'rpsShow', 'rpsDraw', 'rpsLose', 'rpsWin', 'rpsAgain', 'tagGo', 'tagCaught', 'tagEscaped', 'danceGo', 'danceEnd'];
@@ -276,7 +284,8 @@ const PLAIN = {
   playAsk: '좋아! 뭐 하고 놀까?', rpsGo: '가위바위보! 뭐 낼래?', rpsShow: '나는 {hand}!', rpsDraw: '비겼다! 한 번 더', rpsLose: '으앗 졌다! {name} 잘한다~',
   rpsWin: '내가 이겼다~! 헤헤', rpsAgain: '한 판 더 할래?', tagGo: '내가 도망갈게! 잡아 봐~', tagCaught: '으앗 잡혔다~!', tagEscaped: '못 잡았지롱~!',
   danceGo: '같이 춤추자! 하나 둘 셋!', danceEnd: '헤헤 신난다~!', gift: '{name} 이거 선물이야!',
-  starShock: '에엣?! 별똥별이…!', starBye: '가 버렸다…', starPray: '소원을 빌자…!', starCopy: '으아아~!'
+  starShock: '에엣?! 별똥별이…!', starBye: '가 버렸다…', starPray: '소원을 빌자…!', starCopy: '으아아~!',
+  questLater: '그래… 마음이 바뀌면 또 말해 줘'
 };
 
 /** 그 친구의 그 대사 한 줄(목록이면 하나 골라서 {title} · {mon} · {pay} 를 채운다). */

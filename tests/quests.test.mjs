@@ -107,7 +107,20 @@ test('story chain steps & visit', () => {
   const song = Q.QUESTS.song.steps[1];
   assert.ok(!Q.arrived(song, { x: 0, z: 0 }, 0, 0, 13), 'cave only at night');
   assert.ok(Q.arrived(song, { x: 0, z: 0 }, 0, 0, 21));
-  for (let i = 0; i < 4; i++) s = Q.completeStep(s, 'story', 5).state;
+  s = Q.completeStep(s, 'story', 5).state; // visit
+  s = Q.completeStep(s, 'story', 5).state; // 대장에게 왕버섯 이야기
+  // 마지막 보스 앞: 구역 보스 셋을 한 번씩(지금까지 잡은 것도 센다)
+  assert.equal(Q.stepOf(s, 'story').type, 'bosses');
+  s = { ...s, hunted: { ...s.hunted, bigmole: 2 } };
+  assert.deepEqual(Q.progressOf(s, 'story'), { have: 1, need: 3 });
+  assert.ok(!Q.stepReady(s, 'story'));
+  assert.deepEqual(Q.shortGoal(s, 'story').parts.map((p) => p.have), [1, 0, 0]);
+  s = { ...s, hunted: { ...s.hunted, elder: 1, bigcrab: 1 } };
+  assert.ok(Q.stepReady(s, 'story'));
+  assert.deepEqual(Q.questsFor(s, 'captain').report, ['story']);
+  s = Q.completeStep(s, 'story', 6).state;
+  assert.equal(Q.stepOf(s, 'story').type, 'boss');
+  for (let i = 0; i < 2; i++) s = Q.completeStep(s, 'story', 6).state;
   assert.ok(Q.isDone(s, 'story'));
   assert.ok(s.wardrobe.owned.includes('crown'));
   assert.ok(s.money >= 6000);
@@ -171,6 +184,18 @@ test('예전 저장(버전 3)의 이야기 퀘스트는 단계 번호를 한 칸
   assert.ok(S.isValidState(done));
   // 지금 버전은 그대로
   assert.equal(S.deserialize(S.serialize({ ...fresh(), quests: { story: { step: 0, base: 0 } } })).state.quests.story.step, 0);
+});
+
+test('예전 저장(버전 4)의 이야기: 왕버섯 싸움 단계였으면 구역 보스 셋부터, 이미 쓰러뜨렸으면 하던 단계 그대로', () => {
+  const at = (step, extra = {}) => S.deserialize(S.serialize({ ...fresh(), version: 4, quests: { story: { step, base: 0, ...extra } } })).state;
+  assert.equal(Q.stepOf(at(6), 'story').type, 'talk', '대장에게 알리러 가던 사람은 그대로');
+  assert.equal(Q.stepOf(at(7), 'story').type, 'bosses', '왕버섯 싸움 단계였던 사람은 구역 보스 셋부터');
+  assert.equal(Q.stepOf(at(8), 'story').goal, '대장 갑옷 씨에게 알려 주자!', '왕버섯을 쓰러뜨리고 알리러 가던 사람은 그대로');
+  const done = at(9, { done: 20 });
+  assert.ok(Q.isDone(done, 'story'));
+  assert.ok(S.isValidState(done));
+  // 버전 3 저장은 두 번 다 민다(안내서 + 구역 보스 셋)
+  assert.equal(Q.stepOf(S.deserialize(S.serialize({ ...fresh(), version: 3, quests: { story: { step: 7, base: 0 } } })).state, 'story').goal, '대장 갑옷 씨에게 알려 주자!');
 });
 
 test('같이 다니는 일상 부탁(같이 하기 · 같이 가기)은 잘 시간 두 시간 전부터 새로 뜨지 않는다', () => {

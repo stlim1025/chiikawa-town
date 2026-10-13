@@ -15,7 +15,7 @@ import { isValidStorage } from './storage.js';
 import { isValidGlowfluff } from './glowfluff.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
-import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep } from './quests.js';
+import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep, STORY_BOSSES_AT } from './quests.js';
 import { isValidRaffle } from './raffle.js';
 import { isValidGround } from './ground.js';
 import { isValidHunters } from './hunters.js';
@@ -96,6 +96,7 @@ export function deserialize(text) {
  * 예전 모양의 상태를 지금 모양으로(state.version 이 낮으면). 하트 개수는 늘 그대로.
  * 1 → 2: 친밀도 점수를 하트 하나 6점 단위로, 2 → 3: 하트마다 점수가 다른 곡선(friends.js 의 HEART_AT)으로,
  * 3 → 4: 이야기 퀘스트 맨 앞에 '토벌 안내서 읽기' 단계가 생겨 받아 둔 이야기의 단계 번호를 한 칸 민다.
+ * 4 → 5: 왕버섯 싸움 앞에 '구역 보스 셋' 단계가 생겨, 왕버섯을 이미 쓰러뜨린 이야기의 단계 번호를 한 칸 민다.
  */
 export function upgradeState(s) {
   const v = s.version || 1;
@@ -104,6 +105,7 @@ export function upgradeState(s) {
   if (friends && v < 2) friends = upgradeFriends(friends);
   if (friends && v < 3) friends = curveFriends(friends);
   if (quests && v < 4) quests = shiftStoryStep(quests);
+  if (quests && v < 5) quests = shiftStoryStep(quests, STORY_BOSSES_AT + 1);
   return { ...s, version: STATE_VERSION, ...(friends ? { friends } : {}), ...(quests ? { quests } : {}) };
 }
 

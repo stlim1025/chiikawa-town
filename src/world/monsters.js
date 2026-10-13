@@ -107,7 +107,8 @@ Object.entries(ATK).forEach(([k, a]) => { if (!a.kind) a.kind = k; });
  * pick(화남 0..2, 0..1 굴림) 멀 때 쓸 공격(한 번 골라 두고 다 쓸 때까지 그대로), minion(화남, 몇 번째) 부르는 부하 종류.
  */
 const KITS = {
-  kingcap: { near: ATK.bossSlam, again: ATK.bossSlam2, pick: (r, roll) => (r >= 1 && roll < 0.38 ? ATK.bossRain : roll < 0.68 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'fluff') },
+  // 왕버섯(마지막 보스): 마지막 단계(체력 절반부터)에는 포자 비가 잦고 독버섯 부하가 둘
+  kingcap: { near: ATK.bossSlam, again: ATK.bossSlam2, pick: (r, roll) => (r >= 1 && roll < (r >= 2 ? 0.55 : 0.38) ? ATK.bossRain : roll < 0.75 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot), minion: (r, k) => (r >= 2 && k < 2 ? 'shroom' : 'fluff') },
   bigmole: { near: ATK.moleSwipe, again: ATK.moleSwipe2, pick: (r, roll) => (roll < 0.5 ? ATK.moleBurrow : r >= 1 ? ATK.moleRain2 : ATK.moleRain), minion: (r, k) => (r >= 2 && k === 0 ? 'mole' : 'fluff') },
   elder: { near: ATK.elderSlam, again: ATK.elderSlam2, pick: (r, roll) => (roll < 0.45 ? ATK.elderRoots : r >= 1 ? ATK.elderAcorn2 : ATK.elderAcorn), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'beetle') },
   bigcrab: { near: ATK.crabPinch, again: null, pick: (r, roll) => (roll < 0.5 ? (r >= 1 ? ATK.crabCharge2 : ATK.crabCharge) : r >= 1 ? ATK.crabBubble2 : ATK.crabBubble), minion: (r, k) => (r >= 2 && k === 0 ? 'crab' : 'slime') }
@@ -788,7 +789,9 @@ export function createMonsters(scene, village, random = Math.random) {
     if (Math.hypot(P.x - x, P.z - z) < r + ME) hurt(m, dmg, x, z);
   }
   /** 보스가 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
-  const rage = (m) => (!m.M.boss ? 0 : m.hp <= m.M.hp * 0.3 ? 2 : m.hp <= m.M.hp * 0.6 ? 1 : 0);
+  // 화남: 구역 보스는 체력 60% · 30% 에서, 마지막 보스 왕버섯은 일찍(75%) 화내고 절반부터 마지막 단계
+  const RAGE_AT = { kingcap: [0.75, 0.5] };
+  const rage = (m) => { if (!m.M.boss) return 0; const [a, b] = RAGE_AT[m.species] || [0.6, 0.3]; return m.hp <= m.M.hp * b ? 2 : m.hp <= m.M.hp * a ? 1 : 0; };
   /**
    * 지금 쓸 공격. 보스(KITS): 가까우면 near, 아니면 멀 때 쓸 공격을 한 번 골라 둔다
    * (매 프레임 다시 고르면 다가갈 거리가 흔들린다). 이어 치기(nextAtk)가 있으면 그것부터.

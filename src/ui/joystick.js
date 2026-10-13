@@ -1,4 +1,6 @@
 const RADIUS = 56;
+/** 두 손가락을 이만큼(ms) 안에 같이 대야 확대 · 축소로 본다. 먼저 한참 누르고 있던 손가락(공격 · 풀 뽑기)에 다른 손가락이 닿으면 조이스틱이다. */
+const PINCH_GAP = 300;
 const KEYS = { KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
 
 /**
@@ -47,9 +49,19 @@ export function createInput(ui, canvas) {
 
   function onDown(e) {
     if (e.pointerType === 'touch') {
-      // 조이스틱을 쥐고 움직이던 중에 닿은 손가락은 확대가 아니라 다른 누름(공격 연타 등)이다. 확대는 두 손가락을 거의 같이 댈 때만
-      if (touch && (performance.now() - touch.at > 250 || Math.hypot(touch.dx, touch.dy) > 12)) return;
-      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const now = performance.now(), left = e.clientX <= window.innerWidth * 0.5;
+      // 조이스틱을 쥐고 움직이던 중에 닿은 손가락: 오른쪽이면 다른 누름(공격 연타 등)이다. 왼쪽이면 조이스틱 손가락을 뗀 소식을 놓친 채
+      // (아이폰에서 가끔) 다시 닿은 것이라 조이스틱을 새로 잡는다 — 예전엔 놓친 손가락이 남아 조이스틱이 다시 나타나지 않았다
+      if (touch && (now - touch.at > PINCH_GAP || Math.hypot(touch.dx, touch.dy) > 12)) {
+        if (!left) return;
+        fingers.delete(touch.id);
+        touch = null;
+        stick.hidden = true;
+      }
+      // 먼저 닿아 있던 손가락이 한참 눌려 있었으면(오른쪽 화면을 누른 채 공격 · 풀 뽑기, 또는 뗀 소식을 놓친 손가락) 확대가 아니다:
+      // 확대 셈에서 빼서 이번 손가락이 조이스틱이 되게 한다(예전엔 두 손가락으로 알아 조이스틱 대신 화면이 확대 · 축소됐다)
+      for (const [id, f] of fingers) if (now - f.at > PINCH_GAP) fingers.delete(id);
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, at: now });
       if (fingers.size === 2) {
         // 두 번째 손가락: 조이스틱을 놓고 확대 · 축소로
         pinchDist = spread();
@@ -69,8 +81,9 @@ export function createInput(ui, canvas) {
     knob.style.transform = '';
   }
   function onMove(e) {
-    if (fingers.has(e.pointerId)) {
-      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const f = fingers.get(e.pointerId);
+    if (f) {
+      f.x = e.clientX; f.y = e.clientY;
       if (fingers.size === 2) {
         const d = spread();
         if (pinchDist > 0 && d > 0) zoomListeners.forEach((fn) => fn(pinchDist / d)); // 벌리면 가까이

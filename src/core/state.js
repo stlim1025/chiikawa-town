@@ -8,7 +8,7 @@ export const MAX_STAMINA = 100;
  * 상태 모양 버전(state.version). 2: 친밀도 하트 하나가 3점 → 6점, 3: 하트마다 점수가 다른 곡선(처음엔 금방, 갈수록 오래),
  * 4: 이야기 퀘스트 맨 앞에 '토벌 안내서 읽기' 단계. 예전 저장은 save.js 가 불러올 때 바꾼다.
  */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 /** 새 게임 상태. profile = { name, look }. */
 export function createState(profile) {

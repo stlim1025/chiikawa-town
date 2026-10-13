@@ -105,8 +105,11 @@ export const QUESTS = {
       { type: 'hunt', species: 'turtle', n: 3, goal: '북쪽 바위산의 이끼 거북 세 마리를 잡자!', say: ['수고했다. 그런데… 이상하군.', '쓰러뜨려도 쓰러뜨려도 바위산 쪽에서 계속 나타난다고 한다.', '랏코라면 뭔가 알지도 모른다. 랏코 수련장에 가 봐라.'] },
       { type: 'talk', to: 'rakko', goal: '랏코에게 바위산 이야기를 물어보자!', say: ['…대장이 보냈나.', '바위산 깊은 곳에서 이상한 기척이 난다. 몬스터들이 거기서 깨어나는 것 같다.', '옛날 이야기라면 카니가 잘 알 거다. 헌책방에 가 봐라.'] },
       { type: 'talk', to: 'kani', goal: '카니 헌책방에서 옛이야기를 들어 보자!', say: ['…바위산 이야기?', '(낡은 그림책을 펼친다)', '…"바위산 깊은 곳, 길이 끝나는 곳에 커다란 버섯이 산다. 포자를 뿌려 풀과 몬스터를 깨운다"…', '…그림책 이야기인 줄 알았는데…', '…바위산 오솔길 끝이야. 조심해. 딱.'] },
-      { type: 'visit', place: 'lair', goal: '바위산 오솔길 끝을 살펴보자! (깊은 곳)', speaker: null, say: ['(땅이 쿵, 쿵 울린다…)', '(바위 그늘에서 커다란 버섯이 몸을 일으켰다!)', '…저게 그림책 속 왕버섯이야! 일단 마을에 알리자.'] },
-      { type: 'talk', goal: '대장 갑옷 씨에게 왕버섯 이야기를 하자!', say: ['…왕버섯이라고?!', '그 녀석이 포자로 몬스터들을 깨우고 있었던 거군.', '기운을 가득 채우고, 좋은 무기를 들고 가라. 가까이 가면 풀뭉치를 불러낸다니 조심하고.', '마을의 운명이 너에게 달렸다, {name}!'] },
+      { type: 'visit', place: 'lair', goal: '바위산 오솔길 끝을 살펴보자! (깊은 곳)', speaker: null, say: ['(땅이 쿵, 쿵 울린다…)', '(바위 그늘에서 커다란 버섯이 쿨쿨 자고 있다. 숨 쉴 때마다 포자가 퍼진다…)', '…저게 그림책 속 왕버섯이야! 일단 마을에 알리자.'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 왕버섯 이야기를 하자!', say: ['…왕버섯이라고?!', '그 녀석이 포자로 몬스터들을 깨우고 있었던 거군. 들판, 숲, 강가의 큰 녀석들이 사나워진 것도 그 탓이다.', '하지만 지금 실력으로 왕버섯에게 덤비는 건 무리다.', '먼저 들판의 대왕 두더지, 숲의 고목 거인, 강가의 왕집게를 쓰러뜨리고 와라. 그만한 실력이면 맡길 수 있다.'] },
+      // 왕버섯은 마지막 보스: 구역 보스 셋을 한 번씩 쓰러뜨려야 싸울 수 있다. 지금까지 잡은 것도 센다(연계 퀘스트로 잡았으면 바로 통과, 같이 진행 중이면 한 번에 둘 다)
+      { type: 'bosses', species: ['bigmole', 'elder', 'bigcrab'], goal: '구역 보스 셋을 쓰러뜨리자! (들판 대왕 두더지, 숲 고목 거인, 강가 왕집게)', ask: '구역 보스 셋 다 쓰러뜨렸어!',
+        say: ['…셋 다 쓰러뜨렸다고?! 흠흠, 역시 내 눈은 틀리지 않았군.', '이제 왕버섯과 맞설 때다. 기운을 가득 채우고, 좋은 무기를 들고 가라.', '체력이 절반쯤 깎이면 포자를 마구 뿜으며 날뛴다고 한다. 부하들도 조심하고.', '마을의 운명이 너에게 달렸다, {name}!'] },
       { type: 'boss', goal: '바위산 깊은 곳의 왕버섯을 쓰러뜨리자!', speaker: null, say: ['(왕버섯이 털썩 쓰러지며 포자가 흩어졌다…)', '(바위산에 조용한 바람이 분다)', '해냈다! 대장 갑옷 씨에게 알리자.'] },
       { type: 'talk', goal: '대장 갑옷 씨에게 알려 주자!', say: ['…해냈군, {name}!', '이제 바위산도 조용해질 거다. 마을 모두를 대신해서… 고맙다.', '이건 마을이 너에게 주는 선물이다. 흠흠, 잘 어울리겠군.'] }
     ],
@@ -549,6 +552,7 @@ export function progressOf(state, id) {
   const q = questState(state, id), step = stepOf(state, id);
   if (!step) return null;
   if (step.type === 'hunt') return { have: Math.min(step.n, ((state.hunted || {})[step.species] || 0) - q.base), need: step.n };
+  if (step.type === 'bosses') return { have: step.species.filter((sp) => ((state.hunted || {})[sp] || 0) > 0).length, need: step.species.length }; // 지금까지 잡은 것도 센다
   if (step.type === 'pull') return { have: Math.min(step.n, ((state.weedLog || {})[step.kind] || 0) - q.base), need: step.n };
   if (step.type === 'together') return { have: Math.min(step.n, Math.max(0, actsWith(state, step.act, reportTo(id, step)) - q.base)), need: step.n };
   if (step.type === 'study') { const p = studyProgress(state, step.id); return hasLicense(state, step.id) ? { have: p.need, need: p.need } : p; }
@@ -749,12 +753,17 @@ export function pickTrack(state) {
 }
 /** 장면 단계(scene)에 멈춘 퀘스트들: 장면은 저장되지 않으니, 장면이 안 돌고 있는데 이 단계면(장면 도중 새로고침) 그만둔 것으로 본다. */
 export const staleScenes = (state) => activeQuests(state).filter((id) => { const st = stepOf(state, id); return !!st && st.type === 'scene'; });
-/** 버전 3 이하 저장: 이야기(story) 맨 앞에 '토벌 안내서 읽기' 단계가 생겼으니 받아 둔 이야기의 단계 번호를 한 칸 민다(하던 단계 그대로). */
-export function shiftStoryStep(quests) {
+/**
+ * 이야기(story)에 단계가 끼어들었을 때 받아 둔 이야기의 단계 번호를 한 칸 민다(from 번째 단계부터 · 하던 단계 그대로).
+ * 버전 3 이하: 맨 앞에 '토벌 안내서 읽기'(from 0). 버전 4 이하: 왕버섯 싸움 앞에 '구역 보스 셋'(STORY_BOSSES_AT 다음부터 —
+ * 왕버섯 싸움 단계였던 사람은 구역 보스 셋부터, 이미 쓰러뜨리고 알리러 가던 사람은 그대로 알리러).
+ */
+export function shiftStoryStep(quests, from = 0) {
   const q = quests && quests.story;
-  if (!q) return quests;
+  if (!q || q.step < from) return quests;
   return { ...quests, story: { ...q, step: Math.min(q.step + 1, QUESTS.story.steps.length) } };
 }
+export const STORY_BOSSES_AT = QUESTS.story.steps.findIndex((st) => st.type === 'bosses');
 
 /** 퀘스트를 없던 일로(다시 부탁받을 수 있게). */
 export function dropQuest(state, id) {
@@ -800,6 +809,7 @@ export function shortGoal(state, id) {
     return { goal: `${REGION_AT[M.region] ? REGION_AT[M.region] + '의 ' : ''}${josa(M.name, '을/를')} 잡자!`, n: '', parts: [{ kind: 'monster', id: step.species, have: p.have, need: p.need }] };
   }
   if (step.type === 'pull') return { goal: `${josa(WEED_KINDS[step.kind].name, '을/를')} 뽑자!`, n: '', parts: [{ kind: 'item', id: step.kind, have: p.have, need: p.need }] };
+  if (step.type === 'bosses') return { goal: '구역 보스를 쓰러뜨리자!', n: '', parts: step.species.map((sp) => ({ kind: 'monster', id: sp, have: ((state.hunted || {})[sp] || 0) > 0 ? 1 : 0, need: 1 })) };
   const n = p && !(step.type === 'study' && p.need <= 1) ? `${p.have} / ${p.need}` : ''; // 안내서 읽기처럼 한 번이면 0 / 1 은 안 보인다
   return { goal: step.goal.replace(/\s*\([^)]*\)/g, '').trim(), n, parts: [] };
 }
@@ -836,6 +846,7 @@ export function checkQuestData() {
       if (st.to && !FRIENDS[st.to]) errs.push(id + ': to ' + st.to);
       if (st.type === 'bring') for (const it of Object.keys(st.items)) if (!itemInfo(it)) errs.push(id + ': item ' + it);
       if (st.type === 'hunt' && !MONSTERS[st.species]) errs.push(id + ': species');
+      if (st.type === 'bosses' && !(Array.isArray(st.species) && st.species.length && st.species.every((sp) => MONSTERS[sp]))) errs.push(id + ': bosses');
       if (st.type === 'pull' && !WEED_KINDS[st.kind]) errs.push(id + ': weed');
       if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
       if (st.type === 'together' && (!ACTS[st.act] || !(st.n > 0))) errs.push(id + ': act');

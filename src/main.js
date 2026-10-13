@@ -2500,7 +2500,7 @@ function boot() {
     gatherSpeakers(n, Q.offer);
     const ask = Q.side ? (Q.daily ? '같이 갈래?' : '같이 가 볼래?') : Q.story ? '맡아 주겠나?' : Q.daily ? '같이 할래?' : '…부탁해도 될까?';
     sayAs(n, Q.offer, () => askAs(n, ask, [Q.side ? '좋아, 같이 가자!' : Q.daily ? '좋아, 같이 하자!' : '좋아, 해 볼게!', '지금은 좀…'], (i) => {
-      if (i !== 0) { sayAs(n, ['그래… 마음이 바뀌면 또 말해 줘.'], endTalk); return; }
+      if (i !== 0) { sayAs(n, [lineOf(n.kind, 'questLater')], endTalk); return; } // 친구 말투로(우사기는 소리로만)
       commit(startQuest(state, id));
       sound.play('job');
       endTalk();
@@ -2769,7 +2769,7 @@ function boot() {
    */
   const readySeen = new Set();
   let readyInit = false;
-  const READY_TYPES = { bring: ['다 모았어요!', '가져가요'], hunt: ['다 잡았어요!', '알려요'], pull: ['다 뽑았어요!', '알려요'] };
+  const READY_TYPES = { bring: ['다 모았어요!', '가져가요'], hunt: ['다 잡았어요!', '알려요'], pull: ['다 뽑았어요!', '알려요'], bosses: ['구역 보스를 다 쓰러뜨렸어요!', '알려요'] };
   function checkReady() {
     const now = activeQuests(state).filter((id) => { const st = stepOf(state, id); return st && READY_TYPES[st.type] && stepReady(state, id); })
       .map((id) => `${id}:${state.quests[id].step}`);
@@ -5924,7 +5924,7 @@ function boot() {
         // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
         onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
         onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },
-        onRage: (m, r) => { sound.play('thud'); hud.toast(`${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
+        onRage: (m, r) => { sound.play('thud'); hud.toast(m.species === 'kingcap' && r >= 2 ? '왕버섯이 포자를 마구 뿜으며 날뛰어요!' : `${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
       });
     }
     if (state) ground.sync(visiting ? visiting.ground || [] : groundOf(state), groundKind); // 친구 마을에서는 그 마을 바닥 물건
