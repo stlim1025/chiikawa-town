@@ -64,6 +64,7 @@ export function createSound(storage) {
   let musicOn = false, nextTime = 0, step = 0, ducked = false, boss = false, bossStep = 0;
   let bossBus = null; // 보스 곡만 따로 지나가는 통로(끝날 때 이것째로 줄여, 미리 걸어 둔 음까지 한꺼번에 거둔다)
   let charge = null; // { osc, gain }
+  let rainNode = null; // 빗소리(날씨 비): { src, g }
 
   function ensure() {
     if (ctx) return ctx;
@@ -333,6 +334,29 @@ export function createSound(storage) {
     voice(kind, text) {
       if (!prefs.sfx || !ensure() || ctx.state !== 'running') return;
       if (!playVoice(ctx, sfxBus, kind, text)) SFX.talk(kind);
+    },
+    /** 빗소리(world/weather.js 의 비): 켜면 쏴아 하는 소리가 천천히 커지고, 끄면 잦아든다. */
+    rain(on) {
+      if (on) {
+        if (rainNode || !prefs.sfx || !ensure() || ctx.state !== 'running') return;
+        const src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+        src.buffer = noiseBuf;
+        src.loop = true;
+        hp.type = 'highpass'; hp.frequency.value = 450;
+        lp.type = 'lowpass'; lp.frequency.value = 2600;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 1.6);
+        src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(sfxBus);
+        src.start();
+        rainNode = { src, g };
+      } else if (rainNode) {
+        const { src, g } = rainNode, t0 = ctx.currentTime;
+        rainNode = null;
+        g.gain.cancelScheduledValues(t0);
+        g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t0);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+        src.stop(t0 + 1.6);
+      }
     },
     /** 뽑는 동안 힘에 따라 높아지는 소리. */
     chargeStart() {

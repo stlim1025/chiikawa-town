@@ -105,6 +105,8 @@ export function createHud(ui, input) {
     window.addEventListener('keydown', onKey, true);
     setTimeout(finish, Math.max(0, ms - 400));
   }
+  // 사이드스토리 쪽지의 꼬리표: 펼친 책(머리 위 이야기 표시와 같은 그림)
+  const SIDE_BOOK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5q4.8-2.2 9.5.9 4.7-3.1 9.5-.9v12.2q-4.8-2.2-9.5.9-4.7-3.1-9.5-.9z" fill="#fff"/><path d="M12 7.4v12.2" stroke="#a978c4" stroke-width="1.6"/></svg>';
   const PIN_SVG ='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3h7l-1.2 5.2 3.2 3.3V14h-11v-2.5l3.2-3.3z" fill="currentColor"/><path d="M12 14v7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   const questPinFns = [];
   moreBtn.addEventListener('click', () => { questsOpen = !questsOpen; questsPeek = 0; foldQuests(); }); // 직접 고른 것은 카드 연출이 끝나도 그대로
@@ -375,7 +377,7 @@ export function createHud(ui, input) {
         e.classList.toggle('story', !!q.story);
         e.classList.toggle('side', !!q.side && !q.story);
         e.classList.toggle('incoming', incoming.has(q.id));
-        e.querySelector('i').textContent = q.story ? '이야기' : q.side ? '사이드스토리' : '부탁';
+        const tag = e.querySelector('i'); if (q.side && !q.story) { if (!tag.querySelector('svg')) tag.innerHTML = SIDE_BOOK_SVG; tag.title = '사이드스토리'; } else { tag.textContent = q.story ? '이야기' : '부탁'; tag.removeAttribute('title'); } // 사이드스토리는 책 그림 하나로 작게
         e.querySelector('b').textContent = q.title;
         e.querySelector('em').textContent = q.goal;
         const sm = e.querySelector('small');

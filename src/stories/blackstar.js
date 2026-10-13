@@ -15,7 +15,7 @@ import { buildAlarmClock } from '../world/chiiroom.js';
  * 별이 부르는 노래는 가사 없이 흥얼거림으로만.
  * ctx: { hud, guide, sound, input, npcs, staged, ui, getPlayer, who(kind), narrator, fill(lines), setMode, setCinematic, myLook,
  *        stage(치이카와네 방 — 처음 들어갈 때 만든다), villageScene, minigame, homeOf(kind),
- *        startLoop(), markLoop(), endLoop(), rewindNow(), nudgeSearch() }
+ *        startLoop(), markLoop(), endLoop(), rewindNow(), nudgeSearch(), setRain(on) }
  */
 const STAR = { kind: 'blackstar', name: '검은 별똥별', tag: '#3a3348', ink: '#efe9ff' };
 const VILLAGE_SCENES = ['wish', 'morning', 'dejavu', 'rain'];
@@ -38,7 +38,7 @@ export function createBlackStarStory(ctx) {
   };
 
   function fresh(kind, done) {
-    S = { kind, done, staged: [], wait: null, mini: false, rainEl: null, prop: null };
+    S = { kind, done, staged: [], wait: null, mini: false, rain: false, prop: null };
     input.setEnabled(false);
     hud.setAction(null);
   }
@@ -73,11 +73,11 @@ export function createBlackStarStory(ctx) {
     ctx.ui.appendChild(el);
     setTimeout(() => el.remove(), 900);
   }
-  /** 비 오는 아침: 빗줄기 · 어둑한 하늘(화면 위에 겹친다). */
+  /** 비 오는 아침: 마을에 진짜 비(world/weather.js — 빗줄기 · 물방울 고리 · 잿빛 하늘). */
   function rain(on) {
-    if (!S) return;
-    if (on && !S.rainEl) { const el = document.createElement('div'); el.className = 'rain-fx'; el.setAttribute('aria-hidden', 'true'); ctx.ui.appendChild(el); S.rainEl = el; }
-    else if (!on && S.rainEl) { S.rainEl.remove(); S.rainEl = null; }
+    if (!S || S.rain === on) return;
+    S.rain = on;
+    ctx.setRain(on);
   }
   /** 치이카와 옆에 놓는 자명종 소품(마을). */
   function clockProp(x, z) {

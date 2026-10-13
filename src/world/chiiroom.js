@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
 import { buildStarman } from './starfall.js';
+import { placeOnDome } from './interior.js';
 
 /**
  * 치이카와네 방(사이드스토리 '검은 별똥별' — stories/blackstar.js): 클럽 · 무대처럼 따로 그리는 장면.
@@ -9,20 +10,25 @@ import { buildStarman } from './starfall.js';
  * 흥얼거리며 시곗바늘을 거꾸로 돌린다. 마지막엔 산소 표백제를 푼 대야에 자명종을 담가 쫓아낸다.
  * → { scene, camera, light, start(look), shot(name, snap), setMood(m), star(m), spinBack(on), smash(), dunk(), busy, resize, update }
  */
-const WALL_Z = -3.2;
-const CLOCK = [1.9, 1.32, -2.72]; // 선반 위 자명종 가운데
-const TUB = [0.55, 0, -0.75]; // 산소 표백제 대야
+const ROOM_R = 3.6, DOME_H = ROOM_R * 0.9; // 우리 집(world/interior.js)처럼 동그란 돔 방
+const CLOCK_A = 0.55; // 자명종 선반이 붙은 벽의 방위(0 이 뒤쪽 −z, + 는 오른쪽)
+const CLOCK = [Math.sin(CLOCK_A) * 2.8, 1.32, -Math.cos(CLOCK_A) * 2.8]; // 선반 위 자명종 가운데
+const CLOCK_YAW = Math.atan2(-CLOCK[0], -CLOCK[2]); // 방 가운데를 본다
+const IN = [-Math.sin(CLOCK_A), Math.cos(CLOCK_A)]; // 자명종에서 방 가운데 쪽
+const TUB = [0.55, 0, -0.6]; // 산소 표백제 대야
 const KINDS = ['me', 'chiikawa', 'hachiware', 'usagi'];
+const SIT_LIFT = 0.12; // 앉기 몸짓은 몸을 내리니 그만큼 들어 바닥에 묻히지 않게
 // 장면마다 앉는 자리(x, z)와 바라보는 곳
 const SPOTS = {
-  watch: { me: [0.85, -1.25], chiikawa: [1.75, -1.35] },
-  sleep: { chiikawa: [-1.05, -0.95], me: [-0.35, -0.8], hachiware: [0.35, -0.8], usagi: [1.05, -0.95] }, // 이불 앞에 나란히(얼굴이 보이게 앞을 본다)
-  soak: { me: [1.55, -0.2], chiikawa: [-0.25, -0.55] }
+  watch: { me: [0.45, -0.95], chiikawa: [1.0, -1.35] },
+  sleep: { chiikawa: [-0.75, -0.7], me: [-0.05, -0.6], hachiware: [0.65, -0.6], usagi: [1.35, -0.7] }, // 깔개 위에 나란히(얼굴이 보이게 앞을 본다)
+  soak: { me: [1.45, -0.05], chiikawa: [-0.25, -0.45] }
 };
+const CLOCK_LOOK = [CLOCK[0] + IN[0] * 0.15, CLOCK[1] + 0.35, CLOCK[2] + IN[1] * 0.15]; // 자명종과 그 위로 나온 별까지
 const SHOTS = {
-  room: { pos: [0.2, 2.9, 4.6], look: [0.3, 0.9, -1.2], portrait: { pos: [0.2, 3.3, 6.4], look: [0.3, 0.9, -1.2] } },
-  clock: { pos: [1.3, 1.8, -0.1], look: [CLOCK[0] - 0.05, CLOCK[1] + 0.35, CLOCK[2]], portrait: { pos: [1.15, 1.9, 0.9], look: [CLOCK[0] - 0.05, CLOCK[1] + 0.35, CLOCK[2]] } }, // 자명종과 그 위로 나온 별까지
-  tub: { pos: [0.3, 2.3, 2.0], look: [0.4, 0.45, -0.8], portrait: { pos: [0.3, 2.7, 3.2], look: [0.4, 0.45, -0.8] } }
+  room: { pos: [0.3, 3.2, 5.4], look: [0.2, 0.8, -0.9], portrait: { pos: [0.3, 3.6, 7.2], look: [0.2, 0.8, -0.9] } },
+  clock: { pos: [CLOCK[0] + IN[0] * 2.2, 1.85, CLOCK[2] + IN[1] * 2.2], look: CLOCK_LOOK, portrait: { pos: [CLOCK[0] + IN[0] * 3.2, 1.95, CLOCK[2] + IN[1] * 3.2], look: CLOCK_LOOK } },
+  tub: { pos: [0.3, 2.3, 2.2], look: [0.45, 0.45, -0.65], portrait: { pos: [0.3, 2.7, 3.4], look: [0.45, 0.45, -0.65] } }
 };
 const propsOf = (c) => new Set(Object.values(c.props || {}).flat());
 const hideProps = (c) => propsOf(c).forEach((m) => { m.visible = false; });
@@ -48,30 +54,32 @@ export function buildAlarmClock() {
 export function createChiiRoom() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#2b2230');
-  scene.add(new THREE.HemisphereLight(0xfff0e0, 0x5a4a5a, 1.0));
+  scene.add(new THREE.HemisphereLight(0xfff3e4, 0x8a7468, 1.45)); // 밤이어도 방 안은 따뜻한 불빛
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 60);
   const light = new THREE.Color(0.95, 0.92, 0.98); // 밤 방 안 불빛(살짝 푸르스름)
   const basic = (c, o = {}) => new THREE.MeshBasicMaterial({ color: c, ...o });
   const add = (parent, geo, mat, pos, scale, rot) => { const m = new THREE.Mesh(geo, mat); m.position.set(...pos); if (scale) m.scale.set(...scale); if (rot) m.rotation.set(...rot); parent.add(m); return m; };
   const toon = (parent, geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); parent.add(m); return m; };
 
-  // ---------- 방: 나무 바닥 · 연분홍 벽 · 천장 ----------
-  toon(scene, GEO.box, '#d8b48a', { position: [0, -0.05, 0], scale: [9, 0.1, 8], outline: false });
-  for (let i = -4; i <= 4; i += 0.9) add(scene, new THREE.PlaneGeometry(0.025, 8).rotateX(-Math.PI / 2), basic('#b98f66'), [i, 0.002, 0]);
-  toon(scene, GEO.box, '#f6e1d6', { position: [0, 2, WALL_Z - 0.1], scale: [9, 4, 0.2], outline: false });
-  [-1, 1].forEach((sd) => toon(scene, GEO.box, '#f1d8cc', { position: [sd * 4.4, 2, 0.8], scale: [0.2, 4, 8], outline: false }));
-  toon(scene, GEO.box, '#e7c2b2', { position: [0, 0.25, WALL_Z], scale: [9, 0.5, 0.06], outline: false }); // 걸레받이
-  add(scene, new THREE.PlaneGeometry(9, 8).rotateX(Math.PI / 2), basic('#4a3a48'), [0, 4, 0.8]); // 천장
-  // 창(뒷벽 왼쪽): 밤하늘 · 작은 별
-  toon(scene, GEO.box, '#c9a07a', { position: [-1.7, 2.05, WALL_Z + 0.02], scale: [1.5, 1.25, 0.08], outline: 0.02, shell: true });
-  add(scene, new THREE.PlaneGeometry(1.32, 1.07), basic('#22305a'), [-1.7, 2.05, WALL_Z + 0.07]);
-  [[-2.1, 2.3], [-1.45, 2.45], [-1.9, 1.8], [-1.25, 1.95], [-2.2, 1.65]].forEach(([x, y]) => add(scene, new THREE.CircleGeometry(0.025, 6), basic('#fff6c8'), [x, y, WALL_Z + 0.075]));
-  toon(scene, GEO.box, '#c9a07a', { position: [-1.7, 2.05, WALL_Z + 0.08], scale: [0.05, 1.07, 0.03], outline: false });
+  // ---------- 방: 우리 집처럼 동그란 돔(나무 바닥 · 안쪽 면만 그리는 돔 벽 · 동그란 깔개 · 십자 창) ----------
+  toon(scene, GEO.cylinder, '#e2c29b', { position: [0, -0.1, 0], scale: [ROOM_R, 0.1, ROOM_R], outline: 0.04 });
+  const wall = toonMesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), '#fbefe8', { scale: [ROOM_R, DOME_H, ROOM_R], outline: false, shadow: false });
+  wall.material = wall.material.clone();
+  wall.material.side = THREE.BackSide; // 앞쪽(카메라 쪽) 벽은 보이지 않게
+  scene.add(wall);
+  toon(scene, GEO.cylinder, '#f6c6d2', { position: [0.25, 0, 0.1], scale: [1.35, 0.02, 1.35], outline: 0.015 });
+  const win = new THREE.Group(); // 밤하늘이 보이는 십자 창(돔 벽면에 딱 붙게)
+  placeOnDome(win, ROOM_R, DOME_H, -0.7, 1.7);
+  win.add(toonMesh(GEO.box, '#22305a', { scale: [0.95, 0.95, 0.05], shell: true, outline: 0.03, shadow: false }));
+  [[-0.22, 0.24], [0.26, 0.14], [-0.08, -0.22], [0.28, -0.27]].forEach(([x, y]) => add(win, new THREE.CircleGeometry(0.025, 6), basic('#fff6c8'), [x, y, 0.035]));
+  win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.9, 0.03], outline: false, shadow: false }));
+  win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.9, 0.06, 0.03], outline: false, shadow: false }));
+  scene.add(win);
 
-  // ---------- 이불 · 베개 · 작은 상 ----------
-  toon(scene, GEO.box, '#ffffff', { position: [-1.4, 0.07, -1.3], scale: [1.4, 0.14, 1.9], outline: 0.02, shell: true });
-  toon(scene, GEO.box, '#f6b6c8', { position: [-1.4, 0.17, -1.0], scale: [1.42, 0.1, 1.2], outline: 0.02, shell: true });
-  toon(scene, GEO.sphere, '#fff6ea', { position: [-1.4, 0.24, -2.0], scale: [0.45, 0.12, 0.25], outline: 0.015 });
+  // ---------- 이불(벽 쪽) · 베개 · 작은 상 ----------
+  toon(scene, GEO.box, '#ffffff', { position: [-1.85, 0.07, -0.95], scale: [1.3, 0.14, 1.8], outline: 0.02, shell: true });
+  toon(scene, GEO.box, '#f6b6c8', { position: [-1.85, 0.17, -0.7], scale: [1.32, 0.1, 1.15], outline: 0.02, shell: true });
+  toon(scene, GEO.sphere, '#fff6ea', { position: [-1.85, 0.24, -1.6], scale: [0.42, 0.12, 0.24], outline: 0.015 });
   const table = new THREE.Group();
   table.position.set(-0.9, 0, 1.1);
   toon(table, GEO.cylinder, '#b9845a', { position: [0, 0.3, 0], scale: [0.55, 0.06, 0.55], outline: 0.015 });
@@ -79,9 +87,10 @@ export function createChiiRoom() {
   scene.add(table);
 
   // ---------- 선반 위 커다란 빨간 자명종(바늘이 돈다) ----------
-  toon(scene, GEO.box, '#c99a6a', { position: [CLOCK[0], 0.45, CLOCK[2] - 0.08], scale: [1.3, 0.9, 0.62], outline: 0.02, shell: true });
+  toon(scene, GEO.box, '#c99a6a', { position: [Math.sin(CLOCK_A) * 2.85, 0.45, -Math.cos(CLOCK_A) * 2.85], rotation: [0, CLOCK_YAW, 0], scale: [1.2, 0.9, 0.55], outline: 0.02, shell: true });
   const { group: clock, hourHand, minHand } = buildAlarmClock();
   clock.position.set(...CLOCK);
+  clock.rotation.y = CLOCK_YAW;
   scene.add(clock);
   const clockHome = clock.position.clone();
 
@@ -110,9 +119,10 @@ export function createChiiRoom() {
 
   let shot = SHOTS.room, snapNext = true, mood = 'watch', starMode = 'hide', starT = 0, spin = false, smashT = -1, dunkT = -1;
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
-  const OUT = new THREE.Vector3(CLOCK[0] - 0.15, CLOCK[1] + 0.7, CLOCK[2] + 0.45); // 자명종 위에 둥실
+  const FACE = new THREE.Vector3(CLOCK[0] + IN[0] * 0.1, CLOCK[1], CLOCK[2] + IN[1] * 0.1); // 자명종 판 앞(별이 나오는 자리)
+  const OUT = new THREE.Vector3(CLOCK[0] + IN[0] * 0.45, CLOCK[1] + 0.7, CLOCK[2] + IN[1] * 0.45); // 자명종 위에 둥실
   const PLEAD = new THREE.Vector3(TUB[0] + 0.1, 1.15, TUB[2] + 0.35); // 대야 앞에서 매달린다
-  const WINDOW = new THREE.Vector3(-1.7, 2.05, WALL_Z - 0.6);
+  const WINDOW = win.position.clone().multiplyScalar(1.3); // 창 너머 밤하늘로
 
   function place(k, x, z, faceX, faceZ) {
     const c = charOf(k);
@@ -133,7 +143,7 @@ export function createChiiRoom() {
       hideProps(me);
       scene.add(me.root);
       clock.position.copy(clockHome);
-      clock.rotation.set(0, 0, 0);
+      clock.rotation.set(0, CLOCK_YAW, 0);
       clock.visible = true;
       star.group.visible = false;
       starMode = 'hide';
@@ -157,10 +167,10 @@ export function createChiiRoom() {
       }
       tub.visible = m === 'soak';
       if (m === 'soak') { clock.position.set(TUB[0] - 0.45, 0.62, TUB[2] + 0.05); clock.rotation.set(0, 0.6, 0); } // 치이카와가 대야 옆에 들고 있다
-      else { clock.position.copy(clockHome); clock.rotation.set(0, 0, 0); }
+      else { clock.position.copy(clockHome); clock.rotation.set(0, CLOCK_YAW, 0); }
     },
     /** 별똥별: 'hide' 숨음 · 'out' 자명종에서 나와 둥실(흥얼흥얼) · 'plead' 대야 앞에서 매달림 · 'gone' 창밖으로 슝. */
-    star(m) { starMode = m; starT = 0; star.group.visible = m !== 'hide'; if (m === 'out') star.group.position.set(CLOCK[0], CLOCK[1], CLOCK[2] + 0.1); },
+    star(m) { starMode = m; starT = 0; star.group.visible = m !== 'hide'; star.group.rotation.set(0, CLOCK_YAW, 0); if (m === 'out') star.group.position.copy(FACE); },
     /** 시곗바늘이 거꾸로 뱅글뱅글. */
     spinBack(on) { spin = !!on; },
     /** 우사기가 "우라!" 하고 내리친다: 별똥별은 쏙 자명종 속으로. */
@@ -183,7 +193,7 @@ export function createChiiRoom() {
       const P = star.group.position;
       if (starMode === 'out') {
         const u = Math.min(1, starT / 1.1), e = u * u * (3 - 2 * u);
-        P.lerpVectors(tmpPos.set(CLOCK[0], CLOCK[1], CLOCK[2] + 0.1), OUT, e);
+        P.lerpVectors(FACE, OUT, e);
         P.y += Math.sin(t * 2.6) * 0.05 * e;
         star.group.rotation.z = Math.sin(t * 3) * 0.2 + (spin ? t * 6 : 0);
         star.group.scale.setScalar(0.3 * (0.4 + 0.6 * e));
@@ -223,6 +233,7 @@ export function createChiiRoom() {
         if (mood === 'watch') anim = k === 'chiikawa' && starMode !== 'hide' ? 'shy' : 'sit';
         else if (mood === 'sleep') anim = k === 'usagi' && smashT >= 0 && smashT < 0.9 ? 'swing' : k === 'hachiware' && starMode === 'out' ? 'talk' : 'sit';
         else if (mood === 'soak') anim = k === 'chiikawa' ? (starMode === 'plead' ? 'shy' : 'idle') : 'idle';
+        c.root.position.y = anim === 'sit' ? SIT_LIFT : 0;
         animateChibi(c, anim, t, { phase: k.length, swing: anim === 'swing' ? Math.min(1, smashT / 0.8) : 0 });
       }
       // 카메라

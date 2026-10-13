@@ -118,6 +118,7 @@ import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
 import { createStarDinerStory } from './stories/stardiner.js';
 import { createChiiRoom } from './world/chiiroom.js';
+import { createWeather } from './world/weather.js';
 import { createBlackStarStory } from './stories/blackstar.js';
 import { loopDue, rewind as loopRewind, markLoop as loopMark, startLoop as loopStart, endLoop as loopEnd, loopGate, loopOf, BLEACH_PRICE } from './core/blackstar.js';
 import { createStarGame } from './ui/stargame.js';
@@ -1356,6 +1357,8 @@ function boot() {
       starDiner.reset();
       blackStar.reset();
       loopRewinding = false;
+      weather.setRain(false);
+      sound.rain(false);
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -3449,7 +3452,8 @@ function boot() {
     get stage() { return chiiRoom || (chiiRoom = createChiiRoom()); }, villageScene: scene, minigame, homeOf: (kind) => homeDoor(kind),
     startLoop: () => commit(loopStart(state)), markLoop: () => commit(loopMark(state)), endLoop: () => commit(loopEnd(state)),
     rewindNow: () => { commit(loopRewind(loopMark(state))); afterLoopRewind(); }, // 장면 끝의 되감기: 본 장면을 적어 두고 같은 날 아침으로
-    nudgeSearch: () => { appNudge = 'search'; }
+    nudgeSearch: () => { appNudge = 'search'; },
+    setRain: (on) => { weather.setRain(on); sound.rain(on); }
   });
   /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
   function afterLoopRewind() {
@@ -5025,6 +5029,8 @@ function boot() {
 
   // ---------- 별똥별이 쏟아지는 밤(core/starfall.js · world/starfall.js): 소원을 빌다가 진짜 별똥별이 떨어져 별똥별맨이 ----------
   const starfall = createStarfall(scene), streaks = createStreaks(ui);
+  const weather = createWeather(scene); // 비: 켜면 빗줄기 · 물방울 고리, 하늘 · 빛은 applySky 가 잿빛으로
+  const RAIN_TOP = new THREE.Color('#5b6470'), RAIN_HOR = new THREE.Color('#8b939d');
   let starNotice = 0, shakeT = 0;
   const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
   const meWho = () => ({ kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
@@ -5212,9 +5218,11 @@ function boot() {
     const a = SKY[i], b = SKY[i + 1], k = Math.min(1, Math.max(0, (h - a.h) / (b.h - a.h)));
     skyTop.copy(a.topC).lerp(b.topC, k);
     skyHorizon.copy(a.horC).lerp(b.horC, k);
+    const wet = weather.rain; // 비가 오면 하늘은 잿빛, 해와 빛은 어둑하게
+    if (wet > 0.001) { skyTop.lerp(RAIN_TOP, wet * 0.85); skyHorizon.lerp(RAIN_HOR, wet * 0.85); }
     gfx.setSky(skyTop, skyHorizon);
-    sun.intensity = a.sun + (b.sun - a.sun) * k;
-    hemi.intensity = a.hemi + (b.hemi - a.hemi) * k;
+    sun.intensity = (a.sun + (b.sun - a.sun) * k) * (1 - 0.65 * wet);
+    hemi.intensity = (a.hemi + (b.hemi - a.hemi) * k) * (1 - 0.3 * wet);
     // 캐릭터는 명암 대신 빛 색만 따른다: 밤에는 푸르스름하게(마을보다는 밝게 두어 잘 보이게)
     const day = Math.min(1, Math.max(0, (sun.intensity + hemi.intensity - 0.95) / 2.25));
     // 마을 밖의 밤은 훨씬 어둡다: 울타리에서 멀어질수록 밤의 빛을 더 줄인다(불을 들면 캐릭터는 조금 밝게)
@@ -5762,6 +5770,7 @@ function boot() {
       cam.set(titlePos, titleLook);
     }
     starfall.update(dt, cam.camera);
+    weather.update(dt, focus); // 비(검은 별똥별의 비 오는 아침 등)
     gfx.followSun(focus.x, focus.z);
     if (!skipRender && drawNow) {
       lod.update(cam.camera, performance.now(), mode !== 'title'); // 타이틀은 마을을 멀리서 내려다봐서 외곽선을 다 남긴다
