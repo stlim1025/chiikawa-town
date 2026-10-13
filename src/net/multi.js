@@ -2,12 +2,27 @@
  * 같이 놀기(멀티): 동물의 숲처럼 내 마을 문을 열면 친구가 내 마을 코드로 놀러 온다(서버: server/TownServer 의 SignalR 허브 /town).
  * 게임 진행은 각자 기기에 있고, 여기서는 '누가 어디서 뭘 하는지'와 주인 마을의 모습(시간 · 친구들 · 풀)만 나눈다.
  * SignalR 클라이언트는 처음 연결할 때만 CDN 에서 불러온다(같이 놀기를 안 쓰면 받지 않는다).
+ * 같은 마을 사람끼리는 되도록 핸드폰끼리 바로 주고받는다(rtc.js, 서버는 처음 연결 정보만), 안 되면 서버를 거친다.
  */
+import { createRtc } from './rtc.js';
+
 const SIGNALR_URL = 'https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/+esm';
 /** 같이 놀기 서버(Tailscale Funnel 고정 주소, server/README.md). 화면에는 보이지 않고 마을 코드만 넣는다. */
 export const DEFAULT_SERVER = 'desktop-jc07560.tail4a150e.ts.net';
-/** 위치를 보내는 간격(초): 1초에 15번(서버는 1초에 20번 넘게 오면 버린다). 짧을수록 친구 화면에서 덜 늦게 보인다. */
+/** 서버로 위치를 보내는 간격(초): 1초에 15번(서버는 1초에 20번 넘게 오면 버린다). */
 export const SEND_EVERY = 1 / 15;
+/** 바로 연결된 사람에게 위치를 보내는 간격(초): 1초에 30번(서버 한도와 상관없다). */
+export const FAST_EVERY = 1 / 30;
+
+/**
+ * 바로 연결로 받은 움직임을 서버가 하던 것처럼 다듬는다(숫자가 아니면 0, 몸짓 · 있는 곳은 16자까지). 모양이 아니면 null.
+ */
+export function cleanMove(d) {
+  if (!d || typeof d !== 'object') return null;
+  const num = (v) => (Number.isFinite(v) ? v : 0);
+  const word = (v, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 16) : fallback);
+  return { x: num(d.x), z: num(d.z), yaw: num(d.yaw), anim: word(d.anim, 'idle'), area: word(d.area, 'village') };
+}
 /** 가만히 있어도 이만큼(초)마다 한 번은 보낸다. */
 const HEARTBEAT = 2;
 /** 내 마을 코드 글자(헷갈리는 I · L · O · 0 · 1 은 뺐다). */
@@ -72,11 +87,35 @@ const REASON = {
  */
 export function createMulti(events = {}) {
   let lib = null, conn = null, status = 'off', error = '', room = null, role = null, info = null, hostId = null, you = null;
-  let sendT = 0, beatT = 0, lastKey = '';
+  let sendT = 0, beatT = 0, lastKey = '', srvT = 0, srvKey = '';
   const players = new Map(); // id → { name, host }(나 빼고)
   const setStatus = (s, err = '') => { status = s; error = err; events.status?.(); };
-  const clearPlayers = () => { players.clear(); events.cleared?.(); };
   const live = () => status === 'open' || status === 'visiting';
+  // 바로 연결(WebRTC): 핸드폰끼리 바로 주고받는다(서버는 처음 연결 정보를 건네줄 때만). 바로 연결이 안 된 사람과는 서버로
+  const rtc = createRtc({
+    signal: (to, payload) => { if (conn) conn.send('Direct', to, payload).catch(() => {}); },
+    onMessage: (id, kind, data) => fromPeer(id, kind, data),
+    onChange: () => events.status?.()
+  });
+  const clearPlayers = () => { players.clear(); rtc.closeAll(); events.cleared?.(); };
+  /** 새로 만난 사람과 바로 연결을 시작한다(연결 id 가 작은 쪽이 먼저 청한다 — 둘이 동시에 청하지 않게). */
+  const meet = (id) => rtc.connect(id, !!you && you < id);
+  /** 바로 연결로 받은 것: 서버를 거치지 않았으니 서버가 하던 확인(숫자 · 길이)을 여기서 한다. */
+  function fromPeer(id, kind, d) {
+    if (!live() || !players.has(id)) return;
+    if (kind === 'move') { const m = cleanMove(d); if (m) events.moved?.(id, m); }
+    else if (kind === 'world') { if (role === 'guest' && status === 'visiting' && id === hostId && d && typeof d === 'object') events.world?.(d); }
+    else if (kind === 'act') { if (role === 'host' && status === 'open' && d && typeof d === 'object') events.guestAct?.(id, d); }
+    else if (kind === 'direct') { if (d && typeof d === 'object' && d.t !== 'rtc') events.direct?.(id, d); }
+    else if (kind === 'say') { if (typeof d === 'string' && d.trim()) events.said?.(id, d.trim().slice(0, 30)); }
+    else if (kind === 'emote') { if (typeof d === 'string' && d.trim()) events.emote?.(id, d.trim().slice(0, 16)); }
+  }
+  /** 바로 연결된 사람에게는 바로, 아닌 사람이 있으면 서버로도(서버는 모두에게 나눠 주고, 바로 연결된 사람은 서버 쪽을 버린다). → 서버로 보내야 하면 true */
+  function toEveryone(kind, data, fast) {
+    let server = false;
+    for (const id of players.keys()) if (!rtc.send(id, kind, data, fast)) server = true;
+    return server;
+  }
 
   /** 문을 열거나 놀러 간다(처음 연결 · 끊겼다 다시 이어졌을 때 again=true). */
   async function enter(again = false) {
@@ -90,8 +129,9 @@ export function createMulti(events = {}) {
     clearPlayers();
     hostId = r.host;
     you = r.you;
-    for (const p of r.players || []) { players.set(p.id, { name: p.name, host: !!p.host }); events.joined?.(p, false); }
+    for (const p of r.players || []) { players.set(p.id, { name: p.name, host: !!p.host }); events.joined?.(p, false); meet(p.id); }
     lastKey = '';
+    srvKey = '';
     setStatus(role === 'host' ? 'open' : 'visiting');
   }
   async function stop() {
@@ -119,19 +159,25 @@ export function createMulti(events = {}) {
         .withAutomaticReconnect([0, 1000, 3000, 5000, 10000])
         .configureLogging(lib.LogLevel.Warning)
         .build();
-      c.on('playerJoined', (p) => { players.set(p.id, { name: p.name, host: !!p.host }); events.joined?.(p, true); events.status?.(); });
-      c.on('playerMoved', (id, m) => events.moved?.(id, m));
+      c.on('playerJoined', (p) => { players.set(p.id, { name: p.name, host: !!p.host }); events.joined?.(p, true); meet(p.id); events.status?.(); });
+      // 바로 연결된 사람의 움직임 · 한마디 · 마을 모습은 바로 온 것을 쓴다(서버로 늦게 온 것은 버린다)
+      c.on('playerMoved', (id, m) => { if (!rtc.live(id)) events.moved?.(id, m); });
       c.on('playerLeft', (id) => {
         const p = players.get(id);
         players.delete(id);
+        rtc.forget(id);
         events.left?.(id, p ? p.name : '');
         events.status?.();
       });
-      c.on('playerSaid', (id, text) => events.said?.(id, text));
-      c.on('playerEmote', (id, name) => events.emote?.(id, name));
-      c.on('world', (w) => { if (role === 'guest' && status === 'visiting') events.world?.(w); });
+      c.on('playerSaid', (id, text) => { if (!rtc.live(id)) events.said?.(id, text); });
+      c.on('playerEmote', (id, name) => { if (!rtc.live(id)) events.emote?.(id, name); });
+      c.on('world', (w) => { if (role === 'guest' && status === 'visiting' && !rtc.live(hostId)) events.world?.(w); });
       c.on('guestAct', (id, a) => { if (role === 'host' && status === 'open' && players.has(id)) events.guestAct?.(id, a); });
-      c.on('direct', (id, a) => { if (live() && players.has(id)) events.direct?.(id, a); });
+      c.on('direct', (id, a) => {
+        if (!live() || !players.has(id)) return;
+        if (a && a.t === 'rtc') rtc.take(id, a); // 바로 연결 정보
+        else events.direct?.(id, a);
+      });
       c.on('gateClosed', (hostName) => {
         // 놀러 간 마을의 주인이 문을 닫았다: 연결을 끊고 집으로
         if (conn !== c) return;
@@ -168,8 +214,8 @@ export function createMulti(events = {}) {
     get room() { return room; },
     /** 'host'(내 마을 문을 열었다) · 'guest'(놀러 갔다) · null. */
     get role() { return live() || status === 'connecting' ? role : null; },
-    /** 같은 마을 사람들(나 빼고) [{ id, name, host }]. */
-    get players() { return [...players].map(([id, p]) => ({ id, ...p })); },
+    /** 같은 마을 사람들(나 빼고) [{ id, name, host, link: { mode: 'direct' | 'trying' | 'server', rtt } }]. */
+    get players() { return [...players].map(([id, p]) => ({ id, ...p, link: rtc.info(id) })); },
     /** 같은 마을 사람 수(나 빼고). */
     get count() { return players.size; },
     /** 내 연결 id(주인이 보내는 '이 풀은 누가 뽑는 중' 표시에서 나를 알아본다). */
@@ -187,32 +233,50 @@ export function createMulti(events = {}) {
       await stop();
       setStatus('off');
     },
-    /** 매 프레임: 내 움직임 { x, z, yaw, anim, area } 을 SEND_EVERY 초마다(바뀌었을 때만, 가만히 있어도 HEARTBEAT 초마다 한 번). */
+    /**
+     * 매 프레임: 내 움직임 { x, z, yaw, anim, area } 을 보낸다(바뀌었을 때만, 가만히 있어도 HEARTBEAT 초마다 한 번).
+     * 바로 연결된 사람에게는 FAST_EVERY 초마다 바로. 서버로는 바로 연결이 안 된 사람이 있으면 SEND_EVERY 초마다,
+     * 다 바로 연결돼 있으면 1초에 한 번만(서버가 새로 오는 사람에게 알려 줄 내 자리를 맞춰 두려고).
+     */
     tick(dt, move) {
       if (!live() || !conn) return;
       sendT += dt;
       beatT += dt;
-      if (sendT < SEND_EVERY) return;
+      srvT += dt;
+      if (sendT < FAST_EVERY) return;
       sendT = 0;
       const key = `${move.x.toFixed(2)},${move.z.toFixed(2)},${move.yaw.toFixed(2)},${move.anim},${move.area}`;
-      if (key === lastKey && beatT < HEARTBEAT) return;
-      lastKey = key;
-      beatT = 0;
-      conn.send('Move', move).catch(() => {});
+      let server = false;
+      if (key !== lastKey || beatT >= HEARTBEAT) {
+        lastKey = key;
+        beatT = 0;
+        server = toEveryone('move', move, true);
+      } else for (const id of players.keys()) if (!rtc.live(id)) server = true;
+      if (srvT >= (server ? SEND_EVERY : 1) && (key !== srvKey || srvT >= HEARTBEAT)) {
+        srvT = 0;
+        srvKey = key;
+        conn.send('Move', move).catch(() => {});
+      }
     },
-    /** 주인: 내 마을의 모습을 손님들에게 보낸다(손님이 있을 때만). */
-    sendWorld(payload) { if (status === 'open' && conn && players.size) conn.send('World', payload).catch(() => {}); },
+    /** 주인: 내 마을의 모습을 손님들에게 보낸다(손님이 있을 때만). 풀 · 바닥 물건 · 집이 든 것은 꼭 닿게(sure), 나머지는 빠르게(fast). */
+    sendWorld(payload) {
+      if (status !== 'open' || !conn || !players.size) return;
+      const heavy = 'w' in payload || 'g' in payload || 'h' in payload;
+      if (toEveryone('world', payload, !heavy)) conn.send('World', payload).catch(() => {});
+    },
     /** 손님: 내 행동(풀 뽑기 · 열매 따기 · 몬스터 치기 · 물건 버리기와 줍기)을 주인에게 알린다. */
-    act(payload) { if (status === 'visiting' && conn) conn.send('Act', payload).catch(() => {}); },
+    act(payload) { if (status === 'visiting' && conn && !rtc.send(hostId, 'act', payload)) conn.send('Act', payload).catch(() => {}); },
     /** 같은 마을의 한 사람(to: 연결 id)에게만 보낸다(맞았다 · 쓰러뜨렸다 · 깨웠다 · 주운 물건). */
-    direct(to, payload) { if (live() && conn && to) conn.send('Direct', to, payload).catch(() => {}); },
+    direct(to, payload) { if (live() && conn && to && !rtc.send(to, 'direct', payload)) conn.send('Direct', to, payload).catch(() => {}); },
+    /** 그 사람과의 연결 { mode: 'direct' 바로 · 'trying' 잇는 중 · 'server' 서버로, rtt: 바로 연결 왕복 ms | null }. */
+    linkOf(id) { return rtc.info(id); },
     /** 마을 주인의 연결 id(놀러 가 있을 때). */
     get hostId() { return hostId; },
     /** 같은 마을 사람의 이름(모르면 ''). */
     nameOf(id) { const p = players.get(id); return p ? p.name : ''; },
     /** 한마디(정해진 말)를 보낸다. */
-    say(text) { if (live() && conn) conn.send('Say', text).catch(() => {}); },
+    say(text) { if (live() && conn && toEveryone('say', text, false)) conn.send('Say', text).catch(() => {}); },
     /** 이모트(몸짓 이름)를 보낸다. */
-    emote(name) { if (live() && conn) conn.send('Emote', name).catch(() => {}); }
+    emote(name) { if (live() && conn && toEveryone('emote', name, false)) conn.send('Emote', name).catch(() => {}); }
   };
 }

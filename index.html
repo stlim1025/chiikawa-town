@@ -1266,6 +1266,10 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .mp-code .btn { flex: none; min-height: 38px; padding: 2px 16px 4px; }
 .mp-input { font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
 .mp-players, .mp-says { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 친구와의 연결: 바로 연결(초록) · 잇는 중 · 서버 거쳐서(주황) */
+.mp-players .mp-link { margin-left: 6px; padding: 0 7px 1px; border-radius: 999px; font-size: 12px; background: #fde7c8; color: #9a6418; }
+.mp-players .mp-link.direct { background: #d5f0e2; color: #2f7a55; }
+.mp-players .mp-link.trying { background: #eee6d8; color: #7a6a55; }
 .mp-says .btn { min-height: 38px; padding: 2px 14px 4px; font-size: 17px; }
 .world-label.mp-name { padding: 1px 10px 3px; font-size: 15px; color: #fff; background: rgba(74, 110, 96, 0.85); border-radius: 999px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); }
 .panel .row.f-card { justify-content: flex-start; align-items: flex-start; gap: 10px; }

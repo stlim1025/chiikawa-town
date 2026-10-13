@@ -11,7 +11,7 @@ namespace TownServer;
 /// </summary>
 public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<TownHub> log) : Hub
 {
-    private const int MaxName = 8, MaxLook = 2048, MaxWord = 16, MaxSay = 30, MaxWorld = 48 * 1024, MaxAct = 512;
+    private const int MaxName = 8, MaxLook = 2048, MaxWord = 16, MaxSay = 30, MaxWorld = 48 * 1024, MaxAct = 512, MaxDirect = 8 * 1024;
 
     /// <summary>
     /// 내 마을 문을 연다(이 연결이 그 마을 코드의 주인이 된다). 그 코드로 이미 열려 있으면 'taken'.
@@ -85,15 +85,15 @@ public sealed class TownHub(RoomRegistry rooms, TownOptions options, ILogger<Tow
     }
 
     /// <summary>
-    /// 같은 마을의 한 사람에게만 보낸다(맞았다 · 쓰러뜨렸다 · 깨웠다 · 주운 물건처럼 그 사람만 알면 되는 일).
-    /// 서버는 내용을 해석하지 않는다(512자까지, 너무 자주 오면 버린다).
+    /// 같은 마을의 한 사람에게만 보낸다(맞았다 · 쓰러뜨렸다 · 깨웠다 · 주운 물건처럼 그 사람만 알면 되는 일,
+    /// 핸드폰끼리 바로 연결(WebRTC)할 때 서로 건네는 연결 정보). 서버는 내용을 해석하지 않는다(8KB까지, 너무 자주 오면 버린다).
     /// </summary>
     public async Task Direct(string to, JsonElement payload)
     {
         var me = rooms.Get(Context.ConnectionId);
         var target = rooms.Get(to ?? "");
         if (me is null || target is null || target.Id == me.Id || target.Room != me.Room) return;
-        if (payload.ValueKind != JsonValueKind.Object || payload.GetRawText().Length > MaxAct) return;
+        if (payload.ValueKind != JsonValueKind.Object || payload.GetRawText().Length > MaxDirect) return;
         if (!me.Acts.Take(Environment.TickCount64, options.ActsPerSecond, options.ActBurst)) return;
         await Clients.Client(target.Id).SendAsync("direct", me.Id, payload);
     }

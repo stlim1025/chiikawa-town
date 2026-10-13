@@ -1172,7 +1172,10 @@ export function createPanels(ui, handlers) {
       const opened = st.status === 'open', away = st.visiting;
       const says = () => [h('h3', { class: 'shop-sec' }, '한마디'),
         h('div', { class: 'mp-says' }, MP_SAYS.map((t) => h('button', { class: 'btn', type: 'button', onClick: () => { M.say(t); close(); } }, t)))];
-      const chips = (list, empty) => list.length ? h('div', { class: 'mp-players' }, list.map((p) => h('span', { class: 'chip' }, p.name))) : h('p', { class: 'note' }, empty);
+      // 친구 이름 + 연결: 핸드폰끼리 바로(왕복 ms) · 잇는 중 · 서버를 거쳐서(조금 느리다)
+      const linkText = (l) => (!l ? '' : l.mode === 'direct' ? `바로 연결${l.rtt != null ? ` ${Math.round(l.rtt)}ms` : ''}` : l.mode === 'trying' ? '잇는 중' : '서버 거쳐서');
+      const chips = (list, empty) => list.length ? h('div', { class: 'mp-players' }, list.map((p) => h('span', { class: 'chip' }, p.name,
+        p.link ? h('small', { class: `mp-link ${p.link.mode}` }, linkText(p.link)) : null))) : h('p', { class: 'note' }, empty);
       const out = [appBar('같이 놀기')];
       if (st.status === 'error') out.push(h('p', { class: 'note warn' }, st.error));
       // 친구 마을에 놀러 와 있다: 같이 있는 친구 · 한마디 · 집으로

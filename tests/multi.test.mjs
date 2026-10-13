@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hubUrl, roomCode, newVillageCode, isVillageCode, CODE_LEN, DEFAULT_SERVER } from '../src/net/multi.js';
+import { hubUrl, roomCode, newVillageCode, isVillageCode, cleanMove, CODE_LEN, DEFAULT_SERVER } from '../src/net/multi.js';
+
+test('바로 연결로 받은 움직임은 서버처럼 다듬는다: 숫자가 아니면 0, 몸짓 · 있는 곳은 16자까지', () => {
+  assert.deepEqual(cleanMove({ x: 1.5, z: -2, yaw: 0.3, anim: 'walk', area: 'village' }), { x: 1.5, z: -2, yaw: 0.3, anim: 'walk', area: 'village' });
+  assert.deepEqual(cleanMove({ x: 'a', z: NaN, yaw: Infinity, anim: '', area: 7 }), { x: 0, z: 0, yaw: 0, anim: 'idle', area: 'village' });
+  assert.equal(cleanMove({ anim: 'x'.repeat(40) }).anim.length, 16);
+  assert.equal(cleanMove(null), null);
+  assert.equal(cleanMove('move'), null);
+});
 
 test('고정 서버 주소는 Tailscale Funnel 의 https 허브 주소가 된다', () => {
   assert.match(hubUrl(DEFAULT_SERVER), /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.ts\.net\/town$/);
