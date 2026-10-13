@@ -92,17 +92,21 @@ test('저장: 이야기 기록(story)은 그대로 불러온다', () => {
   assert.equal(back.state.story.usagiSeen, 2);
 });
 
-test('피자호빵: 아침에 라멘 로우 새 메뉴 소식 → 그날 우사기에게 이야기 표시', async () => {
-  let s = withHearts(fresh(3, 9), 'usagi', 1);
+test('피자호빵: 소풍 자리를 끝낸 뒤 아침에 라멘 로우 새 메뉴 소식 → 그날 우사기에게 이야기 표시', async () => {
+  const noPicnic = withHearts(fresh(3, 9), 'usagi', 1);
+  assert.ok(!Q.pizzaNewsDue(noPicnic), '우사기의 소풍 자리 먼저(같은 하트 1이라 겹치지 않게)');
+  assert.ok(!Q.canOffer({ ...noPicnic, story: { pizzaNews: 3 } }, 'pizzaBun'), '소식을 들었어도 소풍 자리 먼저');
+  let s = { ...noPicnic, quests: { picnic: { step: 1, base: 0, done: 2 } } };
   assert.ok(Q.pizzaNewsDue(s), '셋째 날 아침, 우사기와 하트 1');
   assert.ok(!Q.pizzaNewsDue({ ...s, clock: at(2, 9) }), '너무 이르다');
   assert.ok(!Q.pizzaNewsDue({ ...s, clock: at(3, 15) }), '소식은 아침에만');
-  assert.ok(!Q.pizzaNewsDue(withHearts(fresh(3, 9), 'usagi', 0)), '우사기와 조금은 친해야');
+  assert.ok(!Q.pizzaNewsDue(withHearts(s, 'usagi', 0)), '우사기와 조금은 친해야');
   assert.ok(!Q.canOffer(s, 'pizzaBun'), '소식 전');
   s = { ...s, story: { pizzaNews: 3 } };
   assert.ok(!Q.pizzaNewsDue(s), '소식은 한 번');
   assert.ok(Q.canOffer(s, 'pizzaBun'), '소식 들은 그날부터');
   assert.equal(Q.markOf(s, 'usagi'), 'story');
+  assert.notEqual(Q.QUESTS.pizzaBun.ask, '우라?', '우사기 일상 부탁(우라?)과 같은 고를 거리가 두 번 뜨지 않게');
   s = Q.startQuest(s, 'pizzaBun');
   assert.ok(!Q.stepReady(s, 'pizzaBun'));
   const Sh = await import(G + 'shop.js');
@@ -157,7 +161,9 @@ test('시사의 슈퍼 알바이터: 면 삶기 특훈 뒤 아침에 이야기 �
 test('하치와레가 구덩이에!: 말로는 시작 안 함(숲에서 발견) · 덩굴풀 3개면 끌어올릴 수 있다', async () => {
   const I = await import(G + 'inventory.js');
   let s = withHearts(fresh(5, 12), 'hachiware', 2);
-  const g4 = { ...s, license: { ...(s.license || {}), grade: 4 } };
+  const noSong = { ...s, license: { ...(s.license || {}), grade: 4 } };
+  assert.ok(!Q.pitDue(noSong), '하치와레의 동굴 무대 먼저(같은 하트 2라 겹치지 않게)');
+  const g4 = { ...noSong, quests: { song: { step: 2, base: 0, done: 4 } } };
   assert.ok(!Q.canOffer(g4, 'hachiPit'), '말 걸어서는 시작하지 않는다');
   assert.ok(!Q.questsFor(g4, 'hachiware').offer.includes('hachiPit'), '이야기 표시로 부르지 않는다(별 세 개 레스토랑은 따로)');
   assert.ok(Q.pitDue(g4), '4급 · 하트 2 · 낮 · 넷째 날부터');
@@ -220,15 +226,17 @@ test('수상한 섬 합숙: 친구 다섯과 하트 2개면 여덟째 날부터 
   for (const k of ['chiikawa', 'hachiware', 'usagi', 'rakko']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
 });
 
-test('위스키 봉봉: 쿠리만쥬(하트 2)가 열째 날부터 낮에 소문 → 숲길 옆 초콜릿 덩굴 → 숲속 장면 → 위스키 봉봉 · 포셰트 갑옷 씨와도 친해진다', async () => {
+test('위스키 봉봉: 쿠리만쥬(하트 2)가 새 안주 뒤 열째 날부터 낮에 소문 → 숲길 옆 초콜릿 덩굴 → 숲속 장면 → 위스키 봉봉 · 포셰트 갑옷 씨와도 친해진다', async () => {
   const I = await import(G + 'inventory.js');
   const Gf = await import(G + 'gifts.js');
-  const s = withHearts(fresh(10, 12), 'kurimanju', 2);
+  const noSnack = withHearts(fresh(10, 12), 'kurimanju', 2);
+  assert.ok(!Q.canOffer(noSnack, 'whiskeyBonbon'), '쿠리만쥬의 새 안주 먼저(같은 하트 2라 겹치지 않게)');
+  const s = { ...noSnack, quests: { snack: { step: 1, base: 0, done: 8 } } };
   assert.ok(Q.canOffer(s, 'whiskeyBonbon'));
   assert.equal(Q.markOf(s, 'kurimanju'), 'story', '쿠리만쥬 머리 위에 이야기 표시');
-  assert.ok(!Q.canOffer(withHearts(fresh(10, 12), 'usagi', 5), 'whiskeyBonbon'), '우사기 하트로는 열리지 않는다');
-  assert.ok(!Q.canOffer(withHearts(fresh(9, 12), 'kurimanju', 2), 'whiskeyBonbon'), '열째 날부터');
-  assert.ok(!Q.canOffer(withHearts(fresh(10, 12), 'kurimanju', 1), 'whiskeyBonbon'), '쿠리만쥬와 하트 2개부터');
+  assert.ok(!Q.canOffer(withHearts({ ...s, friends: {} }, 'usagi', 5), 'whiskeyBonbon'), '우사기 하트로는 열리지 않는다');
+  assert.ok(!Q.canOffer({ ...s, clock: at(9, 12) }, 'whiskeyBonbon'), '열째 날부터');
+  assert.ok(!Q.canOffer(withHearts(s, 'kurimanju', 1), 'whiskeyBonbon'), '쿠리만쥬와 하트 2개부터');
   assert.ok(!Q.canOffer({ ...s, clock: at(10, 18) }, 'whiskeyBonbon'), '낮에만');
   const step = Q.QUESTS.whiskeyBonbon.steps[0];
   assert.equal(step.place, 'bonbonVine');

@@ -43,6 +43,18 @@ test('연계 퀘스트 여는 조건: 의뢰한 친구 하트 · 토벌 자격�
   assert.ok(Q.canOffer(done(r, 'training'), 'training2'));
 });
 
+test('연계 퀘스트는 한 번에 하나, 끝내고 하루는 쉰다(토벌 자격을 따자마자 몰리지 않게)', () => {
+  let s = hunter(withHearts(withHearts(fresh(8, 12), 'usagi', 3), 'kani', 2));
+  assert.ok(Q.canOffer(s, 'fieldBurrow') && Q.canOffer(s, 'riverClaw'), '둘 다 열릴 수 있는 때');
+  s = Q.startQuest(s, 'fieldBurrow');
+  assert.ok(Q.chainBusy(s));
+  assert.ok(!Q.canOffer(s, 'riverClaw'), '하나를 하는 동안은 다음 연계가 안 열린다');
+  assert.ok(Q.canOffer(withHearts(s, 'chiikawa', 1), 'pillow'), '일반 부탁은 그대로');
+  s = { ...s, quests: { ...s.quests, fieldBurrow: { step: Q.QUESTS.fieldBurrow.steps.length, base: 0, done: 8 } } };
+  assert.ok(!Q.canOffer(s, 'riverClaw'), '끝낸 그날은 쉰다');
+  assert.ok(Q.canOffer({ ...s, clock: at(8 + Q.CHAIN_GAP, 12) }, 'riverClaw'), `${Q.CHAIN_GAP}일 지나면`);
+});
+
 test('들판의 굴밭: 흙두더지 → 당근 → 랏코 → 굴밭 입구 → 우사기 → 대왕 두더지 → 밀짚모자', () => {
   let s = Q.startQuest(hunter(withHearts(fresh(8, 12), 'usagi', 3)), 'fieldBurrow');
   const kill = (sp, n) => { s = { ...s, hunted: { ...(s.hunted || {}), [sp]: ((s.hunted || {})[sp] || 0) + n } }; };

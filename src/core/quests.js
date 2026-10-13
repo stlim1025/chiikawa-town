@@ -31,6 +31,8 @@ import { VILLAGERS, villagerOf, BED_HOUR } from './villagers.js';
  *   하나를 끝내면 SIDE_GAP 일 동안은 다음 이야기가 열리지 않는다(일상 부탁처럼 되풀이하는 daily 사이드는 따로).
  *   needStory: state.story[그 이름] 에 적힌 날 다음 날부터(본 일이 있어야) · after: 그 퀘스트를 끝낸 뒤 · hours: 그 시각에만 부탁한다.
  *   reward.friends: { 친구: 점수 } 같이 한 친구들 친밀도도.
+ * 연계 퀘스트(chain): 여러 친구를 거쳐 구역 보스까지 가는 긴 부탁. 사이드스토리와 따로 한 번에 하나만,
+ *   하나를 끝내면 CHAIN_GAP 일 동안은 다음 연계가 열리지 않는다(토벌 자격을 따자마자 한꺼번에 몰리지 않게).
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
  * state.quests = { 퀘스트 id: { step, base: 그 단계를 받았을 때 센 값, done?: 끝낸 날 } }, state.questTrack = 화면에 띄울 퀘스트 id,
  * state.story = { bossSeen?, bossDown? }, state.truce = 모몽가가 소매치기를 쉬는 마지막 날.
@@ -272,7 +274,7 @@ export const QUESTS = {
     reward: { bond: 3, friends: { usagi: 3, chiikawa: 2 }, furniture: 'djbooth' }
   },
   pizzaBun: {
-    title: '우사기의 피자호빵', giver: 'usagi', side: true, needStory: 'pizzaNews', sameDay: true, hours: [9, 20], needHearts: 1, ask: '우라?',
+    title: '우사기의 피자호빵', giver: 'usagi', side: true, after: 'picnic', needStory: 'pizzaNews', sameDay: true, hours: [9, 20], needHearts: 1, ask: '라멘 로우 새 메뉴 봤어?',
     offer: ['(라멘 로우 쪽을 가리키며 킁킁…)', '우라…? (침을 꿀꺽)', '(새로 나온 피자호빵이 몹시 궁금한 것 같다…!)'],
     steps: [{
       type: 'bring', items: { pizzabun: 1 }, fx: 'pizzaCry', goal: '라멘 로우에서 피자호빵을 사다 주자! (라멘 로우, 60원)',
@@ -404,7 +406,7 @@ export const QUESTS = {
   // 덩굴을 당기자 머리에서 덩굴이 자란 새하얀 큰 뱀 → 셋이 삼켜졌다가 갑옷 씨가 너클 더스터로 구한다). 연출은 stories/bonbon.js
   // 술꾼 쿠리만쥬가 숲의 '위스키 냄새 나는 초콜릿' 소문을 전해 준다(쿠리만쥬 하트 2 — 우사기 · 하치와레 하트 조건 이야기와 겹치지 않게)
   whiskeyBonbon: {
-    title: '위스키 봉봉', giver: 'kurimanju', side: true, minDay: 10, hours: [9, 16], needHearts: 2, ask: '숲에 재밌는 소문 없어?',
+    title: '위스키 봉봉', giver: 'kurimanju', side: true, after: 'snack', minDay: 10, hours: [9, 16], needHearts: 2, ask: '숲에 재밌는 소문 없어?',
     offer: ['하아~ {name}, 들었어? 서쪽 숲에 초콜릿이 주렁주렁 열리는 덩굴이 있대.', '따도 따도 또 열린다나… 우사기가 입가에 초콜릿을 잔뜩 묻히고 다니더라.',
       '근데 그 초콜릿, 냄새가 좀… 위스키 냄새 같았어. 하아~ 안주로 딱인데.',
       { who: 'hachiware', text: '초콜릿?! 우리도 먹으러 가자~! 치이카와랑 우사기도 같이!' }, { who: 'chiikawa', text: '…!! (초콜릿…!)' },
@@ -486,16 +488,16 @@ export const isActive = (state, id) => !!(questState(state, id) && !questState(s
 export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
 /** 그 단계를 누구에게 알리는지. */
 export const reportTo = (id, step) => step.to || QUESTS[id].giver;
-/** '우사기의 피자호빵' 아침 소식(라멘 로우 새 메뉴)을 띄울 때인지: 셋째 날부터 아침(8 ~ 12시), 우사기와 조금 친하고 다른 이야기를 하는 중이 아닐 때 한 번. */
+/** '우사기의 피자호빵' 아침 소식(라멘 로우 새 메뉴)을 띄울 때인지: 셋째 날부터 아침(8 ~ 12시), 우사기의 소풍 자리를 끝냈고 우사기와 조금 친하고 다른 이야기를 하는 중이 아닐 때 한 번. */
 export function pizzaNewsDue(state) {
-  if (!state.clock || state.tutorial !== 'done' || (state.story || {}).pizzaNews || state.clock.day < 3) return false;
+  if (!state.clock || state.tutorial !== 'done' || (state.story || {}).pizzaNews || state.clock.day < 3 || !isDone(state, 'picnic')) return false;
   const h = hourOf(state.clock);
   return h >= 8 && h < 12 && !sideBusy(state) && hearts(friendOf(state, 'usagi')) >= 1;
 }
-/** '하치와레가 구덩이에!'가 일어날 수 있는지: 넷째 날부터 낮(10 ~ 17시), 덩굴풀을 뽑을 수 있는 급수(4급), 하치와레와 하트 2, 다른 이야기가 없을 때 한 번. */
+/** '하치와레가 구덩이에!'가 일어날 수 있는지: 넷째 날부터 낮(10 ~ 17시), 덩굴풀을 뽑을 수 있는 급수(4급), 하치와레와 하트 2, 하치와레의 동굴 무대를 끝냈고 다른 이야기가 없을 때 한 번. */
 export function pitDue(state) {
   if (!state.clock || (state.tutorial && state.tutorial !== 'done') || state.clock.day < 4) return false;
-  if (isActive(state, 'hachiPit') || isDone(state, 'hachiPit')) return false;
+  if (isActive(state, 'hachiPit') || isDone(state, 'hachiPit') || !isDone(state, 'song')) return false;
   const h = hourOf(state.clock), grade = (state.license || {}).grade ?? 5;
   return h >= 10 && h < 17 && grade <= WEED_KINDS.vine.grade && !sideBusy(state) && hearts(friendOf(state, 'hachiware')) >= 2;
 }
@@ -505,6 +507,15 @@ export function sideBusy(state) {
   if (ids.some((id) => isActive(state, id))) return true;
   const last = Math.max(0, ...ids.map((id) => (questState(state, id) || {}).done || 0));
   return !!last && !!state.clock && state.clock.day - last < SIDE_GAP;
+}
+/** 연계 퀘스트를 하나 끝내면 이만큼 날이 지나야 다음 연계가 열린다. */
+export const CHAIN_GAP = 1;
+/** 연계 퀘스트를 지금 새로 열 수 없는지: 하나를 하는 중이거나, 마지막으로 끝낸 지 CHAIN_GAP 일이 안 됐다. */
+export function chainBusy(state) {
+  const ids = Object.keys(QUESTS).filter((id) => QUESTS[id].chain);
+  if (ids.some((id) => isActive(state, id))) return true;
+  const last = Math.max(0, ...ids.map((id) => (questState(state, id) || {}).done || 0));
+  return !!last && !!state.clock && state.clock.day - last < CHAIN_GAP;
 }
 
 /** 그 단계를 받았을 때 세어 두는 값(사냥 · 풀 · 같이 하기는 그 뒤로 센다). */
@@ -600,6 +611,7 @@ function baseOffer(state, id, viaBoard = false) {
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
   if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;
   if (isStorySide(id) && sideBusy(state)) return false;
+  if (Q.chain && chainBusy(state)) return false;
   if (Q.needFriends && Object.entries(Q.needFriends).some(([k, n]) => hearts(friendOf(state, k)) < n)) return false; // 여럿과 다 친해야 열리는 이야기
   return hearts(friendOf(state, Q.giver)) >= (Q.needHearts || 0);
 }
