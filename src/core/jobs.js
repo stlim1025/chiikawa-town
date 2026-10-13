@@ -16,6 +16,8 @@ export const JOB_TYPES = {
   thorny3: { id: 'thorny3', title: '위험한 풀 3개 뽑기', kind: 'thorny', target: 3, base: 150, cleanBonus: 10, needGrade: 3, where: '마을 울타리 가, 숲' },
   reed5: { id: 'reed5', title: '물가 갈대 5개 뽑기', kind: 'reed', target: 5, base: 230, cleanBonus: 12, needGrade: 3, where: '남쪽 강가, 호숫가' },
   rockmoss4: { id: 'rockmoss4', title: '바위틈 이끼풀 4개 뽑기', kind: 'rockmoss', target: 4, base: 300, cleanBonus: 15, needGrade: 2, where: '북쪽 바위산' },
+  // 밤 노동: 서쪽 숲 빛나는 버섯 갓 위의 반짝 털뭉치(core/glowfluff.js) — 가장 밝을 때 떼면 깔끔하게
+  glow5: { id: 'glow5', title: '반짝 털뭉치 5개 따기', kind: 'glowfluff', target: 5, base: 240, cleanBonus: 12, needGrade: 4, where: '서쪽 숲 빛나는 버섯 (밤에만)' },
   moon3: { id: 'moon3', title: '달빛 풀 3개 뽑기', kind: 'moongrass', target: 3, base: 330, cleanBonus: 18, needGrade: 2, where: '숲, 바위산 (밤에만)' },
   giant2: { id: 'giant2', title: '왕잡초 2개 뽑기', kind: 'giantweed', target: 2, base: 420, cleanBonus: 30, needGrade: 1, where: '서쪽 숲 깊은 곳' },
   poison3: { id: 'poison3', title: '독풀 3개 뽑기', kind: 'poisonweed', target: 3, base: 450, cleanBonus: 25, needGrade: 1, where: '북쪽 바위산 깊은 곳' },

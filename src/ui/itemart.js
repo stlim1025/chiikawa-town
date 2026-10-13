@@ -51,6 +51,8 @@ export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"
 
 /** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */
 const EXTRA = {
+  // 반짝 털뭉치(밤 노동): 민들레 씨처럼 동그란 하얀 털뭉치, 노란 빛무리
+  glowfluff: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="14" ry="3.5" fill="#e6d8b8"/><circle cx="32" cy="31" r="22" fill="#fff3b8" opacity="0.55"/><circle cx="32" cy="31" r="15" fill="#ffffff" ${S}/><g stroke="#cdbb86" stroke-width="1.6" stroke-linecap="round"><path d="M32 20v4M32 38v4M21 31h4M39 31h4M24.5 23.5l2.8 2.8M36.7 35.7l2.8 2.8M39.5 23.5l-2.8 2.8M27.3 35.7l-2.8 2.8"/></g><circle cx="32" cy="31" r="4.2" fill="#ffe27a"/><circle cx="26" cy="25" r="2" fill="#fff" opacity="0.9"/></svg>`,
   // 별 조각: 별똥별맨이 남기고 간 노란 별, 반짝
   starshard: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="15" ry="4" fill="#e6d8b8"/>
     <path d="M32 9l6.5 13.5 15 2-11 10.5 3 15-13.5-7.5-13.5 7.5 3-15-11-10.5 15-2z" fill="#ffe23a" ${S}/>

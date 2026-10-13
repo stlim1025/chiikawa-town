@@ -11,7 +11,7 @@ import { JOB_TYPES } from './jobs.js';
  */
 export const DAILY_JOBS = {
   weed8: 5, clover6: 4, sticker10: 4, berry6: 4, // 5급(친구들도 목표를 위해 부지런히 받아 가니 넉넉히)
-  foxtail6: 2, vine4: 2, // 4급
+  foxtail6: 2, vine4: 2, glow5: 2, // 4급(반짝 털뭉치는 밤 노동)
   thorny3: 2, reed5: 2, // 3급
   rockmoss4: 2, moon3: 1, // 2급
   giant2: 1, poison3: 1, // 1급

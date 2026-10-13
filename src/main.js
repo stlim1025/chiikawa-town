@@ -45,6 +45,8 @@ import { TUTORIAL_LINES, HELP_TOPICS, tutorialActive, tutorialNext } from './cor
 import { createGuide } from './ui/guide.js';
 import { playSleep } from './ui/sleepfx.js';
 import { createBerries } from './world/berries.js';
+import { createGlowShrooms } from './world/glowshrooms.js';
+import { GLOW_CLEAN, glowResult, pickedTonight, markPicked } from './core/glowfluff.js';
 import { openSticker } from './ui/sticker.js';
 import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
@@ -171,6 +173,7 @@ function boot() {
   const cam = createFollowCamera(gfx.resize());
   const village = buildVillage(scene);
   const berries = createBerries(scene, village); // 잡초보다 먼저 심어서 잡초가 덤불을 피해 자란다
+  const glows = createGlowShrooms(scene, village); // 서쪽 숲 빛나는 버섯(밤에 반짝 털뭉치) — 잡초가 버섯 위에 돋지 않게 먼저
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
   // 가려진 몬스터 실루엣은 스텐실 버퍼로 '제 몸이 보이는 곳'을 빼고 칠한다. 기기 · 브라우저가 스텐실을 안 주면
@@ -1678,6 +1681,43 @@ function boot() {
     celebrateIfDone(before, state.job);
   }
 
+  /**
+   * 반짝 털뭉치 따기(밤, 서쪽 숲 빛나는 버섯 — core/glowfluff.js): 버섯 빛이 가장 밝을 때 누르면 깔끔하게, 적당히 밝으면 그냥 떼어지고,
+   * 어두울 때 누르면 털뭉치가 움찔해서 못 뗀다(기운은 안 든다, 빛이 돌아오면 다시). 일감이면 일감에, 아니면 가방에.
+   */
+  function pickGlow(s) {
+    const top = { x: s.x, y: 1.5, z: s.z };
+    player.face(s.x, s.z);
+    const res = glowResult(glows.glowOf(s));
+    if (res === 'startle') {
+      glows.startle(s);
+      sound.play('none');
+      hud.floatText({ ...top, text: '움찔! 빛이 밝을 때 살살', kind: 'tip' });
+      return;
+    }
+    if (state.stamina < WORK_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
+    const clean = res === 'clean', counted = jobKind() === 'glowfluff' && !isComplete(state.job);
+    let next = markPicked(useStamina(state, WORK_STAMINA).state, s.id);
+    if (counted) next = { ...next, job: recordPull(next.job, 'glowfluff', clean ? 'clean' : 'snapped') };
+    else {
+      const a = addItem(next, 'glowfluff', 1, clean ? 1 : 0); // 일감이 아니면 가방에(나중에 일감에 내거나 팔거나 선물)
+      if (!a.added) { hud.toast('가방이 꽉 찼어요'); return; }
+      next = a.state;
+      hud.bagBump();
+    }
+    const before = state.job;
+    glows.pick(s, player.position);
+    commit(next);
+    sound.play('clean');
+    player.cheerTime = clean ? 0.7 : 0;
+    hud.floatText({ ...top, text: clean ? '살살 땄다! 반짝' : '땄다!', kind: clean ? 'clean' : 'pick', icon: itemSvg('glowfluff') });
+    if (counted && !isComplete(state.job)) {
+      const prog = `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`;
+      setTimeout(() => hud.floatText({ ...top, y: 1.9, text: prog, kind: 'note' }), 350);
+    }
+    celebrateIfDone(before, state.job);
+  }
+
   // ---------- 풀 뽑기 ----------
   function beginPull(weed) {
     const W = WEED_KINDS[weed.kind];
@@ -1962,6 +2002,11 @@ function boot() {
       const b = berries.nearestReady(player.position.x, player.position.z, 60);
       if (b && Math.hypot(b.x - player.position.x, b.z - player.position.z) > 1.6) return { id: 'guide', x: b.x, y: 1.4, z: b.z, text: '열매!', kind: 'mark' };
     }
+    // 반짝 털뭉치 일감(밤): 가까운 빛나는 버섯 위에(털뭉치가 앉아 있는 것만)
+    if (kind === 'glowfluff' && player && !isComplete(state.job)) {
+      const s = glows.nearest(player.position.x, player.position.z, 60);
+      if (s && Math.hypot(s.x - player.position.x, s.z - player.position.z) > 1.8) return { id: 'guide', x: s.x, y: 1.8, z: s.z, text: '털뭉치!', kind: 'mark' };
+    }
     if (step === 'pull' && player) {
       const w = weeds.nearest(player.position.x, player.position.z, 40, 'weed');
       if (w && Math.hypot(w.x - player.position.x, w.z - player.position.z) > 1.4) return { id: 'guide', x: w.x, y: 1.1, z: w.z, text: '풀!', kind: 'mark' };
@@ -2039,6 +2084,7 @@ function boot() {
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
+    else if (target.type === 'glow') pickGlow(target.shroom);
     else if (target.type === 'wakeMp') wakeFriend(target);
     else if (target.type === 'mpTalk') talkToPlayer(target);
     else if (target.type === 'hostHome') enterHostHome();
@@ -2305,6 +2351,7 @@ function boot() {
   let cryFx = null, closeup = null; // cryFx: { n, t, crying } · closeup: { n, t, a(카메라가 오는 방향), fromPos, fromLook, out, outT }
   let cutscene = false; // 이야기 장면이라 화면 글을 숨긴 중(body.cutscene)
   let storyCam = false; // 이야기 카메라(잠옷 밤나들이 별 보기)를 쓰는 중: 끝나면 따라가기 카메라를 내 자리에 바로 붙인다
+  let glowMeter = false; // 털뭉치 앞이라 버섯 빛 게이지를 띄운 중
   /** 대사 줄의 연출 신호. */
   function storyCue(cue) {
     const F = cryFx;
@@ -4800,6 +4847,8 @@ function boot() {
     }
     const bush = berries.nearestReady(p.x, p.z, 1.4);
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
+    const shroom = glows.nearest(p.x, p.z, 1.5); // 밤: 빛나는 버섯 위 반짝 털뭉치
+    if (shroom) options.push({ d: Math.hypot(shroom.x - p.x, shroom.z - p.z) - 0.2, t: { type: 'glow', shroom, label: '털뭉치 따기' } });
     const npc = npcs.nearest(p.x, p.z, 1.6);
     // 퀘스트 표시(! · ?)가 뜬 친구는 가게 문 앞에 서 있어도 말 걸기가 먼저
     // 같이 토벌하다 쓰러진 친구: 가까이 가면 '깨우기'가 먼저
@@ -5021,6 +5070,7 @@ function boot() {
     if (!tg) return null;
     if (tg.type === 'weed') { const big = tg.weed.kind === 'giantweed'; return { x: tg.weed.x, z: tg.weed.z, r: big ? 0.75 : 0.5, y: big ? 2.0 : 1.05, id: 'w' + tg.weed.id }; }
     if (tg.type === 'berry') return { x: tg.bush.x, z: tg.bush.z, r: 0.75, y: 1.3, id: 'b' + tg.bush.x.toFixed(2) };
+    if (tg.type === 'glow') return { x: tg.shroom.x, z: tg.shroom.z, r: 0.8, y: 1.55, id: 'g' + tg.shroom.id };
     if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
@@ -5435,6 +5485,8 @@ function boot() {
     village.update(dt, player ? player.position : null, nearMonsters);
     weeds.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza });
     berries.update(dt);
+    // 빛나는 버섯: 밤이면 숨 쉬듯 빛나고 갓 위에 반짝 털뭉치(이번 밤에 뗀 것 빼고). 친구 마을에서는 털뭉치가 그 마을 주인 몫이라 안 보인다
+    glows.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza, picked: state ? pickedTonight(state) : [], guest: !!visiting });
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 · 쓰러짐 중에는 멈칫). 내 마을에 놀러 온 친구도 노린다
@@ -5480,6 +5532,11 @@ function boot() {
       // 무기를 들고 몬스터가 근처에 있으면(닿지 않아도) 휘두르기 버튼을 띄운다(휴대폰)
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
       hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
+      // 털뭉치 앞: 버섯 빛을 게이지로(바늘이 노란 칸 — 가장 밝을 때 — 에 오면 톡). 풀 뽑기 게이지와 같은 자리
+      if (target && target.type === 'glow' && !pulling) {
+        hud.showMeter(glows.glowOf(target.shroom), { from: GLOW_CLEAN, to: 1 }, [{ icon: itemSvg('glowfluff'), text: '빛이 가장 밝을 때 톡!' }]);
+        glowMeter = true;
+      } else if (glowMeter) { glowMeter = false; if (!pulling) hud.hideMeter(); }
       hud.render(state);
       updateExamPill();
       // 별똥별이 쏟아지는 밤: 처음 한 번 알리고, 화면 위쪽에 별똥별이 가끔 지나간다(소원을 빌면 하늘을 올려다본다)

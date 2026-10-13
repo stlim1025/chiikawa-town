@@ -16,7 +16,7 @@ export const LIKES = {
   chiikawa: ['tissue', 'cookies', 'candy', 'fruitbasket', 'hotpot'], // 울보라 휴지가 늘 필요하다 · 원작에서 추첨으로 받은 전골 세트
   hachiware: ['starshard', 'cookies', 'riceball', 'berry'],
   usagi: ['sweetroot', 'clover', 'pizzabun', 'riceball', 'katsucurry'], // 토끼라 당근 · 토끼풀, 먹성 좋아 든든한 음식
-  momonga: ['bigacorn', 'candy', 'cookies', 'starshard', 'pearl'], // 날다람쥐라 도토리, 응석받이라 단것 · 반짝이는 것
+  momonga: ['bigacorn', 'candy', 'cookies', 'starshard', 'pearl', 'glowfluff'], // 날다람쥐라 도토리, 응석받이라 단것 · 반짝이는 것
   kurimanju: ['bottlebeer', 'jellybake', 'jelly', 'shellsoup'],
   rakko: ['shellsoup', 'pearl', 'hotpot', 'horn'], // 해달이라 조개 · 진주, 토벌 고수라 전리품 뿔
   shisa: ['shellsoup', 'katsucurry', 'pizzabun', 'hotpot'],

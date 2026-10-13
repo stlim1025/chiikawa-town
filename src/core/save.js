@@ -12,6 +12,7 @@ import { isValidTools } from './tools.js';
 import { isValidWeedLog } from './weeding.js';
 import { isValidBag } from './inventory.js';
 import { isValidStorage } from './storage.js';
+import { isValidGlowfluff } from './glowfluff.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep } from './quests.js';
@@ -57,6 +58,7 @@ export function isValidState(s) {
   if (s.weedLog !== undefined && !isValidWeedLog(s.weedLog)) return false; // 풀 도감(2단계부터)
   if (s.bag !== undefined && !isValidBag(s.bag)) return false; // 가방
   if (s.storage !== undefined && !isValidStorage(s.storage)) return false; // 집 보관 상자
+  if (s.glowfluff !== undefined && !isValidGlowfluff(s.glowfluff)) return false; // 이번 밤에 뗀 반짝 털뭉치
   if (s.wardrobe !== undefined && !isValidWardrobe(s.wardrobe)) return false; // 꾸미기 소품
   if (s.weapon !== undefined && !isValidWeapon(s.weapon)) return false; // 무기(4단계)
   if (s.hunted !== undefined && !isValidHunted(s.hunted)) return false; // 잡은 몬스터 수
