@@ -710,6 +710,7 @@ function boot() {
     commit({ ...state, money: state.money - pay });
     sound.play('coin');
     visiting.worksPaid = { ...(visiting.worksPaid || {}), [a.id]: Math.min(W.price, ((visiting.worksPaid || {})[a.id] || 0) + n) };
+    if (a.full) visiting.works = { ...(visiting.works || {}), [a.id]: 'building' }; // 내가 다 채웠다: 주인의 다음 마을 모습을 기다리지 않고 공사 중 울타리를 바로
     const chips = [{ icon: 'coin', text: `−${won(pay)}` }];
     if (a.full) { player.cheerTime = 1.0; hud.toast(`${host}네 ${josa(W.name, '이/가')} 다 모였어요! 내일 아침에 생겨요`, 3600, { chips }); }
     else hud.toast(`${host}네 ${W.name}에 보탰어요`, 2200, { chips });

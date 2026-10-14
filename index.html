@@ -1112,6 +1112,8 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .work-bar i { display: block; height: 100%; border-radius: 999px; background: var(--mint-deep); }
 .work-sum { margin-top: 2px; font-size: 14px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .work-btns { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+/* 포셰트 줄의 가운데 칸 규칙(.panel .row.pochette > div: 줄어들 수 있음)이 단추 칸까지 줄여 「다 내기 28,000원」 글자가 단추 밖으로 나왔다: 단추 칸은 글자만큼 */
+.panel .row.pochette > .work-btns { flex: 0 0 auto; }
 .work-btns .btn { white-space: nowrap; }
 .panel .row.pochette.work.done { background: var(--mint); }
 .work-level { display: flex; align-items: center; gap: 12px; margin: 6px 8px 4px; font-size: 18px; }
@@ -1583,8 +1585,9 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest-over::after { content: "▸"; font-size: 12px; line-height: 1; }
 .hud-quest-over:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
 .hud-quest-over[hidden] { display: none; }
-/* 새 버전 알림 띠(src/ui/update.js): 화면 위 가운데. 「새로고침」은 저장하고 새로고침, 「나중에」는 닫기. 연출 중에는 숨긴다 */
-.update-bar { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 16px; border-radius: 999px; background: var(--paper); box-shadow: 0 3px 0 var(--shadow), 0 6px 18px rgba(0, 0, 0, 0.12); color: var(--ink); font-size: 15px; white-space: nowrap; }
+/* 새 버전 알림 띠(src/ui/update.js): 화면 위 가운데. 「새로고침」은 저장하고 새로고침, 「나중에」는 닫기. 연출 중에는 숨긴다.
+   쌓임 순서는 화면 요소 차례대로(HUD 보다 위, 나중에 열리는 창 아래 — 창 제목을 가리지 않게) */
+.update-bar { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 16px; border-radius: 999px; background: var(--paper); box-shadow: 0 3px 0 var(--shadow), 0 6px 18px rgba(0, 0, 0, 0.12); color: var(--ink); font-size: 15px; white-space: nowrap; }
 .update-bar[hidden] { display: none; }
 .update-bar button { font: inherit; font-size: 14px; border: 2px solid #fff; border-radius: 999px; padding: 3px 12px 5px; cursor: pointer; }
 .update-bar .ub-go { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); }
