@@ -1659,11 +1659,11 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .q-card.locked .q-face { filter: grayscale(0.8); }
 .q-bar { height: 10px; margin-top: 5px; padding: 2px; border-radius: 999px; background: var(--paper-3); }
 .q-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(#ffd77a, #f2a65a); }
-/* PC: 왼쪽 위 퀘스트 쪽지를 크게 */
-[data-input="desk"] .hud-quest { max-width: min(520px, 46vw); gap: 2px 10px; padding: 7px 20px 9px 12px; }
-[data-input="desk"] .hud-quest i { padding: 2px 10px 3px; font-size: 16px; }
-[data-input="desk"] .hud-quest b { font-size: 20px; }
-[data-input="desk"] .hud-quest > span { font-size: 18px; }
+/* PC: 왼쪽 위 퀘스트 쪽지 — 글 크기는 사이드스토리 쪽지와 같게(부탁 쪽지만 튀어 보이지 않게) */
+[data-input="desk"] .hud-quest { max-width: min(440px, 36vw); gap: 1px 9px; padding: 5px 16px 7px 10px; }
+[data-input="desk"] .hud-quest i { padding: 1px 9px 2px; font-size: 14px; }
+[data-input="desk"] .hud-quest b { font-size: 17px; }
+[data-input="desk"] .hud-quest > span { font-size: 15px; }
 /* 사이드스토리 쪽지는 작게: 꼬리표는 책 그림 하나(제목 옆), 글은 한 단계 작게 — 목표가 길어 화면을 많이 가리지 않게 */
 .hud-quest.side { max-width: min(300px, 62vw); padding: 4px 12px 6px 8px; }
 .hud-quest.side i { display: grid; place-items: center; width: 26px; height: 22px; padding: 0; }
