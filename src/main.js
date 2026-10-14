@@ -5837,13 +5837,13 @@ function boot() {
     if (tg.type === 'wakeMp') return { x: tg.x, z: tg.z, r: 0.6, y: 1.1, id: 'mpw' + tg.id }; // 같이 놀기: 쓰러진 친구
     if (tg.type === 'mpTalk') return { x: tg.x, z: tg.z, r: 0.55, y: 1.55, id: 'mpt' + tg.id }; // 같이 놀기: 다른 사람에게 말 걸기
     if (tg.type === 'hostHome') { const s = village.spots.home; return { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'phostHome' }; }
-    if (tg.type === 'fish' || tg.type === 'noRod') return { x: tg.spot.x, z: tg.spot.z, r: 0.55, y: 0.9, id: 'fish' }; // 낚시: 찌가 떨어질 물 위에 고리 · 안내
+    if (tg.type === 'fish' || tg.type === 'noRod') return { x: player.position.x, z: player.position.z, r: 0.5, y: 1.45, id: 'fish', noRing: true }; // 낚시: 물가에 서면 내 머리 위에 안내만(물 위 고리는 없다)
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }
   function showTargetCue() {
     const sp = targetSpot(target);
-    cue.visible = !!sp;
+    cue.visible = !!sp && !sp.noRing; // 낚시처럼 고리 없이 안내만 띄우는 대상도 있다
     if (!sp) return null;
     const pulse = 1 + 0.07 * Math.sin(t * 6);
     cue.material.color.set(sp.foe ? 0xff6b5b : 0xfcd95b); // 공격할 몬스터는 붉은 고리
