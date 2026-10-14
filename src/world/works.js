@@ -41,19 +41,24 @@ export function createWorks(village) {
   const circle = (g, lx, lz, r) => ({ ...at(g, lx, lz), r });
   const box = (g, lx, lz, hx, hz) => ({ ...at(g, lx, lz), box: { hx, hz, yaw: g.rotation.y } });
 
-  /** 광장 꽃밭: 돌 테두리 안 흙에 잎 덤불 넷과 색색 꽃 열한 송이. */
+  /** 광장 꽃밭: 땅에 박힌 납작한 돌멩이 테두리 안에 봉긋한 흙, 잎 덤불 다섯과 색색 꽃 열한 송이(높은 돌 화분이 아니라 땅에 붙은 화단). */
   function flowerBed({ x, z }, i, obs) {
-    const g = unit(x, z);
-    part(g, GEO.cylinder, '#d9cfc0', { scale: [0.85, 0.26, 0.85] });
-    part(g, GEO.cylinder, '#8a6a4a', { scale: [0.74, 0.24, 0.74], outline: false, shadow: false });
-    for (let k = 0; k < 4; k++) {
-      const a = k * 1.57 + 0.4 + i;
-      part(g, GEO.sphere, '#7cc46a', { position: [Math.cos(a) * 0.42, 0.26, Math.sin(a) * 0.42], scale: [0.2, 0.09, 0.2], outline: 0.012, shadow: false });
+    const g = unit(x, z), MOUND = 0.72;
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2 + i * 0.3;
+      part(g, GEO.sphere, k % 2 ? '#b9ad9a' : '#a69884', { position: [Math.cos(a) * 0.8, 0.03, Math.sin(a) * 0.8], rotation: [0, -a, 0], scale: [0.11, 0.07, 0.15], outline: 0.01, shadow: false });
+    }
+    part(g, GEO.cylinder, '#6e4a2e', { scale: [0.78, 0.04, 0.78], outline: false, shadow: false });
+    part(g, GEO.sphere, '#7d5535', { position: [0, 0.04, 0], scale: [MOUND, 0.1, MOUND], outline: false, shadow: false });
+    const soil = (r) => 0.04 + 0.1 * Math.sqrt(Math.max(0, 1 - (r / MOUND) ** 2)); // 흙 더미 겉 높이
+    for (let k = 0; k < 5; k++) {
+      const a = k * 1.26 + 0.4 + i;
+      part(g, GEO.sphere, '#7cc46a', { position: [Math.cos(a) * 0.45, soil(0.45), Math.sin(a) * 0.45], scale: [0.18, 0.08, 0.18], outline: 0.012, shadow: false });
     }
     for (let k = 0; k < 11; k++) {
-      const a = k * 2.4 + i, r = k === 0 ? 0 : 0.2 + 0.42 * Math.sqrt(k / 10), fx = Math.cos(a) * r, fz = Math.sin(a) * r;
-      part(g, GEO.box, '#5fa04f', { position: [fx, 0.3, fz], scale: [0.02, 0.12, 0.02], outline: false, shadow: false });
-      part(g, GEO.sphere, FLOWER_COLORS[(k + i) % FLOWER_COLORS.length], { position: [fx, 0.39, fz], scale: [0.085, 0.06, 0.085], outline: 0.01, shadow: false });
+      const a = k * 2.4 + i, r = k === 0 ? 0 : 0.18 + 0.4 * Math.sqrt(k / 10), fx = Math.cos(a) * r, fz = Math.sin(a) * r, y = soil(r);
+      part(g, GEO.box, '#5fa04f', { position: [fx, y + 0.07, fz], scale: [0.02, 0.14, 0.02], outline: false, shadow: false });
+      part(g, GEO.sphere, FLOWER_COLORS[(k + i) % FLOWER_COLORS.length], { position: [fx, y + 0.16, fz], scale: [0.085, 0.06, 0.085], outline: 0.01, shadow: false });
     }
     obs.push(circle(g, 0, 0, 0.85));
     return finish(g);
