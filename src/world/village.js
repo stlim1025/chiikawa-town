@@ -608,6 +608,7 @@ export function buildVillage(scene) {
   // ---------- 마을 울타리: 동그랗게 두르고 문 넷만 비운다 ----------
   const RING = VILLAGE_R + 0.5;
   const nearGate = (x, z) => Object.values(GATES).some((g) => Math.hypot(x - (g.x * RING) / VILLAGE_R, z - (g.z * RING) / VILLAGE_R) < GATE_HALF - 0.45); // 문 기둥 바로 옆까지 막는다
+  const fenceParts = []; // 나무 울타리(기둥 · 가로대): 마을 가꾸기 '든든한 돌담'이 생기면 숨긴다(world/works.js)
   {
     const posts = [], rails = [], UP = new THREE.Vector3(0, 1, 0);
     const steps = Math.round((Math.PI * 2 * RING) / 1.6);
@@ -624,8 +625,8 @@ export function buildVillage(scene) {
       }
       prev = { x, z };
     }
-    world.add(toonInstances(GEO.box, '#efdbbb', posts, { shell: true }));
-    world.add(toonInstances(GEO.box, '#efdbbb', rails, { shell: true, shadow: false }));
+    fenceParts.push(toonInstances(GEO.box, '#efdbbb', posts, { shell: true }), toonInstances(GEO.box, '#efdbbb', rails, { shell: true, shadow: false }));
+    fenceParts.forEach((g) => world.add(g));
     const n = Math.round((Math.PI * 2 * RING) / 0.8);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2, x = Math.sin(a) * RING, z = Math.cos(a) * RING;
@@ -882,6 +883,8 @@ export function buildVillage(scene) {
     lamp: (x, z) => lamp(x, z),
     /** 글씨 간판 재질(다른 간판처럼 밤에는 어두워진다). opts: signTexture 와 같다. */
     signMaterial(text, opts) { const m = new THREE.MeshBasicMaterial({ map: signTexture(text, opts) }); signs.push(m); return m; },
+    /** 나무 울타리 묶음(마을 가꾸기 '든든한 돌담'이 생기면 숨긴다). */
+    fence: fenceParts,
     /** 장애물이 생기거나 꺼졌을 때(마을 가꾸기 시설): 길찾기 격자를 처음부터 다시 본다. */
     refreshNav() { nav.fill(0); },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */

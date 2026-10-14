@@ -1114,6 +1114,9 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .work-btns { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .work-btns .btn { white-space: nowrap; }
 .panel .row.pochette.work.done { background: var(--mint); }
+.work-level { display: flex; align-items: center; gap: 12px; margin: 6px 8px 4px; font-size: 18px; }
+.work-level .work-bar { flex: 1 1 auto; height: 12px; margin-top: 0; }
+.work-level .work-bar i { background: linear-gradient(90deg, #9fdc7f, var(--mint-deep)); }
 @media (max-width: 480px) { .panel .row.pochette > .work-btns { margin-left: auto; flex-direction: row; } }
 
 /* 포셰트 가게: 포셰트 그림 + 이름 · 값 + 버튼, 메는 중인 줄은 노랗게 */

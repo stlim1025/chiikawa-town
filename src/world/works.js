@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { toonMaterial, toonMesh, GEO } from '../render/toon.js';
+import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
 import { mergeUnit } from '../render/batch.js';
-import { WORK_IDS, WORK_SPOTS, outerLampSpots } from '../core/works.js';
+import { WORK_IDS, WORK_SPOTS, WORK_SIGNS, outerLampSpots, pavedStrips } from '../core/works.js';
+import { PLAZA, VILLAGE_R, GATES, GATE_HALF } from '../core/layout.js';
 import { hourOf } from '../core/clock.js';
 
 const PYRAMID = new THREE.ConeGeometry(1, 1, 4).translate(0, 0.5, 0).rotateY(Math.PI / 4); // 네모 지붕(면이 앞 · 옆을 본다)
@@ -140,21 +141,128 @@ export function createWorks(village) {
     return finish(g);
   }
 
+  /** 돌 포장 무늬(캔버스): 엇갈려 쌓은 둥근 네모 돌 네 줄, 돌마다 조금씩 다른 밝기와 윗면 반짝, 사이는 진한 줄눈. 되풀이해 깐다. */
+  function stoneTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d'), tones = ['#e6dfcf', '#dcd3c0', '#d2c9b4', '#ebe5d7', '#d8cdb6'];
+    const box = (x, y, w, h, r) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); g.fill(); };
+    g.fillStyle = '#a99e8b';
+    g.fillRect(0, 0, 128, 128);
+    for (let row = 0; row < 4; row++) {
+      for (let col = -1; col < 4; col++) {
+        const x = col * 32 + (row % 2 ? 16 : 0), y = row * 32;
+        g.fillStyle = tones[(((row * 3 + col * 7) % tones.length) + tones.length) % tones.length];
+        box(x + 2.5, y + 2.5, 27, 27, 7);
+        g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        box(x + 6, y + 5, 12, 4, 2);
+      }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  }
+  const TILE = 1.1; // 돌 무늬 한 장이 덮는 크기(m)
+  const tileUv = (geo, su, sv) => { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); return geo; };
+  /** 돌길 포장: 마을 안 길마다 돌 무늬 판(흙길 위에 살짝 띄운다), 광장은 둥근 돌 마당에 진한 돌 테두리와 가운데 둥근 무늬. */
+  function paving() {
+    const mat = toonMaterial('#ffffff', { unique: true });
+    mat.map = stoneTexture();
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -1;
+    mat.polygonOffsetUnits = -4;
+    const out = [];
+    const add = (m) => { m.receiveShadow = true; village.group.add(m); out.push(m); return m; };
+    pavedStrips().forEach((s, i) => {
+      const m = add(new THREE.Mesh(tileUv(new THREE.PlaneGeometry(s.w, s.len).rotateX(-Math.PI / 2), s.w / TILE, s.len / TILE), mat));
+      m.position.set(s.x, 0.018 + i * 0.002, s.z); // 겹치는 네거리에서 깜빡이지 않게 판마다 조금씩 높이를 달리
+      m.rotation.y = s.yaw;
+    });
+    const R = PLAZA.r + 0.25, flat = (geo) => geo.rotateX(-Math.PI / 2);
+    add(new THREE.Mesh(tileUv(flat(new THREE.CircleGeometry(R, 56)), (2 * R) / TILE, (2 * R) / TILE), mat)).position.set(PLAZA.x, 0.034, PLAZA.z);
+    add(toonMesh(flat(new THREE.RingGeometry(R, R + 0.32, 56)), '#a99d88', { outline: false, shadow: false })).position.set(PLAZA.x, 0.04, PLAZA.z);
+    add(toonMesh(flat(new THREE.RingGeometry(1.15, 1.45, 40)), '#c9b48e', { outline: false, shadow: false })).position.set(PLAZA.x, 0.042, PLAZA.z);
+    add(toonMesh(flat(new THREE.CircleGeometry(0.55, 32)), '#e3b5ad', { outline: false, shadow: false })).position.set(PLAZA.x, 0.042, PLAZA.z);
+    return out;
+  }
+
+  /**
+   * 든든한 돌담: 나무 울타리 자리(마을 둘레)를 따라 두 가지 빛깔이 번갈아 드는 돌벽과 덮개돌, 세 마디마다와 끝마다 돌기둥,
+   * 문 넷 양옆에는 금빛 구슬을 얹은 큰 돌기둥. 둘레 장애물은 나무 울타리 것을 그대로 쓰고, 문 옆 큰 기둥만 더 막는다.
+   */
+  function stoneWall(obs) {
+    const RING = VILLAGE_R + 0.5, steps = Math.round((Math.PI * 2 * RING) / 1.6), UP = new THREE.Vector3(0, 1, 0);
+    const nearGate = (x, z) => Object.values(GATES).some((g) => Math.hypot(x - (g.x * RING) / VILLAGE_R, z - (g.z * RING) / VILLAGE_R) < GATE_HALF - 0.45);
+    const M = (x, y, z, yaw, sx, sy, sz) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, sy, sz));
+    const pts = [];
+    for (let i = 0; i <= steps; i++) { const a = (i / steps) * Math.PI * 2; pts.push({ x: Math.sin(a) * RING, z: Math.cos(a) * RING, a, gap: false }); }
+    pts.forEach((p) => { p.gap = nearGate(p.x, p.z); });
+    const walls = [[], []], caps = [], pillars = [], pcaps = [];
+    pts.forEach((p, i) => {
+      if (p.gap) return;
+      const prev = pts[i - 1], next = pts[i + 1];
+      if (prev && !prev.gap) {
+        const len = Math.hypot(p.x - prev.x, p.z - prev.z) + 0.04, yaw = Math.atan2(p.x - prev.x, p.z - prev.z), cx = (prev.x + p.x) / 2, cz = (prev.z + p.z) / 2;
+        walls[i % 2].push(M(cx, 0.3, cz, yaw, 0.34, 0.6, len));
+        caps.push(M(cx, 0.64, cz, yaw, 0.44, 0.09, len));
+      }
+      if (i % 3 === 0 || !prev || prev.gap || !next || next.gap) {
+        pillars.push(M(p.x, 0.45, p.z, p.a, 0.46, 0.9, 0.46));
+        pcaps.push(M(p.x, 0.95, p.z, p.a, 0.56, 0.1, 0.56));
+      }
+    });
+    // 문 양옆 큰 돌기둥(문을 돌린 방향 = 둘레 접선)
+    const gp = [], gcap = [], gball = [];
+    for (const G of Object.values(GATES)) {
+      const r = Math.hypot(G.x, G.z), tx = -G.z / r, tz = G.x / r, yaw = Math.atan2(G.x, G.z);
+      for (const sd of [-1, 1]) {
+        const x = G.x + tx * sd * 2.05, z = G.z + tz * sd * 2.05;
+        gp.push(M(x, 0.75, z, yaw, 0.62, 1.5, 0.62));
+        gcap.push(M(x, 1.54, z, yaw, 0.76, 0.12, 0.76));
+        gball.push(M(x, 1.72, z, 0, 0.15, 0.15, 0.15));
+        obs.push({ x, z, r: 0.38 });
+      }
+    }
+    const out = [
+      toonInstances(GEO.box, '#d6cfbf', walls[0], { shell: true }),
+      toonInstances(GEO.box, '#c9c0ac', walls[1], { shell: true }),
+      toonInstances(GEO.box, '#ece6d8', caps, { shell: true, shadow: false }),
+      toonInstances(GEO.box, '#bfb5a0', pillars, { shell: true }),
+      toonInstances(GEO.box, '#ece6d8', pcaps, { shell: true, shadow: false }),
+      toonInstances(GEO.box, '#b7ac96', gp, { shell: true }),
+      toonInstances(GEO.box, '#ece6d8', gcap, { shell: true, shadow: false }),
+      toonInstances(GEO.sphere, '#f6c453', gball, { outline: 0.02, shadow: false })
+    ];
+    out.forEach((g) => village.group.add(g));
+    return out;
+  }
+
   /** 시설마다: 만들어서 { groups, obs } (장애물은 마을 장애물에 넣는다). */
   const BUILD = {
     flowers: (obs) => WORK_SPOTS.flowers.map((p, i) => flowerBed(p, i, obs)),
     benches: (obs) => WORK_SPOTS.benches.map((p) => parkBench(p, obs)),
     clock: (obs) => [clockTower(WORK_SPOTS.clock[0], obs)],
     pavilion: (obs) => [pavilion(WORK_SPOTS.pavilion[0], obs)],
-    lamps: (obs) => lampSpots.map((p) => { const l = village.lamp(p.x, p.z); obs.push(l.obstacle); return l.group; })
+    lamps: (obs) => lampSpots.map((p) => { const l = village.lamp(p.x, p.z); obs.push(l.obstacle); return l.group; }),
+    roads: () => paving(),
+    fence: (obs) => stoneWall(obs)
   };
-  const signSpot = (id) => (id === 'lamps' ? lampSpots[0] : WORK_SPOTS[id][0]);
+  /** 공사 중 간판 자리: 바깥 가로등은 첫 가로등 자리, 돌길 · 돌담은 정해 둔 자리, 나머지는 시설 자리. */
+  const signSpot = (id) => (id === 'lamps' ? lampSpots[0] : WORK_SIGNS[id] || WORK_SPOTS[id][0]);
   function make(fn) {
     const obs = [], groups = fn(obs);
     for (const o of obs) if (!village.obstacles.list.includes(o)) village.obstacles.push(o);
-    return { groups, obs };
+    return { groups, obs, hide: [] };
   }
-  const setOn = (w, on) => { if (!w) return; w.groups.forEach((g) => { g.visible = on; }); w.obs.forEach((o) => { o.off = !on; }); };
+  /** 보이기 · 숨기기: 시설과 그 장애물, 그리고 시설이 바꿔 놓는 원래 것(돌담이면 나무 울타리)은 거꾸로. */
+  const setOn = (w, on) => {
+    if (!w) return;
+    w.groups.forEach((g) => { g.visible = on; });
+    w.obs.forEach((o) => { o.off = !on; });
+    w.hide.forEach((g) => { g.visible = !on; });
+  };
 
   return {
     /** 바깥 길 가로등 자리(테스트 · 확인용). */
@@ -167,7 +275,10 @@ export function createWorks(village) {
         if ((shown[id] || null) === want) continue;
         shown[id] = want;
         changed = true;
-        if (want === 'open' && !built[id]) built[id] = make(BUILD[id]);
+        if (want === 'open' && !built[id]) {
+          built[id] = make(BUILD[id]);
+          if (id === 'fence') built[id].hide = village.fence || []; // 돌담이 서면 나무 울타리는 걷는다
+        }
         if (want === 'building' && !marks[id]) marks[id] = make((obs) => [workSign(signSpot(id), obs)]);
         setOn(built[id], want === 'open');
         setOn(marks[id], want === 'building');

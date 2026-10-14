@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORKS, WORK_IDS, WORK_SPOTS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, workStatus, workOf, leftOf, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks } from '../src/core/works.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, WORK_SIGNS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, pavedStrips, workStatus, workOf, leftOf, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks } from '../src/core/works.js';
+import { WORK_NEAR, WORK_CHAT, HOME_CHAT, nearWorkLine, upgradeChat } from '../src/core/upgradetalk.js';
 import { LOTS, VILLAGE_R, doorSpot, inDoorLane, lotById, lotRadius, roadDist, shoreDist, lairReach, lampSpots } from '../src/core/layout.js';
 import { createObstacleIndex } from '../src/core/obstacles.js';
 import { createState } from '../src/core/state.js';
@@ -115,6 +116,38 @@ test('장애물: off 인 것은 없는 것으로 친다(숨긴 마을 가꾸기 
   o.off = true;
   assert.equal(ix.hits(0, 0, 0.3), false);
   assert.equal(ix.pushOut(0.5, 0, 0.3), null);
+});
+
+test('마을 가꾸기: 돌길은 마을 안 길 넷을 덮고, 돌길 · 돌담에는 공사 중 간판 자리가 있다', () => {
+  const strips = pavedStrips();
+  assert.ok(strips.length >= 4);
+  for (const s of strips) {
+    assert.ok(Math.hypot(s.x, s.z) < VILLAGE_R && s.len > 10 && s.w > 1, s.id);
+    for (const k of [-0.5, 0.5]) assert.ok(Math.hypot(s.x + Math.sin(s.yaw) * s.len * k, s.z + Math.cos(s.yaw) * s.len * k) <= VILLAGE_R + 1e-6, `${s.id} 끝은 울타리 안`);
+  }
+  for (const id of ['roads', 'fence']) {
+    assert.ok(WORKS[id] && WORK_SIGNS[id], id);
+    assert.ok(Math.hypot(WORK_SIGNS[id].x, WORK_SIGNS[id].z) < VILLAGE_R - 2, `${id} 간판은 마을 안`);
+  }
+});
+
+test('마을 가꾸기: 시설마다 마을 친구 여섯이 곁에서 · 이야기로 하는 말이 있고, 집 이야기도 한다', () => {
+  const kinds = Object.keys(VILLAGERS);
+  const clean = (line, where) => {
+    assert.ok(typeof line === 'string' && line.length && line.length <= 30, `${where}: ${line}`);
+    assert.ok(!line.includes('·') && !/[^.…]\.(\s|$)/.test(line), `${where}: ${line}`);
+  };
+  for (const id of WORK_IDS) for (const k of kinds) { clean(WORK_NEAR[id][k], `near ${id} ${k}`); clean(WORK_CHAT[id][k], `chat ${id} ${k}`); assert.equal(nearWorkLine(k, id), WORK_NEAR[id][k]); }
+  for (const what of ['expand', 'decor']) for (const k of kinds) clean(HOME_CHAT[what][k], `home ${what} ${k}`);
+  assert.equal(upgradeChat('hachiware', {}), null, '아무것도 없으면 할 말이 없다');
+  assert.equal(upgradeChat('hachiware', { open: ['roads'] }, () => 0), WORK_CHAT.roads.hachiware);
+  assert.equal(upgradeChat('rakko', { expanded: true }, () => 0), HOME_CHAT.expand.rakko);
+  for (const k of kinds) for (const type of ['playerHome', 'playerDecor']) {
+    const ev = { type, who: 'me', home: '넓은 방', item: '벚꽃 벽지' };
+    clean(V.praiseLine(k, ev, '승택'), `praise ${type} ${k}`);
+    clean(V.gossipLine(k, ev, '승택'), `gossip ${type} ${k}`);
+  }
+  assert.equal(V.newsLine({ type: 'playerHome', who: 'me', home: '큰 방' }, '승택').text, '승택이 집을 큰 방으로 넓혔어요');
 });
 
 test('마을 가꾸기: 친구들이 새 시설 이야기를 한다(칭찬 · 소문 · 소식)', () => {

@@ -89,7 +89,7 @@ import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, roadDist, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish } from './core/fishing.js';
@@ -99,7 +99,8 @@ import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
-import { WORKS, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks } from './core/works.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, donate, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks } from './core/works.js';
+import { nearWorkLine, upgradeChat } from './core/upgradetalk.js';
 import { createWorks } from './world/works.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
@@ -1314,6 +1315,7 @@ function boot() {
       commit(r.state);
       sound.play(r.bought ? 'coin' : 'click');
       hud.toast(r.bought ? `${josa(D.name, '을/를')} 샀어요! 집에 들어가면 보여요` : `${josa(D.name, '으로/로')} 바꿨어요`, 2600);
+      if (r.bought) happen({ type: 'playerDecor', who: 'me', item: D.name }); // 새로 산 벽지 · 바닥은 마을 친구들이 듣고 이야기한다
       if (paid) gotTicket(paid);
     },
     // 부동산
@@ -1522,6 +1524,7 @@ function boot() {
       commit(r.state);
       const G = gridOf(homeOf(r.state));
       hud.banner('집이 넓어졌어요!', `${G.name}, 가구 놓을 칸이 ${G.cols * G.rows}칸이 됐어요`, 3400);
+      happen({ type: 'playerHome', who: 'me', home: G.name }); // 마을 친구들이 듣고 이야기한다
       sound.play('done');
       player.cheerTime = 1.6;
     },
@@ -2733,7 +2736,12 @@ function boot() {
         const saving = g && savingLine(n.kind, g, villagerOf(state, n.kind, state.clock.day).money);
         if (st && Math.random() < 0.7) { mindOf(n.kind).told.add(st.ev); minds[n.kind] = satisfy(mindOf(n.kind), 'greet'); sayAs(n, [st.line], () => reward(n, 'talk')); }
         else if (saving && Math.random() < 0.6) { m.savedDay = state.clock.day; sayAs(n, [saving], () => reward(n, 'talk')); }
-        else sayAs(n, chatFor(n.kind, h), () => reward(n, 'talk'));
+        else {
+          // 마을 가꾸기 시설 · 넓힌 집 · 새로 꾸민 방이 있으면 가끔 그 이야기(core/upgradetalk.js)
+          const home = homeOf(state), dc = decorOf(home);
+          const up = VILLAGERS[n.kind] && Math.random() < 0.4 ? upgradeChat(n.kind, { open: WORK_IDS.filter((id) => workStatus(state, id) === 'open'), expanded: sizeOf(home) > 0, decorated: dc.wall !== 'cream' || dc.floor !== 'wood' }) : null;
+          sayAs(n, up ? [up] : chatFor(n.kind, h), () => reward(n, 'talk'));
+        }
       }
       else if (k === 'gift') { giftFor = n; panels.openGift({ kind: n.kind, name: FRIENDS[n.kind].name }); } // 친구는 기다리고(talking), 주머니에서 고른다
       else if (k === 'party') askParty(n);
@@ -3099,6 +3107,33 @@ function boot() {
       hud.announce({ kicker, title: QUESTS[id].title, sub: `${to ? to.name : ''}에게 ${verb}`, to: 'quest', id });
     }
   }
+  /** 그 자리(x, z)가 생긴 시설 곁인지: 돌길은 마을 안 길 위, 돌담은 울타리 가, 가로등은 바깥 가로등 둘레, 나머지는 시설 자리 둘레. */
+  function nearWork(id, x, z) {
+    if (id === 'roads') return Math.hypot(x, z) < VILLAGE_R - 1 && roadDist(x, z) < 0.3;
+    if (id === 'fence') { const r = Math.hypot(x, z); return r > VILLAGE_R - 3.5 && r < VILLAGE_R + 3; }
+    if (id === 'lamps') return works.lampSpots.some((q) => Math.hypot(q.x - x, q.z - z) < 3);
+    return (WORK_SPOTS[id] || []).some((q) => Math.hypot(q.x - x, q.z - z) < 3.2);
+  }
+  // 마을 친구가 생긴 시설 곁을 지나면 가끔 혼잣말(말풍선, core/upgradetalk.js). 6초마다 한 친구까지, 같은 친구는 90초 쉰다
+  let chatterT = 0;
+  const chatterAt = new Map();
+  function worksChatter() {
+    chatterT -= 0.3;
+    if (chatterT > 0 || visiting) return;
+    chatterT = 6;
+    const open = WORK_IDS.filter((id) => workStatus(state, id) === 'open');
+    if (!open.length) return;
+    const p = player.position, now = performance.now() / 1000;
+    for (const n of npcs.list) {
+      if (!VILLAGERS[n.kind] || n.away || n.bubble || n === talking || Math.hypot(n.x - p.x, n.z - p.z) > 14) continue;
+      if (now - (chatterAt.get(n.kind) ?? -1e9) < 90 || Math.random() > 0.4) continue;
+      const id = open.find((w) => nearWork(w, n.x, n.z)), line = id && nearWorkLine(n.kind, id);
+      if (!line) continue;
+      npcs.say(n, line);
+      chatterAt.set(n.kind, now);
+      return;
+    }
+  }
   /** 마을 가꾸기(core/works.js): 다 모인 다음 날 아침 시설이 생기면 한 번 알린다(마을 친구들도 이야기한다). */
   function checkWorks() {
     const due = dueWorks(state);
@@ -3131,6 +3166,7 @@ function boot() {
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
     if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
     if (free && !talking) checkWorks();
+    if (!talking) worksChatter();
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
       commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
       hud.toast('라멘 로우에 새 메뉴가 나왔대요!', 4200, { chips: [{ icon: itemSvg('pizzabun'), text: '피자호빵' }] });

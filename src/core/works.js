@@ -11,7 +11,9 @@ export const WORKS = {
   benches: { name: '연못 쉼터', price: 6000, note: '연못가에 나무 벤치 둘이 놓여요' },
   lamps: { name: '바깥 길 가로등', price: 12000, note: '마을 밖 큰길에도 밤이면 불이 켜져요' },
   clock: { name: '마을 시계탑', price: 20000, note: '동쪽 문 옆에서 마을 시각을 알려 줘요' },
-  pavilion: { name: '강가 정자', price: 30000, note: '남쪽 강가에 쉬어 가는 정자가 생겨요' }
+  roads: { name: '돌길 포장', price: 25000, note: '마을 안 흙길과 광장이 반듯한 돌길이 돼요' },
+  pavilion: { name: '강가 정자', price: 30000, note: '남쪽 강가에 쉬어 가는 정자가 생겨요' },
+  fence: { name: '든든한 돌담', price: 40000, note: '나무 울타리가 돌담이 되고 문 옆에 돌기둥이 서요' }
 };
 export const WORK_IDS = Object.keys(WORKS);
 
@@ -25,6 +27,23 @@ export const WORK_SPOTS = {
   clock: [{ x: 22, z: -6, yaw: 0 }],
   pavilion: [{ x: 8, z: 31.5, yaw: 0 }]
 };
+/** 마을 전체를 바꾸는 시설(돌길 · 돌담)의 '공사 중' 간판 자리. */
+export const WORK_SIGNS = { roads: { x: -3.0, z: 4.2 }, fence: { x: 3.2, z: 25.0 } };
+
+/** 돌길로 바꾸는 마을 안 길(울타리 안 큰길 넷 · 상점가 · 주택가 골목)과 광장. */
+export const INNER_ROADS = ['main-ew', 'main-ns', 'shops', 'homes'];
+/** 돌길 판 [{ x, z, len, w, yaw }]: 길 마디마다 한 장(가운데 · 길이 · 폭, yaw 는 길 방향 — three.js rotation.y). 흙길 가장자리까지 덮게 조금 넓다. */
+export function pavedStrips() {
+  const out = [];
+  for (const id of INNER_ROADS) {
+    const r = ROADS.find((q) => q.id === id);
+    for (let k = 1; k < r.pts.length; k++) {
+      const [ax, az] = r.pts[k - 1], [bx, bz] = r.pts[k], len = Math.hypot(bx - ax, bz - az);
+      out.push({ id, x: (ax + bx) / 2, z: (az + bz) / 2, len, w: r.w + 0.35, yaw: Math.atan2(bx - ax, bz - az) });
+    }
+  }
+  return out;
+}
 
 const OUTER_ROADS = ['to-fields', 'to-forest', 'to-mountain', 'to-river'];
 export const OUTER_LAMP_SPACING = 9, OUTER_LAMP_GAP = 5;
