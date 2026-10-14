@@ -474,8 +474,11 @@ export function createNpcs(scene, village, weeds, berries) {
     },
     /** 종류로 친구를 찾는다. */
     byKind(kind) { return list.find((n) => n.kind === kind); },
-    /** 일정을 맡긴다(마을 살림: 일감 · 밥). 다른 일정이 있으면 덮어쓴다. */
-    plan(n, steps) { if (n.task) endTask(n); n.plan = steps; n.timer = 0.2; n.dash = false; },
+    /**
+     * 일정을 맡긴다(마을 살림: 일감 · 밥). 다른 일정이 있으면 덮어쓴다. 걷던 중이면 그 걸음을 멈춘다(일정은 서 있을 때 시작해서,
+     * 산책 · 앞 일정 걸음이 이어지면 이야기가 부른 친구가 원래 가던 데로 계속 걸어갔다).
+     */
+    plan(n, steps) { if (n.task) endTask(n); if (n.state === 'walk') { clearRoute(n); n.state = 'idle'; } n.plan = steps; n.timer = 0.2; n.dash = false; },
     /** 일정이 있거나 따라다니기 · 앞장서기 · 도망 · 대화 중이라 다른 걸 시킬 수 없는지. */
     busy(n) { return !!((n.plan && n.plan.length) || n.follow || n.lead || n.flee || n.talk > 0 || n.emote); },
     /** 말풍선 한 줄. */
