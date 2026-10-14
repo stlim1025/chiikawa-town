@@ -18,6 +18,7 @@ export const NPC_LINES = {
     pull: ['영차…!', '…뽑았다!', '흐읏…!'],
     berry: ['하나…!', '…♪'],
     fish: ['…낚았다…!', '(찌를 꼭 바라본다)'],
+    fishMiss: '…히잉 도망갔다…',
     jobDone: ['와아… {pay}', '…해냈다! {pay}'],
     jobFail: '…히잉 다 못 했어…',
     eat: '(후루룩…) …♪',
@@ -71,6 +72,7 @@ export const NPC_LINES = {
     pull: ['영차~ 하나 더!', '쑥~! ♪', '풀 뽑기는 즐거워~'],
     berry: ['하나 땄다~ ♪', '맛있어 보여~'],
     fish: ['낚았다~! 오늘 저녁은 생선이야!', '입질이 왔어~!'],
+    fishMiss: ['아~ 아깝다! 다음엔 꼭!', '헤헤 놓쳐 버렸다~'],
     jobDone: ['오늘도 해냈다~! {pay}', '보수다~ {pay}'],
     jobFail: '다 못 했다~ 일감은 돌려놓을게',
     eat: '역시 라멘이 최고야~',
@@ -121,6 +123,7 @@ export const NPC_LINES = {
     pull: ['우라!', '야하!', '후랏!'],
     berry: ['(냠)', '야하~'],
     fish: ['(첨벙!) 야하!', '우라!!'],
+    fishMiss: '하아?!',
     jobDone: ['우라~! {pay}', '야하! {pay}'],
     jobFail: '하아…',
     eat: '(후루루루룩!)',
@@ -171,6 +174,7 @@ export const NPC_LINES = {
     pull: ['하아~ 허리야…', '영차…'],
     berry: ['안주로 딱이네~', '하아~ 잘 익었다'],
     fish: ['하아~ 안주 한 마리 추가~', '하아~ 입질이 좋네'],
+    fishMiss: '하아~ 놓쳤네',
     jobDone: ['하아~ 맥줏값 벌었다 {pay}', '하아~ {pay}'],
     jobFail: '하아~ 오늘은 여기까지…',
     eat: '하아~ 라멘엔 맥주인데…',
@@ -220,6 +224,7 @@ export const NPC_LINES = {
     pull: ['…하앗', '뿌리까지 단번에', '훗'],
     berry: ['…훗', '…잘 익었군'],
     fish: ['…훗 걸렸다', '…낚시도 수련이다'],
+    fishMiss: '…놓쳤군 아직 멀었다',
     jobDone: '…받아 두지 {pay}',
     jobFail: '…수련이 부족했다',
     eat: '…맛있군',
@@ -279,7 +284,7 @@ export const NPC_LINES = {
 export const PLAY_KEYS = ['playAsk', 'rpsGo', 'rpsShow', 'rpsDraw', 'rpsLose', 'rpsWin', 'rpsAgain', 'tagGo', 'tagCaught', 'tagEscaped', 'danceGo', 'danceEnd'];
 /** 친구 말투가 없을 때(다른 마을 사람). */
 const PLAIN = {
-  jobTake: '{title}! 할게요', jobSoldOut: '앗 벌써 다 나갔네', sticker: '스티커 붙이는 중', pull: ['영차!'], berry: ['하나 땄다'], fish: ['낚았다!'],
+  jobTake: '{title}! 할게요', jobSoldOut: '앗 벌써 다 나갔네', sticker: '스티커 붙이는 중', pull: ['영차!'], berry: ['하나 땄다'], fish: ['낚았다!'], fishMiss: '놓쳤다…',
   jobDone: '보수 받았다 {pay}', jobFail: '다 못 했다', eat: '라멘 맛있다~', napWake: '잘 쉬었다!',
   examGo: '시험 보는 중…', examPass: '붙었다!', examFail: '떨어졌다…', huntGo: '다녀올게!', huntSoldOut: '토벌 일감이 없네',
   huntCry: ['얏!'], huntDone: '토벌 끝! {pay}', huntFail: '못 잡았다…',

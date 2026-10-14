@@ -40,6 +40,20 @@ const WORK = {
   captain: { type: 'act', anim: 'talk', anims: ['talk', 'think', 'look', 'stretch'], time: 3, lines: ['승급 시험은 여기서!', '흠흠, 규칙은 규칙이다'] }
 };
 const WEED_PULL_SECONDS = 2.4;
+/**
+ * 친구가 풀을 뽑거나 열매를 딸 때 결과(내 캐릭터처럼): clean 깔끔하게 뽑을 확률, fail 힘이 모자라 다시 당길 확률(나머지는 끊어진다),
+ * drop 열매를 떨어뜨릴 확률. 힘센 우사기 · 꼼꼼한 랏코는 잘하고, 겁 많은 치이카와 · 느긋한 쿠리만쥬는 가끔 실수한다.
+ */
+const WORK_SKILL = {
+  chiikawa: { clean: 0.5, fail: 0.14, drop: 0.16 }, hachiware: { clean: 0.6, fail: 0.1, drop: 0.1 }, usagi: { clean: 0.68, fail: 0.04, drop: 0.12 },
+  kurimanju: { clean: 0.45, fail: 0.12, drop: 0.14 }, rakko: { clean: 0.8, fail: 0.03, drop: 0.05 }
+};
+const skillOf = (kind) => WORK_SKILL[kind] || { clean: 0.5, fail: 0.1, drop: 0.1 };
+/** 풀 하나를 다 당겼을 때 결과: 'clean' | 'snapped' | 'none'(다시 당긴다). */
+function pullOutcome(kind, random = Math.random) {
+  const k = skillOf(kind), r = random();
+  return r < k.fail ? 'none' : r < k.fail + k.clean ? 'clean' : 'snapped';
+}
 const STEER = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]; // 가려는 쪽이 막히면 이만큼(라디안) 옆으로 틀어 본다
 const MIN_WEEDS_FOR_FRIENDS = 8; // 내 몫을 남기려고 풀이 이보다 적으면 친구들은 뽑지 않는다
 const POST_ROAM = 2.5; // 자리가 정해진 친구가 쉬다가 자리 둘레를 거니는 거리(따로 정하지 않았으면)
@@ -49,6 +63,7 @@ const VIEW_Z = 7; // 카메라는 늘 내 캐릭터 뒤(+z)에서 본다(render/
 /** 마을 친구 12명. 자리가 정해진 친구는 그 주변에서만 움직인다. 각자 할 일(WORK)을 하다가 돌아다닌다. */
 export function createNpcs(scene, village, weeds, berries) {
   const s = village.spots;
+  let workFx = null; // 친구가 일한 결과 알림(main 이 머리 위 글씨로 띄운다): (n, { type: 'weed' | 'berry', result, x, z })
   const kuri = (village.homes && village.homes.kurimanju) || s.plaza;
   const PS = lotById('pochette') || { x: s.pochette.x, z: s.pochette.z - 1.8 }; // 포셰트 판매대 한가운데(s.pochette 는 손님이 서는 앞자리)
   const POSTS = [
@@ -330,7 +345,12 @@ export function createNpcs(scene, village, weeds, berries) {
       if (step.left <= 0 || !berries) { next(); return; }
       const b = step.bush;
       if (b && Math.hypot(b.x - n.x, b.z - n.z) < 1.5) {
-        if (b.ready) { berries.pick(b); step.left--; step.onPick?.(); n.emote = { anim: 'pull', t: 0.9 }; }
+        if (b.ready) {
+          const drop = Math.random() < skillOf(n.kind).drop; // 떨어뜨리면 덤불에 그대로 남아 다시 딴다
+          if (!drop) { berries.pick(b); step.left--; step.onPick?.(); }
+          workFx?.(n, { type: 'berry', result: drop ? 'drop' : 'ok', x: b.x, z: b.z });
+          n.emote = { anim: drop ? 'shy' : 'pull', t: 0.9 };
+        }
         step.bush = null; step.tries = 0; n.timer = 1.2;
         return;
       }
@@ -433,6 +453,8 @@ export function createNpcs(scene, village, weeds, berries) {
 
   return {
     list,
+    /** 친구가 일한 결과(풀 뽑기 · 열매 따기)를 받을 곳: fn(n, { type, result, x, z }). */
+    onWorkFx(fn) { workFx = fn; },
     /** (x, z) 에서 maxDist 안의 가장 가까운 친구. */
     nearest(x, z, maxDist) {
       let best = null, bd = maxDist;
@@ -607,10 +629,16 @@ export function createNpcs(scene, village, weeds, berries) {
               n.yaw = Math.atan2(w.x - n.x, w.z - n.z);
               mode = 'pull';
               if (n.workT >= WEED_PULL_SECONDS) {
-                weeds.remove(w, 'clean');
-                if (task.onDone) task.onDone(); // 일감으로 뽑았으면 센다(한마디는 일감 쪽에서 그 친구 말투로)
-                else if (Math.random() < 0.5) say(n, pick(WORK[n.kind].lines));
-                endTask(n);
+                // 내 캐릭터처럼 결과가 갈린다: 깔끔! · 끊어졌다… · 힘이 모자라면 다시 당긴다
+                const result = pullOutcome(n.kind);
+                workFx?.(n, { type: 'weed', result, x: w.x, z: w.z });
+                if (result === 'none') n.workT = WEED_PULL_SECONDS * 0.45;
+                else {
+                  weeds.remove(w, result);
+                  if (task.onDone) task.onDone(result); // 일감으로 뽑았으면 센다(한마디는 일감 쪽에서 그 친구 말투로)
+                  else if (Math.random() < 0.5) say(n, pick(WORK[n.kind].lines));
+                  endTask(n);
+                }
               }
             }
           } else {

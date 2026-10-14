@@ -222,6 +222,16 @@ function boot() {
 
   let state = null;
   let player = null;
+  // 친구가 풀을 뽑거나 열매를 따면 내 캐릭터처럼 결과를 머리 위에 띄운다(가까이 있을 때만): 깔끔! · 끊어졌다… · 조금 더 꾹~ · +1 · 떨어뜨렸다
+  npcs.onWorkFx((n, e) => {
+    const p = player && player.position;
+    if (!p || Math.hypot(e.x - p.x, e.z - p.z) > 22) return;
+    if (e.type === 'weed') {
+      const [text, kind] = e.result === 'clean' ? ['깔끔!', 'clean'] : e.result === 'snapped' ? ['끊어졌다…', 'snap'] : ['조금 더 꾹~', 'tip'];
+      hud.floatText({ x: e.x, y: 1.15, z: e.z, text, kind });
+    } else if (e.result === 'drop') hud.floatText({ x: e.x, y: 1.2, z: e.z, text: '앗, 떨어뜨렸다…', kind: 'snap' });
+    else hud.floatText({ x: e.x, y: 1.2, z: e.z, text: '+1', kind: 'pick', icon: itemSvg('berry') });
+  });
   let pulling = null; // { weed, pull }
   let sleeping = false; // 하루가 지나는 연출 중
   let target = null;
@@ -4503,7 +4513,12 @@ function boot() {
       // 낚시 일감: 그 물고기가 사는 물가(연못 · 시냇물 · 바다)로 가서 한 마리씩 낚는다(일감 물고기는 일감에 낸다)
       const water = FISH[T.kind].waters.find((w) => w !== 'lake') || 'pond', spot = npcFishSpot(water) || npcFishSpot('pond');
       if (spot) steps.push({ do: 'walk', x: spot.x, z: spot.z, near: 0.4 });
-      for (let i = 0; i < T.target; i++) steps.push({ do: 'act', anim: 'fish', face: spot ? spot.face : null, time: 4 + Math.random() * 4 }, { do: 'call', fn: () => { job.done++; npcLandFish(n, water, false, T.kind); } });
+      // 놓치기도 한다(친구마다 솜씨가 다르다): 다 낚을 때까지 더 던지고, 너무 많이 놓치면 다 못 한 채 돌아간다
+      for (let got = 0, cast = 0; got < T.target && cast < T.target * 4; cast++) {
+        const miss = Math.random() < fishMiss(n.kind);
+        steps.push({ do: 'act', anim: 'fish', face: spot ? spot.face : null, time: 4 + Math.random() * 4 }, { do: 'call', fn: miss ? () => npcMissFish(n) : () => { job.done++; npcLandFish(n, water, false, T.kind); } });
+        if (!miss) got++;
+      }
     } else steps.push({ do: 'walk', slots: SLOTS.bench(), near: 0.4 }, { do: 'act', anim: 'read', face: benchMid, time: T.target * 1.5, say: lineOf(n.kind, 'sticker') }, { do: 'call', fn: () => { job.done = T.target; tireNpc(n.kind, 15); } });
     steps.push({ do: 'walk', slots: SLOTS.board(), near: 0.45 }, {
       do: 'call',
@@ -5095,14 +5110,24 @@ function boot() {
     tireNpc(n.kind, 4);
     return id;
   }
-  /** 쉬는 틈 낚시: 연못이나 시냇물에 가서 두세 번 던진다. 낚은 물고기는 친구 가방에. */
+  /** 친구 낚시 솜씨: 한 번 던져 놓칠 확률(해달 랏코는 잘 낚는다). */
+  const FISH_MISS = { rakko: 0.18, hachiware: 0.32, kurimanju: 0.28 };
+  const fishMiss = (kind) => FISH_MISS[kind] ?? 0.3;
+  /** 친구가 놓쳤다: 가까우면 머리 위에 '놓쳤다…'(내 낚시처럼), 가끔 한마디. */
+  function npcMissFish(n) {
+    const p = player.position;
+    if (Math.hypot(n.x - p.x, n.z - p.z) < 26) hud.floatText({ x: n.x, y: n.chibi.height + 0.55, z: n.z, text: pickLine(['놓쳤다…', '도망갔다…', '줄이 끊어졌다…']), kind: 'snap' });
+    if (Math.random() < 0.45) npcs.say(n, lineOf(n.kind, 'fishMiss'));
+    tireNpc(n.kind, 2);
+  }
+  /** 쉬는 틈 낚시: 연못이나 시냇물에 가서 두세 번 던진다(놓치기도 한다). 낚은 물고기는 친구 가방에. */
   function npcFishHobby(n) {
     const spot = npcFishSpot(Math.random() < 0.6 ? 'pond' : 'river') || npcFishSpot('pond');
     if (!spot) { npcStroll(n); return; }
     setDoing(n.kind, 'fish', '낚시하는 중');
     const steps = [{ do: 'walk', x: spot.x, z: spot.z, near: 0.4 }];
     const casts = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < casts; i++) steps.push({ do: 'act', anim: 'fish', face: spot.face, time: 5 + Math.random() * 4 }, { do: 'call', fn: () => npcLandFish(n, spot.water, true) });
+    for (let i = 0; i < casts; i++) steps.push({ do: 'act', anim: 'fish', face: spot.face, time: 5 + Math.random() * 4 }, { do: 'call', fn: () => (Math.random() < fishMiss(n.kind) ? npcMissFish(n) : npcLandFish(n, spot.water, true)) });
     steps.push({ do: 'call', fn: () => restHere(n.kind, 6 + Math.random() * 10) });
     npcs.plan(n, steps);
   }
