@@ -20,7 +20,7 @@ export function createWorks(village) {
   const shown = {}, built = {}, marks = {};
   const vcMat = toonMaterial('#ffffff', { vertexColors: true });
   const plain = (m) => m.isMeshToonMaterial && !m.userData.keep && !m.map && !m.vertexColors && m.side === THREE.FrontSide && m.emissive.getHex() === 0;
-  let hands = null, roof = null;
+  let hands = null, roof = null, tower = null;
 
   /** 시설 한 덩어리: (x, z) 에 yaw 만큼 돌려 세운다. 부품은 part 로 붙이고 finish 로 합친다(그리기 몇 번으로). */
   function unit(x, z, yaw = 0) {
@@ -77,35 +77,46 @@ export function createWorks(village) {
     return finish(g);
   }
 
-  /** 마을 시계탑: 돌 받침 위 크림색 탑, 모서리 나무, 빨간 네모 지붕, 앞에 시계(바늘은 마을 시각을 따라 돈다). */
+  /**
+   * 마을 시계탑: 돌 받침 위 크림색 탑, 모서리 나무, 빨간 네모 지붕, 앞에 시계(바늘은 마을 시각을 따라 돈다).
+   * 광장 한가운데 높이 서 있어 뒤(북쪽)에 서면 나를 가린다 → 집처럼 반투명해지게 탑만의 재질로 만든다(다른 시설과 합치지 않는다).
+   */
   function clockTower({ x, z, yaw }, obs) {
     const g = unit(x, z, yaw), cream = '#f7efe0', wood = '#8a5a3c', FACE = 2.55;
-    part(g, GEO.box, '#cfc6b8', { position: [0, 0.15, 0], scale: [1.25, 0.3, 1.25], shell: true });
-    part(g, GEO.box, cream, { position: [0, 1.75, 0], scale: [0.85, 2.9, 0.85], shell: true });
-    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, GEO.box, wood, { position: [sx * 0.43, 1.75, sz * 0.43], scale: [0.1, 2.9, 0.1], shell: true, shadow: false }));
-    part(g, GEO.box, wood, { position: [0, 3.24, 0], scale: [1.05, 0.12, 1.05], shell: true });
-    part(g, PYRAMID, '#d9675b', { position: [0, 3.3, 0], scale: [0.85, 0.9, 0.85], shell: true });
-    part(g, GEO.sphere, '#f6c453', { position: [0, 4.25, 0], scale: [0.1, 0.1, 0.1], outline: 0.012 });
-    part(g, GEO.box, '#a77a52', { position: [0, 0.68, 0.43], scale: [0.36, 0.7, 0.02], outline: 0.012, shadow: false });
+    const mats = new Map(), mat = (c) => {
+      if (!mats.has(c)) { const m = toonMaterial(c, { unique: true }); m.userData.keep = true; mats.set(c, m); }
+      return mats.get(c);
+    };
+    const cp = (geo, color, opts) => part(g, geo, null, { ...opts, material: mat(color) });
+    cp(GEO.box, '#cfc6b8', { position: [0, 0.15, 0], scale: [1.25, 0.3, 1.25], shell: true });
+    cp(GEO.box, cream, { position: [0, 1.75, 0], scale: [0.85, 2.9, 0.85], shell: true });
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => cp(GEO.box, wood, { position: [sx * 0.43, 1.75, sz * 0.43], scale: [0.1, 2.9, 0.1], shell: true, shadow: false }));
+    cp(GEO.box, wood, { position: [0, 3.24, 0], scale: [1.05, 0.12, 1.05], shell: true });
+    cp(PYRAMID, '#d9675b', { position: [0, 3.3, 0], scale: [0.85, 0.9, 0.85], shell: true });
+    cp(GEO.sphere, '#f6c453', { position: [0, 4.25, 0], scale: [0.1, 0.1, 0.1], outline: 0.012 });
+    cp(GEO.box, '#a77a52', { position: [0, 0.68, 0.43], scale: [0.36, 0.7, 0.02], outline: 0.012, shadow: false });
     // 시계판: 나무 테 · 흰 판 · 눈금 열둘(3 · 6 · 9 · 12 는 길게)
-    part(g, GEO.cylinder, wood, { position: [0, FACE, 0.425], rotation: [Math.PI / 2, 0, 0], scale: [0.36, 0.04, 0.36], outline: 0.015, shadow: false });
-    part(g, GEO.cylinder, '#fffdf6', { position: [0, FACE, 0.445], rotation: [Math.PI / 2, 0, 0], scale: [0.31, 0.03, 0.31], outline: false, shadow: false });
+    cp(GEO.cylinder, wood, { position: [0, FACE, 0.425], rotation: [Math.PI / 2, 0, 0], scale: [0.36, 0.04, 0.36], outline: 0.015, shadow: false });
+    cp(GEO.cylinder, '#fffdf6', { position: [0, FACE, 0.445], rotation: [Math.PI / 2, 0, 0], scale: [0.31, 0.03, 0.31], outline: false, shadow: false });
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * Math.PI * 2;
-      part(g, GEO.box, '#3a2a28', { position: [Math.sin(a) * 0.25, FACE + Math.cos(a) * 0.25, 0.478], rotation: [0, 0, -a], scale: k % 3 ? [0.02, 0.02, 0.01] : [0.03, 0.06, 0.01], outline: false, shadow: false });
+      cp(GEO.box, '#3a2a28', { position: [Math.sin(a) * 0.25, FACE + Math.cos(a) * 0.25, 0.478], rotation: [0, 0, -a], scale: k % 3 ? [0.02, 0.02, 0.01] : [0.03, 0.06, 0.01], outline: false, shadow: false });
     }
-    part(g, GEO.sphere, '#3a2a28', { position: [0, FACE, 0.5], scale: [0.03, 0.03, 0.012], outline: false, shadow: false });
+    cp(GEO.sphere, '#3a2a28', { position: [0, FACE, 0.5], scale: [0.03, 0.03, 0.012], outline: false, shadow: false });
     // 바늘: 판 가운데에서 돌아가는 축(합치지 않는다)
     const hand = (len, w) => {
       const p = new THREE.Group();
       p.position.set(0, FACE, 0.49);
-      p.add(toonMesh(GEO.box, '#3a2a28', { position: [0, len / 2 - 0.03, 0], scale: [w, len, 0.012], outline: false, shadow: false }));
+      p.add(toonMesh(GEO.box, null, { position: [0, len / 2 - 0.03, 0], scale: [w, len, 0.012], outline: false, shadow: false, material: mat('#3a2a28') }));
       g.add(p);
       return p;
     };
     hands = { hour: hand(0.15, 0.03), minute: hand(0.23, 0.02) };
     obs.push(box(g, 0, 0, 0.63, 0.63));
-    return finish(g);
+    finish(g);
+    const towerMats = [...mats.values()];
+    tower = { g, mats: towerMats, meshes: g.children.filter((m) => towerMats.includes(m.material)), fade: 1 }; // 합친 뒤의 탑 메시(외곽선은 비칠 때 숨긴다)
+    return g;
   }
 
   /** 강가 정자: 나무 바닥 위 기둥 넷, 뒤 · 옆 난간, 뒤에 긴 의자, 초록 네모 지붕. 앞이 트여 있어 들어가 쉴 수 있다(지붕은 들어가면 비친다). */
@@ -290,12 +301,27 @@ export function createWorks(village) {
       }
       if (changed) village.refreshNav();
     },
-    /** 매 프레임: 시계탑 바늘을 마을 시각에, 정자 안에 들어가면 지붕을 비치게. */
+    /** 매 프레임: 시계탑 바늘을 마을 시각에, 시계탑 뒤에 서면 탑을 · 정자 안에 들어가면 지붕을 비치게. */
     update(dt, clock, focus) {
       if (hands && shown.clock === 'open' && clock) {
         const h = hourOf(clock);
         hands.hour.rotation.z = -((h % 12) / 12) * Math.PI * 2;
         hands.minute.rotation.z = -(h % 1) * Math.PI * 2;
+      }
+      // 시계탑: 내 캐릭터보다 카메라 쪽(남쪽)에 있으면서 옆으로 가까우면(탑 뒤에 섰으면) 마을 집처럼 반투명하게
+      if (tower && shown.clock === 'open' && focus) {
+        const dz = tower.g.position.z - focus.z, dx = Math.abs(tower.g.position.x - focus.x);
+        const hiding = dz > -0.6 && dz < 6 && dx < 1.6;
+        if (hiding || tower.fade < 1) {
+          const f = tower.fade + ((hiding ? 0.3 : 1) - tower.fade) * Math.min(1, dt * 8);
+          tower.fade = f > 0.995 ? 1 : f;
+          tower.mats.forEach((m) => {
+            m.opacity = tower.fade;
+            m.depthWrite = tower.fade > 0.95;
+            if (m.transparent !== tower.fade < 1) { m.transparent = tower.fade < 1; m.needsUpdate = true; }
+          });
+          tower.meshes.forEach((m) => { for (const c of m.children) c.visible = tower.fade > 0.95; });
+        }
       }
       if (roof && shown.pavilion === 'open' && focus) {
         const { g } = roof, a = g.rotation.y, dx = focus.x - g.position.x, dz = focus.z - g.position.z;
