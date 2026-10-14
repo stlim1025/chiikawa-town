@@ -28,6 +28,9 @@ export const HOME_CHAT = {
   decor: { chiikawa: '…벽지 바꿨어…? 예쁠 것 같아…', hachiware: '방 분위기 바꿨다며? 궁금해~', usagi: '(벽에 색칠하는 흉내) 야하!', kurimanju: '하아~ 새 벽지 냄새 좋지', rakko: '…방이 새로워졌다고 들었다', momonga: '벽지 색은 내가 골라 줄 걸 그랬네 흥' }
 };
 
+/** 시계탑 종소리를 들은 마을 친구의 한마디(말풍선). */
+export const BELL_HEARD = { chiikawa: '…종소리다…!', hachiware: '종소리다~! 좋은 소리!', usagi: '(종소리에 맞춰 폴짝 뛴다) 우라!', kurimanju: '하아~ 종소리 들으니 한 잔 생각나네', rakko: '…좋은 울림이다', momonga: '시끄러워! …조금은 좋네 흥' };
+
 const pick = (list, random) => list[Math.floor(random() * list.length) % list.length];
 /** 시설 곁 혼잣말(그 친구 말이 없으면 null). */
 export const nearWorkLine = (kind, workId) => (WORK_NEAR[workId] && WORK_NEAR[workId][kind]) || null;

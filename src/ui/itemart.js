@@ -140,6 +140,11 @@ Object.assign(EXTRA, {
 /** 추첨권: 주황 표에 별. */
 export const TICKET_SVG = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 11h30v5a4 4 0 0 0 0 8v5H5v-5a4 4 0 0 0 0-8z" fill="#ffb36b" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 12v16" stroke="#5a4431" stroke-width="1.6" stroke-dasharray="2.4 2.4"/><path d="M25 14.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="#fff6c8" stroke="#5a4431" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 export function registerItemArt(map) { Object.assign(EXTRA, map); }
+/** 광장 꽃(core/works.js): 초록 줄기와 잎에 분홍 꽃잎 다섯, 노란 꽃술. */
+const FLOWER_SVG = `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="14" ry="3.2" fill="#e6d8b8"/><path d="M32 54V30" fill="none" stroke="#5fa04f" stroke-width="3.4" stroke-linecap="round"/><path d="M32 46q-12-2-14-10 10-1 14 10zM32 42q10-6 15-2-5 7-15 2z" fill="#7cc46a" ${S}/>`
+  + [0, 72, 144, 216, 288].map((a) => `<ellipse cx="32" cy="14.5" rx="6" ry="8.5" fill="#ffa8c6" ${S} transform="rotate(${a} 32 22)"/>`).join('')
+  + `<circle cx="32" cy="22" r="5" fill="#ffe36e" ${S}/></svg>`;
+
 /** 물고기 그림(core/fishing.js): 종류마다 몸 색, 문어는 둥근 머리에 다리, 빈 깡통은 깡통. */
 function fishSvg(id) {
   const c = FISH[id].color, shadow = '<ellipse cx="32" cy="55" rx="18" ry="3.6" fill="#e6d8b8"/>';
@@ -162,5 +167,6 @@ export function itemSvg(id) {
   }
   if (EXTRA[id]) return EXTRA[id];
   if (FISH[id]) return fishSvg(id);
+  if (id === 'plazaflower') return FLOWER_SVG;
   return `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="18" fill="#eadcb8" ${S}/><text x="32" y="40" text-anchor="middle" font-size="22" fill="${L}">?</text></svg>`;
 }

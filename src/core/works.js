@@ -1,4 +1,5 @@
 import { ROADS, VILLAGE_R, roadDist, shoreDist, lairReach } from './layout.js';
+import { registerItems, addItem } from './inventory.js';
 
 /**
  * 마을 가꾸기(게임 오리지널, 동물의 숲 공공사업처럼): 광장 북쪽 '마을 가꾸기' 모금함에 돈을 모아 내면
@@ -129,6 +130,46 @@ export function unpackWorks(rows) {
   if (!Array.isArray(rows)) return v;
   for (const r of rows.slice(0, WORK_IDS.length)) if (Array.isArray(r) && Object.hasOwn(WORKS, r[0]) && (r[1] === 1 || r[1] === 2)) v[r[0]] = r[1] === 2 ? 'open' : 'building';
   return v;
+}
+
+// ---------- 생긴 시설로 하는 일(게임 오리지널) ----------
+// 광장 꽃밭: 꽃밭마다 하루 한 번 '꽃 따기'(광장 꽃 한 송이) · 연못 벤치 · 강가 정자: '앉아서 쉬기'(앉아 있는 동안 기운이 찬다)
+// 마을 시계탑: 하루 한 번 '종 치기'(종소리를 들은 마을 친구들이 반응하고 조금 친해진다 — main)
+// state.workUse = { flowers: [꽃밭마다 마지막으로 딴 날], bell: 마지막으로 종 친 날 }
+export const WORK_ITEMS = {
+  plazaflower: { name: '광장 꽃', kind: 'flower', sell: 15, note: '광장 꽃밭에서 딴 알록달록한 꽃 한 송이. 꽃을 좋아하는 친구에게 주면 기뻐해요.' }
+};
+registerItems(WORK_ITEMS);
+/** 앉아서 쉴 때 1초에 차는 기운: 벤치보다 강바람 부는 정자가 더 잘 쉬어진다. */
+export const REST_RATE = { benches: 3, pavilion: 5 };
+export const workUseOf = (s) => (s.workUse && typeof s.workUse === 'object' ? s.workUse : {});
+/** i 번째 꽃밭에서 오늘 꽃을 딸 수 있는지(꽃밭이 생겼고 오늘 아직 안 땄다). */
+export function canPickFlower(s, i) {
+  const days = workUseOf(s).flowers || [];
+  return workStatus(s, 'flowers') === 'open' && i >= 0 && i < WORK_SPOTS.flowers.length && days[i] !== s.clock.day;
+}
+/** i 번째 꽃밭에서 꽃을 딴다. → { ok, state, reason: 'none'(오늘은 다 땄다) | 'full'(가방이 꽉 찼다) } */
+export function pickFlower(s, i) {
+  if (!canPickFlower(s, i)) return { ok: false, reason: 'none', state: s };
+  const r = addItem(s, 'plazaflower', 1);
+  if (!r.added) return { ok: false, reason: 'full', state: s };
+  const use = workUseOf(s), days = [...(use.flowers || [])];
+  while (days.length < WORK_SPOTS.flowers.length) days.push(0);
+  days[i] = s.clock.day;
+  return { ok: true, state: { ...r.state, workUse: { ...use, flowers: days } } };
+}
+/** 오늘 시계탑 종을 칠 수 있는지. */
+export const canRingBell = (s) => workStatus(s, 'clock') === 'open' && workUseOf(s).bell !== s.clock.day;
+/** 종을 친다(하루 한 번). → { ok, state } */
+export function ringBell(s) {
+  if (!canRingBell(s)) return { ok: false, state: s };
+  return { ok: true, state: { ...s, workUse: { ...workUseOf(s), bell: s.clock.day } } };
+}
+/** 저장 확인: 꽃밭마다 날은 0 이상 정수, 종 친 날도 정수. */
+export function isValidWorkUse(u) {
+  if (!u || typeof u !== 'object' || Array.isArray(u)) return false;
+  if (u.flowers !== undefined && !(Array.isArray(u.flowers) && u.flowers.length <= WORK_SPOTS.flowers.length && u.flowers.every((d) => Number.isInteger(d) && d >= 0))) return false;
+  return u.bell === undefined || (Number.isInteger(u.bell) && u.bell >= 0);
 }
 
 /** 저장 확인: 아는 시설만, 낸 돈은 0 이상 값까지, 날은 자연수. */

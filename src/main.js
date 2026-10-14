@@ -52,7 +52,7 @@ import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
 import { FURNITURE, HOME_SIZES, WALLPAPERS, FLOORS, homeOf, sizeOf, gridOf, decorOf, expandHome, useDecor, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
-import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
+import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, befriendBy, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
 import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo, MAX_STACK } from './core/inventory.js';
@@ -99,8 +99,8 @@ import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
-import { WORKS, WORK_IDS, WORK_SPOTS, donate, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks } from './core/works.js';
-import { nearWorkLine, upgradeChat } from './core/upgradetalk.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, REST_RATE, donate, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks, canPickFlower, pickFlower, canRingBell, ringBell } from './core/works.js';
+import { nearWorkLine, upgradeChat, BELL_HEARD } from './core/upgradetalk.js';
 import { createWorks } from './world/works.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
@@ -2566,6 +2566,9 @@ function boot() {
     else if (target.type === 'weed') beginPull(target.weed);
     else if (target.type === 'fish') beginFish(target.spot);
     else if (target.type === 'noRod') hud.toast('낚싯대가 있어야 낚시할 수 있어요', 3200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.rod.price)}` }] });
+    else if (target.type === 'flower') pickPlazaFlower(target.i);
+    else if (target.type === 'rest') startRest(target.seat);
+    else if (target.type === 'bell') ringClockBell();
     else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
@@ -2943,7 +2946,7 @@ function boot() {
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
     }
-    if (step.speaker === 'hachiware') {
+    if (step.speaker === 'hachiware' && step.place === 'cave') {
       // 하치와레의 동굴 무대: 동굴 앞에 나와 노래한다
       const h = npcs.byKind('hachiware'), c = village.spots.hachiCave;
       player.setPosition(c.x, c.z + 2.6);
@@ -2965,7 +2968,7 @@ function boot() {
       }, 650);
       setTimeout(() => { if (h) npcs.hold(h, false); }, 7500);
     }
-    if (step.speaker === 'kurimanju') {
+    if (step.speaker === 'kurimanju' && step.place === 'pub') {
       // 맥주집 건배: 쿠리만쥬가 카운터 앞에 와 있고, 같이 짠!
       const k = npcs.byKind('kurimanju'), seat = pubSeat(), front = village.spots.pub;
       player.setPosition(front.x + 0.15, front.z + 0.1);
@@ -2981,6 +2984,7 @@ function boot() {
       }
       sound.play('heartUp');
     }
+    if (step.place === 'bench' || step.place === 'pavilion' || step.place === 'clockTower') workQuestStage(id, step); // 마을 가꾸기 시설에서 하는 부탁
     if (step.speaker === 'rakko' && step.place === 'dojo') {
       // 랏코의 수련 2부: 저녁 수련장에서 대련(랏코가 수련장 앞에 나와 마주 서서 목검을 휘두른다)
       const r = npcs.byKind('rakko'), d = village.spots.dojo, at = village.nearestFree(d.x + 1.3, d.z + 2.2, 0.45);
@@ -3045,9 +3049,11 @@ function boot() {
     hud.announce({ kicker: '다 읽었어요!', title: QUESTS.story.title, sub: '대장 갑옷 씨에게 알려요', to: 'quest', id: 'story' });
   }
   /** 퀘스트에 나오는 곳의 월드 자리. */
+  // 마을 가꾸기로 생긴 곳(퀘스트 visit): 연못 쉼터 · 강가 정자 · 시계탑 앞 · 북쪽 · 동쪽 문 돌기둥
+  const WORK_PLACES = { bench: WORK_SPOTS.benches[0], pavilion: WORK_SPOTS.pavilion[0], clockTower: { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z + 1.1 }, gateNorth: { x: GATES.north.x, z: GATES.north.z + 2 }, gateEast: { x: GATES.east.x - 2, z: GATES.east.z } };
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
     : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot
-    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장
+    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
@@ -5597,9 +5603,114 @@ function boot() {
     if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
     fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저)
+    workTargets(p, options); // 마을 가꾸기 시설: 꽃 따기 · 앉아서 쉬기 · 종 치기
     playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
+  }
+  // ---------- 마을 가꾸기 시설로 하는 일(core/works.js, 게임 오리지널) ----------
+  // 광장 꽃밭 '꽃 따기'(꽃밭마다 하루 한 번) · 연못 벤치와 강가 정자 '앉아서 쉬기'(앉아 있는 동안 기운이 찬다, 움직이면 일어난다)
+  // · 시계탑 '종 치기'(하루 한 번, 종소리를 들은 마을 친구들이 반가워하고 조금 친해진다)
+  let resting = null; // { kind, rate, acc, full } 앉아서 쉬는 중
+  /** 앉을 수 있는 자리 [{ kind, x, z, yaw, lift }]: 생긴 벤치 둘 · 정자 안 뒤쪽 긴 의자. */
+  function restSeats() {
+    const out = [];
+    if (workStatus(state, 'benches') === 'open') for (const b of WORK_SPOTS.benches) out.push({ kind: 'benches', x: b.x, z: b.z, yaw: b.yaw, lift: 0.3 });
+    if (workStatus(state, 'pavilion') === 'open') { const P = WORK_SPOTS.pavilion[0]; out.push({ kind: 'pavilion', x: P.x, z: P.z - 0.82, yaw: P.yaw, lift: 0.3 }); }
+    return out;
+  }
+  function workTargets(p, options) {
+    if (visiting || resting || !state.works) return;
+    WORK_SPOTS.flowers.forEach((b, i) => {
+      const d = Math.hypot(b.x - p.x, b.z - p.z);
+      if (d < 1.7 && canPickFlower(state, i)) options.push({ d: d - 0.6, t: { type: 'flower', i, x: b.x, z: b.z, label: '꽃 따기' } });
+    });
+    for (const seat of restSeats()) {
+      const d = Math.hypot(seat.x - p.x, seat.z - p.z);
+      if (d < 1.3) options.push({ d: d - 0.5, t: { type: 'rest', seat, label: '앉아서 쉬기' } }); // 연못 벤치 바로 앞이면 낚싯대 펼치기(물 바로 앞 0.6)보다 먼저
+    }
+    if (canRingBell(state)) {
+      const c = WORK_SPOTS.clock[0], x = c.x, z = c.z + 1.0, d = Math.hypot(x - p.x, z - p.z);
+      if (d < 1.4) options.push({ d: d - 0.4, t: { type: 'bell', x, z, label: '종 치기' } });
+    }
+  }
+  function pickPlazaFlower(i) {
+    const r = pickFlower(state, i);
+    if (!r.ok) { hud.toast(r.reason === 'full' ? '가방이 꽉 찼어요' : '오늘은 이미 땄어요', 2000); return; }
+    commit(r.state);
+    sound.play('snap');
+    hud.bagBump();
+    const b = WORK_SPOTS.flowers[i];
+    hud.floatText({ x: b.x, y: 1.0, z: b.z, text: '광장 꽃', kind: 'mini', icon: itemSvg('plazaflower') });
+    if (!seen('plazaflower')) { markSeen('plazaflower'); hud.toast('꽃밭마다 하루에 한 송이씩 딸 수 있어요. 꽃을 좋아하는 친구에게 선물해 봐요', 4200); }
+  }
+  function startRest(seat) {
+    player.setPosition(seat.x, seat.z);
+    player.face(seat.x + Math.sin(seat.yaw), seat.z + Math.cos(seat.yaw));
+    player.lift = seat.lift;
+    player.act('sit', 3600);
+    resting = { kind: seat.kind, rate: REST_RATE[seat.kind], acc: 0, full: false, fresh: true }; // fresh: 앉은 몸짓은 다음 player.update 때 잡히니 한 프레임은 일어난 걸로 보지 않는다
+    sound.play('click');
+    if (!seen('rest')) { markSeen('rest'); hud.toast('앉아 있으면 기운이 차요. 움직이면 일어나요', 3200); }
+  }
+  /** 매 프레임: 앉아 있는 동안 기운이 찬다. 걸어서 몸짓이 풀리면 일어난다. */
+  function updateRest(dt) {
+    if (!resting) return;
+    if (resting.fresh) { resting.fresh = false; return; }
+    if (player.anim !== 'sit' || mode !== 'play' || fishing) { player.lift = 0; resting = null; return; }
+    if (state.stamina >= MAX_STAMINA) {
+      if (!resting.full) { resting.full = true; hud.toast('기운이 가득 찼어요', 2000); }
+      return;
+    }
+    resting.acc += resting.rate * dt;
+    if (resting.acc >= 1) { const n = Math.floor(resting.acc); resting.acc -= n; commit({ ...state, stamina: Math.min(MAX_STAMINA, state.stamina + n) }, false); }
+  }
+  function ringClockBell() {
+    const r = ringBell(state);
+    if (!r.ok) return;
+    let s = r.state;
+    sound.play('bell');
+    player.cheerTime = 1.4;
+    const c = WORK_SPOTS.clock[0];
+    [0, 750, 1500].forEach((ms) => setTimeout(() => hud.floatText({ x: c.x, y: 3.4, z: c.z + 0.5, text: '땡—', kind: 'note' }), ms));
+    // 종소리를 들은 마을 친구들: 한마디 하고 기뻐하며, 그날 상한 안에서 조금 친해진다
+    const p = player.position;
+    let heard = 0;
+    for (const n of npcs.list) {
+      if (!VILLAGERS[n.kind] || n.away || Math.hypot(n.x - p.x, n.z - p.z) > 18) continue;
+      heard++;
+      setTimeout(() => { if (n.away) return; npcs.say(n, BELL_HEARD[n.kind]); npcs.emote(n, joyAnim(n.kind), 2); }, 700 + heard * 300);
+      s = befriendBy(s, n.kind, 1, s.clock.day).state;
+    }
+    commit(s);
+    hud.toast(heard ? `종소리가 울려 퍼져요. 들은 친구 ${heard}명이 반가워해요` : '종소리가 마을에 울려 퍼져요', 3400, { chips: [{ icon: ICO.clock, text: timeLabel(state.clock) }] });
+  }
+  /** 마을 가꾸기 시설에서 하는 부탁의 도착 연출: 벤치 · 정자는 내가 앉고 같이 온 친구가 옆에서 노래하거나 굽고, 시계탑은 종이 울린다. */
+  function workQuestStage(id, step) {
+    const f = npcs.byKind(QUESTS[id].giver), p = player.position;
+    if (step.place === 'clockTower') { sound.play('bell'); if (f && !f.away) npcs.emote(f, joyAnim(f.kind), 3); return; }
+    const seat = restSeats().find((q) => q.kind === (step.place === 'bench' ? 'benches' : 'pavilion'));
+    if (!seat) return;
+    startRest(seat);
+    if (!f || f.away) return;
+    const fx = Math.sin(seat.yaw), fz = Math.cos(seat.yaw), rx = Math.cos(seat.yaw), rz = -Math.sin(seat.yaw);
+    f.x = seat.x + fx * 0.9 + rx * 0.7;
+    f.z = seat.z + fz * 0.9 + rz * 0.7;
+    f.yaw = Math.atan2(p.x - f.x, p.z - f.z);
+    npcs.hold(f, true);
+    setTimeout(() => npcs.hold(f, false), 8000);
+    if (QUESTS[id].giver === 'hachiware') {
+      npcs.emote(f, 'dance', 7);
+      let k = 0;
+      const sing = setInterval(() => {
+        if (++k > 8 || mode !== 'play') { clearInterval(sing); return; }
+        hud.floatText({ x: f.x + (Math.random() - 0.5) * 0.8, y: f.chibi.height + 0.4, z: f.z, text: k % 2 ? '♪' : '♫', kind: 'note' });
+        if (k % 3 === 1) sound.play('heart');
+      }, 650);
+    } else {
+      npcs.emote(f, 'drink', 4);
+      setTimeout(() => hud.floatText({ x: (p.x + f.x) / 2, y: 1.6, z: (p.z + f.z) / 2, text: '지글지글♪', kind: 'note' }), 900);
+    }
   }
   /** 물가 대상: 낚싯대가 있으면 '낚싯대 펼치기'(물을 바로 보고 있으면 둘레 풀 · 열매보다 먼저), 없으면 누를 때 어디서 사는지 알려 준다. */
   function fishOption(p, options) {
@@ -5838,6 +5949,9 @@ function boot() {
     if (tg.type === 'mpTalk') return { x: tg.x, z: tg.z, r: 0.55, y: 1.55, id: 'mpt' + tg.id }; // 같이 놀기: 다른 사람에게 말 걸기
     if (tg.type === 'hostHome') { const s = village.spots.home; return { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'phostHome' }; }
     if (tg.type === 'fish' || tg.type === 'noRod') return { x: player.position.x, z: player.position.z, r: 0.5, y: 1.45, id: 'fish', noRing: true }; // 낚시: 물가에 서면 내 머리 위에 안내만(물 위 고리는 없다)
+    if (tg.type === 'flower') return { x: tg.x, z: tg.z, r: 1.0, y: 0.95, id: 'flw' + tg.i }; // 마을 가꾸기: 광장 꽃밭
+    if (tg.type === 'rest') return { x: tg.seat.x, z: tg.seat.z, r: 0.75, y: 1.3, id: 'rest' + tg.seat.x.toFixed(1) + tg.seat.z.toFixed(1) }; // 벤치 · 정자 앉는 자리
+    if (tg.type === 'bell') return { x: tg.x, z: tg.z, r: 0.6, y: 1.7, id: 'bell' }; // 시계탑 앞
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }
@@ -6342,6 +6456,7 @@ function boot() {
       if (pulling) updatePull(dt);
       if (fishing) updateFish(dt);
       updateCatchFx(dt);
+      updateRest(dt); // 벤치 · 정자에 앉아 쉬는 중
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
         : pulling || fishing || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting || downed ? null : findTarget();
       updateFun(dt);

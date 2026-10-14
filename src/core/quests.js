@@ -7,6 +7,8 @@ import { WEAPONS, weaponOf, MONSTERS } from './combat.js';
 import { WEED_KINDS, josa } from './weeding.js';
 import { hourOf } from './clock.js';
 import { VILLAGERS, villagerOf, BED_HOUR } from './villagers.js';
+import { workStatus } from './works.js';
+import './fishing.js'; // 낚은 물고기(붕어)도 부탁 물건으로 쓴다(가방 물건 등록)
 
 /**
  * 퀘스트(5단계): 친구마다 고충(부탁)과 마을 이야기. 친구 머리 위에 ! 가 뜨면 부탁이 있다는 뜻이고,
@@ -30,6 +32,7 @@ import { VILLAGERS, villagerOf, BED_HOUR } from './villagers.js';
  * 사이드스토리(side): 원작 에피소드를 따라가는 이야기. 머리 위에 ! 대신 펼친 책(이야기 표시)이 뜨고, 한 번에 하나만,
  *   하나를 끝내면 SIDE_GAP 일 동안은 다음 이야기가 열리지 않는다(일상 부탁처럼 되풀이하는 daily 사이드는 따로).
  *   needStory: state.story[그 이름] 에 적힌 날 다음 날부터(본 일이 있어야) · after: 그 퀘스트를 끝낸 뒤 · hours: 그 시각에만 부탁한다.
+ *   needWork: 마을 가꾸기(core/works.js)로 그 시설이 생긴 뒤에만 부탁한다.
  *   talk 단계에 nextDay 가 있으면 그 단계를 받은 다음 날부터 알릴 수 있다(state.quests[id].at = 받은 날).
  *   reward.friends: { 친구: 점수 } 같이 한 친구들 친밀도도.
  * 연계 퀘스트(chain): 여러 친구를 거쳐 구역 보스까지 가는 긴 부탁. 사이드스토리와 따로 한 번에 하나만,
@@ -77,7 +80,13 @@ export const PLACES = {
   elderGate: { name: '고목 빈터 입구', r: 4 },
   crabGate: { name: '강가 진흙밭 입구', r: 4 },
   dojo: { name: '수련장', r: 3.4 },
-  bonbonVine: { name: '초콜릿 덩굴', r: 2.8 } // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
+  bonbonVine: { name: '초콜릿 덩굴', r: 2.8 }, // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
+  // 마을 가꾸기(core/works.js)로 생긴 곳
+  bench: { name: '연못 쉼터', r: 2.6 },
+  pavilion: { name: '강가 정자', r: 2.8 },
+  clockTower: { name: '마을 시계탑', r: 2.4 },
+  gateNorth: { name: '북쪽 문 돌기둥', r: 3 },
+  gateEast: { name: '동쪽 문 돌기둥', r: 3 }
 };
 
 /** 같이 하기(together) 부탁에서 세는 일상 일. main 이 내가 그 일을 할 때마다 logAct 로 센다. */
@@ -491,6 +500,56 @@ export const QUESTS = {
     offer: ['우라!', '(숲 쪽을 가리키며 들썩들썩 춤을 춘다)', '(오늘 밤에 또 클럽에 가자는 것 같다…!)'],
     steps: [{ type: 'scene', scene: 'clubNight', speaker: 'usagi', goal: '우사기를 따라 클럽에 가자!', say: ['야하~!!', '(실컷 춤추고 나왔다)'] }],
     reward: { bond: 2 }
+  },
+  // ---------- 마을 가꾸기(core/works.js)로 생긴 곳에서 하는 부탁(게임 오리지널): 그 시설이 생긴 뒤에 열린다 ----------
+  flowerGift: {
+    title: '치이카와의 꽃 한 다발', giver: 'chiikawa', needWork: 'flowers', needHearts: 1, ask: '광장 꽃밭 봤어?',
+    offer: ['…있잖아…', '광장에 꽃밭이 생겼잖아…', '…방에 꽃을 꽂아 두면… 아침에 기분이 좋을 것 같아…', '광장 꽃… 세 송이만… 따다 줄 수 있어…?'],
+    steps: [{ type: 'bring', items: { plazaflower: 3 }, goal: '광장 꽃 세 송이를 치이카와에게 갖다주자! (광장 꽃밭에서 꽃 따기, 꽃밭마다 하루 한 번)',
+      say: ['…와아…! 알록달록해…!', '(작은 병에 꽃을 하나하나 꽂는다)', '…고마워…♪ 이거… 아껴 둔 주먹밥… 같이 먹자…'] }],
+    reward: { money: 300, bond: 3, items: { riceball: 1 } }
+  },
+  benchConcert: {
+    title: '연못 벤치 음악회', giver: 'hachiware', needWork: 'benches', needHearts: 2, ask: '연못 벤치 가 봤어?',
+    offer: ['있잖아, {name}!', '연못가에 벤치가 생겼잖아~ 거기서 노래하면 연못이 무대 같을 것 같아!', '저녁에 같이 가서 들어 줄래? 관객이 있어야 신나거든~'],
+    steps: [{ type: 'visit', place: 'bench', with: true, hours: [16, 20], goal: '저녁에 하치와레랑 연못 쉼터에 가자! (오후 4시 ~ 8시)', speaker: 'hachiware',
+      say: ['(벤치에 앉아 노을 진 연못을 바라본다)', '♪ 퐁당퐁당~ 연못에 비친 노을~ ♪', '헤헤, 연못 물고기들도 들었을까? 같이 와 줘서 고마워!'] }],
+    reward: { money: 400, bond: 4 }
+  },
+  pavilionPicnic: {
+    title: '쿠리만쥬의 정자 소풍', giver: 'kurimanju', needWork: 'pavilion', needHearts: 2, ask: '강가 정자 가 봤어?',
+    offer: ['하아~ {name}, 강가에 정자 생긴 거 봤어?', '강바람 맞으며 생선구이라니… 생각만 해도 좋네~', '붕어 두 마리만 낚아다 줄래? 그다음 낮에 정자에서 같이 굽자~'],
+    steps: [
+      { type: 'bring', items: { crucian: 2 }, goal: '붕어 두 마리를 쿠리만쥬에게 갖다주자! (시냇물이나 호수에서 낚시)',
+        say: ['오~ 통통하네!', '좋아, 낮에 강가 정자로 같이 가자. 내가 작은 화로 챙겨 갈게~'] },
+      { type: 'visit', place: 'pavilion', with: true, hours: [11, 17], goal: '낮에 쿠리만쥬랑 강가 정자에 가자! (오전 11시 ~ 오후 5시)', speaker: 'kurimanju',
+        say: ['(정자에서 붕어를 굽는다… 지글지글)', '하아~ 강바람에 생선구이라니 최고다', '같이 와 줘서 고마워. 이건 네 몫이야~'] }
+    ],
+    reward: { money: 500, bond: 4, items: { bottlebeer: 1 } }
+  },
+  wallPatrol: {
+    title: '랏코의 돌담 순찰', giver: 'rakko', needWork: 'fence', needHearts: 2, needLicense: 'hunter', ask: '새 돌담 어때?',
+    offer: ['…{name}. 마을에 돌담이 생겼군.', '돌담이 튼튼해도 지키는 눈이 필요하다.', '북쪽 문과 동쪽 문 돌기둥을 둘러보고 와라. 서쪽은 내가 보겠다.'],
+    steps: [
+      { type: 'visit', place: 'gateNorth', goal: '북쪽 문 돌기둥을 둘러보자!', speaker: null, say: ['(돌담이 단단하게 서 있다. 바위산 쪽은 조용하다)', '이번엔 동쪽 문으로 가 보자.'] },
+      { type: 'visit', place: 'gateEast', goal: '동쪽 문 돌기둥을 둘러보자!', speaker: null, say: ['(들판의 풀뭉치가 돌담을 보더니 슬금슬금 돌아간다)', '랏코에게 알려 주자.'] },
+      { type: 'talk', goal: '랏코에게 순찰 이야기를 하자!', say: ['…이상 없었나.', '돌담 덕분에 몬스터들이 함부로 다가오지 못하는군.', '수고했다. …이건 수련하며 모은 것이다. 받아라.'] }
+    ],
+    reward: { money: 600, bond: 4 }
+  },
+  noonBell: {
+    title: '우사기의 정오 종', giver: 'usagi', needWork: 'clock', needHearts: 1, ask: '시계탑 구경했어?',
+    offer: ['우라!', '(시계탑을 가리키고는 종 치는 시늉을 한다)', '하아~! (해가 머리 위에 있을 때를 손으로 그린다)', '(낮 열두 시에 시계탑 종을 같이 치고 싶은 모양이다!)'],
+    steps: [{ type: 'visit', place: 'clockTower', with: true, hours: [12, 13], goal: '낮 열두 시에 우사기랑 시계탑에 가자! (낮 12시 ~ 1시)', speaker: 'usagi',
+      say: ['(우사기와 함께 종 줄을 힘껏 잡아당긴다)', '(땡— 땡— 땡— 정오의 종소리가 마을에 울려 퍼진다)', '야하!! (신나서 주먹밥을 건넨다)'] }],
+    reward: { money: 300, bond: 3, items: { riceball: 2 } }
+  },
+  lampWalk: {
+    title: '모몽가의 밤 산책', giver: 'momonga', needWork: 'lamps', needHearts: 2, ask: '가로등 켜진 길 봤어?',
+    offer: ['야, {name}. 마을 밖 길에 가로등 생겼지?', '밤에 불빛 아래 걸으면… 내가 더 귀여워 보일 거야.', '…혼자 가기 무서운 거 아니거든! 같이 가 줘도 돼. 흥!'],
+    steps: [{ type: 'visit', place: 'bridge', with: true, night: true, goal: '밤에 모몽가랑 강가 다리까지 걷자! (밤 7시 ~ 새벽 5시)', speaker: 'momonga',
+      say: ['(가로등 불빛이 강물에 반짝반짝 비친다)', '…예쁘다. 흥, 나 말고 불빛 말이야!', '…같이 와 줘서 고마워. 이틀은 네 지갑 안 건드릴게. 흥!'] }],
+    reward: { money: 300, bond: 4, truce: 2 }
   }
 };
 export const QUEST_ORDER = Object.keys(QUESTS);
@@ -634,6 +693,7 @@ function baseOffer(state, id, viaBoard = false) {
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
   if (Q.unlessLicense && hasLicense(state, Q.unlessLicense)) return false; // 이미 그 자격이 있으면 따라는 부탁은 안 한다
   if (Q.after && !isDone(state, Q.after)) return false;
+  if (Q.needWork && (!state.clock || workStatus(state, Q.needWork) !== 'open')) return false; // 마을 가꾸기로 그 시설이 생긴 뒤에
   if (Q.minDay && state.clock && state.clock.day < Q.minDay) return false;
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
   if (Q.hours && state.clock && !inHours(hourOf(state.clock), Q.hours)) return false;

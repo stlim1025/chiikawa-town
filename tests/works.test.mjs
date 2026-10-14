@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORKS, WORK_IDS, WORK_SPOTS, WORK_SIGNS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, pavedStrips, workStatus, workOf, leftOf, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks } from '../src/core/works.js';
-import { WORK_NEAR, WORK_CHAT, HOME_CHAT, nearWorkLine, upgradeChat } from '../src/core/upgradetalk.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, WORK_SIGNS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, pavedStrips, workStatus, workOf, leftOf, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks, WORK_ITEMS, REST_RATE, canPickFlower, pickFlower, canRingBell, ringBell, isValidWorkUse } from '../src/core/works.js';
+import { WORK_NEAR, WORK_CHAT, HOME_CHAT, BELL_HEARD, nearWorkLine, upgradeChat } from '../src/core/upgradetalk.js';
+import { QUESTS, PLACES, canOffer, checkQuestData } from '../src/core/quests.js';
+import { ptsForHearts } from '../src/core/friends.js';
+import { loves } from '../src/core/gifts.js';
+import { countOf, itemInfo } from '../src/core/inventory.js';
 import { LOTS, VILLAGE_R, doorSpot, inDoorLane, lotById, lotRadius, roadDist, shoreDist, lairReach, lampSpots } from '../src/core/layout.js';
 import { createObstacleIndex } from '../src/core/obstacles.js';
 import { createState } from '../src/core/state.js';
@@ -160,4 +164,69 @@ test('마을 가꾸기: 친구들이 새 시설 이야기를 한다(칭찬 · �
   }
   assert.equal(V.praiseLine('hachiware', ev, '승택'), '바깥 길 가로등 봤어? 승택 덕분이래~ 고마워!');
   assert.equal(V.newsLine(ev, '승택').text, '승택 덕분에 마을에 바깥 길 가로등이 생겼어요');
+});
+
+// ---------- 마을 가꾸기 시설로 하는 일 · 부탁 ----------
+const opened = (s, ids) => ({ ...s, works: Object.fromEntries(ids.map((id) => [id, { paid: WORKS[id].price, day: s.clock.day - 1, open: s.clock.day }])) });
+const withHearts = (s, kind, h) => ({ ...s, tutorial: 'done', friends: { ...(s.friends || {}), [kind]: { pts: ptsForHearts(h), talk: 0, play: 0, gift: true } } });
+
+test('마을 가꾸기: 광장 꽃밭마다 하루 한 송이, 다음 날 다시 핀다', () => {
+  let s = rich(1000, 5);
+  assert.equal(canPickFlower(s, 0), false, '꽃밭이 생기기 전');
+  assert.equal(pickFlower(s, 0).ok, false);
+  s = opened(s, ['flowers']);
+  assert.equal(itemInfo('plazaflower').name, '광장 꽃');
+  assert.ok(WORK_ITEMS.plazaflower.sell > 0 && !WORK_ITEMS.plazaflower.note.includes('·'));
+  for (let i = 0; i < WORK_SPOTS.flowers.length; i++) {
+    const r = pickFlower(s, i);
+    assert.ok(r.ok, `꽃밭 ${i}`);
+    s = r.state;
+  }
+  assert.equal(countOf(s, 'plazaflower'), WORK_SPOTS.flowers.length);
+  assert.equal(pickFlower(s, 0).reason, 'none', '같은 날 또 못 딴다');
+  assert.equal(canPickFlower(s, -1) || canPickFlower(s, WORK_SPOTS.flowers.length), false, '없는 꽃밭');
+  assert.ok(isValidWorkUse(s.workUse) && isValidState(s));
+  s = { ...s, clock: at(6, 8) };
+  assert.ok(canPickFlower(s, 0), '다음 날');
+  assert.ok(loves('chiikawa', 'plazaflower') && loves('momonga', 'plazaflower'));
+});
+
+test('마을 가꾸기: 시계탑 종은 하루 한 번, 종소리 한마디는 친구 여섯 다 있다', () => {
+  let s = rich(1000, 5);
+  assert.equal(canRingBell(s), false);
+  s = opened(s, ['clock']);
+  const r = ringBell(s);
+  assert.ok(r.ok && r.state.workUse.bell === 5);
+  assert.equal(ringBell(r.state).ok, false, '같은 날 두 번은 안 된다');
+  assert.ok(canRingBell({ ...r.state, clock: at(6, 9) }));
+  for (const k of Object.keys(VILLAGERS)) assert.ok(BELL_HEARD[k] && !BELL_HEARD[k].includes('·'), k);
+  assert.ok(REST_RATE.pavilion > REST_RATE.benches && REST_RATE.benches > 0, '정자가 더 잘 쉬어진다');
+});
+
+test('마을 가꾸기: 쓰던 기록 저장 확인', () => {
+  assert.ok(isValidWorkUse({}));
+  assert.ok(isValidWorkUse({ flowers: [0, 3], bell: 2 }));
+  assert.equal(isValidWorkUse({ flowers: [1, 1, 1, 1, 1] }), false, '꽃밭 수보다 많다');
+  assert.equal(isValidWorkUse({ flowers: [1.5] }), false);
+  assert.equal(isValidWorkUse({ bell: -1 }), false);
+  assert.equal(isValidWorkUse([]), false);
+  assert.equal(isValidState({ ...rich(), workUse: { bell: 'x' } }), false);
+});
+
+test('마을 가꾸기: 시설이 생겨야 그곳에서 하는 부탁이 열린다', () => {
+  assert.deepEqual(checkQuestData(), []);
+  const ids = { flowerGift: 'flowers', benchConcert: 'benches', pavilionPicnic: 'pavilion', wallPatrol: 'fence', noonBell: 'clock', lampWalk: 'lamps' };
+  for (const [id, work] of Object.entries(ids)) {
+    const Q = QUESTS[id];
+    assert.equal(Q.needWork, work, id);
+    for (const st of Q.steps) if (st.place) assert.ok(PLACES[st.place], `${id}: ${st.place}`);
+    let s = { ...withHearts(rich(1000, 5), Q.giver, 5), licenses: { hunter: { day: 1 } } };
+    if (Q.steps.some((st) => st.hours)) s = { ...s, clock: at(5, Q.steps.find((st) => st.hours).hours[0] + 0.5) };
+    assert.equal(canOffer(s, id), false, `${id}: 시설이 생기기 전`);
+    assert.ok(canOffer(opened(s, [work]), id), `${id}: 시설이 생긴 뒤`);
+    const text = [Q.title, ...Q.offer, ...Q.steps.flatMap((st) => [st.goal, ...(st.say || [])])].join('');
+    assert.ok(!text.includes('·'), `가운뎃점: ${id}`);
+    assert.ok(Object.keys(QUESTS).every((o) => o === id || QUESTS[o].giver !== Q.giver || QUESTS[o].ask !== Q.ask), `${id}: 같은 친구의 다른 부탁과 묻는 말이 겹친다`);
+  }
+  assert.equal(canOffer(opened(withHearts(rich(1000, 5), 'rakko', 5), ['fence']), 'wallPatrol'), false, '돌담 순찰은 토벌 자격이 있어야');
 });

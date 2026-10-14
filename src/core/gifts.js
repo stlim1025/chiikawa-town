@@ -13,10 +13,10 @@ import { addToPantry } from './pantry.js';
 
 /** 친구마다 좋아하는 물건(생김새 · 성격대로). */
 export const LIKES = {
-  chiikawa: ['tissue', 'cookies', 'candy', 'fruitbasket', 'hotpot'], // 울보라 휴지가 늘 필요하다 · 원작에서 추첨으로 받은 전골 세트
+  chiikawa: ['tissue', 'cookies', 'candy', 'fruitbasket', 'hotpot', 'plazaflower'], // 울보라 휴지가 늘 필요하다 · 원작에서 추첨으로 받은 전골 세트 · 광장 꽃(마을 가꾸기)
   hachiware: ['starshard', 'cookies', 'riceball', 'berry'],
   usagi: ['sweetroot', 'clover', 'pizzabun', 'riceball', 'katsucurry'], // 토끼라 당근 · 토끼풀, 먹성 좋아 든든한 음식
-  momonga: ['bigacorn', 'candy', 'cookies', 'starshard', 'pearl', 'glowfluff'], // 날다람쥐라 도토리, 응석받이라 단것 · 반짝이는 것
+  momonga: ['bigacorn', 'candy', 'cookies', 'starshard', 'pearl', 'glowfluff', 'plazaflower'], // 날다람쥐라 도토리, 응석받이라 단것 · 반짝이는 것 · 예쁜 꽃
   kurimanju: ['bottlebeer', 'jellybake', 'jelly', 'shellsoup', 'bonbon'], // 술꾼이라 위스키 든 초콜릿도
   rakko: ['shellsoup', 'pearl', 'hotpot', 'horn'], // 해달이라 조개 · 진주, 토벌 고수라 전리품 뿔
   shisa: ['shellsoup', 'katsucurry', 'pizzabun', 'hotpot'],
