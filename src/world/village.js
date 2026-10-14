@@ -274,12 +274,11 @@ export function buildVillage(scene) {
     part(GEO.box, '#3a3236', { position: [wx * 1.005, wy, wz * 1.005], rotation: [-el * 0.8, az, 0], scale: [0.04 * s, 0.34 * s, 0.05], outline: false, shadow: false });
     part(GEO.box, '#3a3236', { position: [wx * 1.005, wy, wz * 1.005], rotation: [-el * 0.8, az, 0], scale: [0.34 * s, 0.04 * s, 0.05], outline: false, shadow: false });
     world.add(g);
-    obstacles.push({ x, z, r: R * 1.05 });
-    // 현관 혹도 막는다(문에 파고들지 않게)
-    obstacles.push({ x: x + Math.cos(yaw) * bx + Math.sin(yaw) * bz, z: z - Math.sin(yaw) * bx + Math.cos(yaw) * bz, r: rz + 0.12 });
+    const obs = [{ x, z, r: R * 1.05 }, { x: x + Math.cos(yaw) * bx + Math.sin(yaw) * bz, z: z - Math.sin(yaw) * bx + Math.cos(yaw) * bz, r: rz + 0.12 }]; // 몸통 · 현관 혹(문에 파고들지 않게)
+    obs.forEach((o) => obstacles.push(o));
     houses.push({ x, z, half: R, mats: [...mats.values()], meshes, fade: 1 });
     windows.push(mats.get('#c6e7f5'));
-    return { R };
+    return { R, group: g, obs };
   }
 
   /** 포셰트 가게 노점: lot 자리에서 남쪽(카메라 쪽)을 본다. */
@@ -582,6 +581,7 @@ export function buildVillage(scene) {
 
   // ---------- 마을 건물: layout 의 자리(LOTS)마다 남쪽(카메라 쪽)을 보고 짓는다 ----------
   const homes = {};
+  let myHome = null; // 내 집 돔 { lot, group, obs, label, door }(world/homeext.js 가 넓힌 집으로 바꿔 세운다)
   const SIGN_TOP = 2.5; // 집 이름표 높이 상한(처마 언저리)
   for (const lot of LOTS) {
     if (lot.kind === 'house') {
@@ -590,7 +590,10 @@ export function buildVillage(scene) {
       labels.push({ x: lot.x, y: Math.min(d.H + 0.55, SIGN_TOP), z: lot.z + 1.716 * lot.s * 0.6, text: lot.label });
     } else if (lot.kind === 'dome') {
       const d = dome(lot.x, lot.z, lot.s, lot.yaw || 0);
-      labels.push({ x: lot.x, y: Math.min(d.R + 0.9, SIGN_TOP), z: lot.z + 1.4 * lot.s * 0.5, text: lot.label });
+      const label = { x: lot.x, y: Math.min(d.R + 0.9, SIGN_TOP), z: lot.z + 1.4 * lot.s * 0.5, text: lot.label };
+      labels.push(label);
+      // 내 집(world/homeext.js): 넓히면 이 돔 대신 더 큰 집 · 저택이 선다(돔은 숨기고 장애물은 끈다)
+      if (lot.id === 'home') myHome = { lot, group: d.group, obs: d.obs, label: { ...label }, door: doorSpot(lot) };
     } else if (lot.kind === 'stall') stall(lot);
     else if (lot.kind === 'board') board(lot);
     else if (lot.kind === 'bench') bench(lot);
@@ -885,6 +888,10 @@ export function buildVillage(scene) {
     signMaterial(text, opts) { const m = new THREE.MeshBasicMaterial({ map: signTexture(text, opts) }); signs.push(m); return m; },
     /** 나무 울타리 묶음(마을 가꾸기 '든든한 돌담'이 생기면 숨긴다). */
     fence: fenceParts,
+    /** 내 집 돔과 그 장애물 · 이름표 자리 · 문 앞(world/homeext.js 가 넓힌 집으로 바꿔 세운다). */
+    myHome,
+    /** 밤에 불이 들어오는 창 재질을 더한다(넓힌 내 집의 창). */
+    addWindow(m) { windows.push(m); },
     /** 장애물이 생기거나 꺼졌을 때(마을 가꾸기 시설): 길찾기 격자를 처음부터 다시 본다. */
     refreshNav() { nav.fill(0); },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */

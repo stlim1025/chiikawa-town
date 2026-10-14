@@ -27,6 +27,16 @@ export function roomLayout(size = 0) {
   const { cols, rows, roomR: R } = HOME_SIZES[size], S = R / HOME_SIZES[0].roomR;
   return { size, cols, rows, R, S, X0: -(cols * HOME_CELL) / 2, Z0: -2.9 * S, DOOR: { x: 0, z: 2.9 * S }, WARDROBE: { x: -3.2 * S, z: -1.0 * S }, CHEST: { x: 3.25 * S, z: -0.9 * S } };
 }
+/**
+ * 방 모양(집 안 장면 world/interior.js 의 벽 · 걷는 곳, 게임 오리지널): 처음 방은 둥근 돔 방 { kind: 'round', R },
+ * 넓힌 방부터는 네모난 집 { kind: 'rect', hx(좌우 벽까지), z0(뒤 벽), z1(앞 문간), fancy }. 넓은 방은 평범한 집, 큰 방은 화려한 집(fancy).
+ * 옷장 · 보관 상자는 좌우 벽에 붙고, 칸 격자와 문간은 늘 방 안에 든다.
+ */
+export function roomShape(size = 0) {
+  const r = roomLayout(size);
+  if (!size) return { kind: 'round', R: r.R };
+  return { kind: 'rect', hx: Math.max(Math.abs(r.WARDROBE.x), Math.abs(r.CHEST.x)) + 0.42, z0: r.Z0 - 0.75, z1: r.DOOR.z + 0.35, fancy: size >= 2 };
+}
 /** 그 크기 방의 칸 (cx, cz) 바닥 가운데. */
 export function homeCellCenter(size, cx, cz) {
   const r = roomLayout(size);

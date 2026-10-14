@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_SIZES, HOME_CELL, WALLPAPERS, FLOORS, createHome, homeOf, sizeOf, gridOf, nextSize, roomLayout, homeCellCenter, expandHome, placeFurniture, moveFurniture, decorOf, hasDecor, useDecor, isValidHome } from '../src/core/home.js';
+import { HOME_SIZES, HOME_CELL, WALLPAPERS, FLOORS, createHome, homeOf, sizeOf, gridOf, nextSize, roomLayout, roomShape, homeCellCenter, expandHome, placeFurniture, moveFurniture, decorOf, hasDecor, useDecor, isValidHome } from '../src/core/home.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
 
@@ -84,4 +84,21 @@ test('집 저장 확인: 크기 · 벽지 · 바닥이 맞아야 한다', () => 
   assert.equal(isValidHome({ ...h, floor: '__proto__' }), false);
   assert.equal(isValidHome({ ...h, walls: 'pink' }), false);
   assert.equal(isValidHome({ ...h, floors: ['nope'] }), false);
+});
+
+test('집 안 모양: 처음 방은 둥근 돔, 넓힌 방은 네모난 집(큰 방은 화려한 집)이고, 칸 · 옷장 · 상자 · 문간이 다 방 안에 든다', () => {
+  assert.equal(roomShape(0).kind, 'round');
+  assert.equal(roomShape(1).kind, 'rect');
+  assert.ok(!roomShape(1).fancy && roomShape(2).fancy, '큰 방만 화려한 집');
+  for (let size = 1; size < HOME_SIZES.length; size++) {
+    const r = roomLayout(size), b = roomShape(size), walk = (x, z) => Math.abs(x) <= b.hx - 0.45 && z >= b.z0 + 0.5 && z <= b.z1 - 0.12;
+    for (const [cx, cz] of [[0, 0], [r.cols - 1, 0], [0, r.rows - 1], [r.cols - 1, r.rows - 1]]) {
+      const c = homeCellCenter(size, cx, cz);
+      assert.ok(walk(c.x, c.z), `칸 ${size}:${cx},${cz}`);
+    }
+    assert.ok(walk(r.DOOR.x, r.DOOR.z - 0.5), '문간에 들어서 설 수 있다');
+    assert.ok(r.DOOR.z <= b.z1 - 0.12 + 0.9, '문에 손이 닿는다');
+    for (const p of [r.WARDROBE, r.CHEST]) assert.ok(Math.abs(p.x) < b.hx && Math.abs(p.x) > b.hx - 0.7, `벽에 붙은 옷장 · 상자 ${size}`);
+    if (size > 1) assert.ok(b.hx > roomShape(size - 1).hx && b.z0 < roomShape(size - 1).z0, '클수록 넓다');
+  }
 });

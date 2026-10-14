@@ -102,6 +102,7 @@ import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js'
 import { WORKS, WORK_IDS, WORK_SPOTS, REST_RATE, donate, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks, canPickFlower, pickFlower, canRingBell, ringBell } from './core/works.js';
 import { nearWorkLine, upgradeChat, BELL_HEARD } from './core/upgradetalk.js';
 import { createWorks } from './world/works.js';
+import { createHomeExterior } from './world/homeext.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
@@ -195,6 +196,7 @@ function boot() {
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
   const works = createWorks(village); // 마을 가꾸기 시설(모금함에 돈을 모아 생긴 꽃밭 · 벤치 · 가로등 · 시계탑 · 정자)
+  const homeExt = createHomeExterior(village); // 내 집 바깥: 넓힐수록 돔 집 → 아담한 집 → 저택
   // 가려진 몬스터 실루엣은 스텐실 버퍼로 '제 몸이 보이는 곳'을 빼고 칠한다. 기기 · 브라우저가 스텐실을 안 주면
   // 실루엣이 몬스터 몸 위를 분홍으로 덮어 모습이 안 보이므로, 그런 화면에서는 실루엣을 끈다
   {
@@ -2382,7 +2384,7 @@ function boot() {
   const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '하치와레가 게시판에서 기다려!', phone: '오른쪽 위 폰 버튼을 톡!' };
   let tutPhoneOpened = false; // 안내 'phone' 단계에서 마을폰을 열어 봤는지(닫으면 하치와레가 마을폰 이야기를 한다)
   const homeLabel = village.labels.find((l) => l.text === '내 집');
-  const homeLead = { x: village.spots.home.x + 1.1, z: village.spots.home.z + 0.6 }; // 하치와레가 서서 기다리는 현관 옆
+  const homeLead = { get x() { return village.spots.home.x + 1.1; }, get z() { return village.spots.home.z + 0.6; } }; // 하치와레가 서서 기다리는 현관 옆(넓힌 집이면 그 문 옆)
   const boardLead = { x: village.spots.board.x + 1.4, z: village.spots.board.z + 0.2 }; // 노동 접수 게시판 옆(내가 서는 게시판 앞자리는 비워 둔다)
   const nearHome = () => !!player && Math.hypot(player.position.x - village.spots.home.x, player.position.z - village.spots.home.z) < 2.6;
   const boardSign = village.labels.find((l) => l.text === '노동 접수'); // '여기!' 는 게시판 간판 바로 위에
@@ -6516,6 +6518,10 @@ function boot() {
     const worksGuest = visiting && !visiting.arriving;
     works.show(!state ? {} : worksGuest ? visiting.works || {} : worksView(state));
     works.update(dt, worksGuest ? visiting.clock : state && state.clock, player ? player.position : null);
+    // 내 집 바깥(world/homeext.js): 넓힌 만큼 아담한 집 · 저택으로, 친구 마을에서는 주인 집 크기대로. 이름표도 그 집 앞면으로
+    const homeSize = !state ? 0 : worksGuest ? (visiting.house ? visiting.house.size : 0) : sizeOf(homeOf(state));
+    if (homeExt.show(homeSize) && homeSign) Object.assign(homeSign, homeExt.signAt());
+    homeExt.update(dt, player ? player.position : null);
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 · 쓰러짐 중에는 멈칫). 내 마을에 놀러 온 친구도 노린다

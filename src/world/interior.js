@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
-import { HOME_CELL as CELL, roomLayout, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS } from '../core/home.js';
+import { HOME_CELL as CELL, roomLayout, roomShape, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS } from '../core/home.js';
 import { photoFrameTexture } from './photoframe.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
@@ -119,7 +119,10 @@ export function createInterior() {
   const floorMat = toonMaterial(FLOORS.wood.color, { unique: true });
   const wallMat = toonMaterial(WALLPAPERS.cream.color, { unique: true });
   wallMat.side = THREE.BackSide; // 앞쪽 벽은 보이지 않게 안쪽 면만 그린다
+  const wallFlat = toonMaterial(WALLPAPERS.cream.color, { unique: true }); // 넓힌 집(네모난 방)의 벽: 같은 벽지 색
+  const glow = (c) => new THREE.MeshBasicMaterial({ color: c }); // 불빛(벽난로 불 · 촛불)은 빛을 받지 않고 늘 밝게
   const WALL_GEO = new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+  const ARCH_TOP = new THREE.CylinderGeometry(1, 1, 1, 20, 1, false, Math.PI / 2, Math.PI).rotateX(Math.PI / 2); // 아치 창 위쪽 반원
   // 칸 표시(꾸미기 중에만): 칸마다 얇은 판
   const tileGeo = new THREE.PlaneGeometry(CELL * 0.92, CELL * 0.92).rotateX(-Math.PI / 2);
   const tileMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
@@ -140,21 +143,22 @@ export function createInterior() {
   /** 그 크기(core/home.js HOME_SIZES 번호)의 방을 짓는다. 카메라도 방 크기만큼 물러선다. */
   function buildRoom(size) {
     roomG.clear();
-    room = roomLayout(size);
-    const { R, S, cols, rows, DOOR, WARDROBE, CHEST } = room;
-    roomG.add(toonMesh(GEO.cylinder, null, { material: floorMat, position: [0, -0.1, 0], scale: [R, 0.1, R], outline: 0.04, receive: true }));
-    roomG.add(toonMesh(WALL_GEO, null, { material: wallMat, scale: [R, R * 0.9, R], outline: false }));
-    // 안쪽 벽의 십자 창(돔 벽면에 딱 붙게). 넓힌 방은 오른쪽에 하나 더
-    for (const a of size ? [-0.45, 0.55] : [-0.45]) {
+    room = { ...roomLayout(size), shape: roomShape(size) };
+    const { R, S, cols, rows, DOOR, WARDROBE, CHEST } = room, rect = room.shape.kind === 'rect';
+    if (rect) buildRect(room);
+    else {
+      roomG.add(toonMesh(GEO.cylinder, null, { material: floorMat, position: [0, -0.1, 0], scale: [R, 0.1, R], outline: 0.04, receive: true }));
+      roomG.add(toonMesh(WALL_GEO, null, { material: wallMat, scale: [R, R * 0.9, R], outline: false }));
+      // 안쪽 벽의 십자 창(돔 벽면에 딱 붙게)
       const win = new THREE.Group();
-      placeOnDome(win, R, R * 0.9, a, 2.1);
+      placeOnDome(win, R, R * 0.9, -0.45, 2.1);
       win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.9, 0.9, 0.05], shell: true, outline: 0.03 }));
       win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.86, 0.03], outline: false }));
       win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.86, 0.06, 0.03], outline: false }));
       roomG.add(win);
+      // 문간 깔개(앞쪽)
+      roomG.add(toonMesh(GEO.box, '#e7a3b0', { position: [0, 0.01, DOOR.z - 0.15], scale: [1.2, 0.02, 0.6], outline: 0.02, receive: true }));
     }
-    // 문간 깔개(앞쪽)
-    roomG.add(toonMesh(GEO.box, '#e7a3b0', { position: [0, 0.01, DOOR.z - 0.15], scale: [1.2, 0.02, 0.6], outline: 0.02, receive: true }));
     tiles = [];
     for (let cz = 0; cz < rows; cz++) {
       for (let cx = 0; cx < cols; cx++) {
@@ -166,16 +170,136 @@ export function createInterior() {
         tiles.push(t);
       }
     }
-    addWardrobe(WARDROBE);
-    addChest(CHEST);
+    addWardrobe(WARDROBE, rect);
+    addChest(CHEST, rect);
     camera.position.set(0, 7.4 * S, 8.6 * S);
     camera.lookAt(0, 0.6, -0.5 * S);
   }
+  /**
+   * 넓힌 집의 네모난 방(core/home.js roomShape): 바닥 · 뒤 · 좌우 벽(앞은 트여 들여다본다) · 걸레받이.
+   * 평범한 집(넓은 방): 커튼 단 창 둘 · 사이에 풍경화 · 상자 위 선반과 화분 · 분홍 문간 깔개.
+   * 화려한 집(큰 방): 나무 징두리 판벽과 금빛 몰딩 · 벽기둥 · 붉은 커튼을 단 아치 창 · 가운데 벽난로(불꽃 · 촛대 · 금테 그림) · 샹들리에 ·
+   * 금빛 바닥 테두리 · 문에서 들어오는 붉은 깔개 · 구석 화분 · 옆벽 그림.
+   */
+  function buildRect(room) {
+    const { hx, z0, z1, fancy } = room.shape, H = fancy ? 3.0 : 2.6, w = hx * 2, d = z1 - z0, mz = (z0 + z1) / 2;
+    const add = (geo, c, o) => { const m = toonMesh(geo, c, o); roomG.add(m); return m; };
+    roomG.add(toonMesh(GEO.box, null, { material: floorMat, position: [0, -0.1, mz], scale: [w + 0.4, 0.2, d + 0.2], outline: 0.04, receive: true }));
+    const wall = (x, z, sx, sz) => roomG.add(toonMesh(GEO.box, null, { material: wallFlat, position: [x, H / 2, z], scale: [sx, H, sz], outline: 0.03, receive: true }));
+    wall(0, z0 - 0.1, w + 0.4, 0.2);
+    [-1, 1].forEach((sd) => wall(sd * (hx + 0.1), mz, 0.2, d + 0.2));
+    // 벽을 따라 붙이는 띠(걸레받이 · 판벽 · 몰딩): 뒤 벽과 좌우 벽 세 군데에 같은 높이로
+    const band = (c, y, h, t, o = {}) => {
+      add(GEO.box, c, { position: [0, y, z0 + t / 2], scale: [w, h, t], outline: 0.012, shadow: false, ...o });
+      [-1, 1].forEach((sd) => add(GEO.box, c, { position: [sd * (hx - t / 2), y, mz], scale: [t, h, d], outline: 0.012, shadow: false, ...o }));
+    };
+    band(fancy ? '#7a4f30' : '#a87b4c', 0.07, 0.14, 0.05);
+    // 창(뒤 벽): 흰 틀 · 유리 · 창살, arch 면 위가 둥근 창
+    const win = (x, y, ww, wh, arch) => {
+      add(GEO.box, '#ffffff', { position: [x, y, z0 + 0.03], scale: [ww + 0.14, wh + 0.14, 0.05], shell: true, outline: 0.02 });
+      add(GEO.box, '#c6e7f5', { position: [x, y, z0 + 0.06], scale: [ww, wh, 0.03], outline: false });
+      add(GEO.box, '#5a4431', { position: [x, y, z0 + 0.08], scale: [0.04, wh, 0.015], outline: false, shadow: false });
+      add(GEO.box, '#5a4431', { position: [x, y, z0 + 0.08], scale: [ww, 0.04, 0.015], outline: false, shadow: false });
+      if (arch) {
+        add(ARCH_TOP, '#ffffff', { position: [x, y + wh / 2, z0 + 0.03], scale: [ww / 2 + 0.07, ww / 2 + 0.07, 0.05], outline: 0.02 });
+        add(ARCH_TOP, '#c6e7f5', { position: [x, y + wh / 2, z0 + 0.06], scale: [ww / 2, ww / 2, 0.03], outline: false });
+      }
+    };
+    // 액자(벽에 붙인다): 테 색 · 그림 색 · 해(동그라미)
+    const frame = (x, y, z, rotY, fw, fh, edge, art) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      g.rotation.y = rotY;
+      g.add(toonMesh(GEO.box, edge, { scale: [fw, fh, 0.05], shell: true, outline: 0.015 }));
+      g.add(toonMesh(GEO.box, art, { position: [0, 0, 0.03], scale: [fw - 0.12, fh - 0.12, 0.01], outline: false, shadow: false }));
+      g.add(toonMesh(GEO.box, '#7cc46a', { position: [0, -fh * 0.22, 0.036], scale: [fw - 0.12, fh * 0.2, 0.01], outline: false, shadow: false }));
+      g.add(toonMesh(GEO.dot, '#ffe36e', { position: [fw * 0.22, fh * 0.15, 0.04], scale: [0.06, 0.06, 0.01], outline: false, shadow: false }));
+      roomG.add(g);
+    };
+    if (!fancy) {
+      // 평범한 집: 커튼 단 창 둘, 사이에 풍경화, 오른쪽 벽 상자 위 선반과 화분, 문간 깔개
+      for (const x of [-hx * 0.48, hx * 0.48]) {
+        win(x, 1.5, 0.9, 0.9, false);
+        add(GEO.box, '#8a5a3c', { position: [x, 2.1, z0 + 0.1], scale: [1.5, 0.05, 0.05], outline: false, shadow: false });
+        [-1, 1].forEach((sd) => add(GEO.box, '#f4a6b8', { position: [x + sd * 0.62, 1.45, z0 + 0.12], scale: [0.26, 1.2, 0.05], shell: true, outline: 0.015, shadow: false }));
+      }
+      frame(0, 1.65, z0 + 0.04, 0, 0.7, 0.5, '#c99a6a', '#bfe3f0');
+      const sx = hx - 0.08;
+      add(GEO.box, '#a87b4c', { position: [sx - 0.12, 1.45, room.CHEST.z], scale: [0.24, 0.05, 0.9], outline: 0.012 });
+      add(GEO.cylinder, '#d98a5a', { position: [sx - 0.14, 1.475, room.CHEST.z - 0.2], scale: [0.09, 0.14, 0.09], outline: 0.012 });
+      add(GEO.sphere, '#7cc46a', { position: [sx - 0.14, 1.7, room.CHEST.z - 0.2], scale: [0.14, 0.12, 0.14], outline: 0.012 });
+      frame(-hx + 0.03, 1.75, room.WARDROBE.z + 1.2, Math.PI / 2, 0.5, 0.4, '#c99a6a', '#f6d6e0');
+      add(GEO.box, '#e7a3b0', { position: [0, 0.01, room.DOOR.z - 0.15], scale: [1.2, 0.02, 0.6], outline: 0.02, receive: true });
+      return;
+    }
+    // ---------- 화려한 집 ----------
+    band('#9a6a46', 0.55, 1.0, 0.04); // 징두리 판벽
+    band('#e8c26a', 1.06, 0.06, 0.07); // 판벽 위 금빛 띠
+    band('#e8c26a', H - 0.08, 0.12, 0.08); // 천장 밑 몰딩
+    // 벽기둥 넷(뒤 벽): 크림색 기둥에 금빛 머리
+    for (const x of [-hx + 0.35, -1.45, 1.45, hx - 0.35]) {
+      add(GEO.box, '#fff8ec', { position: [x, H / 2, z0 + 0.06], scale: [0.24, H, 0.1], shell: true, outline: 0.015 });
+      add(GEO.box, '#e8c26a', { position: [x, H - 0.25, z0 + 0.1], scale: [0.32, 0.14, 0.12], outline: 0.012, shadow: false });
+    }
+    // 아치 창 둘과 붉은 커튼 · 금빛 커튼 걸이
+    const wx = (hx - 0.35 + 1.45) / 2;
+    for (const x of [-wx, wx]) {
+      win(x, 1.55, 0.8, 1.2, true);
+      add(GEO.box, '#e8c26a', { position: [x, 2.65, z0 + 0.12], scale: [1.6, 0.05, 0.05], outline: false, shadow: false });
+      [-1, 1].forEach((sd) => {
+        add(GEO.box, '#b8343f', { position: [x + sd * 0.62, 1.55, z0 + 0.14], scale: [0.3, 2.2, 0.06], shell: true, outline: 0.015, shadow: false });
+        add(GEO.box, '#e8c26a', { position: [x + sd * 0.62, 1.2, z0 + 0.18], scale: [0.32, 0.06, 0.04], outline: false, shadow: false });
+      });
+    }
+    // 벽난로: 돌 테두리 · 검은 아궁이 · 불꽃 · 나무 선반 · 금빛 촛대 둘 · 위에 금테 그림
+    const fzz = z0 + 0.18;
+    add(GEO.box, '#efe6d8', { position: [0, 0.6, fzz], scale: [1.7, 1.2, 0.36], shell: true, outline: 0.025 });
+    add(GEO.box, '#3a2a28', { position: [0, 0.42, fzz + 0.12], scale: [0.95, 0.72, 0.16], outline: false });
+    roomG.add(toonMesh(GEO.cone, null, { material: glow('#ff8a3a'), position: [-0.12, 0.08, fzz + 0.15], scale: [0.2, 0.42, 0.12], outline: false, shadow: false }));
+    roomG.add(toonMesh(GEO.cone, null, { material: glow('#ffc04a'), position: [0.14, 0.08, fzz + 0.16], scale: [0.16, 0.32, 0.1], outline: false, shadow: false }));
+    add(GEO.box, '#5a3b28', { position: [0, 0.1, fzz + 0.16], rotation: [0, 0.3, 0], scale: [0.6, 0.08, 0.1], outline: false, shadow: false });
+    add(GEO.box, '#8a5a3c', { position: [0, 1.25, fzz + 0.04], scale: [1.95, 0.1, 0.46], shell: true, outline: 0.02 });
+    for (const x of [-0.7, 0.7]) {
+      add(GEO.cylinder, '#e8c26a', { position: [x, 1.3, fzz + 0.06], scale: [0.05, 0.22, 0.05], outline: 0.01, shadow: false });
+      add(GEO.cylinder, '#fffaf0', { position: [x, 1.52, fzz + 0.06], scale: [0.03, 0.12, 0.03], outline: false, shadow: false });
+      roomG.add(toonMesh(GEO.dot, null, { material: glow('#ffd36a'), position: [x, 1.68, fzz + 0.06], scale: [0.03, 0.05, 0.03], outline: false, shadow: false }));
+    }
+    frame(0, 2.05, z0 + 0.04, 0, 1.1, 0.75, '#e8c26a', '#a9c8e8');
+    // 옆벽 그림(왼쪽은 옷장 위 뒤쪽 · 오른쪽은 둘)
+    frame(-hx + 0.03, 1.8, room.WARDROBE.z + 1.5, Math.PI / 2, 0.7, 0.5, '#e8c26a', '#f6d6e0');
+    frame(hx - 0.03, 1.8, room.CHEST.z + 1.4, -Math.PI / 2, 0.7, 0.5, '#e8c26a', '#d8e8c0');
+    frame(hx - 0.03, 1.9, room.CHEST.z - 1.6, -Math.PI / 2, 0.5, 0.6, '#e8c26a', '#f2d6b0');
+    // 뒤 구석 화분(잎 넓은 나무)
+    for (const sd of [-1, 1]) {
+      const x = sd * (hx - 0.45), z = z0 + 0.42;
+      add(GEO.cylinder, '#e9e2d4', { position: [x, 0, z], scale: [0.22, 0.4, 0.22], outline: 0.015 });
+      for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; add(GEO.sphere, '#5f9e5a', { position: [x + Math.sin(a) * 0.16, 0.75 + (k % 2) * 0.12, z + Math.cos(a) * 0.16], scale: [0.22, 0.12, 0.22], outline: 0.012, shadow: false }); }
+    }
+    // 바닥 금빛 테두리 · 문에서 들어오는 붉은 깔개(금 가장자리)
+    const ib = 0.3, iw = w - ib * 2, id = d - ib * 2;
+    for (const [x, z, sx, sz] of [[0, z0 + ib, iw, 0.06], [0, z1 - ib, iw, 0.06], [-hx + ib, mz, 0.06, id], [hx - ib, mz, 0.06, id]]) add(GEO.box, '#e8c26a', { position: [x, 0.006, z], scale: [sx, 0.012, sz], outline: false, shadow: false, receive: true });
+    const rz0 = room.Z0 + room.rows * CELL + 0.05, rz1 = z1 - 0.1;
+    add(GEO.box, '#b8343f', { position: [0, 0.012, (rz0 + rz1) / 2], scale: [1.3, 0.02, rz1 - rz0], outline: 0.015, receive: true });
+    [-1, 1].forEach((sd) => add(GEO.box, '#e8c26a', { position: [sd * 0.6, 0.024, (rz0 + rz1) / 2], scale: [0.06, 0.01, rz1 - rz0], outline: false, shadow: false }));
+    // 샹들리에(뒤쪽 위): 금빛 고리 · 촛불 여섯 · 유리 방울, 천장까지 사슬
+    const cg = new THREE.Group();
+    cg.position.set(0, H - 0.75, z0 + d * 0.33);
+    cg.add(toonMesh(new THREE.TorusGeometry(0.5, 0.035, 8, 28).rotateX(Math.PI / 2), '#e8c26a', { outline: 0.01, shadow: false }));
+    cg.add(toonMesh(GEO.cylinder, '#e8c26a', { position: [0, 0, 0], scale: [0.015, 0.75, 0.015], outline: false, shadow: false }));
+    cg.add(toonMesh(GEO.sphere, '#e8c26a', { position: [0, -0.05, 0], scale: [0.1, 0.12, 0.1], outline: 0.01, shadow: false }));
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2, x = Math.sin(a) * 0.5, z = Math.cos(a) * 0.5;
+      cg.add(toonMesh(GEO.cylinder, '#fffaf0', { position: [x, 0.02, z], scale: [0.025, 0.12, 0.025], outline: false, shadow: false }));
+      cg.add(toonMesh(GEO.dot, null, { material: glow('#ffd36a'), position: [x, 0.17, z], scale: [0.025, 0.04, 0.025], outline: false, shadow: false }));
+      cg.add(toonMesh(GEO.dot, '#cfe9f5', { position: [x * 0.8, -0.12, z * 0.8], scale: [0.03, 0.05, 0.03], outline: false, shadow: false }));
+    }
+    roomG.add(cg);
+  }
   // 옷장(늘 왼쪽 벽에 붙어 있다): 나무 장 + 문 두 짝 + 거울
-  function addWardrobe(WARDROBE) {
+  function addWardrobe(WARDROBE, rect = false) {
     const g = new THREE.Group();
     g.position.set(WARDROBE.x, 0, WARDROBE.z);
-    g.rotation.y = Math.PI / 2 - 0.35;
+    g.rotation.y = rect ? Math.PI / 2 : Math.PI / 2 - 0.35; // 둥근 방은 굽은 벽을 따라 비스듬히, 네모난 방은 벽에 반듯이
     g.add(toonMesh(GEO.box, '#c99a6a', { position: [0, 0.95, 0], scale: [1.3, 1.9, 0.55], shell: true, outline: 0.03 }));
     g.add(toonMesh(GEO.box, '#d8ad7d', { position: [-0.32, 0.95, 0.29], scale: [0.6, 1.72, 0.04], shell: true, outline: 0.02 }));
     g.add(toonMesh(GEO.box, '#cfe7f2', { position: [0.32, 1.05, 0.29], scale: [0.5, 1.2, 0.04], shell: true, outline: 0.02 }));
@@ -185,10 +309,10 @@ export function createInterior() {
     roomG.add(g);
   }
   // 보관 상자(옷장 맞은편 오른쪽 벽): 나무 상자 + 뚜껑 + 금빛 띠 두 줄 + 자물쇠
-  function addChest(CHEST) {
+  function addChest(CHEST, rect = false) {
     const g = new THREE.Group();
     g.position.set(CHEST.x, 0, CHEST.z);
-    g.rotation.y = -(Math.PI / 2 - 0.35);
+    g.rotation.y = rect ? -Math.PI / 2 : -(Math.PI / 2 - 0.35);
     g.add(toonMesh(GEO.box, '#c08550', { position: [0, 0.27, 0], scale: [0.95, 0.54, 0.6], shell: true, outline: 0.03 }));
     g.add(toonMesh(GEO.box, '#d49a62', { position: [0, 0.62, 0], scale: [1.0, 0.16, 0.65], shell: true, outline: 0.025 }));
     [-0.3, 0.3].forEach((x) => g.add(toonMesh(GEO.box, '#e8b84e', { position: [x, 0.36, 0], scale: [0.08, 0.74, 0.67], outline: 0.012 })));
@@ -202,7 +326,8 @@ export function createInterior() {
   cue.visible = false;
   scene.add(cue);
   const blocked = (home, x, z, r) => {
-    if (Math.hypot(x, z) > room.R - 0.55) return true;
+    const sh = room.shape;
+    if (sh && sh.kind === 'rect' ? Math.abs(x) > sh.hx - 0.45 || z < sh.z0 + 0.5 || z > sh.z1 - 0.12 : Math.hypot(x, z) > room.R - 0.55) return true; // 벽(둥근 방 · 네모난 방)
     if (Math.hypot(x - room.WARDROBE.x, z - room.WARDROBE.z) < 0.75 + r) return true;
     if (Math.hypot(x - room.CHEST.x, z - room.CHEST.z) < 0.55 + r) return true;
     return home.placed.some((p) => {
@@ -224,6 +349,7 @@ export function createInterior() {
       const size = sizeOf(home), d = decorOf(home);
       if (size !== room.size) buildRoom(size);
       wallMat.color.set(WALLPAPERS[d.wall].color);
+      wallFlat.color.set(WALLPAPERS[d.wall].color);
       floorMat.color.set(FLOORS[d.floor].color);
       furniture.clear();
       models.clear();
