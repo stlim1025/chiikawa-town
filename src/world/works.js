@@ -198,9 +198,18 @@ export function createWorks(village) {
     });
     const R = PLAZA.r + 0.25, flat = (geo) => geo.rotateX(-Math.PI / 2);
     add(new THREE.Mesh(tileUv(flat(new THREE.CircleGeometry(R, 56)), (2 * R) / TILE, (2 * R) / TILE), mat)).position.set(PLAZA.x, 0.034, PLAZA.z);
-    add(toonMesh(flat(new THREE.RingGeometry(R, R + 0.32, 56)), '#a99d88', { outline: false, shadow: false })).position.set(PLAZA.x, 0.04, PLAZA.z);
-    add(toonMesh(flat(new THREE.RingGeometry(1.15, 1.45, 40)), '#c9b48e', { outline: false, shadow: false })).position.set(PLAZA.x, 0.042, PLAZA.z);
-    add(toonMesh(flat(new THREE.CircleGeometry(0.55, 32)), '#e3b5ad', { outline: false, shadow: false })).position.set(PLAZA.x, 0.042, PLAZA.z);
+    // 테두리 · 가운데 무늬: 돌길 판(앞으로 당겨 그린다)보다 더 앞으로. 같은 정도면 멀리서 비스듬히 볼 때는 돌길 판에 덮였다가
+    // 가까이 가면 나타났다(시계탑 밑동의 갈색 고리). 무늬마다 재질을 따로 둔다(같은 색을 나눠 쓰는 다른 물체까지 당겨지지 않게)
+    const deco = (geo, color, y) => {
+      const m = toonMaterial(color, { unique: true });
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = -2;
+      m.polygonOffsetUnits = -8;
+      add(toonMesh(flat(geo), null, { material: m, outline: false, shadow: false })).position.set(PLAZA.x, y, PLAZA.z);
+    };
+    deco(new THREE.RingGeometry(R, R + 0.32, 56), '#a99d88', 0.04);
+    deco(new THREE.RingGeometry(1.15, 1.45, 40), '#c9b48e', 0.042);
+    deco(new THREE.CircleGeometry(0.55, 32), '#e3b5ad', 0.042);
     return out;
   }
 
