@@ -58,11 +58,8 @@ export function createHud(ui, input) {
   // 하는 중인 퀘스트(5단계): 일감 칸 아래에 퀘스트마다 쪽지 한 장씩(화면에 띄운 것이 맨 위)
   const quests = el('div', 'hud-quests');
   dock.append(status, partyTag, visitTag, job, quests);
-  // 퀘스트 쪽지가 많이 쌓이면 화면 한쪽을 다 가린다: 휴대폰(좁은 화면)에서는 맨 위 하나만, 넓으면 셋까지 보이고 나머지는 단추로 접어 둔다
-  const moreBtn = el('button', 'hud-quest-more');
-  moreBtn.type = 'button';
-  moreBtn.hidden = true;
-  // 퀘스트 쪽지를 왼쪽으로 통째로 숨기기 · 꺼내기: 숨기면 쪽지 수만 적힌 작은 단추가 남는다(고른 것은 이 브라우저에 기억)
+  // 퀘스트 쪽지를 왼쪽으로 숨기기 · 꺼내기: 숨기면 고정(압정)한 쪽지만 남고 나머지는 쪽지 수가 적힌 작은 단추로(고른 것은 이 브라우저에 기억).
+  // 숨기지 않았으면 하는 중인 퀘스트 쪽지가 모두 보인다
   const STOW_KEY = 'chiikawa-town-quests-stowed';
   let stowed = false;
   try { stowed = localStorage.getItem(STOW_KEY) === '1'; } catch { /* 저장이 막혀 있으면 늘 펼친 채로 */ }
@@ -70,17 +67,18 @@ export function createHud(ui, input) {
   stowBtn.type = 'button';
   const qbar = el('div', 'hud-quest-bar');
   qbar.hidden = true;
-  qbar.append(moreBtn, stowBtn);
+  qbar.append(stowBtn);
   quests.appendChild(qbar); // 늘 맨 끝(쪽지는 그 앞에 끼운다)
   function applyStow() {
     quests.classList.toggle('stowed', stowed);
-    const n = quests.querySelectorAll('.hud-quest').length;
+    const n = quests.querySelectorAll('.hud-quest:not(.pinned)').length; // 숨긴(숨길) 쪽지 수: 고정한 것은 늘 보여서 빼고 센다
     stowBtn.textContent = stowed ? `퀘스트 ${n}` : '숨기기';
-    stowBtn.title = stowed ? '퀘스트 쪽지 꺼내기' : '퀘스트 쪽지를 왼쪽으로 숨기기';
+    stowBtn.title = stowed ? '퀘스트 쪽지 꺼내기' : '퀘스트 쪽지를 왼쪽으로 숨기기(고정한 쪽지는 남아요)';
     stowBtn.setAttribute('aria-pressed', String(stowed));
   }
   stowBtn.addEventListener('click', () => {
-    const shown = [...quests.querySelectorAll('.hud-quest')].filter((e) => !e.hidden);
+    const loose = () => [...quests.querySelectorAll('.hud-quest:not(.pinned)')].filter((e) => !e.hidden); // 숨기고 꺼낼 쪽지(고정한 것은 늘 그 자리)
+    const shown = loose();
     const slide = (on) => { stowed = on; try { localStorage.setItem(STOW_KEY, on ? '1' : '0'); } catch { /* 기억 못 해도 지금은 바뀐다 */ } applyStow(); foldQuests(); };
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (!stowed && shown.length && !still && shown[0].animate) {
@@ -90,30 +88,14 @@ export function createHud(ui, input) {
       return;
     }
     slide(!stowed);
-    if (!stowed && !still) [...quests.querySelectorAll('.hud-quest')].filter((e) => !e.hidden).forEach((e) => e.animate?.([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'ease-out' }));
+    if (!stowed && !still) loose().forEach((e) => e.animate?.([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'ease-out' }));
   });
-  let questsOpen = false;
-  let questsPeek = 0; // 새 퀘스트 카드가 날아오는 동안 접힌 목록을 잠깐 펼쳐 둔 수(다 꽂히면 다시 접는다)
-  const narrowMq = window.matchMedia('(max-width: 820px), (max-height: 520px)');
-  /**
-   * 접힌 상태에 맞춰 쪽지를 숨긴다. 고정(압정)한 쪽지는 접어도 늘 보이고, 남은 자리(휴대폰 1 · 넓은 화면 3에서 고정 수를 뺀 만큼)만큼 나머지를 보인다.
-   * 날아오는 중인 쪽지는 카드가 꽂힐 자리라 늘 보인다.
-   */
+  /** 숨긴 상태에 맞춰 쪽지를 보인다: 숨겼으면 고정(압정)한 쪽지만, 아니면 모두. */
   function foldQuests() {
-    const items = [...quests.querySelectorAll('.hud-quest')], limit = narrowMq.matches ? 1 : 3;
-    const pinned = items.filter((e) => e.classList.contains('pinned')).length, room = Math.max(0, limit - pinned);
-    let free = room, hidden = 0;
-    items.forEach((e) => {
-      let show = questsOpen || e.classList.contains('pinned') || e.classList.contains('incoming');
-      if (!show && free > 0) { free--; show = true; }
-      e.hidden = !show;
-      if (!show) hidden++;
-    });
-    moreBtn.hidden = stowed || items.length - pinned <= room; // 접어도 숨을 쪽지가 없으면 단추도 없다(통째로 숨겼으면 꺼내기 단추만)
+    const items = [...quests.querySelectorAll('.hud-quest')];
+    items.forEach((e) => { e.hidden = stowed && !e.classList.contains('pinned'); });
     qbar.hidden = !items.length;
     applyStow();
-    moreBtn.textContent = questsOpen ? '접기' : `퀘스트 ${hidden}개 더`;
-    moreBtn.setAttribute('aria-expanded', String(questsOpen));
   }
   /**
    * 가운데 큰 카드(부탁 · 이야기 완료, 큰 소식): ms 뒤에 저절로 사라지고, 그 전에 화면 어디를 누르거나 Space · Enter · Esc 를 누르면 바로 넘긴다.
@@ -140,8 +122,6 @@ export function createHud(ui, input) {
   const SIDE_BOOK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5q4.8-2.2 9.5.9 4.7-3.1 9.5-.9v12.2q-4.8-2.2-9.5.9-4.7-3.1-9.5-.9z" fill="#fff"/><path d="M12 7.4v12.2" stroke="#a978c4" stroke-width="1.6"/></svg>';
   const PIN_SVG ='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3h7l-1.2 5.2 3.2 3.3V14h-11v-2.5l3.2-3.3z" fill="currentColor"/><path d="M12 14v7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   const questPinFns = [];
-  moreBtn.addEventListener('click', () => { questsOpen = !questsOpen; questsPeek = 0; foldQuests(); }); // 직접 고른 것은 카드 연출이 끝나도 그대로
-  narrowMq.addEventListener?.('change', foldQuests);
   const notes = new Map(); // 퀘스트 id → { el, key }
   // 카드가 날아오는 중인 퀘스트(그동안 그 쪽지는 숨겨 두었다가 카드가 꽂히면 반짝이며 나타난다)
   const incoming = new Map(); // id → 날아오는 카드 수
@@ -389,7 +369,7 @@ export function createHud(ui, input) {
         if (!nt) {
           const e = el('div', 'hud-quest');
           e.innerHTML = '<i></i><b></b><span><em></em><small></small></span>';
-          // 압정: 누르면 이 쪽지를 고정(접어도 늘 보인다) · 한 번 더 누르면 풀기
+          // 압정: 누르면 이 쪽지를 고정(숨겨도 늘 보인다) · 한 번 더 누르면 풀기
           const pin = el('button', 'hud-quest-pin', PIN_SVG);
           pin.type = 'button';
           pin.addEventListener('click', (ev) => { ev.stopPropagation(); questPinFns.forEach((fn) => fn(pin.dataset.id)); });
@@ -404,7 +384,7 @@ export function createHud(ui, input) {
         pin.dataset.id = q.id;
         pin.setAttribute('aria-pressed', String(!!q.pinned));
         pin.setAttribute('aria-label', q.pinned ? `${q.title} 고정 풀기` : `${q.title} 고정하기`);
-        pin.title = q.pinned ? '고정 풀기' : '고정하기(접어도 보여요)';
+        pin.title = q.pinned ? '고정 풀기' : '고정하기(숨겨도 보여요)';
         e.classList.toggle('story', !!q.story);
         e.classList.toggle('side', !!q.side && !q.story);
         e.classList.toggle('incoming', incoming.has(q.id));
@@ -568,7 +548,6 @@ export function createHud(ui, input) {
       if (toQuest && id && !stowed) {
         incoming.set(id, (incoming.get(id) || 0) + 1);
         notes.get(id)?.el.classList.add('incoming');
-        if (!questsOpen || questsPeek) { questsPeek++; questsOpen = true; } // 접혀 있었으면 카드가 날아와 꽂히는 동안만 목록을 펼친다
         foldQuests();
       }
       target?.classList.add('incoming');
@@ -591,8 +570,6 @@ export function createHud(ui, input) {
           const left = (incoming.get(id) || 1) - 1, note = notes.get(id)?.el;
           if (left > 0) incoming.set(id, left); else { incoming.delete(id); note?.classList.remove('incoming'); }
           shineQuest(note);
-          // 반짝임이 끝나면 잠깐 펼쳤던 목록을 다시 접는다(그사이 직접 펼치거나 접었으면 그대로)
-          setTimeout(() => { if (questsPeek > 0 && --questsPeek === 0) questsOpen = false; foldQuests(); }, 1700);
           return;
         }
         job.classList.remove('got');

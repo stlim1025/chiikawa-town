@@ -1552,12 +1552,6 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest small { padding: 0 8px 1px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-size: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-quests { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .hud-quest[hidden] { display: none; }
-/* 접어 둔 퀘스트 쪽지 펼치기 · 접기(왼쪽 위 기둥은 눌리지 않게 해 두어서 이 단추만 눌리게) */
-/* 퀘스트 더 보기 · 접기: 쪽지(연한 크림색)와 달리 노란 단추 + 화살표로 누르는 것임을 알 수 있게 */
-.hud-quest-more { pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px 5px 14px; border: 2px solid #fff; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
-.hud-quest-more::after { content: "▾"; font-size: 12px; line-height: 1; }
-.hud-quest-more[aria-expanded="true"]::after { content: "▴"; }
-.hud-quest-more:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
 /* 퀘스트 고정 압정(쪽지 오른쪽 위 모서리): 고정하면 노란 동그라미에 빨간 압정, 쪽지 테두리도 노랗게 */
 .hud-quest-pin { position: absolute; top: -9px; right: -9px; width: 26px; height: 26px; padding: 0; display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%;
   background: #f3e6c4; color: #b8a27a; box-shadow: 0 2px 0 rgba(120, 88, 48, 0.25); pointer-events: auto; cursor: pointer; }
@@ -1566,7 +1560,6 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest.pinned { box-shadow: 0 3px 0 #e8c97a, 0 0 0 2px var(--yellow); }
 .hud-quest.pinned .hud-quest-pin { background: var(--yellow); color: #e0464f; }
 .hud-quest.pinned .hud-quest-pin svg { transform: none; }
-.hud-quest-more[hidden] { display: none; }
 .hud-quest, .toast { word-break: keep-all; } /* 한국어는 낱말 단위로 줄바꿈 */
 .hud-quest .q-chips { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
 .hud-quest .q-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 9px 1px 3px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1575,7 +1568,7 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest .q-chip.one { padding: 0 5px 1px 3px; }
 .hud-quest > .q-chips { grid-column: -2 / -1; margin-top: 3px; } /* 꼬리표가 여럿이면 목표 글 아래 칸 */
 .hud-quests:empty { display: none; }
-/* 퀘스트 쪽지 아래 단추 줄: 더 보기 · 접기, 숨기기(◂). 숨기면 쪽지는 모두 빠지고 '퀘스트 N ▸' 꺼내기 단추만 */
+/* 퀘스트 쪽지 아래 단추 줄: 숨기기(◂). 숨기면 고정(압정)한 쪽지만 남고 나머지는 '퀘스트 N ▸' 꺼내기 단추로 */
 .hud-quest-bar { display: flex; align-items: center; gap: 6px; }
 .hud-quest-stow { pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px 5px 10px; border: 2px solid #fff; border-radius: 999px; background: var(--paper-soft); box-shadow: 0 3px 0 var(--shadow); color: var(--ink-soft); font: inherit; font-size: 14px; cursor: pointer; position: relative; }
 .hud-quest-stow::before { content: "◂"; font-size: 12px; line-height: 1; }
@@ -1583,7 +1576,7 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quests.stowed .hud-quest-stow { padding: 3px 10px 5px 14px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); }
 .hud-quests.stowed .hud-quest-stow::before { content: none; }
 .hud-quests.stowed .hud-quest-stow::after { content: "▸"; font-size: 12px; line-height: 1; }
-.hud-quests.stowed > .hud-quest { display: none !important; }
+.hud-quests.stowed > .hud-quest:not(.pinned) { display: none !important; }
 .hud-quest-stow.shine { animation: q-shine 1.4s ease-out; }
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
