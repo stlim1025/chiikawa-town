@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { WEED_KINDS, stagesOf } from '../core/weeding.js';
-import { regionAt, roadDist, shoreDist, VILLAGE_R } from '../core/layout.js';
+import { regionAt, roadDist, shoreDist, VILLAGE_R, SOUTH_SHORE } from '../core/layout.js';
 import { part, mergeParts } from '../render/merge.js';
 
 /**
  * 풀 10종이 자라는 곳. area 는 아래 AREAS 의 자리 고르기 규칙, n 은 그 자리에 동시에 자라는 수.
  * 마을 안은 5 · 4 · 3급 풀만, 마을 밖 구역마다 그 구역의 풀이 자란다.
+ * near: 뽑힌 자리 근처(NEAR_R 안)에 먼저 다시 자란다(갈대밭처럼 — 물가 띠가 길어서 아무 데나 나면 뽑은 곳에 다시 안 나는 것 같았다).
  */
 const SPAWN = {
   weed: [{ area: 'village', n: 24 }, { area: 'fields', n: 10 }],
@@ -14,7 +15,7 @@ const SPAWN = {
   foxtail: [{ area: 'fields', n: 14 }, { area: 'villageEdge', n: 4 }],
   vine: [{ area: 'forest', n: 14 }],
   thorny: [{ area: 'villageEdge', n: 8 }, { area: 'forest', n: 5 }],
-  reed: [{ area: 'shore', n: 16 }],
+  reed: [{ area: 'shore', n: 16, near: true }],
   rockmoss: [{ area: 'mountain', n: 14 }],
   moongrass: [{ area: 'forest', n: 6 }, { area: 'mountain', n: 6 }],
   giantweed: [{ area: 'forestDeep', n: 4 }],
@@ -28,9 +29,11 @@ const AREAS = {
   mountain: { box: [-55, 55, -68, -34], ok: (x, z) => regionAt(x, z) === 'mountain' },
   mountainDeep: { box: [-50, 50, -70, -55], ok: (x, z) => regionAt(x, z) === 'mountain' },
   riverbank: { box: [-60, 60, 32, 68], ok: (x, z) => regionAt(x, z) === 'river' && shoreDist(x, z) > 1.5 },
-  shore: { box: [-70, 70, 30, 72], ok: (x, z) => Math.hypot(x, z) > VILLAGE_R + 3 && shoreDist(x, z) > 0.4 && shoreDist(x, z) < 1.8 }
+  // 물가 갈대: 강가 · 호숫가(일감 안내대로). 남쪽 바닷가는 뺀다(거기 난 갈대는 아무도 찾지 않아 자리만 차지했다)
+  shore: { box: [-70, 70, 30, 72], ok: (x, z) => Math.hypot(x, z) > VILLAGE_R + 3 && shoreDist(x, z) > 0.4 && shoreDist(x, z) < 1.8 && SOUTH_SHORE - z > 2 }
 };
 const REGROW_SECONDS = 20;
+const NEAR_R = 6; // near 규칙: 뽑힌 자리에서 이만큼 안에 먼저 다시 자란다
 /** 이보다 먼 풀은 그리지 않는다(안개 너머). */
 const DRAW_DIST = 50;
 const HINT_DIST = 22; // 뽑을 풀 표시는 이만큼 가까운 풀에만(멀리까지 다 띄우면 어지럽다)
@@ -177,14 +180,17 @@ export function createWeeds(scene, village, random = Math.random) {
   const list = [];
   const flying = [];
   let nextId = 1, regrow = 0, cull = 0, nightK = 0;
+  const pulledAt = new Map(); // near 규칙(종류|자리) → 뽑힌 자리들(다시 자랄 때 먼저 쓴다, 먼저 뽑힌 것부터)
+  const nearRule = (kind, area) => (SPAWN[kind] || []).some((r) => r.area === area && r.near);
 
-  /** 그 규칙의 빈 자리 하나(없으면 null). */
-  function spotFor(area) {
+  /** 그 규칙의 빈 자리 하나(없으면 null). near 를 주면 처음 절반은 그 자리 둘레(NEAR_R 안)에서 고른다. */
+  function spotFor(area, near = null) {
     if (area === 'village') return village.randomFreeSpot(random, 5, 25);
     if (area === 'villageEdge') return village.randomFreeSpot(random, 21, 26.5);
     const A = AREAS[area], [x0, x1, z0, z1] = A.box;
     for (let i = 0; i < 80; i++) {
-      const x = x0 + random() * (x1 - x0), z = z0 + random() * (z1 - z0);
+      const close = near && i < 40;
+      const x = close ? near.x + (random() * 2 - 1) * NEAR_R : x0 + random() * (x1 - x0), z = close ? near.z + (random() * 2 - 1) * NEAR_R : z0 + random() * (z1 - z0);
       if (!A.ok(x, z) || roadDist(x, z) < 0.4 || !village.isFree(x, z, 0.6, true)) continue;
       if (Object.values(village.spots).some((s) => Math.hypot(s.x - x, s.z - z) < 2.5)) continue;
       return { x, z };
@@ -192,8 +198,8 @@ export function createWeeds(scene, village, random = Math.random) {
     return null;
   }
 
-  function spawn(kind, area) {
-    const spot = spotFor(area);
+  function spawn(kind, area, near = null) {
+    const spot = spotFor(area, near);
     if (!spot || list.some((w) => Math.hypot(w.x - spot.x, w.z - spot.z) < 1.0)) return false;
     const mesh = weedMesh(kind);
     mesh.position.set(spot.x, 0, spot.z);
@@ -293,6 +299,12 @@ export function createWeeds(scene, village, random = Math.random) {
       const i = list.indexOf(weed);
       if (i < 0) return;
       list.splice(i, 1);
+      if (nearRule(weed.kind, weed.area)) {
+        const key = weed.kind + '|' + weed.area, q = pulledAt.get(key) || [];
+        q.push({ x: weed.x, z: weed.z });
+        if (q.length > 16) q.shift();
+        pulledAt.set(key, q);
+      }
       dropHint(weed);
       flyOff(weed.mesh, result);
     },
@@ -399,10 +411,12 @@ export function createWeeds(scene, village, random = Math.random) {
       regrow += dt;
       if (regrow >= REGROW_SECONDS) {
         regrow = 0;
-        // 자리마다 모자란 만큼 하나씩 다시 자란다
+        // 자리마다 모자란 만큼 하나씩 다시 자란다(near 규칙은 뽑힌 자리 근처부터)
         for (const [kind, rules] of Object.entries(SPAWN)) {
           for (const r of rules) {
-            if (list.filter((w) => w.kind === kind && w.area === r.area).length < r.n) spawn(kind, r.area);
+            if (list.filter((w) => w.kind === kind && w.area === r.area).length >= r.n) continue;
+            const q = r.near ? pulledAt.get(kind + '|' + r.area) : null;
+            spawn(kind, r.area, q && q.length ? q.shift() : null);
           }
         }
         applyVisibility(focus);
