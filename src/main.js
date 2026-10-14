@@ -96,6 +96,7 @@ import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
+import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
@@ -588,6 +589,7 @@ function boot() {
   /** 주인: 놀러 온 친구가 몬스터를 쓰러뜨렸다 → 전리품 · 점수는 그 친구 쪽에서. 구역 보스면 내 마을에서도 오늘은 끝. */
   function guestKilled(id, m) {
     multi.direct(id, { t: 'kill', sp: m.species, x: r2(m.x), z: r2(m.z), clean: m.hitGuests && m.hitGuests.has(id) ? 0 : 1 });
+    if (m.bounty) { bountyM = null; commit(markBountyDown(state)); hud.toast(`${josa(m.M.name, '이/가')} 쓰러졌어요! 게시판에서 현상금을 받아요`, 3600, { icon: monsterSvg(m.species) }); } // 놀러 온 친구가 잡아도 우리 마을 현상금
     if (Math.hypot(m.x - player.position.x, m.z - player.position.z) < 16) sound.play('poof');
     if (BOSS_LAIRS[m.species]) {
       lairBossM[m.species] = null;
@@ -967,6 +969,16 @@ function boot() {
       const lines = [...st.say];
       lines.speaker = 'chiikawa';
       finishQuestStep('blackStar', null, lines);
+    },
+    // 현상금 몬스터(core/bounty.js): 게시판 전단 · 현상금 받기
+    bounty: () => (state && !visiting ? bountyNow(state) : null),
+    claimBounty: () => {
+      const r = claimBounty(state);
+      if (!r.ok) return;
+      commit(r.state);
+      sound.play('coin');
+      player.cheerTime = 1.0;
+      hud.toast('현상금을 받았어요!', 3200, { chips: [{ icon: 'coin', text: won(r.reward) }] });
     },
     // 사이드스토리 '수상한 섬 합숙': 친구 다섯과 친해지면 게시판에 '보수 100배' 전단지가 붙는다. 떼면 친구들이 모여들어 보고 이야기 시작
     boardStory: () => (state ? boardStory(state) : null),
@@ -2763,6 +2775,25 @@ function boot() {
       }
     }
   }
+  /**
+   * 현상금 몬스터(core/bounty.js): 그날 정해진 시각이 되면 그 구역에 황금 대장이 나타나고 게시판에 전단이 붙는다(알림 한 번).
+   * 쓰러뜨리면 게시판에서 현상금을 받는다. 밤 10시가 지나면 사라진다. 다시 불러온 저장이면 아직 안 잡은 대장을 다시 세운다.
+   */
+  let bountyM = null, bountyNote = 0; // bountyNote: 나타났다고 알린 날(사라졌다고 알렸으면 음수)
+  function updateBounty(p) {
+    const b = bountyNow(state);
+    if (!b || b.status !== 'up') {
+      if (bountyM) { if (!bountyM.dead) monsters.clear((m) => m === bountyM); bountyM = null; }
+      if (b && b.status === 'gone' && bountyNote === b.day) { bountyNote = -b.day; hud.toast(`${josa(b.name, '이/가')} 어디론가 사라졌어요`, 3000, { icon: monsterSvg(b.species) }); }
+      return;
+    }
+    if (!bountyM || bountyM.dead) bountyM = monsters.spawnElite(b.species, p, { name: b.name, ...ELITE });
+    if (bountyM && bountyNote !== b.day && bountyNote !== -b.day) {
+      bountyNote = b.day;
+      sound.play('warn');
+      hud.toast('현상금 몬스터가 나타났어요!', 5200, { icon: monsterSvg(b.species), chips: [{ text: b.name }, { text: b.where }, { icon: 'coin', text: won(b.reward) }] });
+    }
+  }
   /** 0.3초마다: 도착한 곳 · 왕버섯 깨우기 · 처음 부탁 안내. */
   /**
    * 부탁에 필요한 걸 다 모았을 때(물건 · 토벌 · 풀): 그 순간 한 번 '다 모았어요!' 카드가 떠서 퀘스트 쪽지로 날아가 반짝이고, 띠링 소리 · 만세.
@@ -2823,6 +2854,7 @@ function boot() {
       if (!bossTime) { monsters.clear((m) => m === bossM); bossM = null; }
     }
     updateLairBosses(p);
+    updateBounty(p);
     // 처음으로 부탁할 친구가 생기면 한 번 알려 준다
     if (!questHint && !seen('quest-intro') && !tutorialActive(state.tutorial) && free) {
       const any = npcs.list.some((m) => markOf(state, m.kind) === '!');
@@ -3101,13 +3133,14 @@ function boot() {
     if (BOSS_LAIRS[m.species] && !m.remote) s = markBossDown(s, m.species, s.clock.day); // 구역 보스: 오늘은 끝, 내일 다시 나타난다
     const before = s.job;
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
-    const drop = m.M.drop;
+    if (m.bounty && !m.remote) s = markBountyDown(s); // 현상금 황금 대장: 게시판에서 현상금을 받는다
+    const drop = m.M.drop, many = m.bounty ? ELITE.drops : 1;
     let got = 0;
-    if (drop && !partners.length) { const r = addItem(s, drop, 1); s = r.state; got = r.added; }
+    if (drop && !partners.length) { const r = addItem(s, drop, many); s = r.state; got = r.added; }
     commit(s);
     // 전리품 · 토벌 일감 진행: 열매 따기처럼 그림 + 숫자가 반짝이며 통통(가방 개수는 가방이 톡 튀는 것으로)
     if (drop && partners.length) dropToWorld(drop, m.x, m.z); // 파티: 전리품은 그 자리 바닥에(누구든 줍는다)
-    else if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: '+1', kind: 'pick', icon: itemSvg(drop) }); hud.bagBump(); }
+    else if (got) { hud.floatText({ x: m.x, y: m.mesh.height + 0.35, z: m.z, text: `+${got}`, kind: 'pick', icon: itemSvg(drop) }); hud.bagBump(); }
     else if (drop) hud.toast('가방이 꽉 찼어요');
     if (state.hunted[m.species] === 1) hud.toast(`${m.M.name} 첫 토벌!`, 2600, { icon: monsterSvg(m.species) });
     else if (state.job && JOB_TYPES[state.job.typeId].kind === m.species && !isComplete(state.job)) hud.floatText({ x: m.x, y: m.mesh.height + 1.05, z: m.z, text: `${state.job.count} / ${JOB_TYPES[state.job.typeId].target}`, kind: 'pick', icon: monsterSvg(m.species) });
@@ -3121,6 +3154,11 @@ function boot() {
       monsters.clear((o) => o.summoned);
       hud.banner('왕버섯을 쓰러뜨렸다!', '', 3000);
       if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
+    }
+    if (m.bounty) {
+      bountyM = null;
+      happen({ type: 'playerBoss', who: 'me', boss: m.M.name }); // 온 마을에 소문이 난다
+      hud.banner(`${josa(m.M.name, '을/를')} 쓰러뜨렸다!`, '노동 접수 게시판에서 현상금을 받아요', 3400);
     }
     // 구역 보스를 쓰러뜨렸다: 부하는 흩어지고, 소문이 나고, 내일 다시 나타난다
     if (BOSS_LAIRS[m.species]) {
@@ -4162,7 +4200,7 @@ function boot() {
         npcs.say(n, lineOf(n.kind, 'huntGo', { mon: MONSTERS[T.kind] ? MONSTERS[T.kind].name : '' }));
       } },
       { do: 'hunt', left: T.target, giveUp: () => lifeClock > deadline,
-        find: (x, z, skip) => monsters.nearest(x, z, 140, (m) => m.species === T.kind && !m.summoned && !m.exam && !m.M.boss && !skip.has(m)),
+        find: (x, z, skip) => monsters.nearest(x, z, 140, (m) => m.species === T.kind && !m.summoned && !m.exam && !m.M.boss && !m.bounty && !skip.has(m)), // 현상금 황금 대장은 내 몫
         hit: (m) => monsters.npcHit(m, power, n.x, n.z),
         onKill: (m) => {
           job.done++;

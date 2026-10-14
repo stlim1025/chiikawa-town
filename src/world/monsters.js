@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toonMaterial, addOutline, GEO } from '../render/toon.js';
+import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
 import { MONSTERS, inSwing } from '../core/combat.js';
 import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, canyonAt, ARENA_WALL } from '../core/layout.js';
@@ -1301,6 +1301,30 @@ export function createMonsters(scene, village, random = Math.random) {
     },
     /** 시험 허수아비 · 이야기 속 왕버섯처럼 정해진 자리에 놓는다. extra.exam 이면 마을 안에도 둔다. */
     spawnAt(species, x, z, extra = {}) { return add(species, x, z, { ...extra, wobble: 0 }); },
+    /**
+     * 현상금 몬스터(core/bounty.js): 그 종류가 사는 곳(avoid 에서 떨어진 자리)에 크고 단단한 '황금' 대장 하나 — 머리에 금관, 발밑에 금빛 고리.
+     * E: { name, hp, dmg, size } 배율. 자리가 없으면 null(조금 뒤 다시).
+     */
+    spawnElite(species, avoid, E) {
+      const base = MONSTERS[species], S = SPAWN[species], spot = S && spotFor(S.area, base.size * E.size, avoid);
+      if (!spot) return null;
+      const M = { ...base, name: E.name, short: E.name, hp: Math.round(base.hp * E.hp), dmg: Math.round(base.dmg * E.dmg), size: base.size * E.size };
+      const m = add(species, spot.x, spot.z, { M, hp: M.hp, bounty: true, big: E.size });
+      m.born = 0.01;
+      m.mesh.root.scale.setScalar(0.01);
+      const crown = new THREE.Group(), gold = '#f2c94c';
+      crown.position.y = (m.mesh.height || 0.8) + (m.mesh.hover || 0) - 0.04;
+      crown.add(toonMesh(GEO.cylinder, gold, { scale: [0.17, 0.08, 0.17], outline: 0.02, shadow: false }));
+      [0, 1, 2, 3, 4].forEach((i) => { const a = (i / 5) * Math.PI * 2; crown.add(toonMesh(GEO.cone, gold, { position: [Math.sin(a) * 0.14, 0.08, Math.cos(a) * 0.14], scale: [0.05, 0.11, 0.05], outline: 0.012, shadow: false })); });
+      crown.add(toonMesh(GEO.dot, '#ff7a9a', { position: [0, 0.06, 0.17], scale: [0.035, 0.035, 0.035], outline: false, shadow: false }));
+      m.mesh.inner.add(crown);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.55, depthWrite: false }));
+      ring.position.y = 0.03 - (m.mesh.hover || 0);
+      ring.scale.setScalar(base.size * 1.15);
+      m.mesh.inner.add(ring);
+      m.mesh.height = (m.mesh.height || 0.8) * E.size + 0.2; // 이름표 · 글씨가 금관 위에 뜨게
+      return m;
+    },
     /** 조건에 맞는 몬스터를 없앤다(연기 없이). */
     clear(fn) {
       for (let i = list.length - 1; i >= 0; i--) if (fn(list[i])) removeAt(i);
@@ -1602,7 +1626,7 @@ export function createMonsters(scene, village, random = Math.random) {
         if (m.dead) {
           m.deadT += dt;
           const k = m.deadT / 0.35;
-          root.scale.setScalar(Math.max(0.01, (1 + k * 0.3) * (1 - k)));
+          root.scale.setScalar(Math.max(0.01, (1 + k * 0.3) * (1 - k)) * (m.big || 1));
           root.rotation.y += dt * 14;
           if (m.mound) m.mound.visible = false;
           if (k >= 1) removeAt(i);
@@ -1613,7 +1637,7 @@ export function createMonsters(scene, village, random = Math.random) {
         if (m.leaving) {
           m.leaveT = (m.leaveT || 0) + dt;
           root.position.y = m.leaveT * 2.2;
-          root.scale.setScalar(Math.max(0.01, 1 - m.leaveT / 1.6));
+          root.scale.setScalar(Math.max(0.01, 1 - m.leaveT / 1.6) * (m.big || 1));
           if (m.leaveT > 1.6) removeAt(i);
           continue;
         }
@@ -1626,8 +1650,8 @@ export function createMonsters(scene, village, random = Math.random) {
           continue;
         }
         root.visible = true;
-        if (m.born > 0) { m.born = Math.min(1, m.born + Math.max(0, dt) * 2.2); root.scale.setScalar(m.born >= 1 ? 1 : m.born); if (m.born >= 1) m.born = 0; }
-        else if (m.born < 0 || root.scale.x <= 0) { m.born = 0; root.scale.setScalar(1); } // 크기가 0 이하로 굳은 몬스터(뒤집혀 땅속)는 바로잡는다
+        if (m.born > 0) { m.born = Math.min(1, m.born + Math.max(0, dt) * 2.2); root.scale.setScalar((m.born >= 1 ? 1 : m.born) * (m.big || 1)); if (m.born >= 1) m.born = 0; } // big: 현상금 황금 대장은 크다
+        else if (m.born < 0 || root.scale.x <= 0) { m.born = 0; root.scale.setScalar(m.big || 1); } // 크기가 0 이하로 굳은 몬스터(뒤집혀 땅속)는 바로잡는다
         m.flash = Math.max(0, m.flash - dt);
         m.alert = Math.max(0, m.alert - dt);
         m.stun = Math.max(0, m.stun - dt);

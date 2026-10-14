@@ -512,6 +512,19 @@ export function createPanels(ui, handlers) {
           h('div', { class: 'bf-sub' }, fl.sub),
           h('button', { class: 'btn primary', type: 'button', onClick: () => handlers.takeFlyer() }, '전단지 떼기')));
       }
+      // 현상금 몬스터(core/bounty.js): 나타나 있거나 쓰러뜨렸으면 빨간 '현상금' 전단(쓰러뜨렸으면 현상금 받기)
+      const bt = !tutorial && handlers.bounty?.();
+      if (bt && ['up', 'down', 'paid'].includes(bt.status)) {
+        out.push(h('div', { class: `board-wanted ${bt.status}` },
+          h('i', { class: 'pin', 'aria-hidden': 'true' }),
+          svgSpan('bw-art', monsterSvg(bt.species)),
+          h('div', { class: 'bw-txt' },
+            h('div', { class: 'bw-head' }, '현상금'),
+            h('div', { class: 'bw-name' }, bt.name),
+            h('div', { class: 'bw-sub' }, bt.status === 'up' ? `${bt.where}에 나타났어요. 밤 10시가 지나면 사라져요` : bt.status === 'down' ? '쓰러뜨렸어요! 현상금을 받아 가세요' : '현상금을 받았어요'),
+            h('div', { class: 'bw-pay' }, svgSpan('coin-ico', COIN), won(bt.reward))),
+          bt.status === 'down' ? h('button', { class: 'btn primary', type: 'button', onClick: after(() => handlers.claimBounty()) }, '현상금 받기') : null));
+      }
       // 오늘 남은 일감: 제목 밑 얇은 막대 한 줄(상자 없이)
       if (!tutorial) {
         const pct = total > 0 ? Math.min(100, Math.round((remain / total) * 100)) : 0;
