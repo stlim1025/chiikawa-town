@@ -1,6 +1,7 @@
 // 가방 · 옷장 그림: 열매, 꾸미기 소품, 포셰트, (풀은 weedart.js). 64 × 64 칸.
 import { weedSvg } from './weedart.js';
 import { WEED_KINDS } from '../core/weeding.js';
+import { FISH } from '../core/fishing.js';
 
 const L = '#5a4431';
 const S = `stroke="${L}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"`;
@@ -139,6 +140,17 @@ Object.assign(EXTRA, {
 /** 추첨권: 주황 표에 별. */
 export const TICKET_SVG = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 11h30v5a4 4 0 0 0 0 8v5H5v-5a4 4 0 0 0 0-8z" fill="#ffb36b" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 12v16" stroke="#5a4431" stroke-width="1.6" stroke-dasharray="2.4 2.4"/><path d="M25 14.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="#fff6c8" stroke="#5a4431" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 export function registerItemArt(map) { Object.assign(EXTRA, map); }
+/** 물고기 그림(core/fishing.js): 종류마다 몸 색, 문어는 둥근 머리에 다리, 빈 깡통은 깡통. */
+function fishSvg(id) {
+  const c = FISH[id].color, shadow = '<ellipse cx="32" cy="55" rx="18" ry="3.6" fill="#e6d8b8"/>';
+  if (id === 'can') return `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow}<rect x="20" y="18" width="24" height="34" rx="5" fill="${c}" ${S}/><path d="M20 26h24M20 44h24" fill="none" ${S}/><rect x="25" y="30" width="14" height="10" rx="2" fill="#e0524f"/></svg>`;
+  if (id === 'octopus') return `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow}<path d="M14 44q4 10 10 4M24 46q2 9 8 4M32 46q4 9 9 3M40 44q6 8 10 2" fill="none" stroke="${c}" stroke-width="5" stroke-linecap="round"/><ellipse cx="32" cy="30" rx="17" ry="16" fill="${c}" ${S}/><circle cx="26" cy="31" r="2.6" fill="#3a2a28"/><circle cx="38" cy="31" r="2.6" fill="#3a2a28"/><circle cx="25" cy="24" r="2" fill="#fff" opacity=".7"/></svg>`;
+  const puff = id === 'puffer', h = puff ? 14 : FISH[id].size === 2 ? 11 : 9;
+  return `<svg viewBox="0 0 64 64" aria-hidden="true">${shadow}<path d="M48 32l10-9v18z" fill="${c}" ${S}/><ellipse cx="30" cy="32" rx="${puff ? 17 : 20}" ry="${h}" fill="${c}" ${S}/>` +
+    (id === 'rainbow' ? '<path d="M14 33q16-5 34 0" fill="none" stroke="#f7c6d4" stroke-width="3.4"/>' : '') +
+    `<path d="M28 ${32 - h + 3}q4 6 0 ${2 * h - 6}" fill="none" stroke="#3a2a28" stroke-width="1.6" opacity=".5"/><circle cx="18" cy="29" r="2.6" fill="#3a2a28"/><circle cx="17.2" cy="28.2" r="0.9" fill="#fff"/><ellipse cx="34" cy="${32 - h + 4}" rx="6" ry="2" fill="#fff" opacity=".35"/></svg>`;
+}
+
 export function itemSvg(id) {
   if (WEED_KINDS[id]) return weedSvg(id);
   if (id === 'berry') {
@@ -149,5 +161,6 @@ export function itemSvg(id) {
       <circle cx="19" cy="37" r="2.6" fill="#fff" opacity=".7"/><circle cx="39" cy="37" r="2.6" fill="#fff" opacity=".7"/><circle cx="29.5" cy="27.5" r="2.4" fill="#fff" opacity=".7"/></svg>`;
   }
   if (EXTRA[id]) return EXTRA[id];
+  if (FISH[id]) return fishSvg(id);
   return `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="18" fill="#eadcb8" ${S}/><text x="32" y="40" text-anchor="middle" font-size="22" fill="${L}">?</text></svg>`;
 }

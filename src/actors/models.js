@@ -970,6 +970,13 @@ function playerDef(rawLook) {
   const arm = parts.find((pt) => pt.n === 'armR' && pt.m === 'sphere'), az = arm.r ? arm.r[2] : 0;
   pivots.weapon = [arm.p[0] + arm.s[1] * Math.sin(az), arm.p[1] - arm.s[1] * Math.cos(az), arm.p[2]];
   for (const [tag, list] of Object.entries(WEAPON_PARTS)) held({ parts }, 'armR', HOLD.train, list).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag }));
+  // 낚싯대(core/fishing.js, 꼬리표 'rod' — player.setRod 로 보인다): 손잡이 · 릴 · 앞으로 길게 뻗은 대 끝에 빨간 끝
+  held({ parts }, 'armR', HOLD.train, [
+    { m: 'box', c: '#7a5136', p: [0, 0, 0.03], s: [0.05, 0.05, 0.24] },
+    { m: 'cylinder', c: '#b9bec6', p: [0.055, -0.03, 0.06], r: [0, 0, Math.PI / 2], s: [0.05, 0.035, 0.05] },
+    { m: 'box', c: '#d9b27a', p: [0, 0.06, 0.78], r: [-0.12, 0, 0], s: [0.026, 0.026, 1.3] },
+    { m: 'dot', c: '#e0524f', p: [0, 0.14, 1.43], s: [0.03, 0.03, 0.03], o: false }
+  ]).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'rod' }));
   // 랭커가 무기에 새긴 내 얼굴(꼬리표 'wf-무기id', player.setEngraved 로 보인다)
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …

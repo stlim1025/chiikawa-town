@@ -21,7 +21,7 @@ import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
 import { buildChibi, setCrying, wearPajama, PAJAMA_COLORS } from './actors/models.js';
-import { setCelLight } from './render/toon.js';
+import { setCelLight, toonMesh, GEO } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
 import { createNpcs } from './actors/npcs.js';
 import { createInput } from './ui/joystick.js';
@@ -89,9 +89,10 @@ import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, RAMEN_SEATS, RAMEN_QUEUE } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
+import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf } from './core/fishing.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
@@ -932,9 +933,10 @@ function boot() {
     player.update(dt, input);
     updateCombat(dt); // 휘두르기 · 맞은 뒤 잠깐 무적
     if (pulling) updatePull(dt);
-    target = pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || downed ? null : findGuestTarget();
+    if (fishing) updateFish(dt);
+    target = pulling || fishing || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || downed ? null : findGuestTarget();
     const p = player.position, swingable = !target && !downed && weaponNow() && monsters.nearest(p.x, p.z, 6);
-    hud.setAction(pulling ? '뽑는 중' : target ? target.label : swingable ? '휘두르기' : null);
+    hud.setAction(pulling ? '뽑는 중' : fishing ? fishLabel() : target ? target.label : swingable ? '휘두르기' : null);
     updateExamPill(); // 친구 마을 검정소에서 본 제초 승급 시험도 그 마을 풀로 이어 간다
     // 할 일 쪽지(○급 시험을 보자!)도 여기서 걷는다: 내 마을 갱신은 놀러 간 동안 멈춰 있어서, 친구 마을에서 시험을 시작해도 쪽지가 남았다
     updateExamGoal();
@@ -1966,8 +1968,149 @@ function boot() {
   }
 
   /** 결과 없이 뽑기를 멈춘다(창이 열리거나 다시 시작할 때). 기운은 쓰지 않는다. */
+  // ---------- 낚시(core/fishing.js, 게임 오리지널): 낚싯대를 들고 물가에서 '낚시하기' ----------
+  // 던지면 찌가 물에 뜨고, 한두 번 톡톡 건드리다가(속지 말 것) 퐁 잠기면 바로 행동 버튼. 큰 고기는 '감기!' 연타로 끌어올린다
+  let fishing = null; // { phase: 'cast' | 'wait' | 'bite' | 'reel', water, spot, t, biteAt, nibbles: [초], fish, power, left }
+  const bobber = new THREE.Group();
+  bobber.add(toonMesh(GEO.sphere, '#ffffff', { scale: [0.08, 0.06, 0.08], outline: 0.012, shadow: false }));
+  bobber.add(toonMesh(GEO.sphere, '#e0524f', { position: [0, 0.05, 0], scale: [0.075, 0.055, 0.075], outline: 0.012, shadow: false }));
+  bobber.visible = false;
+  scene.add(bobber);
+  const fishLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x5a4431 }));
+  fishLine.visible = false;
+  fishLine.frustumCulled = false;
+  scene.add(fishLine);
+  /** 물가인지: 바라보는 쪽부터 둘러보며 1.5 ~ 2.7 앞에 물이 있으면 그 자리 { x, z, water }(내가 물속이면 null). */
+  function fishSpotNear(p, yaw) {
+    if (waterAt(p.x, p.z)) return null;
+    for (const da of [0, 0.45, -0.45, 0.9, -0.9, 1.5, -1.5, 2.2, -2.2, Math.PI]) {
+      for (const d of [1.5, 2.1, 2.7]) {
+        const a = yaw + da, x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d, water = waterAt(x, z);
+        if (water) return { x, z, water };
+      }
+    }
+    return null;
+  }
+  /** 낚싯대 끝: 손에 든 낚싯대의 빨간 끝(못 찾으면 오른손 위 앞쪽 어림). */
+  const rodTip = () => {
+    const v = new THREE.Vector3();
+    if (player.rodTip(v)) return v;
+    const p = player.position, y = player.yaw;
+    return v.set(p.x + Math.cos(y) * 0.35 + Math.sin(y) * 1.2, 1.55, p.z - Math.sin(y) * 0.35 + Math.cos(y) * 1.2);
+  };
+  /** 물낯 높이: 절벽 앞 만(바다를 아래로 낮춘 곳)만 낮다. */
+  const waterY = (x, z) => (z > SOUTH_SHORE && x > CLIFF.cove.x0 && x < CLIFF.cove.x1 ? CLIFF.cove.y : 0) + 0.04;
+  function beginFish(spot) {
+    if (state.stamina < FISH_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
+    commit(useStamina(state, FISH_STAMINA).state, false);
+    player.face(spot.x, spot.z);
+    player.busy = true;
+    player.setRod(true);
+    const wait = BITE_WAIT[0] + Math.random() * (BITE_WAIT[1] - BITE_WAIT[0]);
+    const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.8 + Math.random() * Math.max(0.2, wait - 1.4)).sort((a, b) => a - b); // 톡톡 건드리기(속지 말 것)
+    fishing = { phase: 'cast', t: 0, spot, water: spot.water, biteAt: wait, nibbles, fish: null, power: 0, left: 0 };
+    sound.play('swing');
+    if (!seen('fishing')) { markSeen('fishing'); hud.toast('찌가 퐁 잠기면 바로 눌러요. 톡톡 건드릴 때는 참아요', 4200); }
+  }
+  function cancelFish() {
+    if (!fishing) return;
+    fishing = null;
+    player.busy = false;
+    player.setRod(false);
+    player.mode = 'idle';
+    player.power = 0;
+    bobber.visible = false;
+    fishLine.visible = false;
+    hud.hideMeter();
+  }
+  function fishFail(text) {
+    const s = fishing.spot;
+    hud.floatText({ x: s.x, y: 0.9, z: s.z, text, kind: 'tip' });
+    sound.play('none');
+    cancelFish();
+  }
+  function fishCatch() {
+    const id = fishing.fish, F = FISH[id];
+    cancelFish();
+    const r = addItem(state, id, 1);
+    if (!r.added) { hud.toast('가방이 꽉 찼어요'); return; }
+    commit(r.state);
+    sound.play(F.junk ? 'can' : 'clean');
+    hud.bagBump();
+    player.cheerTime = F.junk ? 0 : 0.9;
+    hud.floatText({ x: player.position.x, y: 1.75, z: player.position.z, text: F.junk ? `${F.name}…` : `${F.name}!`, kind: 'mini', icon: itemSvg(id) });
+  }
+  /** 행동 버튼: 기다릴 때 누르면 너무 일러 놓치고, 찌가 잠기면 낚아채고, 감을 때는 연타. */
+  function fishPress() {
+    const f = fishing;
+    if (f.phase === 'cast') return;
+    if (f.phase === 'wait') { fishFail('너무 일렀어요…'); return; }
+    if (f.phase === 'bite') {
+      const R = rulesOf(f.fish);
+      if (!R.reel) { fishCatch(); return; }
+      f.phase = 'reel';
+      f.t = 0;
+      f.power = 0.35;
+      f.left = R.reel.time;
+      player.mode = 'pull';
+      sound.play('splash');
+      return;
+    }
+    f.power = Math.min(1, f.power + rulesOf(f.fish).reel.tap);
+    sound.play('click');
+    if (f.power >= 1) fishCatch();
+  }
+  function updateFish(dt) {
+    const f = fishing;
+    if (!f) return;
+    if (panels.isOpen() || guide.open || sleeping) { cancelFish(); return; }
+    f.t += dt;
+    const tip = rodTip(), s = f.spot, wy = waterY(s.x, s.z);
+    if (f.phase === 'cast') {
+      // 대 끝에서 포물선으로 날아가 물에 퐁
+      const k = Math.min(1, f.t / 0.45);
+      bobber.position.set(tip.x + (s.x - tip.x) * k, tip.y + (wy - tip.y) * k + Math.sin(k * Math.PI) * 0.9, tip.z + (s.z - tip.z) * k);
+      bobber.visible = true;
+      if (k >= 1) { f.phase = 'wait'; f.t = 0; sound.play('splash'); }
+    } else {
+      let by = wy, ox = 0, oz = 0;
+      if (f.phase === 'wait') {
+        const nib = f.nibbles.some((n) => f.t > n && f.t < n + 0.18); // 톡: 살짝 가라앉았다 뜬다
+        by = wy + Math.sin(f.t * 3) * 0.015 - (nib ? 0.05 : 0);
+        if (f.t >= f.biteAt) {
+          f.phase = 'bite';
+          f.t = 0;
+          f.fish = pickFish(f.water, hourOf(state.clock));
+          sound.play('splash');
+          hud.floatText({ x: s.x, y: 0.8, z: s.z, text: '!', kind: 'tip' });
+        }
+      } else if (f.phase === 'bite') {
+        by = wy - 0.12; // 퐁 잠겼다
+        if (f.t > rulesOf(f.fish).window) { fishFail('도망갔다…'); return; }
+      } else {
+        const R = rulesOf(f.fish).reel;
+        f.power -= R.drain * dt;
+        f.left -= dt;
+        by = wy - 0.08;
+        ox = Math.sin(f.t * 17) * 0.12;
+        oz = Math.cos(f.t * 13) * 0.08;
+        player.power = Math.max(0, f.power);
+        hud.showMeter(Math.max(0, f.power), { from: 0.96, to: 1 }, [{ text: '감기! 연타해요' }]);
+        if (f.power <= 0 || f.left <= 0) { fishFail('놓쳤어요…'); return; }
+      }
+      bobber.position.set(s.x + ox, by, s.z + oz);
+    }
+    // 줄: 대 끝 → 찌
+    const pos = fishLine.geometry.attributes.position;
+    pos.setXYZ(0, tip.x, tip.y, tip.z);
+    pos.setXYZ(1, bobber.position.x, bobber.position.y + 0.06, bobber.position.z);
+    pos.needsUpdate = true;
+    fishLine.visible = true;
+  }
+  const fishLabel = () => (fishing.phase === 'reel' ? '감기!' : fishing.phase === 'bite' ? '지금!' : '기다리는 중');
   function cancelPull() {
     cancelGlow(); // 털뭉치에 손을 뻗던 중이어도(창이 열리거나 연출이 시작되면) 그만둔다
+    cancelFish(); // 낚시하던 중이어도
     if (!pulling) return;
     if (pulling.weed.guest) multi.act({ t: 'drop', id: pulling.weed.id });
     weeds.tug(pulling.weed, 0);
@@ -2263,6 +2406,7 @@ function boot() {
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
+    if (fishing) { if (down && !panels.isOpen()) fishPress(); return; } // 낚시: 찌가 잠길 때 · 감기 연타
     if (!down) {
       if (glowTry) { if (panels.isOpen()) cancelGlow(); else endGlow(); return; } // 털뭉치: 손을 뗀 순간의 빛으로
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -2276,6 +2420,7 @@ function boot() {
     if (target.type === 'attack') doSwing();
     else if (target.type === 'pickup') pickUpGround(target.g);
     else if (target.type === 'weed') beginPull(target.weed);
+    else if (target.type === 'fish') beginFish(target.spot);
     else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
@@ -5262,6 +5407,7 @@ function boot() {
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
+    if (hasTool(state, 'rod')) { const fs = fishSpotNear(p, player.yaw); if (fs) options.push({ d: 1.2, t: { type: 'fish', spot: fs, label: '낚시하기' } }); } // 물가(가까운 다른 대상이 먼저)
     playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
@@ -5294,6 +5440,7 @@ function boot() {
     }
     const bush = berries.nearestReady(p.x, p.z, 1.4);
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
+    if (hasTool(state, 'rod')) { const fs = fishSpotNear(p, player.yaw); if (fs) options.push({ d: 1.2, t: { type: 'fish', spot: fs, label: '낚시하기' } }); } // 친구 마을에서도 낚시(내 가방으로)
     for (const [key, label] of PLACES) {
       if (!GUEST_PLACES.has(key)) continue;
       const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
@@ -5992,13 +6139,14 @@ function boot() {
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);
+      if (fishing) updateFish(dt);
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
-        : pulling || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting || downed ? null : findTarget();
+        : pulling || fishing || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting || downed ? null : findTarget();
       updateFun(dt);
       villageLife(dt);
       // 무기를 들고 몬스터가 근처에 있으면(닿지 않아도) 휘두르기 버튼을 띄운다(휴대폰)
       const swingable = !target && hunting && weaponNow() && monsters.nearest(player.position.x, player.position.z, 6);
-      hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : glowTry ? '따는 중' : target ? target.label : swingable ? '휘두르기' : null);
+      hud.setAction(hachiPit.phase === 'rescue' ? '영차!' : pulling ? '뽑는 중' : glowTry ? '따는 중' : fishing ? fishLabel() : target ? target.label : swingable ? '휘두르기' : null);
       // 털뭉치 따기(꾹 누르고 있는 동안): 버섯 빛을 게이지로 — 바늘이 초록 칸(손을 뻗을 때마다 자리가 바뀐다)에 왔을 때 손을 뗀다. 풀 뽑기 게이지와 같은 자리
       if (glowTry) {
         if (!glowTry.s.has) cancelGlow(); // 그새 날이 밝았다

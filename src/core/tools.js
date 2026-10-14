@@ -1,13 +1,15 @@
 import { trySpend } from './state.js';
 
 /**
- * 도구: 마을 지도(카니 헌책방), 랜턴 · 손전등(도구점). 불은 하나만 들고, 화면 버튼으로 끔 → 랜턴 → 손전등을 바꾼다.
+ * 도구: 마을 지도(카니 헌책방), 랜턴 · 손전등 · 낚싯대(도구점). 불은 하나만 들고, 화면 버튼으로 끔 → 랜턴 → 손전등을 바꾼다.
+ * 낚싯대가 있으면 물가에서 '낚시하기'(core/fishing.js).
  * state.tools = { owned: [도구 id], light: 'off' | 'lantern' | 'flashlight' }
  */
 export const TOOLS = {
   map: { name: '마을 지도', price: 300, shop: 'books', note: '다녀온 곳이 다 보여요' }, // 처음부터 부담 없이 사게(예전 500원 → 200원 → 300원)
   lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 밝혀요' },
-  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '둘레는 넓게, 앞은 멀리 밝혀요' }
+  flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '둘레는 넓게, 앞은 멀리 밝혀요' },
+  rod: { name: '낚싯대', price: 600, shop: 'tools', note: '물가에서 낚시해요. 물마다 잡히는 고기가 달라요' }
 };
 export const LIGHT_ORDER = ['off', 'lantern', 'flashlight'];
 

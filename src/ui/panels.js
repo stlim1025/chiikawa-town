@@ -1139,6 +1139,14 @@ export function createPanels(ui, handlers) {
           !own ? priceBtn(T.price, s.money, after(() => handlers.buyTool(id)))
             : held ? h('span', { class: 'lic-badge done' }, ico('check'), '장착 중') : h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.setLight(id)) }, '장착')));
       }
+      // 낚싯대(core/fishing.js): 물가에서 낚시하기
+      {
+        const T = TOOLS.rod, own = hasTool(s, 'rod');
+        const ROD_ART = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 34L32 6" stroke="#d9b27a" stroke-width="3" stroke-linecap="round"/><path d="M8 34l5-6" stroke="#7a5136" stroke-width="5" stroke-linecap="round"/><circle cx="13" cy="27" r="3.4" fill="#b9bec6" stroke="#6f6a63" stroke-width="1.6"/><path d="M32 6Q36 18 30 26" fill="none" stroke="#5a4431" stroke-width="1.2"/><circle cx="30" cy="28" r="3" fill="#e0524f" stroke="#5a4431" stroke-width="1.2"/><path d="M27.2 28h5.6" stroke="#fff" stroke-width="1.4"/></svg>';
+        out.push(h('h3', { class: 'shop-sec' }, '낚시'));
+        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', ROD_ART), h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), '가지고 있음') : priceBtn(T.price, s.money, after(() => handlers.buyTool('rod')))));
+      }
       // 산소 표백제(사이드스토리 '검은 별똥별'에서 찾아야 할 때만 판다)
       const bleach = handlers.bleachShop?.();
       if (bleach) {

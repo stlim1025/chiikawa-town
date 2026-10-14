@@ -12,6 +12,7 @@ export function createPlayer(scene, chibi, village) {
   let yaw = 0, phase = 0, t = 0;
   let model = chibi;
   let held = null, weapon = null, weaponShown = true, engraved = new Set(); // engraved: 얼굴을 새긴 무기(랭커)
+  let rod = false; // 낚시하는 동안: 무기 대신 낚싯대(core/fishing.js)
   let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   let eatT = 0, eatDur = 1, eatMode = null, food = null; // 먹는 중: 몸짓('slurp' | 'gulp' | 'nibble') · 손에 든 음식 꼬리표('f-…')
   let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
@@ -21,7 +22,7 @@ export function createPlayer(scene, chibi, village) {
   const showHeld = () => {
     const on = [];
     for (const [tag, meshes] of Object.entries(model.props || {})) {
-      const vis = food ? tag === food : tag === held || !!(weaponShown && weapon && (tag === 'w-' + weapon || (tag === 'wf-' + weapon && engraved.has(weapon))));
+      const vis = food ? tag === food : rod ? tag === 'rod' || tag === held : tag === held || !!(weaponShown && weapon && (tag === 'w-' + weapon || (tag === 'wf-' + weapon && engraved.has(weapon))));
       for (const m of meshes) m.visible = vis;
       if (vis) on.push(tag);
     }
@@ -59,6 +60,10 @@ export function createPlayer(scene, chibi, village) {
     setHeld(tag) { if (held === tag) return; held = tag; showHeld(); },
     /** 오른손 무기 id | null(4단계). */
     setWeapon(id) { if (weapon === id) return; weapon = id; showHeld(); },
+    /** 낚싯대를 든다(무기는 잠깐 넣어 둔다) · 내려놓는다. */
+    setRod(on) { if (rod === !!on) return; rod = !!on; showHeld(); },
+    /** 낚싯대 끝(빨간 끝 부품)의 월드 자리를 out 에(낚싯줄을 잇는다). 들고 있지 않으면 null. */
+    rodTip(out) { const list = model.props && model.props.rod; return rod && list && list.length ? list[list.length - 1].getWorldPosition(out) : null; },
     /** 얼굴을 새긴 무기들(토벌 랭커). */
     setEngraved(list) { const key = (list || []).join(','); if ([...engraved].join(',') === key) return; engraved = new Set(list || []); showHeld(); },
     /** 무기를 휘두른다(seconds 동안 휘두르기 몸짓). */
