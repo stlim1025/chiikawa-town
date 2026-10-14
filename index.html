@@ -1362,6 +1362,17 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .panel .t .power { margin-left: 8px; font-size: 14px; color: #d98a2b; letter-spacing: 1px; }
 .panel .t .power .half { display: inline-block; width: 0.5em; overflow: clip; } /* 반 개(반짝 검 힘 3.5). hidden 이면 글자 기준선이 바닥으로 내려가 별이 처졌다 */
 .app.monsters .app-ico { background: #a58bd0; }
+.app.fishdex .app-ico { background: #6fa8dc; }
+/* 낚시 도감: 못 잡아 본 물고기는 그림자, 위에 가짓수 보상 줄 */
+.fish-card.unseen .mon-ico svg { filter: brightness(0) opacity(0.28); }
+.dex-prizes { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.dex-prize { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.dex-prize > b { flex: 0 0 auto; min-width: 74px; }
+.dex-prize .dp-money { flex: 1 1 auto; display: flex; align-items: center; gap: 4px; }
+.dex-prize .dp-money .coin { width: 18px; height: 18px; display: inline-flex; }
+.dex-prize .dp-note { color: var(--ink-soft); font-size: 14px; }
+.dex-prize.ready { background: var(--butter); }
+.dex-prize.done { opacity: 0.6; }
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */
 .app.friends .app-ico { background: #ee7489; }
 .app.multi .app-ico { background: #5aa98c; }

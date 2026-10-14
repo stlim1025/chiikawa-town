@@ -50,11 +50,11 @@ export function shareOf(state, from, to) {
   return Object.keys(pantryOf(state, from)).find((id) => tasteOf(from, id) !== 'love' && tasteOf(to, id) === 'love') || null;
 }
 
-/** 팔 것: 좋아하지 않는 전리품 · 풀(먹을 것과 좋아하는 것은 둔다). → [{ id, n, price }] */
+/** 팔 것: 좋아하지 않는 전리품 · 풀 · 낚은 물고기(먹을 것과 좋아하는 것은 둔다). → [{ id, n, price }] */
 export function sellablesOf(state, kind) {
   return Object.entries(pantryOf(state, kind)).filter(([id]) => {
     const info = itemInfo(id);
-    return info && (info.kind === 'drop' || info.kind === 'herb') && tasteOf(kind, id) !== 'love' && sellPrice(id) > 0;
+    return info && (info.kind === 'drop' || info.kind === 'herb' || info.kind === 'fish') && tasteOf(kind, id) !== 'love' && sellPrice(id) > 0;
   }).map(([id, n]) => ({ id, n, price: sellPrice(id) }));
 }
 /** 팔 것을 모두 판다(값은 earned 로 돌려준다 — 친구 지갑에 넣는 건 main). → { state, earned, sold } */

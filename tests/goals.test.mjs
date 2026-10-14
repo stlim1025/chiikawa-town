@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GOALS, goalOf, canBuy, buyGoal, npcPower, CAMERA_PRICE } from '../src/core/goals.js';
+import { TOOLS } from '../src/core/tools.js';
 import { chooseActivity } from '../src/core/brain.js';
 import { liveOffscreen } from '../src/core/offscreen.js';
 import { VILLAGERS, MAX_JOBS_PER_DAY, villagerOf, payVillager, villagerSpend, villagerTakesJob, villagerEnergy, isValidVillagers } from '../src/core/villagers.js';
@@ -22,7 +23,7 @@ test('친구마다 차례로 이루고 싶은 목표가 있고, 값은 가게 �
     if (kind === 'momonga') { assert.deepEqual(list, []); continue; }
     assert.ok(list.length >= 1, `${kind} 목표`);
     for (const g of list) {
-      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : g.kind === 'camera' ? CAMERA_PRICE : FURNITURE[g.item].price;
+      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : g.kind === 'camera' ? CAMERA_PRICE : g.kind === 'rod' ? TOOLS.rod.price : FURNITURE[g.item].price;
       assert.equal(g.cost, want, `${kind} ${g.label}`);
       assert.ok(g.label && g.id, `${kind} 목표 이름`);
     }

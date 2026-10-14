@@ -1,4 +1,4 @@
-import { registerItems } from './inventory.js';
+import { registerItems, countOf, takeItem, addItem } from './inventory.js';
 import { POND, LAKE, RIVER, SOUTH_SHORE, BRIDGES, riverZ } from './layout.js';
 
 /**
@@ -26,6 +26,49 @@ export const FISH = {
   can: { name: '빈 깡통', sell: 3, waters: ['pond', 'river', 'lake', 'sea'], weight: 0.8, size: 0, junk: true, color: '#b9bec6', note: '누가 버렸담. 물이 깨끗해졌다.' }
 };
 registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { name: f.name, kind: 'fish', sell: f.sell, note: f.note }])));
+
+// ---------- 낚은 물고기 쓰기(게임 오리지널): 생선구이 · 낚시 도감 ----------
+/** 생선구이: 쿠리만쥬네 화로에서 굽는다(grillFish). 먹으면 기운이 차고, 랏코 · 쿠리만쥬가 좋아한다. */
+export const FISH_DISHES = { grilledfish: { name: '생선구이', kind: 'food', eat: 35, note: '쿠리만쥬네 화로에서 노릇하게 구운 생선. 고소한 냄새가 솔솔 나요.' } };
+registerItems(FISH_DISHES);
+/** 화로에 한 번에 올리는 생선 수(쿠리만쥬네 놀러 가서 하루 한 번). */
+export const GRILL_MAX = 3;
+/**
+ * 가방의 생선을 굽는다: 쓰레기(빈 깡통)는 빼고 값싼 것부터(귀한 고기는 아껴 둔다) 많아야 GRILL_MAX 마리, 큰 고기는 두 접시.
+ * → { ok, state, used: { id: 마리 }, made: 접시 수, reason?: 'none'(구울 생선 없음) | 'full'(가방이 꽉 찼다) }
+ */
+export function grillFish(s, max = GRILL_MAX) {
+  const ids = Object.keys(FISH).filter((id) => !FISH[id].junk && countOf(s, id) > 0).sort((a, b) => FISH[a].sell - FISH[b].sell);
+  if (!ids.length) return { ok: false, reason: 'none', state: s, used: {}, made: 0 };
+  let state = s, left = max, made = 0;
+  const used = {};
+  for (const id of ids) {
+    while (left > 0 && countOf(state, id) > 0) {
+      const plates = FISH[id].size === 2 ? 2 : 1, r = addItem(takeItem(state, id, 1).state, 'grilledfish', plates);
+      if (!r.added) return made ? { ok: true, state, used, made } : { ok: false, reason: 'full', state: s, used: {}, made: 0 };
+      state = r.state; used[id] = (used[id] || 0) + 1; made += plates; left--;
+    }
+  }
+  return { ok: true, state, used, made };
+}
+
+/** 낚시 도감에 올리는 물고기(빈 깡통은 빼고). */
+export const DEX_FISH = Object.keys(FISH).filter((id) => !FISH[id].junk);
+/** 도감 보상: 잡아 본 물고기가 n 가지가 되면 받는다(마을폰 '낚시 도감'에서 받기). */
+export const DEX_PRIZES = [{ n: 4, money: 300 }, { n: 8, money: 800 }, { n: DEX_FISH.length, money: 3000 }];
+/** 잡아 본 물고기 가짓수. */
+export const dexCount = (s) => DEX_FISH.filter((id) => fishLogOf(s)[id]).length;
+/** 받은 도감 보상(n 목록). */
+export const fishPrizeOf = (s) => (Array.isArray(s.fishPrize) ? s.fishPrize : []);
+export const canClaimDex = (s, n) => DEX_PRIZES.some((p) => p.n === n) && dexCount(s) >= n && !fishPrizeOf(s).includes(n);
+/** 도감 보상을 받는다. → { ok, state, money } */
+export function claimDex(s, n) {
+  if (!canClaimDex(s, n)) return { ok: false, state: s, money: 0 };
+  const money = DEX_PRIZES.find((p) => p.n === n).money;
+  return { ok: true, money, state: { ...s, money: s.money + money, fishPrize: [...fishPrizeOf(s), n] } };
+}
+/** 저장 확인: 아는 보상만, 겹치지 않게. */
+export const isValidFishPrize = (p) => Array.isArray(p) && p.every((n) => DEX_PRIZES.some((q) => q.n === n)) && new Set(p).size === p.length;
 
 /** 한 번 던질 때 드는 기운. */
 export const FISH_STAMINA = 5;

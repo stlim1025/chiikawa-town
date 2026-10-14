@@ -5,7 +5,7 @@ import {
 } from './villagers.js';
 import { JOB_TYPES } from './jobs.js';
 import { DAY_SECONDS, hourOf } from './clock.js';
-import { goalOf, canBuy, buyGoal } from './goals.js';
+import { goalOf, canBuy, buyGoal, canDoJob } from './goals.js';
 
 /** 게임 속 한 시간의 실제 길이(초). 욕구가 차는 빠르기(brain.js 의 NEED_RATE)는 실제 초 기준이다. */
 const HOUR_SECONDS = DAY_SECONDS / 24;
@@ -65,7 +65,7 @@ export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, 
       }
       const v = villagerOf(s, kind, day), spec = VILLAGERS[kind], m = growNeeds(next[kind], kind, HOUR_SECONDS), goal = goalOf(s, kind);
       const left = boardOf(s, day).left;
-      const jobs = v.jobs < MAX_JOBS_PER_DAY ? spec.jobs.filter((id) => left[id] > 0) : [];
+      const jobs = v.jobs < MAX_JOBS_PER_DAY ? spec.jobs.filter((id) => left[id] > 0 && canDoJob(s, kind, id)) : []; // 낚시 일감은 낚싯대를 산 뒤에만
       const friends = kinds.filter((k) => !done.has(k)).map((k) => ({ kind: k, dist: 10 }));
       const c = chooseActivity({
         kind, hour, energy: v.energy, money: v.money, fun: m.fun, social: m.social, diligence: spec.diligence, appetite: spec.eat,

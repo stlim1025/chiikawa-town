@@ -1,4 +1,5 @@
-import { JOB_TYPES, availableJobs, isComplete, payout } from '../core/jobs.js';
+import { JOB_TYPES, availableJobs, isComplete, payout, gradedJob } from '../core/jobs.js';
+import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName } from '../core/fishing.js';
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
@@ -10,7 +11,7 @@ import { boardOf, DAILY_JOBS } from '../core/villagers.js';
 import { SHIFT_BASE, BOWL_PAY } from '../core/ramen.js';
 import { COIN } from './hud.js';
 import { recipeCards } from './ramenshop.js';
-import { TOOLS, hasTool, lightOf } from '../core/tools.js';
+import { TOOLS, hasTool, lightOf, toolsOf } from '../core/tools.js';
 import { exploredCount, N } from '../core/explore.js';
 import { timeLabel } from '../core/clock.js';
 import { REGION_NAMES, regionAt } from '../core/layout.js';
@@ -57,6 +58,7 @@ const APP_ICON = {
   // 같이 놀기: 손잡은 두 친구
   multi: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="13" cy="14" r="6" fill="#fff"/><circle cx="27" cy="14" r="6" fill="#fff"/><path d="M5 33q1-11 8-11t8 11zM19 33q1-11 8-11t8 11z" fill="#fff"/><path d="M17 27h6" stroke="#5aa98c" stroke-width="2.6" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
+  fishdex: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M29 21l7-6v12z" fill="#fff"/><ellipse cx="18" cy="21" rx="13" ry="8" fill="#fff"/><circle cx="11" cy="19" r="2.2" fill="#4f86b8"/><path d="M20 14q3 7 0 14" fill="none" stroke="#4f86b8" stroke-width="2" stroke-linecap="round"/></svg>',
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 /** 몬스터가 사는 곳(안내서 · 도감). */
@@ -203,7 +205,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'fishdex', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
   // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
   const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
@@ -357,7 +359,7 @@ export function createPanels(ui, handlers) {
    * 보수는 오른쪽 한 칸에 모아 숫자끼리 줄이 맞게, 남은 건수는 그 밑 작은 글씨로. 다 나가면 흐리게 하고 '마감' 도장.
    */
   function jobRow(type, n, mult) {
-    const pay = won(Math.round(type.base * mult));
+    const pay = won(Math.round(type.base * (gradedJob(type) ? mult : 1))); // 토벌 · 낚시 일감은 급수 배율 없이
     return h('div', { class: `job-row${n > 0 ? '' : ' soldout'}` },
       svgSpan('job-art', jobArt(type)),
       h('div', { class: 'job-main' }, h('b', { class: 'job-name' }, type.title), h('span', { class: 'job-where' }, ico('pin'), type.where)),
@@ -375,7 +377,7 @@ export function createPanels(ui, handlers) {
         h('span', { class: 'job-kicker' }, done ? '다 했어요!' : '하는 중'),
         h('b', { class: 'job-name' }, type.title),
         h('div', { class: 'job-prog' }, h('i', { class: 'bar' }, h('i', { style: `width: ${pct}%` })), h('b', {}, `${s.job.count} / ${type.target}`)),
-        h('span', { class: 'job-where' }, ico('star'), `깔끔하게 ${s.job.clean}번`)),
+        type.cleanBonus > 0 ? h('span', { class: 'job-where' }, ico('star'), `깔끔하게 ${s.job.clean}번`) : h('span', { class: 'job-where' }, ico('pin'), type.where)),
       done ? h('button', { class: 'btn primary take', type: 'button', onClick: after(handlers.reportJob) }, '보수 받기', h('small', {}, won(payout(s.job, s.license.grade))))
         : h('button', { class: 'btn take quiet', type: 'button', onClick: after(handlers.quitJob) }, '그만두기'));
   }
@@ -517,7 +519,7 @@ export function createPanels(ui, handlers) {
     board(s) {
       const left = boardOf(s, s.clock.day).left, tutorial = s.tutorial === 'board';
       // 하치와레 안내 중(첫 일감)에는 풀 뽑기만 보여 준다
-      const mine = tutorial ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s));
+      const mine = tutorial ? [JOB_TYPES.weed8] : availableJobs(s.license.grade, licensesOf(s), toolsOf(s).owned);
       const total = mine.reduce((a, j) => a + (DAILY_JOBS[j.id] || 0), 0), remain = mine.reduce((a, j) => a + (left[j.id] || 0), 0);
       const mult = PAY_MULT[s.license.grade];
       const items = bagOf(s).items, sells = sellableIds(s);
@@ -1295,6 +1297,31 @@ export function createPanels(ui, handlers) {
         row('하치와레의 카메라', '오전 11시 광장 남쪽, 사진 찍은 다음 날 하치와레 옆(뽑은 사진), 또는 광장 장면만(보상 없음)',
           go('광장', () => D.hachiCamera('plaza')), go('뽑은 사진', () => D.hachiCamera('prints')), go('장면만', () => D.hachiCamera('show')))];
     },
+    // 마을폰 '낚시 도감' 앱(게임 오리지널): 맨 위에 가짓수 보상(받기), 물고기마다 그림 · 잡히는 곳 · 때 · 잡은 수 · 가장 큰 것.
+    // 못 잡아 본 물고기는 그림자와 '???'(잡히는 곳 · 때는 힌트로 보인다)
+    fishdex(s) {
+      const log = fishLogOf(s), got = dexCount(s), claimed = fishPrizeOf(s);
+      const out = [appBar('낚시 도감', `${got} / ${DEX_FISH.length}종`)];
+      out.push(h('div', { class: 'dex-prizes' }, ...DEX_PRIZES.map((p) => {
+        const done = claimed.includes(p.n), ready = !done && got >= p.n;
+        return h('div', { class: `dex-prize${done ? ' done' : ready ? ' ready' : ''}` },
+          h('b', {}, p.n === DEX_FISH.length ? '모든 물고기' : `${p.n}종`),
+          h('span', { class: 'dp-money' }, svgSpan('coin', COIN), won(p.money)),
+          done ? h('span', { class: 'dp-note' }, '받았어요')
+            : ready ? h('button', { class: 'btn primary', type: 'button', onClick: after(() => handlers.claimFishDex(p.n)) }, '받기')
+              : h('span', { class: 'dp-note' }, `${p.n - got}종 더`));
+      })));
+      for (const id of DEX_FISH) {
+        const F = FISH[id], rec = log[id], when = F.night ? '밤에만' : F.day ? '낮에만' : null;
+        out.push(h('div', { class: `row mon-card fish-card${rec ? '' : ' unseen'}` },
+          svgSpan('mon-ico', itemSvg(id)),
+          h('div', {},
+            h('div', { class: 't' }, rec ? F.name : '???', h('span', { class: 'weed-count' }, rec ? `${rec.n}마리` : '아직')),
+            h('div', { class: 'mon-chips' }, chip('pin', '', F.waters.map(waterName).join(', ')), when ? chip(null, 'muted', when) : null,
+              rec && rec.best ? chip(null, 'muted', `가장 큰 것 ${rec.best}cm`) : null, rec ? chip(null, 'muted', `팔면 ${won(F.sell)}`) : null))));
+      }
+      return out;
+    },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
     weeds(s) {
       const log = s.weedLog || {}, grade = s.license.grade;
@@ -1352,6 +1379,7 @@ export function createPanels(ui, handlers) {
           app('friends', APP_ICON.friends, '친구', () => show('friends')),
           app('multi', APP_ICON.multi, '같이 놀기', () => show('multi')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
+          hasTool(s, 'rod') || Object.keys(fishLogOf(s)).length ? app('fishdex', APP_ICON.fishdex, '낚시 도감', () => show('fishdex')) : null,
           handlers.searchApp?.() ? app('search', APP_ICON.search, '검색', () => show('search')) : null,
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'

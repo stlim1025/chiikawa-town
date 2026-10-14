@@ -27,7 +27,12 @@ export const JOB_TYPES = {
   huntSlime: { id: 'huntSlime', title: '물방울 슬라임 4마리 토벌', kind: 'slime', target: 4, base: 180, cleanBonus: 10, needGrade: 5, needLicense: 'hunter', hunt: true, where: '남쪽 강가' },
   huntBeetle: { id: 'huntBeetle', title: '도토리 뿔벌레 3마리 토벌', kind: 'beetle', target: 3, base: 205, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '서쪽 숲' },
   huntTurtle: { id: 'huntTurtle', title: '이끼 거북 2마리 토벌', kind: 'turtle', target: 2, base: 300, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '북쪽 바위산' },
-  huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 255, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' }
+  huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 255, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' },
+  // 낚시 일감(게임 오리지널): 낚싯대가 있어야 받는다(needTool). 제초 급수와 상관없이 그대로, 깔끔 보너스 없음.
+  // 낚은 물고기는 따로 팔 수 있으니 보수는 한 마리 매입가보다 넉넉히(일감으로 내는 쪽이 이득)
+  fishMinnow: { id: 'fishMinnow', title: '송사리 4마리 낚기', kind: 'minnow', target: 4, base: 110, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '마을 연못, 시냇물' },
+  fishCrucian: { id: 'fishCrucian', title: '붕어 3마리 낚기', kind: 'crucian', target: 3, base: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '시냇물, 호수' },
+  fishMackerel: { id: 'fishMackerel', title: '고등어 2마리 낚기', kind: 'mackerel', target: 2, base: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '남쪽 바다' }
 };
 
 /** 풀을 뽑는 일감인지. */
@@ -36,14 +41,19 @@ export const isWeedJob = (type) => !!WEED_KINDS[type.kind];
 /** 몬스터 토벌 일감인지(4단계). */
 export const isHuntJob = (type) => !!type.hunt;
 
+/** 낚시 일감인지(낚은 물고기를 낸다). */
+export const isFishJob = (type) => !!type.fishing;
+
 /**
- * 지금 급수(와 자격증)로 받을 수 있는 일감. 풀 · 열매 · 스티커 일감은 높은 급수 일감부터(같은 급수는 적힌 순서대로),
- * 토벌 일감은 토벌 자격증이 있을 때만 맨 뒤에 붙는다. licenses: state.licenses
+ * 지금 급수(와 자격증 · 도구)로 받을 수 있는 일감. 풀 · 열매 · 스티커 일감은 높은 급수 일감부터(같은 급수는 적힌 순서대로),
+ * 낚시 일감은 그 도구(낚싯대)가 있을 때만 그 뒤에, 토벌 일감은 토벌 자격증이 있을 때만 맨 뒤에 붙는다.
+ * licenses: state.licenses, tools: 가진 도구 id 목록(core/tools.js 의 owned)
  */
-export function availableJobs(grade, licenses = {}) {
-  const work = Object.values(JOB_TYPES).filter((j) => !j.needLicense && grade <= j.needGrade).sort((a, b) => a.needGrade - b.needGrade);
+export function availableJobs(grade, licenses = {}, tools = []) {
+  const work = Object.values(JOB_TYPES).filter((j) => !j.needLicense && !j.needTool && grade <= j.needGrade).sort((a, b) => a.needGrade - b.needGrade);
+  const gear = Object.values(JOB_TYPES).filter((j) => j.needTool && tools.includes(j.needTool));
   const licensed = Object.values(JOB_TYPES).filter((j) => j.needLicense && licenses[j.needLicense]);
-  return work.concat(licensed);
+  return work.concat(gear, licensed);
 }
 
 /** 일감 수락. */
@@ -63,8 +73,10 @@ export function isComplete(job) {
   return job.count >= JOB_TYPES[job.typeId].target;
 }
 
-/** 보수 = (기본 + 깔끔 보너스) × 급수 배율. 토벌 일감은 제초 급수와 상관없이 그대로. */
+/** 제초 급수 배율이 붙는 일감인지(토벌 · 낚시 일감은 급수와 상관없이 그대로). */
+export const gradedJob = (type) => !type.hunt && !type.fishing;
+/** 보수 = (기본 + 깔끔 보너스) × 급수 배율. 토벌 · 낚시 일감은 제초 급수와 상관없이 그대로. */
 export function payout(job, grade) {
   const type = JOB_TYPES[job.typeId];
-  return Math.round((type.base + job.clean * type.cleanBonus) * (type.hunt ? 1 : PAY_MULT[grade]));
+  return Math.round((type.base + job.clean * type.cleanBonus) * (gradedJob(type) ? PAY_MULT[grade] : 1));
 }

@@ -105,8 +105,8 @@ test('jobs per grade; every weed kind has a job; old ids kept', () => {
   for (const j of Object.values(J.JOB_TYPES)) if (W.WEED_KINDS[j.kind]) assert.equal(j.needGrade, W.WEED_KINDS[j.kind].grade, j.id);
   assert.deepEqual(J.availableJobs(6).map((j) => j.id).sort(), ['berry6', 'sticker10', 'weed8'], '견습: 토끼풀 일감은 아직');
   assert.deepEqual(J.availableJobs(5).map((j) => j.id).sort(), ['berry6', 'clover6', 'sticker10', 'weed8']);
-  assert.equal(J.availableJobs(1).length, Object.values(J.JOB_TYPES).filter((j) => !j.needLicense).length);
-  assert.equal(J.availableJobs(1, { hunter: { day: 1 } }).length, Object.keys(J.JOB_TYPES).length);
+  assert.equal(J.availableJobs(1).length, Object.values(J.JOB_TYPES).filter((j) => !j.needLicense && !j.needTool).length);
+  assert.equal(J.availableJobs(1, { hunter: { day: 1 } }, ['rod']).length, Object.keys(J.JOB_TYPES).length, '낚시 일감은 낚싯대가 있어야');
   assert.equal(J.availableJobs(3)[0].needGrade, 3);
   for (const id of Object.keys(J.JOB_TYPES)) assert.ok(V.DAILY_JOBS[id] > 0, 'daily ' + id);
   let job = J.acceptJob('foxtail6');

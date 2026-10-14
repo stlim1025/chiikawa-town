@@ -408,7 +408,7 @@ export const NPC_KINDS = Object.keys(DEFS);
  * 손에 쥔 소품을 적는 오른팔 자세. animateChibi 의 그 몸짓과 맞춘다.
  * 수련(train)만은 팔을 살짝 든 자세에서 칼끝이 앞을 보게 적어서, 팔을 내리면 칼끝이 조금 숙이고 내지르면 위로 선다.
  */
-const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0], read: [-1.0, 0, -0.35], snap: [-1.35, 0, -0.5] };
+const HOLD = { drink: [-1.0, 0, -0.5], sweep: [-0.7, 0, 0.2], train: [-0.25, 0, -0.2], dance: [0, 0, 2.0], read: [-1.0, 0, -0.35], snap: [-1.35, 0, -0.5], fish: [-1.05, 0, -0.25] };
 
 /**
  * 손에 쥔 소품 부품을 팔 마디에 단다. 부품은 pose 자세일 때 손끝에서 잰 위치 · 방향(p · r)으로 적고,
@@ -512,6 +512,15 @@ const PROP_PARTS = {
     { m: 'cylinder', c: '#2a2a30', p: [-0.12, -0.005, 0.11], r: [Math.PI / 2, 0, 0], s: [0.055, 0.07, 0.055] },
     { m: 'dot', c: '#8fc0ec', p: [-0.12, -0.005, 0.185], s: [0.036, 0.036, 0.012], o: false },
     { m: 'box', c: '#e85d75', p: [-0.215, 0.095, 0.07], s: [0.045, 0.025, 0.045], o: false }
+  ]),
+  // 낚싯대(친구들도 도구점에서 사서 낚시한다): 손잡이 · 릴 · 앞으로 비스듬히 든 대, 대 끝에서 늘어진 줄과 빨간 찌
+  rod: (def) => held(def, 'armR', HOLD.fish, [
+    { m: 'box', c: '#7a5136', p: [0, 0, 0.03], s: [0.05, 0.05, 0.24] },
+    { m: 'cylinder', c: '#b9bec6', p: [0.055, -0.03, 0.06], r: [0, 0, Math.PI / 2], s: [0.05, 0.035, 0.05] },
+    { m: 'box', c: '#d9b27a', p: [0, 0.36, 0.6], r: [-0.55, 0, 0], s: [0.026, 0.026, 1.3] },
+    { m: 'dot', c: '#e0524f', p: [0, 0.7, 1.15], s: [0.028, 0.028, 0.028], o: false },
+    { m: 'box', c: '#eef2f5', p: [0, 0.2, 1.15], s: [0.006, 1.0, 0.006], o: false },
+    { m: 'sphere', c: '#e0524f', p: [0, -0.3, 1.15], s: [0.04, 0.04, 0.04], o: 0.01 }
   ])
 };
 
@@ -568,9 +577,9 @@ const WEAPON_PARTS = {
  * 'drink' 는 라멘 로우에서 라멘을 먹을 때도 쓰니 그릇을 들고, 쿠리만쥬만 맥주잔을 든다.
  */
 export const PROP_FOR = {
-  kurimanju: { drink: 'beer' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, pochette: { read: 'sewing' }, // 노동 갑옷 씨: 게시판 앞 정리 · 포셰트 갑옷 씨: 바느질
-  rakko: { train: 'sword', drink: 'bowl' }, usagi: { train: 'stick', drink: 'bowl' },
-  hachiware: { dance: 'mic', drink: 'bowl', train: 'fork', snap: 'camera', hug: 'camera' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
+  kurimanju: { drink: 'beer', fish: 'rod' }, kani: { read: 'book' }, shisa: { sweep: 'broom' }, labor: { sweep: 'broom' }, pochette: { read: 'sewing' }, // 노동 갑옷 씨: 게시판 앞 정리 · 포셰트 갑옷 씨: 바느질
+  rakko: { train: 'sword', drink: 'bowl', fish: 'rod' }, usagi: { train: 'stick', drink: 'bowl' },
+  hachiware: { dance: 'mic', drink: 'bowl', train: 'fork', snap: 'camera', hug: 'camera', fish: 'rod' }, chiikawa: { drink: 'bowl', train: 'fork' }, momonga: { drink: 'bowl' }
 };
 
 // 누구나 같은 것을 드는 몸짓: 라멘 로우에서 후루룩 먹을 때는 그릇과 젓가락
@@ -1192,7 +1201,7 @@ export const SEAT_LIFT = 0.42;
 /**
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
- *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'bench' 벤치 · 의자에 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
+ *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'bench' 벤치 · 의자에 앉기 · 'fish' 낚시(낚싯대 소품) · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
  *   · 파자마 파티즈 무대: 'idol' 아이돌 춤(8박 안무) · 'idolSing' 노래하며 춤 · 'glow' 응원봉 흔들기 — 셋 다 opts.beat(곡 박 번호)에 맞춘다
@@ -1342,6 +1351,12 @@ function basePose(mode, t, opts) {
     a.armL = [-0.6, 0, 0.12]; a.armR = [-0.6, 0, -0.12];
     a.head = [0.04 + Math.sin(t * 1.3 + phase) * 0.03, Math.sin(t * 0.6 + phase) * 0.3, 0];
     lean = -0.04; legs = 1.5;
+  } else if (mode === 'fish') {
+    // 낚시(친구들): 오른손에 낚싯대를 앞으로 내밀고 찌를 바라본다. 가끔 입질에 대 끝이 들썩, 왼손은 줄을 잡는다
+    const twitch = Math.max(0, Math.sin(t * 0.9 + phase * 3)) ** 8 * 0.14;
+    a.armR = [HOLD.fish[0] - twitch, HOLD.fish[1], HOLD.fish[2]]; a.armL = [-0.85, 0, 0.35];
+    a.head = [0.14 + Math.sin(t * 0.7 + phase) * 0.03, Math.sin(t * 0.4 + phase) * 0.12, 0];
+    bob = Math.sin(t * 1.5 + phase) * 0.008;
   } else if (mode === 'think') {
     // 갸웃: 한 손을 턱에 대고 고개를 기울인다
     a.armR = [-1.45, 0, -0.5]; a.armL = [-0.55, 0, 0.45];

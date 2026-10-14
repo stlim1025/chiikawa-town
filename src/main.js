@@ -35,7 +35,7 @@ import { createIntro } from './ui/intro.js';
 import { createState, addMoney, trySpend, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
-import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob } from './core/jobs.js';
+import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob, isFishJob } from './core/jobs.js';
 import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, EXAM_STREAK, payExamFee, NOVICE, gradeName } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
@@ -77,7 +77,7 @@ import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engra
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen, asleepSpans } from './core/offscreen.js';
-import { goalOf, canBuy, buyGoal, npcPower } from './core/goals.js';
+import { goalOf, canBuy, buyGoal, npcPower, hasRod, canDoJob } from './core/goals.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
@@ -89,10 +89,10 @@ import { TICKET_SVG } from './ui/itemart.js';
 import { playerPortrait } from './world/portrait.js';
 import { RENT, LOTTERY_PRICE, LODGING_PRICE, ROUGH_REST, housingOf, isEvicted, startDay, payRent, rentAgain, buyHouse, applyLottery, buyByLottery } from './core/housing.js';
 import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core/pochette.js';
-import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, roadDist, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
+import { VILLAGE_R, REGION_NAMES, GATES, POND, RIVER, BRIDGES, riverZ, regionAt, roadDist, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
-import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish } from './core/fishing.js';
+import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish, grillFish, claimDex } from './core/fishing.js';
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
@@ -1000,6 +1000,15 @@ function boot() {
       sound.play('coin');
       player.cheerTime = 1.0;
       hud.toast('현상금을 받았어요!', 3200, { chips: [{ icon: 'coin', text: won(r.reward) }] });
+    },
+    // 낚시 도감(core/fishing.js): 잡아 본 물고기 가짓수 보상 받기
+    claimFishDex: (n) => {
+      const r = claimDex(state, n);
+      if (!r.ok) return;
+      commit(r.state);
+      sound.play('coin');
+      player.cheerTime = 1.0;
+      hud.toast(`낚시 도감 ${n}종 보상!`, 3200, { chips: [{ icon: 'coin', text: won(r.money) }] });
     },
     // 마을 가꾸기(core/works.js): 모금함에 낸다. 다 모이면 그 자리에 '공사 중' 간판이 서고 다음 날 아침에 생긴다
     donateWork: (id, amount) => {
@@ -2165,11 +2174,18 @@ function boot() {
   function fishCatch() {
     const id = fishing.fish, F = FISH[id], from = bobber.position.clone();
     cancelFish();
-    const r = addItem(state, id, 1);
-    if (!r.added) { hud.toast('가방이 꽉 찼어요'); return; }
-    const cm = fishLength(id), lg = logFish(r.state, id, cm);
+    // 낚시 일감(core/jobs.js)의 그 물고기면 가방 대신 일감에 센다
+    const forJob = !F.junk && jobKind() === id && !isComplete(state.job), before = state.job;
+    let s = state;
+    if (forJob) s = { ...s, job: recordPull(s.job, id, 'snapped') };
+    else {
+      const r = addItem(state, id, 1);
+      if (!r.added) { hud.toast('가방이 꽉 찼어요'); return; }
+      s = r.state;
+    }
+    const cm = fishLength(id), lg = logFish(s, id, cm);
     commit(lg.state);
-    hud.bagBump();
+    if (forJob) celebrateIfDone(before, state.job); else hud.bagBump();
     splash(from, F.junk ? 0.6 : 1.3);
     jumpFish(id, from);
     if (F.junk) {
@@ -2179,7 +2195,8 @@ function boot() {
     }
     sound.play('done');
     player.cheerTime = 2.0;
-    fishGame.catchCard({ title: `${josa(F.name, '을/를')} 낚았어요!`, art: itemSvg(id), chips: [`${cm}cm`, `팔면 ${won(F.sell)}`], ribbon: lg.first ? '처음 잡았어요!' : lg.best ? '최고 기록!' : null });
+    const T = forJob && JOB_TYPES[state.job.typeId];
+    fishGame.catchCard({ title: `${josa(F.name, '을/를')} 낚았어요!`, art: itemSvg(id), chips: [`${cm}cm`, T ? `일감 ${state.job.count} / ${T.target}` : `팔면 ${won(F.sell)}`], ribbon: lg.first ? '처음 잡았어요!' : lg.best ? '최고 기록!' : null });
   }
   /**
    * 행동 버튼(down: 눌렀다 · 뗐다): 기다릴 때 누르면 너무 일러 놓치고, 찌가 잠기면 낚아채 끌어올리기 놀이로,
@@ -4213,8 +4230,19 @@ function boot() {
         reward(n, 'home');
       });
     } else if (kind === 'kurimanju') {
-      // 화로 구이: 말랑 젤리가 있으면 젤리 구이 2개로, 없으면 풋콩을 구워 먹는다
-      if (countOf(state, 'jelly') > 0) {
+      // 화로 구이: 낚은 생선이 있으면 생선구이로(값싼 것부터 세 마리까지, 큰 고기는 두 접시), 말랑 젤리가 있으면 젤리 구이 2개로, 없으면 풋콩을 구워 먹는다
+      const grill = grillFish(state);
+      if (grill.ok || grill.reason === 'full') {
+        sayAs(n, ['오~ 싱싱한 생선이네! 화로에 올려 보자~', '(화로에 생선을 굽는다… 지글지글)', '생선구이 완성~! 하아~ 냄새 좋다'], () => {
+          const g = grillFish(state); // 말하는 사이 가방이 바뀌었을 수 있다
+          if (!g.ok) { hud.toast(g.reason === 'full' ? '가방이 꽉 찼어요' : '구울 생선이 없어요', 2400); reward(n, 'home'); return; }
+          commit(g.state);
+          hud.bagBump();
+          sound.play('eat');
+          hud.toast(`생선구이 ${g.made}개!`, 3000, { icon: itemSvg('grilledfish'), chips: Object.entries(g.used).map(([id, k]) => ({ icon: itemSvg(id), text: `${FISH[id].name} −${k}` })) });
+          reward(n, 'home');
+        });
+      } else if (countOf(state, 'jelly') > 0) {
         sayAs(n, ['오~ 말랑 젤리 있네! 이리 줘 봐~', '(화로에 젤리를 굽는다… 치익—)', '젤리 구이 완성~! 두 개 챙겨 가. 하아~'], () => {
           commit(addItem(takeItem(state, 'jelly', 1).state, 'jellybake', 2).state);
           hud.bagBump();
@@ -4222,7 +4250,7 @@ function boot() {
           reward(n, 'home');
         });
       } else {
-        sayAs(n, ['하아~ 풋콩이나 구워 먹자~', '(화로에 풋콩을 굽는다… 톡톡)', '짭짤하지? 말랑 젤리 가져오면 구워 줄게~'], () => {
+        sayAs(n, ['하아~ 풋콩이나 구워 먹자~', '(화로에 풋콩을 굽는다… 톡톡)', '짭짤하지? 생선이나 말랑 젤리 가져오면 구워 줄게~'], () => {
           const got = gainStamina(20);
           sound.play('eat');
           hud.toast('냠냠!', 2400, { chips: [got ? { icon: 'energy', text: `기운 +${got}` } : { text: '배불러요' }] });
@@ -4447,7 +4475,7 @@ function boot() {
   function npcWork(n, typeId) {
     const T = JOB_TYPES[typeId], bench = village.spots.factory, benchMid = { x: bench.x, z: bench.z - 1.7 };
     const job = { day: 0, done: 0 };
-    setDoing(n.kind, T.kind === 'sticker' ? 'star' : 'leaf', T.title);
+    setDoing(n.kind, isFishJob(T) ? 'fish' : T.kind === 'sticker' ? 'star' : 'leaf', T.title);
     // 게시판 일감은 선착순: 아침이거나 할 수 있는 일감이 얼마 안 남았으면 뛰어간다
     const left = boardOf(state, state.clock.day).left, open = VILLAGERS[n.kind].jobs.reduce((a, id) => a + (left[id] || 0), 0);
     const hurry = hourOf(state.clock) < 10 || open <= 2;
@@ -4471,7 +4499,12 @@ function boot() {
     const mutter = (key) => { if (Math.random() < 0.45) npcs.say(n, lineOf(n.kind, key)); };
     if (isWeedJob(T)) steps.push({ do: 'weeds', kind: T.kind, left: T.target, onPull: () => { job.done++; tireNpc(n.kind, 6); mutter('pull'); } });
     else if (T.kind === 'berry') steps.push({ do: 'berries', left: T.target, onPick: () => { job.done++; tireNpc(n.kind, 5); mutter('berry'); } });
-    else steps.push({ do: 'walk', slots: SLOTS.bench(), near: 0.4 }, { do: 'act', anim: 'read', face: benchMid, time: T.target * 1.5, say: lineOf(n.kind, 'sticker') }, { do: 'call', fn: () => { job.done = T.target; tireNpc(n.kind, 15); } });
+    else if (isFishJob(T)) {
+      // 낚시 일감: 그 물고기가 사는 물가(연못 · 시냇물 · 바다)로 가서 한 마리씩 낚는다(일감 물고기는 일감에 낸다)
+      const water = FISH[T.kind].waters.find((w) => w !== 'lake') || 'pond', spot = npcFishSpot(water) || npcFishSpot('pond');
+      if (spot) steps.push({ do: 'walk', x: spot.x, z: spot.z, near: 0.4 });
+      for (let i = 0; i < T.target; i++) steps.push({ do: 'act', anim: 'fish', face: spot ? spot.face : null, time: 4 + Math.random() * 4 }, { do: 'call', fn: () => { job.done++; npcLandFish(n, water, false, T.kind); } });
+    } else steps.push({ do: 'walk', slots: SLOTS.bench(), near: 0.4 }, { do: 'act', anim: 'read', face: benchMid, time: T.target * 1.5, say: lineOf(n.kind, 'sticker') }, { do: 'call', fn: () => { job.done = T.target; tireNpc(n.kind, 15); } });
     steps.push({ do: 'walk', slots: SLOTS.board(), near: 0.45 }, {
       do: 'call',
       fn: () => {
@@ -4900,7 +4933,7 @@ function boot() {
   function lifeDecide(n, kind, day, hour) {
     const v = villagerOf(state, kind, day), spec = VILLAGERS[kind], m = mindOf(kind), H = HUNTER_PROFILES[kind];
     const left = boardOf(state, day).left, roomForJob = v.jobs < MAX_JOBS_PER_DAY;
-    const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0) : [];
+    const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && canDoJob(state, kind, id)) : []; // 낚시 일감은 낚싯대를 산 뒤에만
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
@@ -4946,7 +4979,7 @@ function boot() {
   /** 모은 돈으로 목표(무기 · 카메라는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
   function npcShop(n) {
-    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레)도 도구점에서
+    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera' || g.kind === 'rod'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레) · 낚싯대도 도구점에서
     if (!door) { restHere(n.kind, 5); return; }
     setDoing(n.kind, 'star', `${tools ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
     npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
@@ -5037,8 +5070,45 @@ function boot() {
     npcs.plan(b, steps(b));
   }
   /** 취미: 친구마다 다른 곳에서 다른 것(치이카와 연못 · 공부 · 별, 하치와레 공연, 우사기 뛰어다니기, 쿠리만쥬 안주, 랏코 수련, 모몽가 귀여운 척). */
+  // ---------- 친구들의 낚시(게임 오리지널): 도구점에서 낚싯대를 산 친구(core/goals.js hasRod)는 쉬는 틈에 낚시하고 낚시 일감도 받는다 ----------
+  /** 친구가 낚시할 물가 자리 { x, z, face(물 쪽), water }: 연못(마을 안 동서쪽 가) · 시냇물(남쪽 문 밖 북쪽 둑) · 바다(남쪽 바닷가, 선착장 서쪽). 못 찾으면 null. */
+  function npcFishSpot(water) {
+    for (let k = 0; k < 10; k++) {
+      let x, z, fx, fz;
+      if (water === 'river') { x = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 16); z = riverZ(x) - RIVER.half - 0.8; fx = x; fz = riverZ(x); }
+      else if (water === 'sea') { x = -18 + Math.random() * 22; z = SOUTH_SHORE - 0.8; fx = x; fz = SOUTH_SHORE + 4; }
+      else { const a = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2 + (Math.random() - 0.5) * 1.1); x = POND.x + Math.sin(a) * (POND.r + 0.85); z = POND.z + Math.cos(a) * (POND.r + 0.85) * 0.85; fx = POND.x; fz = POND.z; }
+      const p = village.nearestFree(x, z, 0.4), d = Math.hypot(fx - p.x, fz - p.z) || 1;
+      if (Math.hypot(p.x - x, p.z - z) < 0.9 && waterAt(p.x + ((fx - p.x) / d) * 1.6, p.z + ((fz - p.z) / d) * 1.6) === water) return { x: p.x, z: p.z, face: { x: fx, z: fz }, water };
+    }
+    return null;
+  }
+  /**
+   * 친구가 한 마리 낚는다: 가까우면 머리 위에 물고기 이름 · 그림, 가끔 한마디. want: 그 물고기(일감), 아니면 그 물 · 시각에 사는 것 중에서.
+   * keep 이면 친구 가방에 넣는다(가득 차면 놓아준다 — 좋아하지 않는 물고기는 일하고 돌아와 판다). → 낚은 id
+   */
+  function npcLandFish(n, water, keep, want = null) {
+    const id = want || pickFish(water, hourOf(state.clock)), F = FISH[id], p = player.position;
+    if (Math.hypot(n.x - p.x, n.z - p.z) < 26) hud.floatText({ x: n.x, y: n.chibi.height + 0.55, z: n.z, text: F.name, kind: 'mini', icon: itemSvg(id) });
+    if (Math.random() < 0.5) npcs.say(n, F.junk ? '…깡통이다' : lineOf(n.kind, 'fish'));
+    if (keep && !F.junk) commit(addToPantry(state, n.kind, id, 1).state, false);
+    tireNpc(n.kind, 4);
+    return id;
+  }
+  /** 쉬는 틈 낚시: 연못이나 시냇물에 가서 두세 번 던진다. 낚은 물고기는 친구 가방에. */
+  function npcFishHobby(n) {
+    const spot = npcFishSpot(Math.random() < 0.6 ? 'pond' : 'river') || npcFishSpot('pond');
+    if (!spot) { npcStroll(n); return; }
+    setDoing(n.kind, 'fish', '낚시하는 중');
+    const steps = [{ do: 'walk', x: spot.x, z: spot.z, near: 0.4 }];
+    const casts = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < casts; i++) steps.push({ do: 'act', anim: 'fish', face: spot.face, time: 5 + Math.random() * 4 }, { do: 'call', fn: () => npcLandFish(n, spot.water, true) });
+    steps.push({ do: 'call', fn: () => restHere(n.kind, 6 + Math.random() * 10) });
+    npcs.plan(n, steps);
+  }
   function npcHobby(n, hour) {
     const kind = n.kind;
+    if (hasRod(state, kind) && hour >= 6 && hour < 19 && Math.random() < 0.4) { npcFishHobby(n); return; } // 낚싯대를 샀으면 가끔 낚시하러
     let hobby = (PERSONA[kind] || {}).hobby || 'stroll';
     if (kind === 'chiikawa') hobby = hour >= 18 ? 'stars' : Math.random() < 0.55 ? 'pond' : 'study';
     if (hobby === 'sing') return npcShow(n);

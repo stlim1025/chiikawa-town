@@ -23,7 +23,7 @@ import { isValidStarfall } from './starfall.js';
 import { isValidBosses } from './bosses.js';
 import { isValidBounty } from './bounty.js';
 import { isValidWorks, isValidWorkUse } from './works.js';
-import { isValidFishLog } from './fishing.js';
+import { isValidFishLog, isValidFishPrize } from './fishing.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -80,6 +80,7 @@ export function isValidState(s) {
   if (s.works !== undefined && !isValidWorks(s.works)) return false; // 마을 가꾸기 모금(낸 돈 · 다 모인 날)
   if (s.workUse !== undefined && !isValidWorkUse(s.workUse)) return false; // 마을 가꾸기 시설로 한 일(꽃 딴 날 · 종 친 날)
   if (s.fishLog !== undefined && !isValidFishLog(s.fishLog)) return false; // 낚시 기록(잡은 수 · 가장 큰 cm)
+  if (s.fishPrize !== undefined && !isValidFishPrize(s.fishPrize)) return false; // 낚시 도감 보상(받은 가짓수)
   return true;
 }
 

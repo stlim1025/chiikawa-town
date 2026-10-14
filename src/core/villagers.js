@@ -15,16 +15,17 @@ export const DAILY_JOBS = {
   thorny3: 2, reed5: 2, // 3급
   rockmoss4: 2, moon3: 1, // 2급
   giant2: 1, poison3: 1, // 1급
-  huntFluff: 2, huntSlime: 2, huntBeetle: 2, huntTurtle: 1, huntMoth: 1 // 토벌(토벌 자격증, 자격증을 딴 친구들도 받아 간다 · 전리품도 따로 팔리니 건수는 적게)
+  huntFluff: 2, huntSlime: 2, huntBeetle: 2, huntTurtle: 1, huntMoth: 1, // 토벌(토벌 자격증, 자격증을 딴 친구들도 받아 간다 · 전리품도 따로 팔리니 건수는 적게)
+  fishMinnow: 2, fishCrucian: 2, fishMackerel: 1 // 낚시(낚싯대가 있어야, 낚싯대를 산 친구들도 받아 간다)
 };
 
 /** 일하는 친구들: 처음 지갑, 부지런함(일감을 받을 확률), 할 줄 아는 일감, 밥 먹으러 갈 확률. */
 export const VILLAGERS = {
   chiikawa: { start: 60, diligence: 0.55, jobs: ['weed8', 'berry6', 'sticker10', 'clover6'], eat: 0.25 },
-  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6', 'clover6'], eat: 0.25 },
+  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6', 'clover6', 'fishMinnow', 'fishCrucian'], eat: 0.25 },
   usagi: { start: 200, diligence: 0.7, jobs: ['weed8', 'thorny3', 'berry6'], eat: 0.35 },
-  kurimanju: { start: 300, diligence: 0.3, jobs: ['sticker10', 'berry6'], eat: 0.5 },
-  rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8'], eat: 0.2 },
+  kurimanju: { start: 300, diligence: 0.3, jobs: ['sticker10', 'berry6', 'fishCrucian', 'fishMackerel'], eat: 0.5 },
+  rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8', 'fishMackerel', 'fishCrucian'], eat: 0.2 }, // 낚시 일감(fish…)은 낚싯대를 산 뒤에만(goals.js hasRod)
   momonga: { start: 30, diligence: 0, jobs: [], eat: 0.3, thief: true }
 };
 export const MAX_JOBS_PER_DAY = 3;

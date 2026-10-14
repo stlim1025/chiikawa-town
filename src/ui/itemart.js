@@ -145,6 +145,12 @@ const FLOWER_SVG = `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32"
   + [0, 72, 144, 216, 288].map((a) => `<ellipse cx="32" cy="14.5" rx="6" ry="8.5" fill="#ffa8c6" ${S} transform="rotate(${a} 32 22)"/>`).join('')
   + `<circle cx="32" cy="22" r="5" fill="#ffe36e" ${S}/></svg>`;
 
+/** 생선구이(core/fishing.js, 쿠리만쥬네 화로): 나무 꼬치에 비스듬히 꿴 노릇한 생선, 구운 자국 둘. */
+const GRILLED_SVG = `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="17" ry="3.6" fill="#e6d8b8"/>`
+  + `<path d="M12 54L52 12" stroke="${L}" stroke-width="5" stroke-linecap="round"/><path d="M12 54L52 12" stroke="#e2c49a" stroke-width="2.6" stroke-linecap="round"/>`
+  + `<g transform="rotate(-45 32 33)"><path d="M48 33l9-8v16z" fill="#c9772f" ${S}/><ellipse cx="31" cy="33" rx="18" ry="9" fill="#e09442" ${S}/>`
+  + `<path d="M26 26q3 7 0 14M34 26q3 7 0 14" fill="none" stroke="#8a4f22" stroke-width="2.4" stroke-linecap="round"/><circle cx="18" cy="31" r="2.4" fill="#3a2a28"/><ellipse cx="34" cy="27" rx="6" ry="1.8" fill="#fff" opacity=".4"/></g></svg>`;
+
 /** 물고기 그림(core/fishing.js): 종류마다 몸 색, 문어는 둥근 머리에 다리, 빈 깡통은 깡통. */
 function fishSvg(id) {
   const c = FISH[id].color, shadow = '<ellipse cx="32" cy="55" rx="18" ry="3.6" fill="#e6d8b8"/>';
@@ -168,5 +174,6 @@ export function itemSvg(id) {
   if (EXTRA[id]) return EXTRA[id];
   if (FISH[id]) return fishSvg(id);
   if (id === 'plazaflower') return FLOWER_SVG;
+  if (id === 'grilledfish') return GRILLED_SVG;
   return `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="18" fill="#eadcb8" ${S}/><text x="32" y="40" text-anchor="middle" font-size="22" fill="${L}">?</text></svg>`;
 }

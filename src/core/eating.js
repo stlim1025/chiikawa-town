@@ -30,7 +30,8 @@ export const EAT_STYLE = Object.freeze({
   candy: style('nibble', 'f-candy'),
   omurice: style('slurp', 'f-omurice'),
   rusk: style('nibble', 'f-rusk'),
-  bonbon: style('nibble', 'f-bonbon')
+  bonbon: style('nibble', 'f-bonbon'),
+  grilledfish: style('nibble', 'f-fish')
 });
 
 /** 그 음식을 먹는 몸짓 { mode, prop, dur } (모르는 것은 null). */
