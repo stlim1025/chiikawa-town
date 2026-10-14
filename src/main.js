@@ -2023,6 +2023,7 @@ function boot() {
   // 던지면 찌가 물에 뜨고, 한두 번 톡톡 건드리다가(속지 말 것) 퐁 잠기면 바로 행동 버튼 → 끌어올리기 놀이(ui/fishgame.js):
   // 행동 버튼을 누르고 있으면 초록 칸이 올라가고 떼면 내려온다. 물고기를 칸 안에 두어 게이지를 채우면 물 밖으로 튀어 올라 머리 위로
   let fishing = null; // { phase: 'cast' | 'wait' | 'bite' | 'reel', water, spot, t, biteAt, nibbles: [초], fish, reel: stepReel 상태, hold: 누르고 있다 }
+  let actionDown = false, fishRelease = false; // 행동 버튼을 누르고 있는지 · 낚시가 끝날 때 누르고 있었으면 뗄 때까지 다시 던지지 않는다
   const fishGame = createFishGame(ui);
   const bobber = new THREE.Group();
   bobber.add(toonMesh(GEO.sphere, '#ffffff', { scale: [0.08, 0.06, 0.08], outline: 0.012, shadow: false }));
@@ -2068,6 +2069,7 @@ function boot() {
   function cancelFish() {
     if (!fishing) return;
     fishing = null;
+    fishRelease = actionDown; // 버튼을 누른 채로 끝났으면 한 번 떼야 다시 던진다
     player.busy = false;
     player.setRod(false);
     player.mode = 'idle';
@@ -2515,6 +2517,8 @@ function boot() {
 
   let homeTarget = null; // 집 안에서 지금 누르면 할 일
   input.onAction((down) => {
+    actionDown = down;
+    if (!down) fishRelease = false; // 낚시가 끝난 뒤 버튼을 뗐다: 이제 다시 던질 수 있다
     if (mode === 'visit' && drill) { if (down) drillPress(); return; } // 랏코네 수련: 바늘이 초록일 때 누른다
     if (mode === 'visit' && down && homeTarget && state && !sleeping && !panels.isOpen() && !guide.open) {
       if (homeTarget.type === 'door') exitVisit();
@@ -2546,6 +2550,7 @@ function boot() {
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
     if (fishing) { if (!panels.isOpen()) fishPress(down); return; } // 낚시: 찌가 잠길 때 낚아채기 · 끌어올리기 놀이(누르고 있기)
+    if (fishRelease && down) return; // 낚시가 끝났을 때 누르고 있던 버튼(키 반복 포함)으로는 다시 던지지 않는다 — 한 번 떼고 다시 눌러야 던진다
     if (!down) {
       if (glowTry) { if (panels.isOpen()) cancelGlow(); else endGlow(); return; } // 털뭉치: 손을 뗀 순간의 빛으로
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -5601,7 +5606,7 @@ function boot() {
     const fs = fishSpotNear(p, player.yaw);
     if (!fs) return;
     if (hasTool(state, 'rod')) options.push({ d: fs.front ? 0.6 : 1.2, t: { type: 'fish', spot: fs, label: '낚싯대 펼치기' } });
-    else options.push({ d: 1.25, t: { type: 'noRod', label: '낚시하기' } });
+    else options.push({ d: 1.25, t: { type: 'noRod', spot: fs, label: '낚시하기' } });
   }
   /** 같이 놀기: 친구 마을에서도 쓰는 건물(내 돈 · 내 일감 · 내 자격으로. 토벌 실기만 내 마을 검정소에서). 집은 친구 집이라 따로. */
   const GUEST_PLACES = new Set(['board', 'exam', 'ramen', 'furniture', 'realty', 'pochette', 'books', 'tools', 'pub', 'factory', 'raffle', 'salon']);
@@ -5832,6 +5837,7 @@ function boot() {
     if (tg.type === 'wakeMp') return { x: tg.x, z: tg.z, r: 0.6, y: 1.1, id: 'mpw' + tg.id }; // 같이 놀기: 쓰러진 친구
     if (tg.type === 'mpTalk') return { x: tg.x, z: tg.z, r: 0.55, y: 1.55, id: 'mpt' + tg.id }; // 같이 놀기: 다른 사람에게 말 걸기
     if (tg.type === 'hostHome') { const s = village.spots.home; return { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'phostHome' }; }
+    if (tg.type === 'fish' || tg.type === 'noRod') return { x: tg.spot.x, z: tg.spot.z, r: 0.55, y: 0.9, id: 'fish' }; // 낚시: 찌가 떨어질 물 위에 고리 · 안내
     const s = village.spots[tg.type];
     return s ? { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'p' + tg.type } : null;
   }

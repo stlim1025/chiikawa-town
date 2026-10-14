@@ -34,18 +34,19 @@ export const BITE_WAIT = [2.5, 7];
 /**
  * 물고기 크기별: 찌가 잠긴 뒤 누를 틈(초)과 끌어올리기 놀이 game —
  * zone 초록 칸 크기(물길 전체 1 기준) · speed 물고기 빠르기(초당) · turn 방향을 바꾸는 틈(초 범위) ·
+ * dart 방향을 바꿀 때 휙 내빼는 확률(그때는 REEL.dart 배 빠르게 멀리) ·
  * gain 칸 안에 있을 때 게이지가 차는 빠르기 · loss 밖일 때 빠지는 빠르기 · start 처음 게이지.
  */
 export const SIZE_RULES = [
-  { window: 1.0, game: { zone: 0.36, speed: 0.38, turn: [0.8, 1.7], gain: 0.5, loss: 0.18, start: 0.4 } },
-  { window: 0.75, game: { zone: 0.3, speed: 0.55, turn: [0.6, 1.3], gain: 0.4, loss: 0.2, start: 0.35 } },
-  { window: 0.55, game: { zone: 0.28, speed: 0.64, turn: [0.5, 1.1], gain: 0.36, loss: 0.2, start: 0.34 } }
+  { window: 1.0, game: { zone: 0.28, speed: 0.48, turn: [0.5, 1.2], dart: 0.1, gain: 0.36, loss: 0.24, start: 0.3 } },
+  { window: 0.75, game: { zone: 0.26, speed: 0.55, turn: [0.45, 1.1], dart: 0.14, gain: 0.34, loss: 0.23, start: 0.32 } },
+  { window: 0.55, game: { zone: 0.25, speed: 0.58, turn: [0.45, 1.0], dart: 0.18, gain: 0.32, loss: 0.22, start: 0.34 } }
 ];
 /**
  * 초록 칸 움직임: 누르고 있으면 up 만큼 위로, 떼면 down 만큼 아래로 빨라진다(초당 속도 최대 max). 끝에 닿으면 bounce 만큼 튕긴다.
- * grace: 시작하고 이 시간(초) 동안은 게이지가 빠지지 않는다(손을 버튼에 올릴 틈).
+ * grace: 시작하고 이 시간(초) 동안은 게이지가 빠지지 않는다(손을 버튼에 올릴 틈). dart: 물고기가 내뺄 때 빠르기 배수.
  */
-export const REEL = { up: 4.5, down: 3.6, max: 1.6, bounce: 0.35, grace: 0.8 };
+export const REEL = { up: 4.4, down: 3.6, max: 1.7, bounce: 0.35, grace: 0.5, dart: 1.7 };
 const NAMES = { pond: '연못', river: '시냇물', lake: '호수', sea: '바다' };
 export const waterName = (w) => NAMES[w] || '물';
 
@@ -80,7 +81,7 @@ export const rulesOf = (id) => SIZE_RULES[FISH[id].size];
 /** 끌어올리기 놀이 시작: zone 초록 칸 아래 끝(0 ~ 1 − 칸 크기) · fish 물고기 자리(0 ~ 1) · progress 게이지(0 ~ 1). */
 export function startReel(id, random = Math.random) {
   const g = rulesOf(id).game;
-  return { id, t: 0, zone: 0.5 - g.zone / 2, vz: 0, fish: 0.5, target: 0.3 + random() * 0.4, turnAt: g.turn[0], progress: g.start, inside: true, done: null };
+  return { id, t: 0, zone: 0.5 - g.zone / 2, vz: 0, fish: 0.5, target: 0.3 + random() * 0.4, turnAt: g.turn[0], dart: false, progress: g.start, inside: true, done: null };
 }
 /**
  * dt 초 지나기: holding(행동 버튼을 누르고 있다)이면 초록 칸이 올라가고, 떼면 내려온다. 물고기는 정한 자리로 헤엄치다가
@@ -93,13 +94,18 @@ export function stepReel(r, dt, holding, random = Math.random) {
   let vz = Math.max(-REEL.max, Math.min(REEL.max, r.vz + (holding ? REEL.up : -REEL.down) * dt)), zone = r.zone + vz * dt;
   if (zone < 0) { zone = 0; if (vz < 0) vz = -vz * REEL.bounce; }
   if (zone > top) { zone = top; if (vz > 0) vz = -vz * REEL.bounce; }
-  let { target, turnAt, fish } = r;
-  if (t >= turnAt || Math.abs(target - fish) < 0.01) { target = 0.05 + random() * 0.9; turnAt = t + g.turn[0] + random() * (g.turn[1] - g.turn[0]); }
-  const step = g.speed * dt, d = target - fish;
+  let { target, turnAt, fish, dart } = r;
+  if (t >= turnAt || Math.abs(target - fish) < 0.01) {
+    // 새 자리: 가끔은 휙 내뺀다(지금 자리에서 먼 쪽 끝으로, 빠르게)
+    dart = random() < g.dart;
+    target = dart ? (fish < 0.5 ? 0.7 + random() * 0.25 : 0.05 + random() * 0.25) : 0.05 + random() * 0.9;
+    turnAt = t + g.turn[0] + random() * (g.turn[1] - g.turn[0]);
+  }
+  const step = g.speed * (dart ? REEL.dart : 1) * dt, d = target - fish;
   fish += Math.abs(d) <= step ? d : Math.sign(d) * step;
   const inside = fish >= zone && fish <= zone + g.zone;
   const progress = Math.max(0, Math.min(1, r.progress + (inside ? g.gain : t < REEL.grace ? 0 : -g.loss) * dt));
-  return { ...r, t, vz, zone, fish, target, turnAt, progress, inside, done: progress >= 1 ? 'caught' : progress <= 0 ? 'lost' : null };
+  return { ...r, t, vz, zone, fish, target, turnAt, dart: !!dart, progress, inside, done: progress >= 1 ? 'caught' : progress <= 0 ? 'lost' : null };
 }
 
 /** 잡힌 크기(cm, 정수). 쓰레기는 null. */

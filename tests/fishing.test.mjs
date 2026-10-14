@@ -60,21 +60,27 @@ test('낚시 놀이: 누르면 초록 칸이 올라가고 떼면 내려오며, �
   assert.ok(r.zone >= 0 && r.zone < 0.05, '아래 끝에서 멈춘다');
 });
 
-test('낚시 놀이: 물고기를 따라 누르면 낚고, 손을 놓고 있으면 놓친다(처음 잠깐은 봐준다)', () => {
-  for (const id of ['minnow', 'crucian', 'catfish']) {
+test('낚시 놀이: 잘 따라 누르면 낚고, 큰 고기일수록 어렵고, 손을 놓고 있으면 놓친다(처음 잠깐은 봐준다)', () => {
+  // lag: 반응이 늦는 정도(초), k: 칸이 움직이는 기세까지 보고 미리 떼는 정도(숙련)
+  const play = (id, lag, k, n = 30) => {
     const rnd = seeded(5), g = rulesOf(id).game;
     let won = 0;
-    for (let n = 0; n < 10; n++) {
+    for (let i = 0; i < n; i++) {
       let r = startReel(id, rnd), hold = false, acc = 0;
       while (!r.done && r.t < 60) {
         acc += 1 / 60;
-        if (acc >= 0.15) { acc = 0; hold = r.fish > r.zone + g.zone / 2; } // 사람처럼 조금 늦게 반응한다
+        if (acc >= lag) { acc = 0; hold = r.fish - (r.zone + g.zone / 2) - k * r.vz > 0; }
         r = stepReel(r, 1 / 60, hold, rnd);
       }
       if (r.done === 'caught') won++;
     }
-    assert.ok(won >= 8, `${id}: ${won}/10`);
-  }
+    return won / n;
+  };
+  const skilled = ['minnow', 'crucian', 'catfish'].map((id) => play(id, 0.1, 0.22));
+  assert.ok(skilled[0] >= 0.9 && skilled[1] >= 0.8 && skilled[2] >= 0.5, `숙련: ${skilled}`);
+  const simple = ['minnow', 'crucian', 'catfish'].map((id) => play(id, 0.15, 0));
+  assert.ok(simple[0] > simple[1] && simple[1] > simple[2], `단순하게 누르면 큰 고기일수록 덜 잡힌다: ${simple}`);
+  assert.ok(simple[2] < 0.5, `큰 고기는 대충 눌러서는 잘 안 잡힌다: ${simple[2]}`);
   let r = startReel('catfish', () => 0.95);
   const p0 = r.progress;
   for (let k = 0; k < Math.floor(REEL.grace * 60) - 2; k++) r = stepReel(r, 1 / 60, false, () => 0.95);
