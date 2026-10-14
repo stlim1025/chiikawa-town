@@ -65,9 +65,16 @@ export function createHud(ui, input) {
   try { stowed = localStorage.getItem(STOW_KEY) === '1'; } catch { /* 저장이 막혀 있으면 늘 펼친 채로 */ }
   const stowBtn = el('button', 'hud-quest-stow');
   stowBtn.type = 'button';
+  // 시계 위까지 다 못 들어간 쪽지: 아래부터 숨기고 이 단추로 묶는다(누르면 마을폰 퀘스트 앱)
+  const overBtn = el('button', 'hud-quest-over');
+  overBtn.type = 'button';
+  overBtn.hidden = true;
+  overBtn.title = '나머지 퀘스트는 마을폰 퀘스트 앱에서';
+  const questMoreFns = [];
+  overBtn.addEventListener('click', () => questMoreFns.forEach((fn) => fn()));
   const qbar = el('div', 'hud-quest-bar');
   qbar.hidden = true;
-  qbar.append(stowBtn);
+  qbar.append(stowBtn, overBtn);
   quests.appendChild(qbar); // 늘 맨 끝(쪽지는 그 앞에 끼운다)
   function applyStow() {
     quests.classList.toggle('stowed', stowed);
@@ -90,11 +97,29 @@ export function createHud(ui, input) {
     slide(!stowed);
     if (!stowed && !still) loose().forEach((e) => e.animate?.([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'ease-out' }));
   });
-  /** 숨긴 상태에 맞춰 쪽지를 보인다: 숨겼으면 고정(압정)한 쪽지만, 아니면 모두. */
+  /**
+   * 숨긴 상태에 맞춰 쪽지를 보인다: 숨겼으면 고정(압정)한 쪽지만, 아니면 시계 위까지 들어가는 만큼(쪽지 차례가 고정 → 띄운 것 → 나머지라 그 순서로 남는다).
+   * 넘치면 아래 쪽지부터 숨기고 「외 N개」 단추로 묶는다. 고정한 쪽지와 날아오는 중인 쪽지(카드가 꽂힐 자리)는 숨기지 않는다.
+   */
+  let fitAt = ''; // 마지막으로 맞춘 쪽지 칸 위치 · 화면 크기 · 입력 방식(바뀌면 다시 맞춘다)
+  document.fonts?.ready?.then(() => { fitAt = ''; }); // 글꼴을 다 불러오면 쪽지 높이가 바뀌니 한 번 더
   function foldQuests() {
     const items = [...quests.querySelectorAll('.hud-quest')];
     items.forEach((e) => { e.hidden = stowed && !e.classList.contains('pinned'); });
     qbar.hidden = !items.length;
+    let over = 0;
+    if (!stowed && items.length) {
+      const floor = (clock.offsetParent ? clock.getBoundingClientRect().top : ui.getBoundingClientRect().bottom) - 8;
+      for (let i = items.length - 1; i >= 0 && qbar.getBoundingClientRect().bottom > floor; i--) {
+        const e = items[i];
+        if (e.classList.contains('pinned') || e.classList.contains('incoming')) continue;
+        overBtn.hidden = false; // 단추는 숨기기 옆이라 줄 높이는 그대로
+        e.hidden = true;
+        over++;
+      }
+    }
+    overBtn.hidden = !over;
+    overBtn.textContent = `외 ${over}개`;
     applyStow();
   }
   /**
@@ -300,6 +325,8 @@ export function createHud(ui, input) {
     onRecall(fn) { recallBtn.addEventListener('click', fn); },
     /** 퀘스트 쪽지의 압정(고정)을 누르면 fn(퀘스트 id). */
     onQuestPin(fn) { questPinFns.push(fn); },
+    /** 「외 N개」(시계 위까지 다 못 들어간 퀘스트 쪽지)를 눌렀을 때. */
+    onQuestMore(fn) { questMoreFns.push(fn); },
     /** 마을폰 버튼이 빛나며 빨간 점(새로 생긴 앱이 있을 때 — 지도를 막 샀을 때). */
     setPhoneNudge(on) { if (gear.classList.contains('nudge') !== !!on) { gear.classList.toggle('nudge', !!on); gear.setAttribute('aria-label', on ? '마을폰(새 앱이 생겼어요)' : '마을폰(설정)'); } },
     /** 집으로 버튼을 보일지(마을 밖에 있을 때). */
@@ -360,7 +387,10 @@ export function createHud(ui, input) {
     setQuests(list) {
       const chipKey = (q) => (q.chips || []).map((c) => c.text + (c.done ? '!' : '')).join(',');
       const key = list.map((q) => q.id + ':' + q.goal + ':' + (q.n || '') + ':' + chipKey(q) + (q.pinned ? ':p' : '')).join('|');
-      if (shown.quests === key) return;
+      // 쪽지 위 칸(일감 · 친구 얼굴 …), 화면 크기, 입력 방식(PC · 터치는 쪽지 글 크기가 다르다)이 바뀌면 시계 위까지 들어가는 만큼 다시 맞춘다
+      const fit = [quests.offsetTop, ui.clientWidth, ui.clientHeight, document.documentElement.dataset.input].join(':'), refit = fit !== fitAt;
+      fitAt = fit;
+      if (shown.quests === key) { if (refit) foldQuests(); return; }
       shown.quests = key;
       const keep = new Set(list.map((q) => q.id));
       for (const [id, nt] of notes) if (!keep.has(id)) { nt.el.remove(); notes.delete(id); }

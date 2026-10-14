@@ -1812,12 +1812,15 @@ function boot() {
   const openBag = () => { if (state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy() && !panels.isOpen()) panels.openBag(); };
   hud.onBag(openBag);
   // 마을폰: 마을에서도, 집 · 친구 집 안에서도(꾸미는 중만 빼고) 연다. 오른쪽 위 버튼 또는 E 키
+  const phoneOk = () => !!(state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy());
   const openPhone = () => {
-    if (!(state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy())) return;
+    if (!phoneOk()) return;
     panels.openSettings({ storage: store.available });
     if (state.tutorial === 'phone') tutPhoneOpened = true; // 첫날 안내: 열어 봤으니 닫으면 하치와레가 마을폰 이야기를 한다
   };
   hud.onSettings(openPhone);
+  // 퀘스트 쪽지가 시계 위까지 다 못 들어가 묶인 「외 N개」: 누르면 마을폰 퀘스트 앱
+  hud.onQuestMore(() => { if (phoneOk()) panels.openQuests(); });
   input.onZoom((f) => cam.zoomBy(f)); // 두 손가락으로 확대 · 축소
   // 등불: 가진 불만 끔 → 랜턴 → 손전등. 버튼 또는 F 키(아직 불이 없으면 어디서 사는지 알려 준다)
   const toggleLight = (fromKey) => {

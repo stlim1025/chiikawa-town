@@ -1578,6 +1578,11 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quests.stowed .hud-quest-stow::after { content: "▸"; font-size: 12px; line-height: 1; }
 .hud-quests.stowed > .hud-quest:not(.pinned) { display: none !important; }
 .hud-quest-stow.shine { animation: q-shine 1.4s ease-out; }
+/* 시계 위까지 다 못 들어간 쪽지 묶음 「외 N개 ▸」(누르면 마을폰 퀘스트 앱): 노란 단추라 누르는 것임을 알 수 있게 */
+.hud-quest-over { pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px 5px 12px; border: 2px solid #fff; border-radius: 999px; background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.hud-quest-over::after { content: "▸"; font-size: 12px; line-height: 1; }
+.hud-quest-over:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
+.hud-quest-over[hidden] { display: none; }
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
   .hud-quest { grid-template-columns: 1fr; padding: 4px 12px 6px 10px; }
