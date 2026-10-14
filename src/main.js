@@ -4073,7 +4073,8 @@ function boot() {
       delete awayInfo[kind];
       setDoing(kind, null, null);
     },
-    photosChanged: () => refreshPhotoFrame()
+    photosChanged: () => refreshPhotoFrame(),
+    backdrop: () => (workStatus(state, 'clock') === 'open' ? { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z, r: 0.9 } : null) // 광장 한가운데 시계탑
   });
   /** 같은 날 아침으로 되돌아온 뒤: 친구들은 각자 집에서 자고 있고(일어날 때 나온다), 마을에 있었으면 나는 내 집 앞에서. */
   function afterLoopRewind() {

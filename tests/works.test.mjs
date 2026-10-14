@@ -88,8 +88,8 @@ test('마을 가꾸기: 시설 자리는 길 · 물 · 가게 문 앞 · 마을 
   const size = { flowers: 0.85, benches: 0.7, clock: 0.9, pavilion: 1.5 };
   for (const p of spots) {
     const r = size[p.id];
-    // 시계탑은 광장 안(큰길 둘이 지나는 가운데와 광장 테두리는 비켜서), 나머지는 길을 피한다
-    if (p.id === 'clock') assert.ok(Math.hypot(p.x - PLAZA.x, p.z - PLAZA.z) + r < PLAZA.r && Math.abs(p.x) > 0.7 + r && Math.abs(p.z) > 0.7 + r, `광장: ${p.x},${p.z}`);
+    // 시계탑은 광장 한가운데, 나머지는 길을 피한다
+    if (p.id === 'clock') assert.ok(Math.hypot(p.x - PLAZA.x, p.z - PLAZA.z) < 0.01, `광장 한가운데: ${p.x},${p.z}`);
     else assert.ok(roadDist(p.x, p.z) > r * 0.6, `길: ${p.id} ${p.x},${p.z}`);
     assert.ok(shoreDist(p.x, p.z) > r, `물가: ${p.id}`);
     assert.ok(fronts.every((f) => !inDoorLane(f, p.x, p.z) && Math.hypot(f.x - p.x, f.z - p.z) > 2.2), `문 앞: ${p.id}`);

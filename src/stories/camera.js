@@ -12,7 +12,8 @@ import { loadPhotos, savePhotos } from '../core/photostore.js';
  * 친구를 부르면 그 자리에 다 올 때까지 기다렸다가(늦으면 그 자리에 세운다) 다음 대사로 넘어간다: 대사에 나오는 친구는 늘 화면에 있다.
  * 찍은 사진은 이 브라우저에 남긴다(core/photostore.js): 뽑은 사진 · 흔들린 사진 액자(world/photoframe.js)에 쓴다.
  * ctx: { npcs, village, hud, guide, sound, input, staged, who(kind), narrator, me(), fill(lines), getPlayer, cam, photo(ui/photos.js),
- *        capture({ pos, look, rect }) → data URL | null, setRain(on), shelter() → { stand, spots: [3] }, bring(kind, x, z), photosChanged() }
+ *        capture({ pos, look, rect }) → data URL | null, setRain(on), shelter() → { stand, spots: [3] }, bring(kind, x, z), photosChanged(),
+ *        backdrop() → { x, z, r } | null(광장 한가운데 시계탑: 셋은 그 앞에 선다) }
  */
 const CAPTIONS = ['첫 장, 치이카와', '셋이 나란히', '우사기의 전설의 포즈', '다 같이 점프'];
 /** 셋이서 찍는 세 장: 뷰파인더 위 안내 · 찍기 전 대사(who 가 없으면 해설) · 셋의 몸짓(제자리에서). */
@@ -184,11 +185,19 @@ export function createCameraStory(ctx) {
       { text: '(하치와레에게 카메라를 건네받았다. …생각보다 묵직하다!)' }], setupShoot), 4);
   }
   function setupShoot() {
-    const st = S.stand, c = ctx.cam.camera;
+    let st = S.stand;
+    const c = ctx.cam.camera;
     // 셋(양 끝 몸까지)이 뷰파인더 틀 너비의 8할 안에 들어오는 거리. 틀이 작거나 화면이 좁으면(세로 화면) 멀리 선다
     const tanH = Math.tan(THREE.MathUtils.degToRad(c.fov) / 2) * c.aspect, fw = ctx.photo.frameFraction();
     const dist = Math.min(9, Math.max(3.5, ROW_HALF / (0.8 * tanH * fw)));
     S.fh = tanH * dist * fw; // 셋이 선 거리에서 틀 너비의 반(m)
+    // 광장 한가운데 시계탑(마을 가꾸기)이 있으면 셋은 탑 바로 앞에 서고(탑이 사진 배경), 나는 그만큼 뒤로 물러나 찍는다.
+    // 여기서부터 화면은 내 눈(뷰파인더)이라 물러나는 모습은 보이지 않는다
+    const tw = ctx.backdrop && ctx.backdrop(), front = tw ? tw.z + tw.r + 0.8 : 0;
+    if (tw && Math.abs(tw.x - st.x) < tw.r + ROW_HALF && st.z - dist < front) {
+      st = S.stand = at(st.x, front + dist);
+      P().setPosition(st.x, st.z);
+    }
     S.row = { x: st.x, z: st.z - dist };
     S.cam = { pos: new THREE.Vector3(st.x, 0.92, st.z - 0.5), look: new THREE.Vector3(st.x, 0.55, S.row.z) }; // 내 얼굴 앞에서 셋을 본다
     // 왼쪽부터 치이카와 · 우사기 · 하치와레(우사기가 가운데: 전설의 포즈를 가운데서)

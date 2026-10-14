@@ -1,4 +1,4 @@
-import { ROADS, VILLAGE_R, roadDist, shoreDist, lairReach } from './layout.js';
+import { ROADS, VILLAGE_R, PLAZA, roadDist, shoreDist, lairReach } from './layout.js';
 import { registerItems, addItem } from './inventory.js';
 
 /**
@@ -11,7 +11,7 @@ export const WORKS = {
   flowers: { name: '광장 꽃밭', price: 3000, note: '광장 남쪽 둘레에 꽃밭 넷이 생겨요' },
   benches: { name: '연못 쉼터', price: 6000, note: '연못가에 나무 벤치 둘이 놓여요' },
   lamps: { name: '바깥 길 가로등', price: 12000, note: '마을 밖 큰길에도 밤이면 불이 켜져요' },
-  clock: { name: '마을 시계탑', price: 20000, note: '광장 한켠에서 마을 시각을 알려 줘요' },
+  clock: { name: '마을 시계탑', price: 20000, note: '광장 한가운데에서 마을 시각을 알려 줘요' },
   roads: { name: '돌길 포장', price: 25000, note: '마을 안 흙길과 광장이 반듯한 돌길이 돼요' },
   pavilion: { name: '강가 정자', price: 30000, note: '남쪽 강가에 쉬어 가는 정자가 생겨요' },
   fence: { name: '든든한 돌담', price: 40000, note: '나무 울타리가 돌담이 되고 문 옆에 돌기둥이 서요' }
@@ -25,8 +25,8 @@ export const WORK_IDS = Object.keys(WORKS);
 export const WORK_SPOTS = {
   flowers: [{ x: 3.3, z: 5.72 }, { x: 5.72, z: 3.3 }, { x: -5.72, z: 3.3 }, { x: -3.3, z: 5.72 }],
   benches: [{ x: -4.5, z: 18.2, yaw: 0 }, { x: -4.5, z: 24.6, yaw: Math.PI }],
-  // 시계탑: 광장 남서쪽(한가운데는 카메라 이야기의 단체 사진 줄, 북쪽은 노동 접수 · 경품 추첨 · 모금함 문 앞이라 비켜 선다)
-  clock: [{ x: -3.0, z: 2.6, yaw: 0 }],
+  // 시계탑: 광장 한가운데(카메라 이야기의 단체 사진은 탑 앞에 서서 찍는다 — stories/camera.js)
+  clock: [{ x: PLAZA.x, z: PLAZA.z, yaw: 0 }],
   pavilion: [{ x: 8, z: 31.5, yaw: 0 }]
 };
 /** 마을 전체를 바꾸는 시설(돌길 · 돌담)의 '공사 중' 간판 자리. */
