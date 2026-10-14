@@ -73,7 +73,7 @@ export function createIdolStory(ctx) {
     ctx.stage.shot(r === 1 ? 'wide' : 'dance'); // 1절: 관객이 모여드는 게 보이게 · 2절: 무대 위 춤을 가까이
     rhythm.start({
       bpm: IDOL_BPM, chart: idolChart(r), icon: STAR_ICON, go: '파자마!',
-      label: r === 1 ? '무대 응원' : '다 같이 신나게', hint: '별이 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!',
+      label: r === 1 ? '무대 응원' : '다 같이 신나게', hint: '별이 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!',
       onHit: (q, combo) => {
         ctx.stage.cheer();
         S.hits++;
@@ -118,7 +118,7 @@ export function createIdolStory(ctx) {
         ? [{ who: W('idolG'), text: '다 같이 춰서 너무 즐거웠어~!' }, { who: H(), text: '헤헤, 신난다~! 우리도 아이돌 같았지?' }]
         : [{ who: C(), text: '…헤헤… 어려웠지만… 즐거웠다…' }, { who: W('idolG'), text: '즐거웠으면 그걸로 최고야!' }];
     scenes([
-      ['finale', [...lines, { who: W('idolW'), text: '다음 공연에도 꼭 와 줘~!' }, '(파자마 파티즈의 노래가 한동안 귀에서 떠나지 않았다… 파·자·마·파·티~♪)']]
+      ['finale', [...lines, { who: W('idolW'), text: '다음 공연에도 꼭 와 줘~!' }, '(파자마 파티즈의 노래가 한동안 귀에서 떠나지 않았다… 우~ 우와와 우와~♪)']]
     ], end);
   }
   function end() {

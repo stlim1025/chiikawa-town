@@ -41,6 +41,8 @@ export function createPlayer(scene, chibi, village) {
     /** 친구와 같이 춤추는 남은 시간. */
     danceTime: 0,
     get yaw() { return yaw; },
+    /** 지금 캐릭터 모형의 뿌리(다른 장면이 마을을 그릴 때 잠깐 숨긴다 — 파자마 파티즈 무대). */
+    get root() { return model.root; },
     setPosition(x, z) {
       const p = village.nearestFree(x, z, RADIUS);
       position.x = p.x; position.z = p.z;

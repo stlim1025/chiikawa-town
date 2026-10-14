@@ -89,7 +89,7 @@ function rng(seed) {
 // 잎 색이 같은 나무끼리 도형을 같이 쓴다
 const CANOPY = [[0, 1.65, 0, 0.82], [0.48, 1.35, 0.18, 0.58], [-0.42, 1.42, -0.12, 0.6], [0.05, 1.3, -0.45, 0.55]];
 const canopyGeos = new Map();
-export const canopyGeometry = (leaf, light) => {
+const canopyGeometry = (leaf, light) => {
   const key = leaf + '|' + light;
   if (!canopyGeos.has(key)) canopyGeos.set(key, mergedGeometry(CANOPY.map(([x, y, z, r], i) => ({ geometry: GEO.sphereMid, position: [x, y, z], scale: [r, r * 0.92, r], color: i % 2 ? light : leaf }))));
   return canopyGeos.get(key);

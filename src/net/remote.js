@@ -135,6 +135,8 @@ export function createRemotePlayers(scene, area = 'village') {
   function animOf(id) { const p = list.get(id); return p ? p.anim : null; }
   /** 받은 마지막 자리 · 있는 곳 · 몸짓 · 손에 든 것 [{ id, name, x, z, area, anim, held }](주인: 몬스터가 노릴 놀러 온 친구들). */
   function players() { return [...list.values()].map((p) => ({ id: p.id, name: p.name, x: p.tx, z: p.tz, area: p.area, anim: p.anim, held: p.held })); }
+  /** 같이 노는 사람들의 캐릭터 모형 뿌리(다른 장면이 마을을 그릴 때 잠깐 숨긴다 — 파자마 파티즈 무대). */
+  function roots() { return [...list.values()].map((p) => p.chibi.root); }
   /** 디버그: 그 사람 캐릭터에서 지금 보이는 소품 꼬리표 · 모습. */
   function debugOf(id) { const p = list.get(id); return p && { shown: Object.entries(p.chibi.props || {}).filter(([, ms]) => ms.some((m) => m.visible)).map(([t]) => t), look: p.lookKey }; }
   /** 지금 보이는 사람 [{ id, name, x, z, anim }](말 걸기 · 깨우기 대상). */
@@ -155,5 +157,5 @@ export function createRemotePlayers(scene, area = 'village') {
     return out;
   }
 
-  return { add, move, say, emote, setLook, remove, clear, update, labels, players, visible, downed, lit, animOf, debugOf, get size() { return list.size; } };
+  return { add, move, say, emote, setLook, remove, clear, update, labels, players, roots, visible, downed, lit, animOf, debugOf, get size() { return list.size; } };
 }

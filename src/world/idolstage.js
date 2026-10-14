@@ -1,48 +1,47 @@
 import * as THREE from 'three';
-import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
+import { toonMesh, celMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, wearPajama, PAJAMA_COLORS } from '../actors/models.js';
-import { canopyGeometry } from './village.js';
+import { PLAZA } from '../core/layout.js';
 
 /**
- * 파자마 파티즈 무대(사이드스토리 '파자마 파티즈'): 밤의 광장에 세운 작은 무대. 따로 그리는 장면(클럽 club.js 처럼).
- * 무대 위에는 색색 파자마를 입은 아이돌 넷(별 핀 · 리본, 가운데 초록이 마이크), 앞에는 나 · 치이카와 · 하치와레(응원봉),
+ * 파자마 파티즈 무대(사이드스토리 '파자마 파티즈'): 밤의 마을 광장에 세운 작은 무대. 이 장면에는 무대 · 아이돌 · 관객만 두고(배경 없음),
+ * main.js 가 진짜 마을을 같은 카메라로 먼저 그린 뒤 그 위에 겹쳐 그린다. 아래 자리 · 카메라는 무대 기준(AT 이 원점, 무대는 −z 북쪽)이다.
+ * 무대 위에는 원작처럼 귀 달린 후드 잠옷을 입고 얼굴은 까만 그림자인 아이돌 넷(가운데 초록이 마이크), 앞에는 나 · 치이카와 · 하치와레(응원봉),
  * 노래가 귀에 남아 하나둘 모여드는 갑옷 씨 관객, 2절에는 우사기 · 치이카와 · 하치와레가 무대에 올라 다 같이 춤춘다.
  * 몸짓은 곡 박(beat)에 맞춘다(models.js 의 'idol' · 'idolSing' · 'glow'). 카메라는 shot(이름)으로 부드럽게 옮긴다.
  */
+// 잠옷 색: 원작 그림의 연보라 · 풀빛 초록 · 산호 분홍 · 하양
 export const IDOLS = [
-  { id: 'idolV', name: '보라', color: '#b994ee', ribbon: '#fff6fb' },
-  { id: 'idolG', name: '초록', color: '#86d58e', ribbon: '#ffb3cd', lead: true },
-  { id: 'idolP', name: '분홍', color: '#ff9fc4', ribbon: '#fffaf0' },
-  { id: 'idolW', name: '하양', color: '#fbfaf3', ribbon: '#9fd0f2' }
+  { id: 'idolV', name: '보라', color: '#cbbde9' },
+  { id: 'idolG', name: '초록', color: '#a5c58c', lead: true },
+  { id: 'idolP', name: '분홍', color: '#f28f9b' },
+  { id: 'idolW', name: '하양', color: '#fbfaf3' }
 ];
+const FACE_SHADOW = '#56545c', FACE_BLUSH = '#151316'; // 후드 안 얼굴: 이목구비 없이 동그란 까만 그림자, 볼에 빗금(///) 홍조(원작)
+const HATCH = new THREE.SphereGeometry(1, 8, 6); // 빗금 한 줄(가늘고 긴 납작 타원)
 const STAGE_Y = 0.7;
 const IDOL_X = [-2.1, -0.7, 0.7, 2.1];
+/**
+ * 무대 자리(마을 좌표): 광장 한가운데(시계탑 자리) 바로 남쪽. 무대 뒤로 시계탑 · 노동 접수 · 경품 추첨 줄이 보이고,
+ * 관객석은 광장 남쪽 끝 꽃밭 사이(카메라도 마을처럼 남쪽에서 북쪽을 본다). 관객 자리는 둘레 가로등 · 나무 · 꽃밭을 비켜 잡았다.
+ */
+const AT = { x: PLAZA.x, z: PLAZA.z + 5.7 };
 const PALS = ['chiikawa', 'hachiware', 'usagi'];
-const SEATS = { me: [0, 1.3], chiikawa: [-1.15, 1.6], hachiware: [1.15, 1.6], usagi: [5.5, 1.2] }; // 우사기는 처음엔 무대 옆(보이지 않는 곳)
+const SEATS = { me: [0, 1.3], chiikawa: [-1.15, 2.2], hachiware: [1.15, 2.2], usagi: [4.3, -1.0] }; // 우사기는 처음엔 무대 계단 옆(나타나면 바로 무대로)
 const ON_STAGE = { chiikawa: [-1.4, -2.15], hachiware: [0, -2.05], usagi: [1.4, -2.15] }; // 2절: 무대 앞줄
 // 갑옷 씨 관객: 무대 앞 좌우 날개(가운데 뒤는 비워 카메라가 무대 · 우리 일행을 보게)
-const FANS = [['labor', -3.6, 1.6], ['pochette', 3.6, 1.7], ['labor', -4.7, 0.5], ['captain', 4.7, 0.6], ['labor', -3.3, 3.1], ['pochette', 3.3, 3.2], ['labor', -5.0, 2.5]];
+const FANS = [['labor', -3.6, 1.6], ['pochette', 3.6, 1.7], ['labor', -4.7, 0.5], ['captain', 4.7, 0.6], ['labor', -4.4, 3.0], ['pochette', 3.3, 3.2], ['labor', -5.0, 2.5]];
 const GLOW = ['#ffe45f', '#ff9ae3', '#7fe0ff', '#9dff8a', '#ffb36b'];
 const GLOW_C = GLOW.map((c) => new THREE.Color(c)); // 매 장면 색을 바꿀 때 글자 풀기 없이
 const SHOTS = {
   wide: { pos: [0, 5.0, 8.8], look: [0, 1.2, -2.6] },
-  stage: { pos: [0, 2.3, 3.2], look: [0, 1.55, -3.1], portrait: { pos: [0, 2.9, 5.6], look: [0, 1.45, -3.1] } },
+  stage: { pos: [-0.8, 2.3, 3.2], look: [0, 1.55, -3.1], portrait: { pos: [-0.8, 2.9, 5.6], look: [0, 1.45, -3.1] } }, // 조금 왼쪽에서: 관객석 오른쪽 가로등이 화면에 걸리지 않게
   crowd: { pos: [0, 2.7, -2.4], look: [0, 0.8, 3.2] },
   dance: { pos: [0, 4.8, 4.7], look: [0, 1.2, -3.0], portrait: { pos: [0, 5.6, 7.4], look: [0, 1.2, -3.0] } }, // 세로 화면은 좁아서 조금 뒤에서(양 끝 아이돌까지)
   finale: { pos: [0, 4.4, 6.8], look: [0, 1.4, -2.8] }
 };
 const WHITE = new THREE.Color(1, 1, 1);
 
-/** 다섯 뿔 별 모양(머리 핀). */
-function starGeometry(r = 0.1) {
-  const s = new THREE.Shape();
-  for (let i = 0; i < 10; i++) {
-    const a = Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.45 : r;
-    if (i === 0) s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-  }
-  return new THREE.ExtrudeGeometry(s, { depth: r * 0.35, bevelEnabled: false }).center();
-}
-const STAR = starGeometry(), STAR_MAT = new THREE.MeshBasicMaterial({ color: '#ffe066' });
 /** 들고 다니는 소품(무기 · 도구) 메시들. */
 const propsOf = (c) => new Set(Object.values(c.props || {}).flat());
 /** 가장 큰 부품(머리 · 팔 · 몸통 자리를 잡는 데 쓴다). 합친 덩어리(크기 1)와 skip(소품 — 팔에 붙은 사스마타를 손으로 잘못 잡지 않게)은 뺀다. */
@@ -66,46 +65,20 @@ function giveGlow(c, color) {
 }
 
 export function createIdolStage() {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#1c2552');
-  scene.fog = new THREE.Fog('#1c2552', 18, 40);
-  scene.add(new THREE.HemisphereLight(0xd6dcff, 0x2b3566, 1.05));
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+  const scene = new THREE.Scene(); // 배경 없음: 마을 위에 겹쳐 그린다
+  scene.add(new THREE.HemisphereLight(0xd6dcff, 0x2b3566, 1.05)); // 무대 조명(이 장면 물체에만)
+  const root = new THREE.Group(); // 무대 쪽 물체 모두: 광장 자리로
+  root.position.set(AT.x, 0, AT.z);
+  scene.add(root);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300); // 마을 하늘 돔(반지름 200)까지 보이게
   const light = new THREE.Color(1, 1, 1); // 캐릭터 단색 칠에 곱하는 빛(무대 조명 색이 박자마다 살짝 돈다)
   const basic = (c, o = {}) => new THREE.MeshBasicMaterial({ color: c, ...o });
   const add = (parent, geo, mat, pos, scale, rot) => { const m = new THREE.Mesh(geo, mat); m.position.set(...pos); if (scale) m.scale.set(...scale); if (rot) m.rotation.set(...rot); parent.add(m); return m; };
   const toon = (parent, geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); parent.add(m); return m; };
 
-  // ---------- 밤의 광장 ----------
-  add(scene, new THREE.CircleGeometry(30, 40).rotateX(-Math.PI / 2), basic('#2f4a3a'), [0, -0.02, 0]);
-  add(scene, new THREE.CircleGeometry(7.5, 40).rotateX(-Math.PI / 2), basic('#5c5a6e'), [0, -0.01, 0.6]);
-  // 별 · 달
-  const STARS = 160, starPos = new Float32Array(STARS * 3);
-  for (let i = 0; i < STARS; i++) {
-    const a = (i * 2.39996) % (Math.PI * 2), h = 0.15 + ((i * 53) % 85) / 100, r = 34;
-    starPos[i * 3] = Math.cos(a) * r * Math.cos(h); starPos[i * 3 + 1] = Math.sin(h) * r; starPos[i * 3 + 2] = Math.sin(a) * r * Math.cos(h) - 6;
-  }
-  const starGeo = new THREE.BufferGeometry();
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: '#fff7d6', size: 0.22, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
-  scene.add(stars);
-  add(scene, new THREE.CircleGeometry(1.6, 28), basic('#fff3c4', { fog: false }), [-9, 12, -24]);
-  // 광장 둘레 나무(무대 뒤로 둥글게): 마을 나무(world/village.js)와 같은 줄기 + 잎 덩어리, 밤빛에 맞춰 조금 짙은 초록
-  const leafMat = toonMaterial('#ffffff', { vertexColors: true });
-  const NIGHT_LEAF = [['#4a8660', '#5f9f70'], ['#437c58', '#56946a']];
-  for (let i = 0; i < 9; i++) {
-    const a = -2.5 + i * 0.62, r = 12 + (i % 3), tree = new THREE.Group();
-    tree.position.set(Math.sin(a) * r, 0, -Math.cos(a) * r * 0.7 - 2);
-    tree.rotation.y = i * 1.3;
-    tree.scale.setScalar(1.7 + (i % 3) * 0.2);
-    toon(tree, GEO.cylinder, '#6e5443', { scale: [0.16, 1.1, 0.16], outline: 0.03 });
-    toon(tree, canopyGeometry(...NIGHT_LEAF[i % 2]), null, { material: leafMat, outline: 0.04 });
-    scene.add(tree);
-  }
-
   // ---------- 무대 ----------
   const stage = new THREE.Group();
-  scene.add(stage);
+  root.add(stage);
   toon(stage, GEO.box, '#c79e74', { position: [0, STAGE_Y / 2, -3.2], scale: [7.4, STAGE_Y, 3.1], shell: true, outline: 0.03 });
   toon(stage, GEO.box, '#e8c49b', { position: [0, STAGE_Y + 0.01, -3.2], scale: [7.2, 0.03, 2.9], outline: false });
   // 무대 앞 가장자리: 파스텔 방울 장식
@@ -163,26 +136,37 @@ export function createIdolStage() {
   confGeo.setAttribute('position', new THREE.BufferAttribute(confPos, 3));
   const confetti = new THREE.Points(confGeo, new THREE.PointsMaterial({ size: 0.26, color: '#ffd1e6', transparent: true, opacity: 0, depthWrite: false }));
   confetti.frustumCulled = false; // 점 자리가 매 장면 바뀌어서(처음 경계는 원점 한 점) 화면 밖으로 잘못 빼지 않게
-  scene.add(confetti);
+  root.add(confetti);
 
   // ---------- 아이돌 넷 ----------
+  const faceMat = celMaterial(FACE_SHADOW, { flat: true }), blushMat = celMaterial(FACE_BLUSH, { flat: true });
   const idols = IDOLS.map((d, i) => {
-    const c = buildChibi({ ears: 'round', body: '#ffffff', cheek: '#f5a3b5', eyes: d.lead ? 'sparkle' : 'dot', mouth: d.lead ? 'open' : 'small', accessory: 'none' });
+    const c = buildChibi({ ears: 'round', body: '#ffffff', accessory: 'none' });
+    const head = biggest(c.pivots.head); // 머리 본체(후드를 씌우기 전에 — 후드가 더 크다)
     wearPajama(c, true, d.color);
-    const head = biggest(c.pivots.head);
     if (head) {
-      // 머리 핀: 노란 별(후드 오른쪽 귀 옆)
-      const star = toonMesh(STAR, null, { material: STAR_MAT, outline: 0.012, shadow: false }); // 스스로 빛나는 노랑(밤 조명에 칙칙해지지 않게)
-      star.position.set(head.position.x + head.scale.x * 0.42, head.position.y + head.scale.y * 0.72, head.position.z + head.scale.z * 0.55);
-      star.rotation.z = -0.3;
-      c.pivots.head.add(star);
-    }
-    const body = biggest(c.pivots.body);
-    if (body) {
-      // 목에 리본
-      const y = body.position.y + body.scale.y * 0.62, z = body.position.z + body.scale.z * 0.78;
-      [-1, 1].forEach((sd) => c.pivots.body.add(toonMesh(GEO.sphere, d.ribbon, { position: [body.position.x + sd * 0.09, y, z], scale: [0.09, 0.06, 0.04], rotation: [0, 0, sd * 0.4], outline: 0.01, shadow: false })));
-      c.pivots.body.add(toonMesh(GEO.sphere, d.ribbon, { position: [body.position.x, y, z + 0.01], scale: [0.04, 0.04, 0.035], outline: 0.01, shadow: false }));
+      // 얼굴: 눈 · 입 · 볼은 숨기고 머리 본체를 까맣게 — 후드의 동그란 구멍으로 까만 얼굴만 보인다
+      const suit = new Set(c.pajama);
+      c.pivots.head.children.forEach((m) => { if (m.isMesh && m !== head && !suit.has(m)) m.visible = false; });
+      head.material = faceMat;
+      // 볼: 얼굴 가운데 높이 양옆에 「/」로 기운 짧은 빗금 셋. 머리 크기 묶음 안에서 돌려 붙인다(머리가 납작해도 곡면에 붙게)
+      const mask = new THREE.Group();
+      mask.position.copy(head.position);
+      mask.rotation.copy(head.rotation);
+      mask.scale.copy(head.scale);
+      [-1, 1].forEach((sd) => {
+        const cheek = new THREE.Group();
+        cheek.rotation.set(0.18, sd * 0.48, 0, 'YXZ'); // 얼굴 높이 한가운데(후드 구멍 가운데와 같은 높이)의 양옆
+        [-0.1, 0, 0.1].forEach((x) => {
+          const line = new THREE.Mesh(HATCH, blushMat);
+          line.position.set(x, 0, 1.015); // 까만 얼굴 면 바로 위
+          line.rotation.z = -0.45;
+          line.scale.set(0.032, 0.15, 0.012);
+          cheek.add(line);
+        });
+        mask.add(cheek);
+      });
+      c.pivots.head.add(mask);
     }
     if (d.lead) {
       // 가운데 초록: 마이크
@@ -206,7 +190,7 @@ export function createIdolStage() {
     hideProps(c);
     wearPajama(c, true, PAJAMA_COLORS[k], { ownEars: true }); // 후드 귀는 그 친구 귀 모양 그대로(하치와레 뾰족귀 · 우사기 긴 귀)
     if (k !== 'usagi') giveGlow(c, GLOW[i + 1]);
-    scene.add(c.root);
+    root.add(c.root);
     pals[k] = { c, from: new THREE.Vector3(), to: new THREE.Vector3(), t: 1, sec: 1, onStage: false };
   });
   const fans = FANS.map(([kind, x, z], i) => {
@@ -216,7 +200,7 @@ export function createIdolStage() {
     c.root.position.set(x, 0, z);
     c.root.rotation.y = Math.atan2(-x, -3.2 - z);
     c.root.visible = false;
-    scene.add(c.root);
+    root.add(c.root);
     return { c, pop: 0, phase: i * 0.37 };
   });
   let shown = 0;
@@ -244,7 +228,7 @@ export function createIdolStage() {
     /** 새 공연: 내 생김새 look(잠옷을 입힌다). 손님은 나 · 치이카와 · 하치와레뿐. */
     start(look) {
       if (me) {
-        scene.remove(me.root);
+        root.remove(me.root);
         me.root.traverse((m) => { if (m.isMesh && m.userData.merged) m.geometry.dispose(); }); // 합친 덩어리는 이 모형만의 도형
         if (meGlow) { meGlow.geometry.dispose(); meGlow.material.dispose(); }
       }
@@ -253,7 +237,7 @@ export function createIdolStage() {
       meGlow = giveGlow(me, GLOW[0]);
       me.root.position.set(SEATS.me[0], 0, SEATS.me[1]);
       me.root.rotation.y = Math.PI;
-      scene.add(me.root);
+      root.add(me.root);
       PALS.forEach((k) => { pals[k].onStage = false; pals[k].c.root.visible = true; placePal(k, SEATS[k][0], SEATS[k][1]); });
       pals.usagi.c.root.visible = false;
       idols.forEach((I) => I.c.root.position.copy(I.home));
@@ -288,14 +272,19 @@ export function createIdolStage() {
       ['chiikawa', 'hachiware'].forEach((k, i) => { pals[k].onStage = true; walkPal(k, ON_STAGE[k][0], STAGE_Y, ON_STAGE[k][1], 1.3 + i * 0.2); });
       idols.forEach((I) => I.c.root.position.copy(I.back));
     },
-    /** 말풍선 자리(무대 좌표): 'idolG' 같은 아이돌 · 친구 · 'me'. */
+    /** 말풍선 자리(마을 좌표): 'idolG' 같은 아이돌 · 친구 · 'me'. */
     anchor(who) {
+      const w = (x, y, z) => ({ x: x + AT.x, y, z: z + AT.z });
       const I = idols.find((x) => x.d.id === who);
-      if (I) { const p = I.c.root.position; return { x: p.x, y: p.y + I.c.height * 1.05 + 0.45, z: p.z }; }
+      if (I) { const p = I.c.root.position; return w(p.x, p.y + I.c.height * 1.05 + 0.45, p.z); }
       const P = pals[who];
-      if (P) { const p = P.c.root.position; return { x: p.x, y: p.y + P.c.height + 0.45, z: p.z }; }
-      return me ? { x: me.root.position.x, y: me.height + 0.45, z: me.root.position.z } : { x: 0, y: 1.5, z: 1.3 };
+      if (P) { const p = P.c.root.position; return w(p.x, p.y + P.c.height + 0.45, p.z); }
+      return me ? w(me.root.position.x, me.height + 0.45, me.root.position.z) : w(SEATS.me[0], 1.5, SEATS.me[1]);
     },
+    /** 관객석 맨 앞(내 자리, 마을 좌표): 마을의 반투명 처리(나무 · 시계탑 · 집)를 이 자리 기준으로 — 무대를 가리는 것만 비친다. */
+    focus: { x: AT.x + SEATS.me[0], z: AT.z + SEATS.me[1] },
+    /** 관객석 자리 전체(마을 좌표 — 아직 안 온 갑옷 씨 자리까지): 마을 나무가 카메라에서 이 자리를 가리면 공연 내내 그 나무도 반투명하게. */
+    audience: [SEATS.me, SEATS.chiikawa, SEATS.hachiware, ...FANS.map(([, x, z]) => [x, z])].map(([x, z]) => ({ x: x + AT.x, z: z + AT.z })),
     resize(aspect) {
       camera.aspect = aspect;
       camera.fov = aspect < 1 ? 64 : 42;
@@ -315,7 +304,6 @@ export function createIdolStage() {
         x.mat.opacity = (fever ? 0.2 : 0.11) + 0.08 * on;
       });
       pools.forEach((p, i) => { p.material.color.copy(GLOW_C[(ci + i) % GLOW.length]); p.material.opacity = 0.22 + 0.25 * on; p.position.x = idols[i].c.root.position.x; p.position.z = idols[i].c.root.position.z; });
-      stars.material.opacity = 0.7 + 0.2 * Math.sin(t * 1.3);
       // 아이돌: 노래하면 박자 안무(가운데 초록은 마이크 손), 아니면 꼼지락 · 인사
       idols.forEach((I) => {
         if (mood === 'sing') animateChibi(I.c, I.d.lead ? 'idolSing' : 'idol', t, { beat: b });
@@ -371,13 +359,13 @@ export function createIdolStage() {
         confGeo.attributes.position.needsUpdate = true;
         confetti.material.color.copy(GLOW_C[(ci + 1) % GLOW.length]);
       }
-      // 카메라: 정한 자리로 부드럽게 · 살짝 흔들린다
+      // 카메라: 정한 자리로 부드럽게 · 살짝 흔들린다(무대 기준 자리를 마을 좌표로)
       const k = Math.min(1, dt * 2.2), sh = camera.aspect < 1 && shot.portrait ? shot.portrait : shot;
       if (snapNext) { camPos.set(...sh.pos); camLook.set(...sh.look); snapNext = false; } // 바로 옮기기(세로 화면이면 세로 자리로)
       else { camPos.lerp(tmpPos.set(...sh.pos), k); camLook.lerp(tmpLook.set(...sh.look), k); }
-      camera.position.copy(camPos);
+      camera.position.copy(camPos).add(root.position);
       camera.position.x += Math.sin(t * 0.3) * 0.25;
-      camera.lookAt(camLook);
+      camera.lookAt(tmpLook.copy(camLook).add(root.position));
     }
   };
 }

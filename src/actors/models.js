@@ -123,14 +123,12 @@ const LOOK_PATTERNS = new Set(['part', 'spots', 'stripes', 'heart']);
 // 앞(얼굴)이 트인 머리카락 껍질: theta 는 정수리에서 아래로 내려오는 정도
 const CAP_OPEN = 1.9; // 앞쪽으로 트인 폭(라디안)
 const CAPE_OPEN = 2.9; // 망토 앞이 트인 폭(팔은 망토 밖으로 나온다)
-// 잠옷 후드: 얼굴 쪽이 동그랗게 트인 머리 껍질(뒤 · 옆 · 아래) + 이마를 덮는 앞머리 조각
-const HOOD_OPEN = 1.55;
-const hoodGeo = {
-  back: new THREE.SphereGeometry(1, 32, 18, Math.PI / 2 + HOOD_OPEN / 2, Math.PI * 2 - HOOD_OPEN, 0, Math.PI * 0.9),
-  brow: new THREE.SphereGeometry(1, 16, 8, Math.PI / 2 - HOOD_OPEN / 2, HOOD_OPEN, 0, Math.PI * 0.36)
-};
-/** 잠옷 색: 내 캐릭터 · 친구마다(원작 파자마 파티처럼 파스텔). */
-export const PAJAMA_COLORS = { me: '#c9b3ef', chiikawa: '#f6a6bd', hachiware: '#a7d78f', usagi: '#fbfaf5' };
+// 잠옷 후드: 머리를 감싼 공 껍질에 얼굴 자리만 동그랗게 뚫었다(구멍 반각 HOOD_HOLE, 가운데는 앞에서 HOOD_TILT 만큼 아래 — 원작처럼 얼굴이 동그란 창으로 보인다)
+// (전에는 앞을 위아래로 길게 잘라 낸 껍질 + 이마 조각이라 구멍이 네모나 보였다)
+const HOOD_HOLE = 0.76, HOOD_TILT = 0.18;
+const hoodGeo = new THREE.SphereGeometry(1, 36, 20, 0, Math.PI * 2, HOOD_HOLE, Math.PI - HOOD_HOLE).rotateX(Math.PI / 2 + HOOD_TILT); // 구멍(+y 꼭지)을 앞(+z) 조금 아래로
+/** 잠옷 색: 내 캐릭터 · 친구마다(원작 파자마 파티처럼 파스텔 — 치이카와 분홍 · 하치와레 파랑 · 우사기 노랑). */
+export const PAJAMA_COLORS = { me: '#c9b3ef', chiikawa: '#f6a6bd', hachiware: '#a3c8f0', usagi: '#f9dc82' };
 const hairCaps = {
   cap: new THREE.SphereGeometry(1, 36, 20, Math.PI / 2 + CAP_OPEN / 2, Math.PI * 2 - CAP_OPEN, 0, Math.PI * 0.62),
   top: new THREE.SphereGeometry(1, 36, 14, 0, Math.PI * 2, 0, Math.PI * 0.32),
@@ -1160,9 +1158,7 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me, { ownEars = fals
       if (!ownEars) { P[k].visible = false; hidden.push(P[k]); return; }
       P[k].children.filter((m) => m.isMesh && m.visible).forEach((m) => { m.visible = false; hidden.push(m); earShell(P[k], m); });
     });
-    const sc = head.scale.clone().multiplyScalar(1.09);
-    put(P.head, hoodGeo.back, mat, head.position, sc);
-    put(P.head, hoodGeo.brow, mat, head.position, sc, 0);
+    put(P.head, hoodGeo, mat, head.position, head.scale.clone().multiplyScalar(1.09));
     if (!ownEars) [-1, 1].forEach((sd) => {
       const at = new THREE.Vector3(head.position.x + sd * head.scale.x * 0.6, head.position.y + head.scale.y * 0.86, head.position.z - head.scale.z * 0.08);
       put(P.head, partGeometry('sphere', 0.1), mat, at, new THREE.Vector3(head.scale.x * 0.27, head.scale.y * 0.3, head.scale.z * 0.2));

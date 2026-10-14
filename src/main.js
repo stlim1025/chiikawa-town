@@ -6287,6 +6287,8 @@ function boot() {
       club: () => ({ phase: club.phase, hype: club.hype, rhythm: rhythm.active, guide: guide.open }),
       idol: () => ({ phase: idolStory.phase, round: idolStory.round, rhythm: rhythm.active, guide: guide.open, fans: idolStage ? idolStage.fans : 0, mode }),
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
+      /** 무대 카메라(디버그: zoom 을 올려 아이돌 얼굴을 가까이 본다). */
+      idolCam: () => (idolStage ? idolStage.camera : null),
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
@@ -6401,13 +6403,26 @@ function boot() {
       hud.placeLabels([], club.camera);
       return;
     }
-    // 파자마 파티즈 무대(사이드스토리): 마을 대신 무대 장면. 공연 동안 마을 시계 · 친구들은 멈춰 있다(밤 12시를 넘겨도 공연은 끝까지)
+    // 파자마 파티즈 무대(사이드스토리): 진짜 마을 광장에 세운 무대. 공연 동안 마을 시계 · 친구들은 멈춰 있다(밤 12시를 넘겨도 공연은 끝까지)
     if (mode === 'idol' && state) {
       idolStage.resize(aspect);
       idolStory.tick(dt, t);
+      // 마을의 반투명 처리 · 가까운 구역 · 그림자는 관객석 기준으로(무대 · 관객을 가리는 것만 비친다)
+      const seat = idolStage.focus;
+      village.update(dt, seat, idolStage.audience);
+      works.update(dt, state.clock, seat);
+      homeExt.update(dt, seat);
+      gfx.followSun(seat.x, seat.z);
       setCelLight(idolStage.light);
       lights.update('off', player.position, player.yaw, 0);
-      if (!skipRender && drawNow) gfx.renderer.render(idolStage.scene, idolStage.camera);
+      if (!skipRender && drawNow) {
+        // 마을을 무대 카메라로 먼저 그리고 그 위에 무대를 겹친다(깊이를 같이 써서 앞뒤가 맞는다). 마을을 걷던 나 · 친구들 · 같이 노는 친구는 무대 쪽에 따로 있어 그동안 숨긴다
+        const hide = [player.root, ...npcs.list.map((n) => n.chibi.root), ...remotes.roots()].filter((o) => o.visible);
+        hide.forEach((o) => { o.visible = false; });
+        try { gfx.render(idolStage.camera); } finally { hide.forEach((o) => { o.visible = true; }); }
+        gfx.renderer.autoClear = false;
+        try { gfx.renderer.render(idolStage.scene, idolStage.camera); } finally { gfx.renderer.autoClear = true; }
+      }
       hud.placeLabels(idolStory.labels(), idolStage.camera);
       return;
     }
