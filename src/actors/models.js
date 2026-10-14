@@ -1337,11 +1337,11 @@ function basePose(mode, t, opts) {
   } else if (mode === 'bench') {
     // 벤치 · 의자에 앉기: 엉덩이를 자리에 붙이고 다리는 앞으로 접어 자리 끝에 늘어뜨린 채 살랑살랑 흔든다, 손은 무릎에.
     // 발 덩어리만 있는 짧은 다리라 legs 로 다리 마디를 길게 늘여 자리 밑으로 내려오게 한다(바닥에 앉는 'sit' 은 다리를 앞으로 쭉 뻗는다)
-    const kick = Math.sin(t * 2.4 + phase) * 0.16;
-    a.legL = [-0.9 + kick, 0, 0.06]; a.legR = [-0.9 - kick, 0, -0.06];
+    const kick = Math.sin(t * 2.4 + phase) * 0.14;
+    a.legL = [-1.05 + kick, 0, 0.06]; a.legR = [-1.05 - kick, 0, -0.06];
     a.armL = [-0.6, 0, 0.12]; a.armR = [-0.6, 0, -0.12];
     a.head = [0.04 + Math.sin(t * 1.3 + phase) * 0.03, Math.sin(t * 0.6 + phase) * 0.3, 0];
-    lean = -0.04; legs = 2.2;
+    lean = -0.04; legs = 1.5;
   } else if (mode === 'think') {
     // 갸웃: 한 손을 턱에 대고 고개를 기울인다
     a.armR = [-1.45, 0, -0.5]; a.armL = [-0.55, 0, 0.45];
