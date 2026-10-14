@@ -2,7 +2,7 @@ import { JOB_TYPES, availableJobs, isComplete, payout } from '../core/jobs.js';
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
-import { FURNITURE, homeOf } from '../core/home.js';
+import { FURNITURE, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, decorOf, hasDecor } from '../core/home.js';
 import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, EVICT_AFTER, LODGING_PRICE, ROUGH_REST, housingOf } from '../core/housing.js';
 import { POCHETTES, THEFT_GUARD, pochetteOf, worn } from '../core/pochette.js';
 import { LICENSES, hasLicense, licensesOf, canWorkRamen } from '../core/licenses.js';
@@ -137,6 +137,13 @@ const myWeaponArt = (s, id) => weaponSvg(id, engravedOf(s).includes(id) ? (s.pro
 let boardTab = 'work';
 let sellSel = null; // 노동 접수 '팔기'에서 고른 물건 id
 let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
+let furnitureTab = 'furniture'; // 가구점 탭: 'furniture' | 'decor'(벽지와 바닥)
+/** 벽지 · 바닥 견본 그림(core/home.js): 벽지는 둥근 벽에 창, 바닥은 마루 결. */
+const decorSvg = (kind, c) => (kind === 'wall'
+  ? `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 34V17a14 12 0 0 1 28 0v17z" fill="${c}" stroke="#5a4431" stroke-width="2"/><rect x="15" y="15" width="10" height="10" rx="1.5" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><path d="M20 15v10M15 20h10" stroke="#5a4431" stroke-width="1.2"/></svg>`
+  : `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="24" rx="15" ry="10" fill="${c}" stroke="#5a4431" stroke-width="2"/><path d="M9 20.5h22M6.5 25h27M9 29.5h22" stroke="#5a4431" stroke-opacity=".25" stroke-width="1.4"/></svg>`);
+/** 집 넓히기 그림: 둥근 집 양옆으로 분홍 화살표. */
+const ROOM_ART = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33V19a11 9.5 0 0 1 22 0v14z" fill="#fff3d6" stroke="#5a4431" stroke-width="2"/><path d="M17 33v-6a3 3 0 0 1 6 0v6" fill="#c49a6c" stroke="#5a4431" stroke-width="1.6"/><path d="M2.5 23 6 19.5v7zM37.5 23 34 19.5v7z" fill="#f08fae"/></svg>';
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
@@ -183,7 +190,7 @@ function monsterCards(s, withCount) {
  * 게시판(노동 접수), 제초 검정소, 라멘 로우, 가구점, 부동산, 포셰트 가게, 설정 창. (집 안은 ui/homeui.js)
  * handlers: { getState, acceptJob(typeId), quitJob(), reportJob(), startExam(), buy(itemId), toTitle(),
  *   takeLicense(id: 'liquor' | 'arbeiter' | 'hunter'), studied(id: 'hunter' | 'arbeiter') (토벌 안내서 · 레시피 북을 펼쳤다), workRamen(),
- *   thumbs() → { 가구id: 그림 URL }, buyFurniture(id),
+ *   thumbs() → { 가구id: 그림 URL }, buyFurniture(id), useDecor(kind: 'wall' | 'floor', id) (벽지 · 바닥 사서 붙이기), expandHome() (집 넓히기),
  *   payRent() (밀린 집세만 · 쫓겨났어도 낼 수 있지만 쫓겨난 건 그대로), rentAgain() (쫓겨난 뒤 밀린 집세 + 이번 주 집세 내고 다시 세 들기),
  *   buyHouse(), applyLottery(), buyByLottery(), dayLabel(day), nextDay(요일) → 그 요일이 오는 날,
  *   buyPochette(id) (사면 바로 멘다), wearPochette(id | null) (null 이면 벗기),
@@ -843,6 +850,32 @@ export function createPanels(ui, handlers) {
     // 동물의 숲 카탈로그처럼: 왼쪽 목록에서 고르면 오른쪽에 크게 보인다
     furniture(s) {
       const home = homeOf(s), thumbs = handlers.thumbs(), list = Object.values(FURNITURE).filter((f) => !f.gift); // 선물로만 받는 가구는 안 판다
+      // 탭(포셰트 가게와 같은 모양): 가구 | 벽지와 바닥(옆 숫자는 가진 것 / 전부)
+      const decorIds = [...Object.keys(WALLPAPERS).map((id) => ['wall', id]), ...Object.keys(FLOORS).map((id) => ['floor', id])];
+      const tabs = [{ id: 'furniture', label: '가구', n: null }, { id: 'decor', label: '벽지와 바닥', n: `${decorIds.filter(([k, id]) => hasDecor(home, k, id)).length}/${decorIds.length}` }];
+      const tabBar = h('div', { class: 'board-tabs-wrap' }, h('div', { class: 'board-tabs', role: 'tablist', 'aria-label': '가구점' }, tabs.map((t) =>
+        h('button', { class: 'board-tab', type: 'button', role: 'tab', 'aria-selected': String(t.id === furnitureTab),
+          onClick: () => { if (furnitureTab === t.id) return; furnitureTab = t.id; render(); current.panel.scrollTop = 0; } },
+        t.label, t.n ? h('span', { class: 'n' }, t.n) : null))));
+      if (furnitureTab === 'decor') {
+        // 벽지 · 바닥(core/home.js): 사면 바로 붙이고, 가진 것은 언제든 바꿔 붙인다
+        const d = decorOf(home), out = [head('가구점', s.money), tabBar];
+        for (const [kind, T, title] of [['wall', WALLPAPERS, '벽지'], ['floor', FLOORS, '바닥']]) {
+          out.push(h('h3', { class: 'shop-sec' }, title));
+          for (const [id, D] of Object.entries(T)) {
+            const own = hasDecor(home, kind, id), on = d[kind] === id;
+            const btn = on ? h('span', { class: 'lic-badge done' }, ico('check'), '쓰는 중')
+              : own ? h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.useDecor(kind, id)) }, '바꾸기')
+                : priceBtn(D.price, s.money, after(() => handlers.useDecor(kind, id)));
+            out.push(h('div', { class: `row pochette${on ? ' worn' : ''}` }, svgSpan('pochette-art', decorSvg(kind, D.color)),
+              h('div', {}, h('div', { class: 't' }, D.name), h('div', { class: 'd' }, own ? '가지고 있어요' : kind === 'wall' ? '방 둥근 벽에 붙여요' : '방 바닥에 깔아요')),
+              btn));
+          }
+        }
+        out.push(h('p', { class: 'note' }, '한 번 사면 언제든 바꿔 붙일 수 있어요'));
+        out.push(h('div', { class: 'actions' }, closeBtn()));
+        return out;
+      }
       if (!current.sel) current.sel = list[0].id;
       const view = h('div', { class: 'cat-view', 'aria-live': 'polite' });
       const drawView = () => {
@@ -863,6 +896,7 @@ export function createPanels(ui, handlers) {
       drawView();
       return [
         head('가구점', s.money),
+        tabBar,
         h('div', { class: 'catalog' }, h('div', { class: 'cat-list' }, items), view),
         h('div', { class: 'actions' }, closeBtn())
       ];
@@ -872,6 +906,12 @@ export function createPanels(ui, handlers) {
       const out = [head('부동산', s.money)];
       if (hs.own) {
         out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '내 집이에요!'), h('div', { class: 'd' }, '이제 집세를 내지 않아요'))));
+        // 집 넓히기(core/home.js): 한 단계씩, 가구 놓을 칸이 늘어난다
+        const home = homeOf(s), cur = gridOf(home), next = nextSize(home);
+        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', ROOM_ART),
+          h('div', {}, h('div', { class: 't' }, next ? `${josa(next.name, '으로/로')} 넓히기` : cur.name),
+            h('div', { class: 'd' }, next ? `가구 놓을 칸이 ${cur.cols * cur.rows}칸에서 ${next.cols * next.rows}칸으로 늘어요` : `가장 넓은 방이에요. 가구를 ${cur.cols * cur.rows}칸까지 놓아요`)),
+          next ? priceBtn(next.price, s.money, after(handlers.expandHome), 'btn pink') : h('span', { class: 'lic-badge done' }, ico('check'), '다 넓혔어요')));
       } else {
         const rentDay = handlers.dayLabel(handlers.nextDay(RENT_DAY));
         if (hs.evicted) {
@@ -902,7 +942,7 @@ export function createPanels(ui, handlers) {
         }
         // 돈 모아 사기
         out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어져요')),
+          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어지고 집을 넓힐 수 있어요')),
           hs.unpaid > 0 ? h('span', { class: 'lic-badge' }, '밀린 집세부터') : priceBtn(HOUSE_PRICE, s.money, after(handlers.buyHouse), 'btn pink')));
         // 청약
         const lot = hs.lottery;

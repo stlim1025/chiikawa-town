@@ -1,21 +1,15 @@
 import * as THREE from 'three';
-import { toonMesh, GEO } from '../render/toon.js';
+import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
-import { HOME_GRID } from '../core/home.js';
+import { HOME_CELL as CELL, roomLayout, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS } from '../core/home.js';
 import { photoFrameTexture } from './photoframe.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
-const CELL = 1.1;
-const X0 = -(HOME_GRID.cols * CELL) / 2, Z0 = -2.9; // 칸 격자의 왼쪽 안쪽 모서리
-const ROOM_R = 4.4;
-/** 문간(나가기) · 옷장 · 보관 상자 자리(상자는 옷장 맞은편 벽). 깔개와 방석은 밟고 지나갈 수 있다. */
-const DOOR = { x: 0, z: 2.9 };
-const WARDROBE = { x: -3.2, z: -1.0 };
-const CHEST = { x: 3.25, z: -0.9 };
+// 방 크기 · 칸 격자 · 문간 · 옷장 · 보관 상자 자리는 집 크기마다 다르다(core/home.js roomLayout). 깔개와 방석은 밟고 지나갈 수 있다.
 const WALKABLE = new Set(['rug', 'cushion']);
 
-/** 칸 (cx, cz) 의 바닥 가운데. */
-export const cellCenter = (cx, cz) => ({ x: X0 + (cx + 0.5) * CELL, z: Z0 + (cz + 0.5) * CELL });
+/** 칸 (cx, cz) 의 바닥 가운데(size: 집 크기 번호, 처음 방이 0). */
+export const cellCenter = (cx, cz, size = 0) => homeCellCenter(size, cx, cz);
 
 /** 가구 모델. 한 칸(약 1 x 1) 안에 들어가는 크기. 가구점 썸네일(world/thumbs.js)도 이걸로 그린다. */
 export function furnitureModel(id) {
@@ -118,37 +112,19 @@ export function createInterior() {
   sun.position.set(2, 7, 5);
   scene.add(sun);
 
-  // 바닥(나무)과 돔 벽(앞쪽은 보이지 않게 안쪽 면만 그린다)
-  scene.add(toonMesh(GEO.cylinder, '#e2c29b', { position: [0, -0.1, 0], scale: [ROOM_R, 0.1, ROOM_R], outline: 0.04, receive: true }));
-  const wall = toonMesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), '#fbfaf5', { scale: [ROOM_R, ROOM_R * 0.9, ROOM_R], outline: false });
-  wall.material = wall.material.clone();
-  wall.material.side = THREE.BackSide;
-  scene.add(wall);
-  // 안쪽 벽의 십자 창
-  const win = new THREE.Group();
-  placeOnDome(win, ROOM_R, ROOM_R * 0.9, -0.45, 2.1); // 돔 벽면에 딱 붙게(예전엔 벽 밖으로 파묻혀 있었다)
-  win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.9, 0.9, 0.05], shell: true, outline: 0.03 }));
-  win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.86, 0.03], outline: false }));
-  win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.86, 0.06, 0.03], outline: false }));
-  scene.add(win);
-  // 문간 깔개(앞쪽)
-  scene.add(toonMesh(GEO.box, '#e7a3b0', { position: [0, 0.01, 2.75], scale: [1.2, 0.02, 0.6], outline: 0.02, receive: true }));
-
+  // 방(바닥 · 돔 벽 · 창 · 문간 깔개 · 칸 표시 · 옷장 · 보관 상자): 집 크기가 바뀌면 buildRoom 이 다시 짓는다.
+  // 벽지 · 바닥(core/home.js)은 재질 색만 바꾼다
+  const roomG = new THREE.Group();
+  scene.add(roomG);
+  const floorMat = toonMaterial(FLOORS.wood.color, { unique: true });
+  const wallMat = toonMaterial(WALLPAPERS.cream.color, { unique: true });
+  wallMat.side = THREE.BackSide; // 앞쪽 벽은 보이지 않게 안쪽 면만 그린다
+  const WALL_GEO = new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
   // 칸 표시(꾸미기 중에만): 칸마다 얇은 판
   const tileGeo = new THREE.PlaneGeometry(CELL * 0.92, CELL * 0.92).rotateX(-Math.PI / 2);
   const tileMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
   const hotMat = new THREE.MeshBasicMaterial({ color: 0xff8fb0, transparent: true, opacity: 0.55, depthWrite: false });
-  const tiles = [];
-  for (let cz = 0; cz < HOME_GRID.rows; cz++) {
-    for (let cx = 0; cx < HOME_GRID.cols; cx++) {
-      const c = cellCenter(cx, cz), t = new THREE.Mesh(tileGeo, tileMat);
-      t.position.set(c.x, 0.02, c.z);
-      t.visible = false;
-      t.userData = { cx, cz };
-      scene.add(t);
-      tiles.push(t);
-    }
-  }
+  let room = roomLayout(0), tiles = [];
 
   const furniture = new THREE.Group();
   scene.add(furniture);
@@ -157,12 +133,46 @@ export function createInterior() {
   let ghostModel = null, ghostId = null; // 목록에서 끌어 오는 가구 미리보기
   let me = null;
   // 집 안을 걷는 내 캐릭터: 자리 · 바라보는 방향 · 걸음
-  const pos = { x: DOOR.x, z: DOOR.z - 0.5 };
+  const pos = { x: room.DOOR.x, z: room.DOOR.z - 0.5 };
   let yaw = Math.PI, phase = 0, moving = false;
   let mePose = null; // 잠깐 하는 몸짓(먹기) { mode, t, dur, prop }
 
+  /** 그 크기(core/home.js HOME_SIZES 번호)의 방을 짓는다. 카메라도 방 크기만큼 물러선다. */
+  function buildRoom(size) {
+    roomG.clear();
+    room = roomLayout(size);
+    const { R, S, cols, rows, DOOR, WARDROBE, CHEST } = room;
+    roomG.add(toonMesh(GEO.cylinder, null, { material: floorMat, position: [0, -0.1, 0], scale: [R, 0.1, R], outline: 0.04, receive: true }));
+    roomG.add(toonMesh(WALL_GEO, null, { material: wallMat, scale: [R, R * 0.9, R], outline: false }));
+    // 안쪽 벽의 십자 창(돔 벽면에 딱 붙게). 넓힌 방은 오른쪽에 하나 더
+    for (const a of size ? [-0.45, 0.55] : [-0.45]) {
+      const win = new THREE.Group();
+      placeOnDome(win, R, R * 0.9, a, 2.1);
+      win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.9, 0.9, 0.05], shell: true, outline: 0.03 }));
+      win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.86, 0.03], outline: false }));
+      win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.86, 0.06, 0.03], outline: false }));
+      roomG.add(win);
+    }
+    // 문간 깔개(앞쪽)
+    roomG.add(toonMesh(GEO.box, '#e7a3b0', { position: [0, 0.01, DOOR.z - 0.15], scale: [1.2, 0.02, 0.6], outline: 0.02, receive: true }));
+    tiles = [];
+    for (let cz = 0; cz < rows; cz++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const c = cellCenter(cx, cz, size), t = new THREE.Mesh(tileGeo, tileMat);
+        t.position.set(c.x, 0.02, c.z);
+        t.visible = false;
+        t.userData = { cx, cz };
+        roomG.add(t);
+        tiles.push(t);
+      }
+    }
+    addWardrobe(WARDROBE);
+    addChest(CHEST);
+    camera.position.set(0, 7.4 * S, 8.6 * S);
+    camera.lookAt(0, 0.6, -0.5 * S);
+  }
   // 옷장(늘 왼쪽 벽에 붙어 있다): 나무 장 + 문 두 짝 + 거울
-  {
+  function addWardrobe(WARDROBE) {
     const g = new THREE.Group();
     g.position.set(WARDROBE.x, 0, WARDROBE.z);
     g.rotation.y = Math.PI / 2 - 0.35;
@@ -172,10 +182,10 @@ export function createInterior() {
     g.add(toonMesh(GEO.box, '#ffffff', { position: [0.24, 1.3, 0.315], scale: [0.08, 0.5, 0.01], outline: false, shadow: false }));
     [-0.06, 0.06].forEach((x) => g.add(toonMesh(GEO.dot, '#8a5a30', { position: [x, 1.0, 0.33], scale: [0.04, 0.04, 0.04], outline: false })));
     g.add(toonMesh(GEO.box, '#a87b4c', { position: [0, 1.93, 0], scale: [1.4, 0.08, 0.62], shell: true, outline: 0.02 }));
-    scene.add(g);
+    roomG.add(g);
   }
   // 보관 상자(옷장 맞은편 오른쪽 벽): 나무 상자 + 뚜껑 + 금빛 띠 두 줄 + 자물쇠
-  {
+  function addChest(CHEST) {
     const g = new THREE.Group();
     g.position.set(CHEST.x, 0, CHEST.z);
     g.rotation.y = -(Math.PI / 2 - 0.35);
@@ -184,7 +194,7 @@ export function createInterior() {
     [-0.3, 0.3].forEach((x) => g.add(toonMesh(GEO.box, '#e8b84e', { position: [x, 0.36, 0], scale: [0.08, 0.74, 0.67], outline: 0.012 })));
     g.add(toonMesh(GEO.box, '#f2c94c', { position: [0, 0.5, 0.33], scale: [0.16, 0.18, 0.05], outline: 0.012 }));
     g.add(toonMesh(GEO.dot, '#5a4431', { position: [0, 0.48, 0.36], scale: [0.03, 0.03, 0.03], outline: false }));
-    scene.add(g);
+    roomG.add(g);
   }
   // 대상 발밑의 노란 고리(집 안 행동 안내)
   const cue = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfcd95b, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
@@ -192,31 +202,34 @@ export function createInterior() {
   cue.visible = false;
   scene.add(cue);
   const blocked = (home, x, z, r) => {
-    if (Math.hypot(x, z) > ROOM_R - 0.55) return true;
-    if (Math.hypot(x - WARDROBE.x, z - WARDROBE.z) < 0.75 + r) return true;
-    if (Math.hypot(x - CHEST.x, z - CHEST.z) < 0.55 + r) return true;
+    if (Math.hypot(x, z) > room.R - 0.55) return true;
+    if (Math.hypot(x - room.WARDROBE.x, z - room.WARDROBE.z) < 0.75 + r) return true;
+    if (Math.hypot(x - room.CHEST.x, z - room.CHEST.z) < 0.55 + r) return true;
     return home.placed.some((p) => {
       if (WALKABLE.has(p.id)) return false;
-      const c = cellCenter(p.cx, p.cz);
+      const c = cellCenter(p.cx, p.cz, room.size);
       return Math.abs(x - c.x) < CELL * 0.45 + r && Math.abs(z - c.z) < CELL * 0.45 + r;
     });
   };
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 7.4, 8.6);
-  camera.lookAt(0, 0.6, -0.5);
+  buildRoom(0);
   const ray = new THREE.Raycaster(), floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3();
 
   return {
     scene,
     camera,
-    /** 놓인 가구를 다시 그린다. */
+    /** 놓인 가구를 다시 그린다. 집 크기가 바뀌었으면 방을 다시 짓고, 벽지 · 바닥 색을 붙인다. */
     setHome(home) {
+      const size = sizeOf(home), d = decorOf(home);
+      if (size !== room.size) buildRoom(size);
+      wallMat.color.set(WALLPAPERS[d.wall].color);
+      floorMat.color.set(FLOORS[d.floor].color);
       furniture.clear();
       models.clear();
       cellOf.clear();
       for (const p of home.placed) {
-        const c = cellCenter(p.cx, p.cz), f = furnitureModel(p.id);
+        const c = cellCenter(p.cx, p.cz, size), f = furnitureModel(p.id);
         f.position.set(c.x, 0, c.z);
         f.rotation.y = -p.rot * Math.PI / 2;
         furniture.add(f);
@@ -228,7 +241,7 @@ export function createInterior() {
     drag(cell, point) {
       const f = cell && models.get(`${cell.cx},${cell.cz}`);
       if (!f) return;
-      const c = point || cellCenter(cell.cx, cell.cz);
+      const c = point || cellCenter(cell.cx, cell.cz, room.size);
       f.position.set(c.x, point ? 0.25 : 0, c.z);
     },
     /** 목록에서 끌어 오는 가구 미리보기: 칸 위에 살짝 띄워 보여 준다(id 나 cell 이 null 이면 숨긴다). */
@@ -240,7 +253,7 @@ export function createInterior() {
         ghostId = id;
         scene.add(ghostModel);
       }
-      const c = cellCenter(cell.cx, cell.cz);
+      const c = cellCenter(cell.cx, cell.cz, room.size);
       ghostModel.position.set(c.x, 0.2, c.z);
       ghostModel.visible = true;
     },
@@ -263,7 +276,7 @@ export function createInterior() {
     setPlayer(look, keep = false) {
       if (me) scene.remove(me.root);
       me = buildChibi(look);
-      if (!keep) { pos.x = DOOR.x; pos.z = DOOR.z - 0.5; yaw = Math.PI; }
+      if (!keep) { pos.x = room.DOOR.x; pos.z = room.DOOR.z - 0.5; yaw = Math.PI; }
       me.root.position.set(pos.x, 0, pos.z);
       me.root.rotation.y = yaw;
       scene.add(me.root);
@@ -302,9 +315,9 @@ export function createInterior() {
      * guest: 같이 놀기로 친구 집에 놀러 왔으면 문(나가기)과 잠긴 친구 상자('chestLocked' — 누르면 못 연다고만 알린다).
      */
     target(home, { guest = false } = {}) {
-      const opts = [];
+      const opts = [], { WARDROBE, CHEST, DOOR } = room;
       if (!guest) {
-        for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
+        for (const p of home.placed) if (p.id === 'bed') { const c = cellCenter(p.cx, p.cz, room.size); opts.push({ type: 'bed', x: c.x, z: c.z, r: 0.75, label: '자기', reach: 1.35 }); }
         opts.push({ type: 'wardrobe', x: WARDROBE.x, z: WARDROBE.z, r: 0.85, label: '옷장', reach: 1.5 });
         opts.push({ type: 'chest', x: CHEST.x, z: CHEST.z, r: 0.7, label: '보관 상자', reach: 1.3 });
       } else opts.push({ type: 'chestLocked', x: CHEST.x, z: CHEST.z, r: 0.7, label: '친구 상자', reach: 1.3 });
@@ -333,8 +346,8 @@ export function createInterior() {
     cellAt(nx, ny) {
       ray.setFromCamera({ x: nx, y: ny }, camera);
       if (!ray.ray.intersectPlane(floor, hit)) return null;
-      const cx = Math.floor((hit.x - X0) / CELL), cz = Math.floor((hit.z - Z0) / CELL);
-      return cx >= 0 && cz >= 0 && cx < HOME_GRID.cols && cz < HOME_GRID.rows ? { cx, cz } : null;
+      const cx = Math.floor((hit.x - room.X0) / CELL), cz = Math.floor((hit.z - room.Z0) / CELL);
+      return cx >= 0 && cz >= 0 && cx < room.cols && cz < room.rows ? { cx, cz } : null;
     },
     resize(aspect) {
       camera.aspect = aspect;

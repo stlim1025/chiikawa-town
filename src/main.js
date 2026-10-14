@@ -51,7 +51,7 @@ import { openSticker } from './ui/sticker.js';
 import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
-import { FURNITURE, HOME_GRID, homeOf, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
+import { FURNITURE, HOME_SIZES, WALLPAPERS, FLOORS, homeOf, sizeOf, gridOf, decorOf, expandHome, useDecor, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
 import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
@@ -448,7 +448,7 @@ function boot() {
       }
     }
     if (Array.isArray(w.h)) {
-      const house = parseHouse(w.h), key = JSON.stringify(house.placed);
+      const house = parseHouse(w.h, w.hl), key = JSON.stringify([house.size, house.wall, house.floor, house.placed]);
       if (key !== visiting.houseKey) {
         visiting.houseKey = key;
         visiting.house = house;
@@ -843,12 +843,21 @@ function boot() {
   }
 
   // 주인 집 구경: 주인이 보낸 가구 배치로 집 안을 그린다(꾸미기 · 침대 · 옷장은 주인만, 손님은 둘러보고 나가기만)
-  /** 손님: 주인이 보낸 가구 [[id, cx, cz, rot]] → { placed }. 모르는 가구 · 칸 밖은 버린다. */
-  const parseHouse = (rows) => ({
-    placed: rows.slice(0, HOME_GRID.cols * HOME_GRID.rows * 2)
-      .filter((r) => Array.isArray(r) && Object.hasOwn(FURNITURE, r[0]) && Number.isInteger(r[1]) && Number.isInteger(r[2]) && r[1] >= 0 && r[2] >= 0 && r[1] < HOME_GRID.cols && r[2] < HOME_GRID.rows)
-      .map(([id, cx, cz, rot]) => ({ id, cx, cz, rot: [0, 1, 2, 3].includes(rot) ? rot : 0 }))
-  });
+  /**
+   * 손님: 주인이 보낸 가구 [[id, cx, cz, rot]] 와 집 모습 look [크기, 벽지, 바닥] → { size, wall, floor, placed }.
+   * 모르는 가구 · 그 크기 방의 칸 밖 · 모르는 벽지 · 바닥은 버린다.
+   */
+  const parseHouse = (rows, look) => {
+    const L = Array.isArray(look) ? look : [], size = Number.isInteger(L[0]) && HOME_SIZES[L[0]] ? L[0] : 0, G = HOME_SIZES[size];
+    return {
+      size,
+      wall: typeof L[1] === 'string' && Object.hasOwn(WALLPAPERS, L[1]) ? L[1] : undefined,
+      floor: typeof L[2] === 'string' && Object.hasOwn(FLOORS, L[2]) ? L[2] : undefined,
+      placed: rows.slice(0, G.cols * G.rows * 2)
+        .filter((r) => Array.isArray(r) && Object.hasOwn(FURNITURE, r[0]) && Number.isInteger(r[1]) && Number.isInteger(r[2]) && r[1] >= 0 && r[2] >= 0 && r[1] < G.cols && r[2] < G.rows)
+        .map(([id, cx, cz, rot]) => ({ id, cx, cz, rot: [0, 1, 2, 3].includes(rot) ? rot : 0 }))
+    };
+  };
   function enterHostHome() {
     if (!visiting || !visiting.house) { hud.toast('아직 집 안을 볼 수 없어요', 2000); return; }
     cancelPull();
@@ -911,6 +920,8 @@ function boot() {
       w.b = berries.snapshot();
       w.g = groundOf(state).map((e) => [e.g, e.id, e.n, e.clean || 0, e.weapon ? 1 : 0, r2(e.x), r2(e.z)]); // 바닥 물건(손님도 주울 수 있다)
       w.h = homeOf(state).placed.map((q) => [q.id, q.cx, q.cz, q.rot || 0]); // 내 집 가구(손님이 구경한다)
+      const dc = decorOf(homeOf(state));
+      w.hl = [sizeOf(homeOf(state)), dc.wall, dc.floor]; // 내 집 크기 · 벽지 · 바닥
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
     }
     multi.sendWorld(w);
@@ -1293,6 +1304,16 @@ function boot() {
       hud.toast(`${josa(FURNITURE[id].name, '을/를')} 샀어요!`, 2600);
       gotTicket(paid);
     },
+    // 벽지 · 바닥(core/home.js, 가구점): 안 가졌으면 사서 붙이고, 가졌으면 바꿔 붙인다
+    useDecor(kind, id) {
+      const r = useDecor(state, kind, id);
+      if (!r.ok) { hud.toast('돈이 부족해요'); return; }
+      const paid = state.money - r.state.money, D = (kind === 'wall' ? WALLPAPERS : FLOORS)[id];
+      commit(r.state);
+      sound.play(r.bought ? 'coin' : 'click');
+      hud.toast(r.bought ? `${josa(D.name, '을/를')} 샀어요! 집에 들어가면 보여요` : `${josa(D.name, '으로/로')} 바꿨어요`, 2600);
+      if (paid) gotTicket(paid);
+    },
     // 부동산
     dayLabel: (day) => dateLabel(state.startDate, day),
     nextDay: (dow, from = state.clock.day + 1) => { let d = from; while (weekdayOf(state.startDate, d) !== dow) d++; return d; },
@@ -1491,6 +1512,16 @@ function boot() {
       if (!r.ok) { hud.toast(r.reason === 'unpaid' ? '밀린 집세부터 내요' : r.reason === 'money' ? '돈이 부족해요' : '당첨 기한이 지났어요'); return; }
       commit(r.state);
       celebrateHouse();
+    },
+    // 집 넓히기(core/home.js, 부동산): 내 집을 한 단계 넓혀 가구 칸을 늘린다
+    expandHome() {
+      const r = expandHome(state);
+      if (!r.ok) { hud.toast(r.reason === 'own' ? '집을 사야 넓힐 수 있어요' : r.reason === 'max' ? '이미 가장 넓어요' : '돈이 부족해요'); return; }
+      commit(r.state);
+      const G = gridOf(homeOf(r.state));
+      hud.banner('집이 넓어졌어요!', `${G.name}, 가구 놓을 칸이 ${G.cols * G.rows}칸이 됐어요`, 3400);
+      sound.play('done');
+      player.cheerTime = 1.6;
     },
     /** 메인(타이틀)으로 나간다. 진행은 저장되고, 타이틀에서 이어하기·새로 시작하기를 고른다. */
     toTitle() {
