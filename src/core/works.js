@@ -100,12 +100,23 @@ export const leftOf = (s, id) => Math.max(0, WORKS[id].price - workOf(s, id).pai
 
 /** 모금함에 낸다: 남은 만큼까지만, 가진 돈이 모자라면 못 낸다. → { ok, state, amount, full(이번에 다 모였다) } */
 export function donate(s, id, amount) {
-  if (!WORKS[id] || !(amount > 0)) return { ok: false, state: s };
+  if (!Object.hasOwn(WORKS, id) || !(amount > 0)) return { ok: false, state: s };
   const n = Math.min(Math.floor(amount), leftOf(s, id));
   if (n <= 0 || s.money < n) return { ok: false, state: s };
+  const r = fundWork(s, id, n);
+  return { ...r, state: { ...r.state, money: s.money - n } };
+}
+/**
+ * 모금함에 돈을 더한다(내 돈은 그대로): 같이 놀기로 놀러 온 친구가 내 마을 모금함에 냈을 때(친구 돈은 친구 쪽에서 뺀다).
+ * 남은 만큼까지만 받는다. → { ok, state, amount(받은 돈), full(이번에 다 모였다) }
+ */
+export function fundWork(s, id, amount) {
+  if (!Object.hasOwn(WORKS, id) || !(amount > 0)) return { ok: false, state: s };
+  const n = Math.min(Math.floor(amount), leftOf(s, id));
+  if (n <= 0) return { ok: false, state: s };
   const paid = workOf(s, id).paid + n, full = paid >= WORKS[id].price;
   const w = full ? { paid, day: s.clock.day } : { paid };
-  return { ok: true, amount: n, full, state: { ...s, money: s.money - n, works: { ...worksOf(s), [id]: w } } };
+  return { ok: true, amount: n, full, state: { ...s, works: { ...worksOf(s), [id]: w } } };
 }
 
 /** 생겼는데 아직 알리지 않은 시설(아침에 '새로 생겼어요'). */

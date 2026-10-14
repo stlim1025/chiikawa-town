@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORKS, WORK_IDS, WORK_SPOTS, WORK_SIGNS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, pavedStrips, workStatus, workOf, leftOf, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks, WORK_ITEMS, REST_RATE, canPickFlower, pickFlower, canRingBell, ringBell, isValidWorkUse } from '../src/core/works.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, WORK_SIGNS, WORK_STEP, OUTER_LAMP_GAP, outerLampSpots, pavedStrips, workStatus, workOf, leftOf, donate, fundWork, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks, isValidWorks, WORK_ITEMS, REST_RATE, canPickFlower, pickFlower, canRingBell, ringBell, isValidWorkUse } from '../src/core/works.js';
 import { WORK_NEAR, WORK_CHAT, HOME_CHAT, BELL_HEARD, nearWorkLine, upgradeChat } from '../src/core/upgradetalk.js';
 import { QUESTS, PLACES, canOffer, checkQuestData } from '../src/core/quests.js';
 import { ptsForHearts } from '../src/core/friends.js';
@@ -65,6 +65,22 @@ test('마을 가꾸기: 돈이 모자라면 못 내고, 모르는 시설 · 0원
   assert.equal(donate(s, 'nope', 100).ok, false);
   assert.equal(donate(s, 'flowers', 0).ok, false);
   assert.equal(donate(rich(), 'flowers', -5).ok, false);
+});
+
+test('마을 가꾸기: 놀러 온 친구가 낸 돈은 주인 돈을 건드리지 않고 남은 만큼까지만 모금에 더한다', () => {
+  let s = rich(500, 7);
+  let r = fundWork(s, 'flowers', WORK_STEP);
+  assert.ok(r.ok && !r.full && r.amount === WORK_STEP);
+  assert.equal(r.state.money, 500, '주인 돈은 그대로');
+  assert.equal(workOf(r.state, 'flowers').paid, WORK_STEP);
+  s = r.state;
+  r = fundWork(s, 'flowers', 99999);
+  assert.ok(r.ok && r.full && r.amount === WORKS.flowers.price - WORK_STEP, '남은 만큼만');
+  assert.equal(workStatus(r.state, 'flowers'), 'building', '주인 마을 날짜로 공사 중');
+  assert.equal(workOf(r.state, 'flowers').day, 7);
+  assert.equal(fundWork(r.state, 'flowers', WORK_STEP).ok, false, '다 모인 것에는 더 못 낸다');
+  for (const bad of [['nope', 100], ['flowers', 0], ['flowers', -5], ['flowers', NaN], ['toString', 100]]) assert.equal(fundWork(rich(), ...bad).ok, false, JSON.stringify(bad));
+  assert.ok(isValidState(r.state));
 });
 
 test('마을 가꾸기: 저장 확인과 같이 놀기로 보내는 모습', () => {

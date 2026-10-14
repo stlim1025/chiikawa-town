@@ -200,7 +200,8 @@ function monsterCards(s, withCount) {
  *   buyPochette(id) (사면 바로 멘다), wearPochette(id | null) (null 이면 벗기),
  *   buyTool(id: 'map' | 'lantern' | 'flashlight'), setLight(id) (들 불 고르기), playerPos() → { x, z, yaw }, mapLabels() → [{ x, z, text }],
  *   getSound() → { sfx, music }, toggleSound(kind), onOpen(), onClose(),
- *   donateWork(id, amount) (마을 가꾸기 모금함에 내기, core/works.js) }
+ *   donateWork(id, amount) (마을 가꾸기 모금함에 내기, core/works.js),
+ *   worksState() → 모금함 창에 보일 마을(친구 마을에 놀러 간 동안은 그 마을 모금), worksHost() → 놀러 간 마을 주인 이름 | null }
  */
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
@@ -1184,13 +1185,16 @@ export function createPanels(ui, handlers) {
     },
     // 마을 가꾸기 모금함(core/works.js): 시설마다 모은 돈 막대와 내기 단추. 다 모이면 다음 날 아침에 마을에 생긴다
     works(s) {
-      const out = [head('마을 가꾸기', s.money), h('p', { class: 'sub' }, '돈을 모아 내면 다 모인 다음 날 아침에 마을에 생겨요')];
+      // 친구 마을에 놀러 간 동안은 그 마을 모금(v)을 보이고, 낼 돈은 내 돈(s.money)
+      const v = handlers.worksState ? handlers.worksState() : s, host = handlers.worksHost ? handlers.worksHost() : null;
+      const out = [head(host ? `${host}네 마을 가꾸기` : '마을 가꾸기', s.money),
+        h('p', { class: 'sub' }, host ? `${host}네 마을 모금함이에요. 내 돈으로 같이 채워 줄 수 있어요` : '돈을 모아 내면 다 모인 다음 날 아침에 마을에 생겨요')];
       // 마을 발전: 생긴 시설 수 / 전부
-      const built = WORK_IDS.filter((id) => workStatus(s, id) === 'open').length;
+      const built = WORK_IDS.filter((id) => workStatus(v, id) === 'open').length;
       out.push(h('div', { class: 'work-level' }, h('b', {}, `마을 발전 ${built} / ${WORK_IDS.length}`),
         h('div', { class: 'work-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(WORK_IDS.length), 'aria-valuenow': String(built), 'aria-label': '마을 발전' }, h('i', { style: `width:${Math.round((built / WORK_IDS.length) * 100)}%` }))));
       for (const id of WORK_IDS) {
-        const W = WORKS[id], st = workStatus(s, id), paid = workOf(s, id).paid, left = leftOf(s, id), step = Math.min(WORK_STEP, left);
+        const W = WORKS[id], st = workStatus(v, id), paid = workOf(v, id).paid, left = leftOf(v, id), step = Math.min(WORK_STEP, left);
         const right = st === 'open' ? h('span', { class: 'lic-badge done' }, ico('check'), '완성')
           : st === 'building' ? h('span', { class: 'lic-badge' }, '공사 중')
             : h('div', { class: 'work-btns' },

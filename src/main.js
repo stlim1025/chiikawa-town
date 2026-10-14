@@ -99,7 +99,7 @@ import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
-import { WORKS, WORK_IDS, WORK_SPOTS, REST_RATE, donate, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks, canPickFlower, pickFlower, canRingBell, ringBell } from './core/works.js';
+import { WORKS, WORK_IDS, WORK_SPOTS, REST_RATE, donate, fundWork, workOf, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks, canPickFlower, pickFlower, canRingBell, ringBell } from './core/works.js';
 import { nearWorkLine, upgradeChat, BELL_HEARD } from './core/upgradetalk.js';
 import { createWorks } from './world/works.js';
 import { createHomeExterior } from './world/homeext.js';
@@ -446,7 +446,20 @@ function boot() {
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
     if (Array.isArray(w.w)) { visiting.weeds = w.w.slice(0, 400); if (!visiting.arriving) weeds.showGuest(visiting.weeds, multi.you); }
     if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
-    if (Array.isArray(w.k)) visiting.works = unpackWorks(w.k); // 마을 가꾸기 시설
+    if (Array.isArray(w.k)) {
+      // 마을 가꾸기 시설(공사 중 · 생김): 바뀌면 모금함 창도 다시
+      const k = unpackWorks(w.k), changed = JSON.stringify(k) !== JSON.stringify(visiting.works || {});
+      visiting.works = k;
+      if (changed) panels.refresh('works');
+    }
+    if (Array.isArray(w.kp)) {
+      // 주인 마을 모금함에 모인 돈(시설마다): 모금함 창은 이 금액으로
+      const kp = {};
+      for (const r of w.kp.slice(0, WORK_IDS.length)) if (Array.isArray(r) && Object.hasOwn(WORKS, r[0]) && Number.isFinite(r[1])) kp[r[0]] = Math.max(0, Math.min(WORKS[r[0]].price, Math.floor(r[1])));
+      const changed = JSON.stringify(kp) !== JSON.stringify(visiting.worksPaid || {});
+      visiting.worksPaid = kp;
+      if (changed) panels.refresh('works');
+    }
     if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r }); // 바깥에서 같이 토벌
     if (Array.isArray(w.g)) visiting.ground = parseGround(w.g);
     if (Array.isArray(w.z) && Number.isFinite(w.z[0]) && w.z[0] !== visiting.slept && !visiting.arriving && !visiting.leaving
@@ -512,7 +525,21 @@ function boot() {
       if (killed) guestKilled(id, m);
       return;
     }
-    weedsT = 0; // 바뀐 풀 · 덤불 · 바닥 물건은 다음 마을 모습으로 바로
+    weedsT = 0; // 바뀐 풀 · 덤불 · 바닥 물건 · 모금은 다음 마을 모습으로 바로
+    if (a.t === 'donate') {
+      // 손님이 내 마을 모금함에 냈다: 남은 만큼까지만 받아 내 모금에 더하고(내 돈은 그대로), 받은 만큼을 그 손님에게 알린다(손님 돈은 손님 쪽에서 뺀다)
+      if (!Object.hasOwn(WORKS, a.id)) return;
+      const r = fundWork(state, a.id, Number(a.n));
+      multi.direct(id, { t: 'donated', id: a.id, n: r.ok ? r.amount : 0, full: r.ok && r.full ? 1 : 0 });
+      if (!r.ok) return;
+      commit(r.state);
+      sound.play('coin');
+      const who = multi.nameOf(id) || '친구', chips = [{ icon: 'coin', text: `+${won(r.amount)}` }];
+      if (r.full) hud.toast(`${josa(who, '이/가')} 보태서 ${josa(WORKS[a.id].name, '이/가')} 다 모였어요! 내일 아침에 생겨요`, 3600, { chips });
+      else hud.toast(`${josa(who, '이/가')} ${WORKS[a.id].name}에 보탰어요`, 2600, { chips });
+      panels.refresh('works');
+      return;
+    }
     if (a.t === 'take') {
       // 바닥 물건 줍기: 아직 있으면 달라는 만큼 건네준다(손님 가방에는 손님 쪽에서)
       const list = groundOf(state), e = list.find((o) => o.g === a.g);
@@ -650,6 +677,43 @@ function boot() {
       onKill({ species: a.sp, M, x: Number.isFinite(a.x) ? a.x : player.position.x, z: Number.isFinite(a.z) ? a.z : player.position.z, hitPlayer: !a.clean, mesh: { height: M.height || 1 }, remote: true });
     } else if (a.t === 'got') takeGot(a);
     else if (a.t === 'star') takeStar(a); // 주인이 별똥별에 소원을 빌었다
+    else if (a.t === 'donated') takeDonated(a); // 주인 마을 모금함에 낸 돈을 주인이 받았다
+  }
+  /**
+   * 모금함 창에 보일 마을: 친구 마을에 놀러 간 동안은 주인 마을의 모금(모인 돈 · 공사 중 · 생김)과 시계로. 낼 돈은 내 돈 그대로.
+   * 주인이 보낸 것은 모인 돈(worksPaid)과 마을 모습(works: 공사 중 · 생김)뿐이라, 생김은 어제 · 공사 중은 오늘 다 모인 것으로 맞춘다.
+   */
+  function worksPanelState() {
+    if (!visiting || visiting.arriving) return state;
+    const clock = visiting.clock || state.clock, works = {};
+    for (const id of WORK_IDS) {
+      const st = (visiting.works || {})[id], paid = (visiting.worksPaid || {})[id] || 0, full = Math.max(paid, WORKS[id].price);
+      // 다 모였는데 주인의 '공사 중'이 아직 안 왔으면(방금 내가 채웠다) 공사 중으로
+      works[id] = st === 'open' ? { paid: full, day: clock.day - 1 } : st === 'building' || paid >= WORKS[id].price ? { paid: full, day: clock.day } : { paid };
+    }
+    return { ...state, clock, works };
+  }
+  /** 손님: 주인 마을 모금함에 낸다. 주인이 받은 만큼을 알려 오면(takeDonated) 그때 내 돈에서 뺀다(다른 사람이 먼저 채웠거나 끊겼을 때 헛돈이 안 나가게). */
+  function donateToHost(id, amount) {
+    if (!visiting || visiting.arriving || !Object.hasOwn(WORKS, id)) return;
+    const left = Math.max(0, WORKS[id].price - ((visiting.worksPaid || {})[id] || 0));
+    const n = Math.min(Math.floor(amount), left);
+    if (n <= 0 || state.money < n) return;
+    multi.act({ t: 'donate', id, n });
+  }
+  /** 손님: 주인이 받은 돈 → 그만큼 내 돈에서 빼고, 창에도 바로 더해 둔다(주인의 다음 마을 모습이 곧 맞춰 준다). */
+  function takeDonated(a) {
+    if (!Object.hasOwn(WORKS, a.id)) return;
+    const n = Math.max(0, Math.floor(Number(a.n)) || 0), host = multi.hostName || '친구', W = WORKS[a.id];
+    if (!n) { hud.toast(`${host}네 ${W.name}은 벌써 다 모였대요`, 2400); panels.refresh('works'); return; }
+    const pay = Math.min(n, state.money);
+    commit({ ...state, money: state.money - pay });
+    sound.play('coin');
+    visiting.worksPaid = { ...(visiting.worksPaid || {}), [a.id]: Math.min(W.price, ((visiting.worksPaid || {})[a.id] || 0) + n) };
+    const chips = [{ icon: 'coin', text: `−${won(pay)}` }];
+    if (a.full) { player.cheerTime = 1.0; hud.toast(`${host}네 ${josa(W.name, '이/가')} 다 모였어요! 내일 아침에 생겨요`, 3600, { chips }); }
+    else hud.toast(`${host}네 ${W.name}에 보탰어요`, 2200, { chips });
+    panels.refresh('works');
   }
 
   // 쓰러지기: 같이 노는 친구가 있으면 기운이 다 떨어져도 바로 기절하지 않고 그 자리에 쓰러져 DOWN_WAIT 초 기다린다.
@@ -940,6 +1004,7 @@ function boot() {
       const dc = decorOf(homeOf(state));
       w.hl = [sizeOf(homeOf(state)), dc.wall, dc.floor]; // 내 집 크기 · 벽지 · 바닥
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
+      w.kp = WORK_IDS.map((id) => [id, workOf(state, id).paid]).filter((r) => r[1] > 0); // 시설마다 모인 돈(손님 모금함 창에 내 마을 금액으로)
     }
     multi.sendWorld(w);
   }
@@ -994,6 +1059,9 @@ function boot() {
   let appNudge = null; // 새로 생긴 마을폰 앱(지도를 막 샀으면 'map'): 그 앱을 열 때까지 마을폰 버튼 · 앱 아이콘이 빛난다
   const panels = createPanels(ui, {
     getState: () => state,
+    // 모금함 창: 친구 마을에 놀러 간 동안은 그 마을 모금(worksPanelState)과 주인 이름
+    worksState: () => worksPanelState(),
+    worksHost: () => (visiting && !visiting.arriving ? multi.hostName || '친구' : null),
     appNudge: () => appNudge,
     appSeen: (kind) => { if (kind === appNudge) appNudge = null; },
     // 사이드스토리 '검은 별똥별': 없애는 법을 찾을 차례에만 마을폰 '검색' 앱 · 산소 표백제를 가져갈 차례에만 도구점에서 판다
@@ -1027,6 +1095,7 @@ function boot() {
     },
     // 마을 가꾸기(core/works.js): 모금함에 낸다. 다 모이면 그 자리에 '공사 중' 간판이 서고 다음 날 아침에 생긴다
     donateWork: (id, amount) => {
+      if (visiting) { donateToHost(id, amount); return; } // 친구 마을 모금함: 그 마을 모금으로(내 돈은 주인이 받은 만큼 나중에 뺀다)
       const r = donate(state, id, amount);
       if (!r.ok) return;
       commit(r.state);
