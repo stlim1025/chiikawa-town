@@ -57,6 +57,16 @@ Tailscale Funnel 은 핸드폰 → 도쿄 중계 서버 → 내 PC 로 돌아 �
 
 .NET 10 SDK 가 필요합니다.
 
+### 한 번에 열기(Windows)
+
+저장소 맨 위의 **`서버 열기.bat`** 을 두 번 누른다(`server/open-server.ps1` 을 실행한다).
+
+1. 서버(`http://localhost:5280`)가 이미 켜져 있으면 그대로 두고, 꺼져 있으면 새 창에서 `dotnet run` 으로 켜서 응답할 때까지 기다린다.
+2. Tailscale Funnel 이 5280 을 내보내고 있는지 보고, 아니면 `tailscale funnel --bg 5280` 으로 연다(Tailscale 이 없으면 건너뛴다).
+3. 친구가 들어올 주소(`tailscale funnel status`)를 보여 준다.
+
+서버 창을 닫으면 서버가 꺼진다. 직접 켜려면:
+
 ```bash
 cd server/TownServer
 dotnet run
