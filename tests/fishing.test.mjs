@@ -61,26 +61,33 @@ test('낚시 놀이: 누르면 초록 칸이 올라가고 떼면 내려오며, �
 });
 
 test('낚시 놀이: 잘 따라 누르면 낚고, 큰 고기일수록 어렵고, 손을 놓고 있으면 놓친다(처음 잠깐은 봐준다)', () => {
-  // lag: 반응이 늦는 정도(초), k: 칸이 움직이는 기세까지 보고 미리 떼는 정도(숙련)
-  const play = (id, lag, k, n = 30) => {
+  // 사람처럼 누르기: delay 초 전에 본 모습으로(눈으로 보고 손이 따라가는 늦음), every 초마다 누를지 정한다.
+  // k: 칸이 움직이는 기세까지 보고 미리 떼는 정도(익숙할수록 크다). 늦음 없이 보는 기계로 맞추면 사람에게는 너무 어려워진다
+  const play = (id, { delay, k, every }, n = 60) => {
     const rnd = seeded(5), g = rulesOf(id).game;
     let won = 0;
     for (let i = 0; i < n; i++) {
       let r = startReel(id, rnd), hold = false, acc = 0;
+      const seen = [];
       while (!r.done && r.t < 60) {
+        seen.push(r);
+        const v = seen[Math.max(0, seen.length - 1 - Math.round(delay * 60))];
         acc += 1 / 60;
-        if (acc >= lag) { acc = 0; hold = r.fish - (r.zone + g.zone / 2) - k * r.vz > 0; }
+        if (acc >= every) { acc = 0; hold = v.fish - (v.zone + g.zone / 2) - k * v.vz > 0; }
         r = stepReel(r, 1 / 60, hold, rnd);
       }
       if (r.done === 'caught') won++;
     }
     return won / n;
   };
-  const skilled = ['minnow', 'crucian', 'catfish'].map((id) => play(id, 0.1, 0.22));
-  assert.ok(skilled[0] >= 0.9 && skilled[1] >= 0.8 && skilled[2] >= 0.5, `숙련: ${skilled}`);
-  const simple = ['minnow', 'crucian', 'catfish'].map((id) => play(id, 0.15, 0));
-  assert.ok(simple[0] > simple[1] && simple[1] > simple[2], `단순하게 누르면 큰 고기일수록 덜 잡힌다: ${simple}`);
-  assert.ok(simple[2] < 0.5, `큰 고기는 대충 눌러서는 잘 안 잡힌다: ${simple[2]}`);
+  const ids = ['minnow', 'crucian', 'catfish'];
+  const usual = ids.map((id) => play(id, { delay: 0.2, k: 0.12, every: 0.08 }));
+  assert.ok(usual[0] >= 0.95 && usual[1] >= 0.9 && usual[2] >= 0.6, `보통 사람은 대부분 낚는다: ${usual}`);
+  const skilled = ids.map((id) => play(id, { delay: 0.12, k: 0.22, every: 0.05 }));
+  assert.ok(skilled.every((w) => w >= 0.9), `익숙하면 큰 고기도 낚는다: ${skilled}`);
+  const casual = ids.map((id) => play(id, { delay: 0.25, k: 0, every: 0.12 }));
+  assert.ok(casual[0] >= 0.9 && casual[0] >= casual[1] && casual[1] > casual[2], `대충 누르면 큰 고기일수록 덜 잡힌다: ${casual}`);
+  assert.ok(casual[2] < 0.5, `큰 고기는 대충 눌러서는 잘 안 잡힌다: ${casual[2]}`);
   let r = startReel('catfish', () => 0.95);
   const p0 = r.progress;
   for (let k = 0; k < Math.floor(REEL.grace * 60) - 2; k++) r = stepReel(r, 1 / 60, false, () => 0.95);

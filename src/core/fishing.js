@@ -38,15 +38,15 @@ export const BITE_WAIT = [2.5, 7];
  * gain 칸 안에 있을 때 게이지가 차는 빠르기 · loss 밖일 때 빠지는 빠르기 · start 처음 게이지.
  */
 export const SIZE_RULES = [
-  { window: 1.0, game: { zone: 0.28, speed: 0.48, turn: [0.5, 1.2], dart: 0.1, gain: 0.36, loss: 0.24, start: 0.3 } },
-  { window: 0.75, game: { zone: 0.26, speed: 0.55, turn: [0.45, 1.1], dart: 0.14, gain: 0.34, loss: 0.23, start: 0.32 } },
-  { window: 0.55, game: { zone: 0.25, speed: 0.58, turn: [0.45, 1.0], dart: 0.18, gain: 0.32, loss: 0.22, start: 0.34 } }
+  { window: 1.0, game: { zone: 0.34, speed: 0.4, turn: [0.5, 1.2], dart: 0.06, gain: 0.42, loss: 0.18, start: 0.3 } },
+  { window: 0.75, game: { zone: 0.32, speed: 0.46, turn: [0.45, 1.1], dart: 0.1, gain: 0.4, loss: 0.19, start: 0.32 } },
+  { window: 0.55, game: { zone: 0.3, speed: 0.5, turn: [0.45, 1.0], dart: 0.13, gain: 0.37, loss: 0.2, start: 0.34 } }
 ];
 /**
  * 초록 칸 움직임: 누르고 있으면 up 만큼 위로, 떼면 down 만큼 아래로 빨라진다(초당 속도 최대 max). 끝에 닿으면 bounce 만큼 튕긴다.
  * grace: 시작하고 이 시간(초) 동안은 게이지가 빠지지 않는다(손을 버튼에 올릴 틈). dart: 물고기가 내뺄 때 빠르기 배수.
  */
-export const REEL = { up: 4.4, down: 3.6, max: 1.7, bounce: 0.35, grace: 0.5, dart: 1.7 };
+export const REEL = { up: 3.4, down: 2.9, max: 1.3, bounce: 0.35, grace: 0.5, dart: 1.7 };
 const NAMES = { pond: '연못', river: '시냇물', lake: '호수', sea: '바다' };
 export const waterName = (w) => NAMES[w] || '물';
 
