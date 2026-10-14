@@ -1546,8 +1546,8 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 8px; max-width: min(380px, 70vw); padding: 5px 16px 7px 10px; border-radius: 18px 20px 18px 16px; background: #fff6dc; box-shadow: 0 3px 0 #e8c97a; font-size: 16px; line-height: 1.25; }
 .hud-quest i { grid-row: span 2; align-self: center; padding: 1px 8px 2px; border-radius: 999px; font-style: normal; font-size: 13px; color: #8a5a10; background: #ffd77a; }
 .hud-quest.story i { color: #fff; background: #c0473c; }
-.hud-quest b { font-size: 16px; }
-.hud-quest > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink-soft); font-size: 15px; }
+.hud-quest b { font-size: 15px; }
+.hud-quest > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink-soft); font-size: 14px; }
 .hud-quest em { font-style: normal; }
 .hud-quest small { padding: 0 8px 1px; border-radius: 999px; background: #ffe7a6; color: #8a5a10; font-size: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud-quests { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -1664,18 +1664,14 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 [data-input="desk"] .hud-quest i { padding: 1px 9px 2px; font-size: 14px; }
 [data-input="desk"] .hud-quest b { font-size: 17px; }
 [data-input="desk"] .hud-quest > span { font-size: 15px; }
-/* 사이드스토리 쪽지는 작게: 꼬리표는 책 그림 하나(제목 옆), 글은 한 단계 작게 — 목표가 길어 화면을 많이 가리지 않게 */
+/* 사이드스토리 쪽지는 작게: 꼬리표는 책 그림 하나(제목 옆), 칸을 좁게 — 목표가 길어 화면을 많이 가리지 않게. 글 크기는 다른 쪽지와 같다(화면 크기별 규칙을 그대로 따른다) */
 .hud-quest.side { max-width: min(300px, 62vw); padding: 4px 12px 6px 8px; }
 .hud-quest.side i { display: grid; place-items: center; width: 26px; height: 22px; padding: 0; }
 .hud-quest.side i svg { width: 18px; height: 18px; }
-.hud-quest.side b { font-size: 15px; }
-.hud-quest.side > span { font-size: 14px; }
 @media (max-width: 560px) { .hud-quest.side { grid-template-columns: auto 1fr; } .hud-quest.side i { grid-row: span 2; align-self: start; margin-top: 1px; } }
 [data-input="desk"] .hud-quest.side { max-width: min(400px, 32vw); padding: 5px 16px 7px 10px; }
 [data-input="desk"] .hud-quest.side i { width: 30px; height: 26px; padding: 0; }
 [data-input="desk"] .hud-quest.side i svg { width: 21px; height: 21px; }
-[data-input="desk"] .hud-quest.side b { font-size: 17px; }
-[data-input="desk"] .hud-quest.side > span { font-size: 15px; }
 
 /* ---------- 주머니(동물의 숲처럼): 동그란 칸 · 개수 · 이름 말풍선 · 할 일 메뉴 ---------- */
 .panel-bag, .panel-storage { width: min(760px, 100%); --tab: #f6c453; }
