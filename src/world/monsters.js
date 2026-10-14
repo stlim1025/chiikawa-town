@@ -99,8 +99,22 @@ const ATK = {
   crabCharge: { range: 8, wind: 0.75, lock: 0.65, speed: 9.5, len: 8, width: 1.5, cool: 1.8, rec: 0.9, kind: 'charge' },
   crabCharge2: { range: 9, wind: 0.6, lock: 0.6, speed: 11, len: 11, width: 1.5, bounce: 1, cool: 1.8, rec: 0.9, kind: 'charge' },
   crabBubble: { range: 10, wind: 0.8, n: 8, spread: (Math.PI * 2) / 8, ring: true, speed: 3.8, r: 0.38, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.7, rec: 0.6, kind: 'shoot' },
-  crabBubble2: { range: 10, wind: 0.7, n: 11, spread: (Math.PI * 2) / 11, ring: true, twice: 0.45, speed: 4.2, r: 0.36, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.6, rec: 0.5, kind: 'shoot' }
+  crabBubble2: { range: 10, wind: 0.7, n: 11, spread: (Math.PI * 2) / 11, ring: true, twice: 0.45, speed: 4.2, r: 0.36, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.6, rec: 0.5, kind: 'shoot' },
+  // 현상금 황금 대장(core/bounty.js · 게임 오리지널): 원래 공격에 섞어 쓰는 것들(ELITE_MOVES). 보스보다 한 단계 작게
+  eliteStomp: { range: 6, wind: 0.75, lock: 0.6, air: 0.8, radius: 1.6, height: 1.4, cool: 1.8, rec: 0.8, kind: 'stomp' }, // 뛰어 덮치기
+  eliteSlam: { range: 2.3, wind: 0.85, radius: 2.4, cool: 1.8, rec: 0.8, kind: 'slam' }, // 쿵 내려찍기 · 둘레 할퀴기
+  eliteCharge: { range: 7, wind: 0.7, lock: 0.65, speed: 9.5, len: 7.5, width: 1.1, cool: 1.8, rec: 0.8, kind: 'charge' }, // 일직선 돌진
+  eliteRain: { range: 9, wind: 0.75, n: 4, spread: 3.0, radius: 1.2, warn: 1.1, dmgK: 0.8, cool: 2.2, rec: 0.6, kind: 'rain' }, // 흙덩이 · 포자 · 돌멩이 비
+  eliteLeaf: eliteRing('#7cc25e'), // 잎사귀 · 풀잎 고리
+  eliteAcorn: eliteRing('#b5793e'), // 도토리 고리
+  eliteSpore: eliteRing('#c39be8'), // 포자 고리
+  eliteBubble: eliteRing('#4fa3e6'), // 물방울 고리
+  eliteCloud: eliteRing('#c9d6ea') // 구름 고리
 };
+/** 황금 대장의 고리: 탄 여덟 개를 사방으로(보스 고리보다 적고 느리게). */
+function eliteRing(color) {
+  return { range: 8, wind: 0.8, n: 8, spread: (Math.PI * 2) / 8, ring: true, speed: 4.0, r: 0.3, life: 2.4, color, dmgK: 0.7, cool: 2.0, rec: 0.6, kind: 'shoot' };
+}
 Object.entries(ATK).forEach(([k, a]) => { if (!a.kind) a.kind = k; });
 /**
  * 보스 공격 꾸러미: near 가까우면 쓰는 공격, again 화났을 때 near 뒤에 곧바로 한 번 더(없으면 null),
@@ -113,6 +127,25 @@ const KITS = {
   elder: { near: ATK.elderSlam, again: ATK.elderSlam2, pick: (r, roll) => (roll < 0.45 ? ATK.elderRoots : r >= 1 ? ATK.elderAcorn2 : ATK.elderAcorn), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'beetle') },
   bigcrab: { near: ATK.crabPinch, again: null, pick: (r, roll) => (roll < 0.5 ? (r >= 1 ? ATK.crabCharge2 : ATK.crabCharge) : r >= 1 ? ATK.crabBubble2 : ATK.crabBubble), minion: (r, k) => (r >= 2 && k === 0 ? 'crab' : 'slime') }
 };
+/**
+ * 현상금 황금 대장(게임 오리지널): 원래 공격(ELITE_BASE 만큼)과 함께 섞어 쓰는 공격 둘. 이름은 core/bounty.js 의 ELITE_TRICKS(같은 차례).
+ * 보스처럼 한 번 골라 두고 다 쓸 때까지 그대로(매 프레임 다시 고르면 다가갈 거리가 흔들린다).
+ */
+const ELITE_MOVES = {
+  fluff: [ATK.eliteStomp, ATK.eliteLeaf],
+  hopper: [ATK.eliteLeaf, ATK.eliteCharge],
+  mole: [ATK.eliteRain, ATK.eliteSlam],
+  beetle: [ATK.eliteAcorn, ATK.eliteSlam],
+  shroom: [ATK.eliteRain, ATK.eliteSpore],
+  stump: [ATK.eliteStomp, ATK.eliteAcorn],
+  slime: [ATK.eliteBubble, ATK.eliteStomp],
+  frog: [ATK.eliteStomp, ATK.eliteBubble],
+  crab: [ATK.eliteCharge, ATK.eliteBubble],
+  turtle: [ATK.eliteSlam, ATK.eliteRain],
+  pebble: [ATK.eliteRain, ATK.eliteSlam],
+  ram: [ATK.eliteCharge, ATK.eliteCloud]
+};
+const ELITE_BASE = 0.45;
 /** 맞아도 움츠리기를 멈추지 않는 단단한 몬스터. */
 const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true };
 
@@ -804,10 +837,17 @@ export function createMonsters(scene, village, random = Math.random) {
       if (!m.bossPick) m.bossPick = kit.pick(rage(m), random());
       return m.bossPick;
     }
-    return ATK[m.M.attack] || ATK.bump;
+    const base = ATK[m.M.attack] || ATK.bump, extra = m.bounty && ELITE_MOVES[m.species];
+    if (extra) {
+      // 현상금 황금 대장: 원래 공격과 새 공격 둘을 섞어 쓴다
+      if (!m.elitePick) m.elitePick = random() < ELITE_BASE ? base : extra[Math.floor(random() * extra.length) % extra.length];
+      return m.elitePick;
+    }
+    return base;
   }
   function startWind(m, A) {
     if (m.M.boss) { if (A === m.nextAtk) m.nextAtk = null; else if (A === m.bossPick) m.bossPick = null; }
+    else if (A === m.elitePick) m.elitePick = null; // 황금 대장: 다음에 또 고른다
     m.state = 'wind';
     m.atk = A;
     m.wind = m.windMax = A.wind;

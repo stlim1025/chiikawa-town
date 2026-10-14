@@ -13,6 +13,24 @@ export const BOUNTY_POOL = ['fluff', 'hopper', 'mole', 'beetle', 'shroom', 'stum
 export const BOUNTY_CHANCE = 0.6, BOUNTY_FROM = 9, BOUNTY_TO = 16, BOUNTY_END = 22;
 /** 황금 대장: 체력 · 피해 배율, 몸 크기 배율, 전리품 개수. */
 export const ELITE = { hp: 6, dmg: 1.35, size: 1.45, drops: 3 };
+/**
+ * 황금 대장이 원래 공격에 섞어 쓰는 공격 둘(게임 오리지널)의 이름: 현상금 전단에 적는다. 움직임은 world/monsters.js 의 ELITE_MOVES 가 같은 차례로.
+ * 모두 있던 공격 방식이다: 뛰어 덮치기 · 내려찍기 · 일직선 돌진 · 비(빨간 표시 뒤 쏟아진다) · 고리(탄을 사방으로).
+ */
+export const ELITE_TRICKS = {
+  fluff: ['뛰어 덮치기', '잎사귀 고리'],
+  hopper: ['풀잎 고리', '일직선 돌진'],
+  mole: ['흙덩이 비', '둘레 할퀴기'],
+  beetle: ['도토리 고리', '쿵 내려찍기'],
+  shroom: ['포자 비', '포자 고리'],
+  stump: ['뛰어 덮치기', '도토리 고리'],
+  slime: ['물방울 고리', '뛰어 덮치기'],
+  frog: ['뛰어 덮치기', '물방울 고리'],
+  crab: ['옆걸음 돌진', '물방울 고리'],
+  turtle: ['쿵 내려찍기', '돌멩이 비'],
+  pebble: ['돌멩이 비', '쿵 내려찍기'],
+  ram: ['뿔 돌진', '구름 고리']
+};
 const WHERE = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산' };
 
 /** 현상금(원): 단단한 몬스터일수록 크다(풀뭉치 430원 · 이끼 거북 730원). */
@@ -26,11 +44,11 @@ function roll(day, salt) {
   return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
 }
 
-/** 그날의 현상금: null(없는 날) | { day, species, name, where, hour(나타나는 시각), end, reward }. 둘째 날부터. */
+/** 그날의 현상금: null(없는 날) | { day, species, name, where, hour(나타나는 시각), end, reward, tricks(섞어 쓰는 공격 이름) }. 둘째 날부터. */
 export function bountyOf(day) {
   if (!(day >= 2) || roll(day, 'on') >= BOUNTY_CHANCE) return null;
   const species = BOUNTY_POOL[Math.floor(roll(day, 'who') * BOUNTY_POOL.length) % BOUNTY_POOL.length], M = MONSTERS[species];
-  return { day, species, name: `황금 ${M.name}`, where: WHERE[M.region] || '마을 밖', hour: BOUNTY_FROM + roll(day, 'at') * (BOUNTY_TO - BOUNTY_FROM), end: BOUNTY_END, reward: bountyReward(species) };
+  return { day, species, name: `황금 ${M.name}`, where: WHERE[M.region] || '마을 밖', hour: BOUNTY_FROM + roll(day, 'at') * (BOUNTY_TO - BOUNTY_FROM), end: BOUNTY_END, reward: bountyReward(species), tricks: ELITE_TRICKS[species] || [] };
 }
 
 /** 오늘 현상금 기록(지난 날 것은 버리고 새로). */

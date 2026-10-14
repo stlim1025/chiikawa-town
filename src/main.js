@@ -6394,6 +6394,8 @@ function boot() {
       monsterShots: () => monsters.shots(),
       monsterCounts: () => monsters.counts(),
       spawnMonster: (species, dx = 0, dz = 2) => { const m = monsters.spawnAt(species, player.position.x + dx, player.position.z + dz); m.home = { x: m.x, z: m.z }; return m.id; },
+      /** 황금 대장처럼 새 공격을 섞어 쓰는 몬스터를 내 옆에(디버그: 금관 · 체력 배율은 없이 공격만). */
+      spawnElite: (species, dx = 0, dz = 3) => { const m = monsters.spawnAt(species, player.position.x + dx, player.position.z + dz, { bounty: true }); m.home = { x: m.x, z: m.z }; return m.id; },
       swing: () => doSwing(),
       exam: () => hunterExam && { t: hunterExam.t, left: hunterExam.left },
       iframe: () => iframe,

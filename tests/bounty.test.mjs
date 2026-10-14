@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BOUNTY_POOL, BOUNTY_FROM, BOUNTY_TO, BOUNTY_END, bountyOf, bountyNow, bountyReward, markBountyDown, claimBounty, isValidBounty } from '../src/core/bounty.js';
+import { BOUNTY_POOL, BOUNTY_FROM, BOUNTY_TO, BOUNTY_END, ELITE_TRICKS, bountyOf, bountyNow, bountyReward, markBountyDown, claimBounty, isValidBounty } from '../src/core/bounty.js';
 import { MONSTERS } from '../src/core/combat.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
@@ -28,6 +28,16 @@ test('현상금은 날 번호로 정해진다: 같은 날이면 늘 같고, 열�
   assert.equal(bountyOf(1), null, '첫날은 없다');
   assert.equal(bountyReward('fluff'), 430);
   assert.equal(bountyReward('turtle'), 730);
+});
+
+test('황금 대장: 현상금이 붙는 몬스터마다 원래 공격에 섞어 쓰는 새 공격이 둘, 전단에 이름이 실린다', () => {
+  for (const sp of BOUNTY_POOL) {
+    const t = ELITE_TRICKS[sp];
+    assert.ok(Array.isArray(t) && t.length === 2 && new Set(t).size === 2, sp);
+    for (const name of t) assert.ok(name && !name.includes('·') && name !== MONSTERS[sp].atk, `${sp}: ${name}`);
+  }
+  const d = someDay();
+  assert.deepEqual(bountyOf(d).tricks, ELITE_TRICKS[bountyOf(d).species]);
 });
 
 test('현상금 전단: 토벌 자격증이 있어야 붙고, 시각에 따라 나타났다가 밤 10시에 사라진다', () => {

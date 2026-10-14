@@ -545,6 +545,7 @@ export function createPanels(ui, handlers) {
             h('div', { class: 'bw-head' }, '현상금'),
             h('div', { class: 'bw-name' }, bt.name),
             h('div', { class: 'bw-sub' }, bt.status === 'up' ? `${bt.where}에 나타났어요. 밤 10시가 지나면 사라져요` : bt.status === 'down' ? '쓰러뜨렸어요! 현상금을 받아 가세요' : '현상금을 받았어요'),
+            bt.status === 'up' && bt.tricks && bt.tricks.length ? h('div', { class: 'bw-sub' }, `새 공격: ${bt.tricks.join(', ')}`) : null, // 원래 공격에 섞어 쓰는 것(core/bounty.js)
             h('div', { class: 'bw-pay' }, svgSpan('coin-ico', COIN), won(bt.reward))),
           bt.status === 'down' ? h('button', { class: 'btn primary', type: 'button', onClick: after(() => handlers.claimBounty()) }, '현상금 받기') : null));
       }
