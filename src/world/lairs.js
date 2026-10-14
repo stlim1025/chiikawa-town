@@ -5,7 +5,8 @@ import { WORLD_HALF, ARENAS, ARENA_WALL, CANYON, canyonLen, doorAngle, canyonMou
 /**
  * 보스 마당(core/layout.js 의 ARENAS — 구역 보스 셋 + 왕버섯 굴): 높은 지형에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡 하나.
  *  바위산 · 강가는 절벽 바위, 들판은 풀 언덕, 숲은 고목이 빙 둘러서고, 협곡 양옆도 같은 지형이다. 협곡 바닥엔 길과 이어진 흙길(땅 색으로 칠한다, core/layout.js 의 lairPathDist · 바위산은 원래 오솔길).
- *  카메라(남쪽) 쪽 덩어리는 셋씩 묶어 집처럼 내 캐릭터를 가리면 반투명해진다(village.js 의 fader). 나머지는 마을 정적 배칭이 한 덩어리로 묶는다.
+ *  카메라(남쪽) 쪽 덩어리는 셋씩 묶어 집처럼 내 캐릭터 · 몬스터를 가리면 반투명해진다(village.js 의 fader). 월드 안 마당은 북쪽 둘레까지(바깥 들판에서 가린다).
+ *  나머지(월드 끝 너머 마당의 북쪽 둘레)는 마을 정적 배칭이 한 덩어리로 묶는다.
  *  덩어리 아래로 촘촘한 울타리(장애물)를 둘러 사이로 못 지나가고, 협곡 끝(입구)에 이름표.
  * 구역 보스 자리는 분지 바닥 한 장(굴밭 흙 · 숲 이끼 · 강가 진흙)과 소품 몇 개도. 공유 난수를 쓰지 않는다(앞서 지은 숲 · 들판 자리가 바뀌지 않게).
  * ctx: { zones, obstacles, labels, fader }
@@ -162,10 +163,11 @@ export function buildLairs({ zones, obstacles, labels, fader }) {
     const T = TERRAIN[A.id], g = new THREE.Group();
     g.position.set(A.x, 0, A.z);
     fences(A, obstacles);
-    // 둘러싼 지형: 카메라 쪽(남쪽) 덩어리는 FADE_GROUP 개씩 반투명 묶음으로
-    const spots = massSpots(A, T), south = spots.filter((s) => s.z > -A.r * 0.25), groupOf = new Map();
-    for (let i = 0; fader && i < south.length; i += FADE_GROUP) {
-      const part = south.slice(i, i + FADE_GROUP), cx = part.reduce((a, s) => a + s.x, 0) / part.length, cz = part.reduce((a, s) => a + s.z, 0) / part.length;
+    // 둘러싼 지형: 카메라 쪽(남쪽) 덩어리는 FADE_GROUP 개씩 반투명 묶음으로. 월드 안에 있는 마당(고목 빈터 · 강가 진흙밭)은 북쪽 바깥 들판에서도
+    // 높은 고목 · 절벽이 내 캐릭터와 몬스터를 통째로 가려서 둘레 전부를 묶음으로(월드 끝 너머 마당은 북쪽으로 못 간다)
+    const spots = massSpots(A, T), fading = beyondEdge(A) ? spots.filter((s) => s.z > -A.r * 0.25) : spots, groupOf = new Map();
+    for (let i = 0; fader && i < fading.length; i += FADE_GROUP) {
+      const part = fading.slice(i, i + FADE_GROUP), cx = part.reduce((a, s) => a + s.x, 0) / part.length, cz = part.reduce((a, s) => a + s.z, 0) / part.length;
       const f = fader(A.x + cx, A.z + cz, Math.max(...part.map((s) => Math.hypot(s.x - cx, s.z - cz))) + T.w);
       part.forEach((s) => groupOf.set(s, f));
     }

@@ -685,11 +685,11 @@ export function buildVillage(scene) {
   // ---------- 울타리 밖 네 구역: 월드를 묶음으로 나눠 멀리 있는 묶음은 그리지 않는다 ----------
   const zones = createZones(world, { size: 20, half: WORLD_HALF, view: 56 });
   /**
-   * 집처럼 내 캐릭터를 가리면 반투명해지는 바깥 지형 덩어리(보스 마당의 카메라 쪽 절벽 · 언덕 · 고목)를 등록한다.
+   * 집처럼 내 캐릭터를 가리면 반투명해지는 바깥 지형 덩어리(보스 마당 둘레 절벽 · 언덕 · 고목)를 등록한다. 집과 달리 내 둘레 몬스터를 가려도 반투명해진다(wild).
    * → { mat(색): 이 덩어리 전용 재질, add(메시) } — add 한 메시는 아래 집 합치기에서 한 덩어리로 합쳐진다.
    */
   function fader(x, z, half) {
-    const o = { x, z, half, mats: [], meshes: [], fade: 1 }, byColor = new Map();
+    const o = { x, z, half, mats: [], meshes: [], fade: 1, wild: true }, byColor = new Map();
     houses.push(o);
     return {
       mat(c) {
@@ -963,7 +963,7 @@ export function buildVillage(scene) {
     },
     /**
      * 먼 묶음은 감추고, focus(내 캐릭터)와 카메라 사이를 가리는 나무 · 집 · 문을 반투명하게. 카메라는 남쪽(+z)에 있다.
-     * others: 내 둘레 몬스터 자리 — 위에서 내려다보는 화면이라 나무 앞(남쪽)에 선 몬스터는 우듬지에 통째로 가려지므로 그 나무도 반투명하게.
+     * others: 내 둘레 몬스터 자리 — 위에서 내려다보는 화면이라 나무 앞(남쪽)에 선 몬스터는 우듬지에 통째로 가려지므로 그 나무(보스 마당 둘레 지형도)를 반투명하게.
      */
     update(dt, focus, others = []) {
       if (focus) {
@@ -981,10 +981,10 @@ export function buildVillage(scene) {
           t.mats.forEach((m) => { m.opacity = t.fade; m.depthWrite = t.fade > 0.95; seeThrough(m, t.fade < 1); });
           t.canopy.forEach((c) => { c.children[0].visible = t.fade > 0.95; });
         }
-        // 집: 내 캐릭터보다 카메라 쪽(남쪽)에 있으면서 옆으로 가까우면 반투명하게
+        // 집: 내 캐릭터보다 카메라 쪽(남쪽)에 있으면서 옆으로 가까우면 반투명하게. 보스 마당 둘레 덩어리(wild)는 몬스터를 가려도
+        const shades = (h, p) => { const dz = h.z - p.z, dx = Math.abs(h.x - p.x); return dz > -0.6 && dz < h.half + 5 && dx < h.half + 0.9; };
         for (const h of houses) {
-          const dz = h.z - focus.z, dx = Math.abs(h.x - focus.x);
-          const hiding = dz > -0.6 && dz < h.half + 5 && dx < h.half + 0.9;
+          const hiding = shades(h, focus) || (h.wild && others.some((p) => shades(h, p)));
           h.fade += ((hiding ? 0.3 : 1) - h.fade) * Math.min(1, dt * 8);
           if (h.fade > 0.995) h.fade = 1;
           h.mats.forEach((m) => { m.opacity = h.fade; m.depthWrite = h.fade > 0.95; seeThrough(m, h.fade < 1); });

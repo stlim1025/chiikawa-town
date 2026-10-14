@@ -38,6 +38,13 @@ export function buildOutdoors(ctx) {
   }
 
   const ELDER = BOSS_LAIRS.elder;
+  /**
+   * 고목 빈터 둘레에서 반투명해지는 나무로 지을 자리: 빈터 남쪽(카메라 쪽 — 마당 싸움을 가린다)과 북쪽 숲 들판(몬스터가 돌아다녀서
+   * 그 남쪽 나무가 낮은 카메라 앞에서 내 캐릭터 · 몬스터를 통째로 가렸다).
+   */
+  const elderFade = (x, z) => z > ELDER.z
+    ? z < ELDER.z + ELDER.r + 8 && Math.abs(x - ELDER.x) < ELDER.r + 3
+    : z > ELDER.z - ELDER.r - 14 && Math.abs(x - ELDER.x) < ELDER.r + 6;
   /** 월드 끝 너머 마당(두더지 굴밭) 둘레 큰 둔덕 자리(world/lairs.js 가 짓는다): 그 밑에는 나무 · 꽃을 두지 않는다. */
   const EDGE = ARENAS.flatMap(edgeMounds), underEdge = (x, z, pad = 0) => EDGE.some((m) => Math.hypot(x - m.x, z - m.z) < m.s + pad);
   const inLair = (x, z, pad = 0) => Object.values(BOSS_LAIRS).some((L) => Math.hypot(x - L.x, z - L.z) < L.r + pad);
@@ -58,8 +65,8 @@ export function buildOutdoors(ctx) {
       const s = 0.95 + rand() * 0.45, leaf = rand() < 0.5 ? '#5fb36e' : '#6cc77e';
       if (arenaClear(px, pz)) rand(); // 고목 거인 마당 · 입구 앞: 나무는 빼되 난수(나무 방향 — tree · forestTree 둘 다 한 번)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
       else if (rd < 5) tree(px, pz, s, leaf, zones.groupAt(px, pz));
-      // 빈터 남쪽(카메라 쪽) 나무는 싸움을 가리면 반투명해지는 나무로(이것도 난수를 한 번 쓴다)
-      else if (pz > ELDER.z && pz < ELDER.z + ELDER.r + 8 && Math.abs(px - ELDER.x) < ELDER.r + 3) tree(px, pz, s, leaf, zones.groupAt(px, pz));
+      // 빈터 남쪽(카메라 쪽) · 북쪽 숲 들판 나무는 싸움을 가리면 반투명해지는 나무로(이것도 난수를 한 번 쓴다)
+      else if (elderFade(px, pz)) tree(px, pz, s, leaf, zones.groupAt(px, pz));
       else forestTree(px, pz, s, leaf);
     }
   }
