@@ -1187,10 +1187,12 @@ export function showOnlyProp(chibi, tag) {
 }
 
 const ZERO = [0, 0, 0];
+/** 'bench' 로 벤치 · 정자 긴 의자(자리 윗면 높이 0.44)에 앉을 때 몸을 올리는 높이: 몸 밑(0.02)이 자리에 닿게. */
+export const SEAT_LIFT = 0.42;
 /**
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
- *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
+ *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'bench' 벤치 · 의자에 앉기 · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
  *   · 파자마 파티즈 무대: 'idol' 아이돌 춤(8박 안무) · 'idolSing' 노래하며 춤 · 'glow' 응원봉 흔들기 — 셋 다 opts.beat(곡 박 번호)에 맞춘다
@@ -1216,7 +1218,7 @@ function blendPose(A, B, w) {
 function basePose(mode, t, opts) {
   const a = {};
   const phase = opts.phase || 0, s = Math.sin(phase);
-  let bob = 0, lean = 0, waddle = 0, spin = 0;
+  let bob = 0, lean = 0, waddle = 0, spin = 0, legs = 1;
   if (mode === 'walk') {
     a.armL = [s * 0.7, 0, 0]; a.armR = [-s * 0.7, 0, 0];
     a.legL = [-s * 0.65, 0, 0]; a.legR = [s * 0.65, 0, 0];
@@ -1332,6 +1334,14 @@ function basePose(mode, t, opts) {
     a.armL = [-0.55, 0, 0.12]; a.armR = [-0.55, 0, -0.12];
     a.head = [0.06 + Math.sin(t * 1.3 + phase) * 0.04, Math.sin(t * 0.6 + phase) * 0.35, 0];
     bob = -0.11;
+  } else if (mode === 'bench') {
+    // 벤치 · 의자에 앉기: 엉덩이를 자리에 붙이고 다리는 앞으로 접어 자리 끝에 늘어뜨린 채 살랑살랑 흔든다, 손은 무릎에.
+    // 발 덩어리만 있는 짧은 다리라 legs 로 다리 마디를 길게 늘여 자리 밑으로 내려오게 한다(바닥에 앉는 'sit' 은 다리를 앞으로 쭉 뻗는다)
+    const kick = Math.sin(t * 2.4 + phase) * 0.16;
+    a.legL = [-0.9 + kick, 0, 0.06]; a.legR = [-0.9 - kick, 0, -0.06];
+    a.armL = [-0.6, 0, 0.12]; a.armR = [-0.6, 0, -0.12];
+    a.head = [0.04 + Math.sin(t * 1.3 + phase) * 0.03, Math.sin(t * 0.6 + phase) * 0.3, 0];
+    lean = -0.04; legs = 2.2;
   } else if (mode === 'think') {
     // 갸웃: 한 손을 턱에 대고 고개를 기울인다
     a.armR = [-1.45, 0, -0.5]; a.armL = [-0.55, 0, 0.45];
@@ -1428,7 +1438,7 @@ function basePose(mode, t, opts) {
   const ear = mode === 'walk' ? -0.25 - Math.abs(s) * 0.25 : mode === 'pull' ? -0.4 : mode === 'peek' ? 0.6 : -0.1;
   const spread = mode === 'peek' ? -(1.9 + Math.sin(t * 5 + phase) * 0.08) : 0.08;
   a.earL = [ear, 0, -spread]; a.earR = [ear, 0, spread];
-  return { a, bob, lean, waddle, spin, push: 0, squash: 0 };
+  return { a, bob, lean, waddle, spin, push: 0, squash: 0, legs };
 }
 
 /** 자세를 모델에 입힌다. */
@@ -1437,6 +1447,8 @@ function applyPose(chibi, p) {
     const r = p.a[name] || ZERO;
     chibi.pivots[name].rotation.set(r[0], r[1], r[2], 'YXZ');
   }
+  // 다리 길이(legs): 의자에 앉을 때만 발 마디를 세로로 늘인다(나머지 몸짓은 1)
+  for (const k of ['legL', 'legR']) if (chibi.pivots[k]) chibi.pivots[k].scale.y = p.legs || 1;
   chibi.inner.position.set(0, p.bob, p.push);
   chibi.inner.rotation.set(p.lean, p.spin, p.waddle, 'YXZ');
   chibi.inner.scale.set(1 + p.squash * 0.5, 1 - p.squash, 1 + p.squash * 0.5); // 눌리면(+) 납작, 펴지면(-) 길쭉

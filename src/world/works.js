@@ -326,7 +326,9 @@ export function createWorks(village) {
       if (roof && shown.pavilion === 'open' && focus) {
         const { g } = roof, a = g.rotation.y, dx = focus.x - g.position.x, dz = focus.z - g.position.z;
         const lx = Math.cos(a) * dx - Math.sin(a) * dz, lz = Math.sin(a) * dx + Math.cos(a) * dz;
-        const under = Math.abs(lx) < 1.6 && lz > -1.6 && lz < 3;
+        // 정자 안이거나, 정자 뒤(북쪽)에 서서 지붕이 카메라(남쪽)와 나 사이를 가릴 때
+        const behind = g.position.z - focus.z, side = Math.abs(focus.x - g.position.x);
+        const under = (Math.abs(lx) < 1.6 && lz > -1.6 && lz < 3) || (side < 2.2 && behind > 0 && behind < 6.5);
         if (!under && roof.fade === 1) return;
         const f = roof.fade + ((under ? 0.3 : 1) - roof.fade) * Math.min(1, dt * 8);
         roof.fade = f > 0.995 ? 1 : f;

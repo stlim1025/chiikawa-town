@@ -1,4 +1,4 @@
-import { buildChibi, animateChibi } from '../actors/models.js';
+import { buildChibi, animateChibi, SEAT_LIFT } from '../actors/models.js';
 import { groundY } from '../core/layout.js';
 
 /**
@@ -7,7 +7,7 @@ import { groundY } from '../core/layout.js';
  */
 
 /** 그대로 따라 할 몸짓(그 밖은 서 있기로). swing · thrust: 같이 토벌할 때 휘두르기, faint: 쓰러져 깨워 주길 기다린다. */
-const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze', 'swing', 'thrust', 'faint']);
+const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'bench', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze', 'swing', 'thrust', 'faint']);
 /** 한마디 말풍선이 떠 있는 시간(초). */
 const SAY_SEC = 3.5;
 /** 받은 위치와 이만큼 넘게 떨어져 있으면 따라가지 않고 바로 옮긴다(순간 이동 · 다시 접속). */
@@ -111,7 +111,7 @@ export function createRemotePlayers(scene, area = 'village') {
       p.animT = (p.animT || 0) + dt;
       p.phase += Math.hypot(p.x - ox, p.z - oz) * 3.2; // 걸음은 실제로 움직인 만큼(내 캐릭터와 같은 비율)
       const anim = p.emoteT > 0 ? p.emote : ANIMS.has(p.anim) ? p.anim : 'idle';
-      p.chibi.root.position.set(p.x, floorY(p.x, p.z), p.z);
+      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로
       p.chibi.root.rotation.y = p.yaw;
       const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
       showHeld(p);

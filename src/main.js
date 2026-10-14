@@ -20,7 +20,7 @@ import { createLod } from './render/lod.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
-import { buildChibi, setCrying, wearPajama, PAJAMA_COLORS } from './actors/models.js';
+import { buildChibi, setCrying, wearPajama, PAJAMA_COLORS, SEAT_LIFT } from './actors/models.js';
 import { setCelLight, toonMesh, GEO } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
 import { createNpcs } from './actors/npcs.js';
@@ -5603,7 +5603,7 @@ function boot() {
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
-    fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저)
+    if (!resting) fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저, 벤치에 앉아 있을 때는 일어나서)
     workTargets(p, options); // 마을 가꾸기 시설: 꽃 따기 · 앉아서 쉬기 · 종 치기
     playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
@@ -5612,12 +5612,12 @@ function boot() {
   // ---------- 마을 가꾸기 시설로 하는 일(core/works.js, 게임 오리지널) ----------
   // 광장 꽃밭 '꽃 따기'(꽃밭마다 하루 한 번) · 연못 벤치와 강가 정자 '앉아서 쉬기'(앉아 있는 동안 기운이 찬다, 움직이면 일어난다)
   // · 시계탑 '종 치기'(하루 한 번, 종소리를 들은 마을 친구들이 반가워하고 조금 친해진다)
-  let resting = null; // { kind, rate, acc, full } 앉아서 쉬는 중
+  let resting = null; // { kind, rate, acc, full, stand(일어나면 설 자리) } 앉아서 쉬는 중
   /** 앉을 수 있는 자리 [{ kind, x, z, yaw, lift }]: 생긴 벤치 둘 · 정자 안 뒤쪽 긴 의자. */
   function restSeats() {
     const out = [];
-    if (workStatus(state, 'benches') === 'open') for (const b of WORK_SPOTS.benches) out.push({ kind: 'benches', x: b.x, z: b.z, yaw: b.yaw, lift: 0.3 });
-    if (workStatus(state, 'pavilion') === 'open') { const P = WORK_SPOTS.pavilion[0]; out.push({ kind: 'pavilion', x: P.x, z: P.z - 0.82, yaw: P.yaw, lift: 0.3 }); }
+    if (workStatus(state, 'benches') === 'open') for (const b of WORK_SPOTS.benches) out.push({ kind: 'benches', x: b.x, z: b.z, yaw: b.yaw, lift: SEAT_LIFT });
+    if (workStatus(state, 'pavilion') === 'open') { const P = WORK_SPOTS.pavilion[0]; out.push({ kind: 'pavilion', x: P.x, z: P.z - 0.85, yaw: P.yaw, lift: SEAT_LIFT }); }
     return out;
   }
   function workTargets(p, options) {
@@ -5646,11 +5646,14 @@ function boot() {
     if (!seen('plazaflower')) { markSeen('plazaflower'); hud.toast('꽃밭마다 하루에 한 송이씩 딸 수 있어요. 꽃을 좋아하는 친구에게 선물해 봐요', 4200); }
   }
   function startRest(seat) {
-    player.setPosition(seat.x, seat.z);
-    player.face(seat.x + Math.sin(seat.yaw), seat.z + Math.cos(seat.yaw));
+    // 자리 위에 앉는다: 벤치 · 의자는 장애물이라 충돌 검사 없이 놓고(setPosition 은 자리 앞으로 밀어낸다), 등이 등받이에 닿게 조금 앞으로.
+    // 엉덩이는 자리 높이(lift)에, 다리는 접어 자리 끝에 늘어뜨린다('bench' 몸짓)
+    const fx = Math.sin(seat.yaw), fz = Math.cos(seat.yaw);
+    player.placeAt(seat.x + fx * 0.1, seat.z + fz * 0.1);
+    player.face(seat.x + fx * 2, seat.z + fz * 2);
     player.lift = seat.lift;
-    player.act('sit', 3600);
-    resting = { kind: seat.kind, rate: REST_RATE[seat.kind], acc: 0, full: false, fresh: true }; // fresh: 앉은 몸짓은 다음 player.update 때 잡히니 한 프레임은 일어난 걸로 보지 않는다
+    player.act('bench', 3600);
+    resting = { kind: seat.kind, rate: REST_RATE[seat.kind], acc: 0, full: false, fresh: true, stand: { x: seat.x + fx * 0.8, z: seat.z + fz * 0.8 } }; // fresh: 앉은 몸짓은 다음 player.update 때 잡히니 한 프레임은 일어난 걸로 보지 않는다
     sound.play('click');
     if (!seen('rest')) { markSeen('rest'); hud.toast('앉아 있으면 기운이 차요. 움직이면 일어나요', 3200); }
   }
@@ -5658,7 +5661,12 @@ function boot() {
   function updateRest(dt) {
     if (!resting) return;
     if (resting.fresh) { resting.fresh = false; return; }
-    if (player.anim !== 'sit' || mode !== 'play' || fishing) { player.lift = 0; resting = null; return; }
+    if (player.anim !== 'bench' || mode !== 'play' || fishing) { // 일어나면 자리 앞에 선다(의자 장애물 안에 남지 않게)
+      const st = resting.stand;
+      player.lift = 0; resting = null;
+      if (!fishing) player.setPosition(st.x, st.z);
+      return;
+    }
     if (state.stamina >= MAX_STAMINA) {
       if (!resting.full) { resting.full = true; hud.toast('기운이 가득 찼어요', 2000); }
       return;
