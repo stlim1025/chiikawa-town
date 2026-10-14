@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { toonMesh, GEO } from '../render/toon.js';
+import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, wearPajama, PAJAMA_COLORS } from '../actors/models.js';
+import { canopyGeometry } from './village.js';
 
 /**
  * 파자마 파티즈 무대(사이드스토리 '파자마 파티즈'): 밤의 광장에 세운 작은 무대. 따로 그리는 장면(클럽 club.js 처럼).
@@ -89,10 +90,17 @@ export function createIdolStage() {
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: '#fff7d6', size: 0.22, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
   scene.add(stars);
   add(scene, new THREE.CircleGeometry(1.6, 28), basic('#fff3c4', { fog: false }), [-9, 12, -24]);
-  // 나무 그림자(무대 뒤로 둥글게)
+  // 광장 둘레 나무(무대 뒤로 둥글게): 마을 나무(world/village.js)와 같은 줄기 + 잎 덩어리, 밤빛에 맞춰 조금 짙은 초록
+  const leafMat = toonMaterial('#ffffff', { vertexColors: true });
+  const NIGHT_LEAF = [['#4a8660', '#5f9f70'], ['#437c58', '#56946a']];
   for (let i = 0; i < 9; i++) {
-    const a = -2.5 + i * 0.62, r = 12 + (i % 3);
-    toon(scene, GEO.sphere, i % 2 ? '#24402f' : '#2a4a36', { position: [Math.sin(a) * r, 1.6 + (i % 3) * 0.4, -Math.cos(a) * r * 0.7 - 2], scale: [1.9, 2.1, 1.7], outline: 0.03 });
+    const a = -2.5 + i * 0.62, r = 12 + (i % 3), tree = new THREE.Group();
+    tree.position.set(Math.sin(a) * r, 0, -Math.cos(a) * r * 0.7 - 2);
+    tree.rotation.y = i * 1.3;
+    tree.scale.setScalar(1.7 + (i % 3) * 0.2);
+    toon(tree, GEO.cylinder, '#6e5443', { scale: [0.16, 1.1, 0.16], outline: 0.03 });
+    toon(tree, canopyGeometry(...NIGHT_LEAF[i % 2]), null, { material: leafMat, outline: 0.04 });
+    scene.add(tree);
   }
 
   // ---------- 무대 ----------
