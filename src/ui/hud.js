@@ -766,6 +766,13 @@ export function createHud(ui, input) {
         if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) continue;
         let e = labelEls.get(it.id);
         if (!e) { e = mount(el('div', 'world-label ' + it.kind)); labelEls.set(it.id, e); }
+        if (e.dataset.kind !== it.kind) {
+          // 같은 이름표가 다른 모양이 됐다(친구 머리 위 ? → ! 처럼): 모양 클래스를 바꾸고 속을 새로 그린다(전에는 처음 클래스가 남아 파란 ! 가 떴다)
+          e.className = 'world-label ' + it.kind;
+          e.dataset.kind = it.kind;
+          delete e.dataset.v;
+          e.replaceChildren();
+        }
         if (it.kind === 'prompt') {
           // 행동 안내: (PC 면) 키 모양 + 할 일
           const want = (it.key || '') + '|' + it.text;
