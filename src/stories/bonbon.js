@@ -87,7 +87,7 @@ export function createBonbonStory(ctx) {
     S.beat = true;
     S.eighth = -1;
     rhythm.start({
-      bpm: BPM, chart: DRUM, label: '흥얼흥얼 배 두드리기', hint: '초콜릿이 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!', go: '통!', icon: BONBON_SVG,
+      bpm: BPM, chart: DRUM, label: '흥얼흥얼 배 두드리기', hint: '초콜릿이 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!', go: '통!', icon: BONBON_SVG,
       onHit: () => { ctx.stage.drum(); sound.play('kick'); },
       onEnd: (res) => { S.rank = res.rank; S.beat = false; setTimeout(() => S && tipsy(), 500); }
     });

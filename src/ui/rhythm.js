@@ -1,7 +1,7 @@
 import { press as pressNote, sweep, result, chartBeats } from '../core/rhythm.js';
 
 /**
- * 박자 맞추기 화면(우사기 클럽의 춤): 도토리 음표가 오른쪽에서 동그라미로 다가오고, 닿는 순간 누르면(스페이스 · 행동 버튼 · 화면 아무 데나 탭) 퍼펙트.
+ * 박자 맞추기 화면(우사기 클럽의 춤): 도토리 음표가 오른쪽에서 동그라미로 다가오고, 동그라미 한가운데에 오는 순간 누르면(스페이스 · 행동 버튼 · 화면 아무 데나 탭) 퍼펙트.
  * 실패해서 끝나는 일은 없다. 시계는 화면이 직접 잰다(performance.now) — 박자 소리도 이 시계(time)에 맞춰 친다.
  * start({ bpm, chart, onHit(q, combo), onMiss(), onEnd(result), label?, hint?, go?, icon? }) · press() · update() · stop()
  * label · hint · go · icon: 다른 장면에서 쓸 때 흥 막대 이름 · 아래 안내 · 마지막 카운트 · 음표 그림(없으면 클럽 그대로).
@@ -10,7 +10,7 @@ const APPROACH = 1.7; // 음표가 줄 끝에서 동그라미까지 오는 시�
 const ACORN = '<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="25" rx="11" ry="12" fill="#c98a4b" stroke="#5a3a22" stroke-width="2.4"/><path d="M8 18c0-6 5.4-9 12-9s12 3 12 9c-3.4 1.6-7.6 2.4-12 2.4S11.4 19.6 8 18z" fill="#7a5131" stroke="#5a3a22" stroke-width="2.4" stroke-linejoin="round"/><path d="M20 9V5" stroke="#5a3a22" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="15.5" cy="25" rx="2.4" ry="3.6" fill="#fff" opacity="0.45"/></svg>';
 const WORDS = { perfect: '퍼펙트!', good: '좋아!', miss: '놓침…' };
 const COUNT = ['3', '2', '1', '우라!'];
-const CLUB_TEXT = { label: '손님들 흥', hint: '도토리가 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!', go: '우라!', icon: ACORN };
+const CLUB_TEXT = { label: '손님들 흥', hint: '도토리가 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!', go: '우라!', icon: ACORN };
 
 export function createRhythm(ui) {
   const root = document.createElement('div');
@@ -19,7 +19,7 @@ export function createRhythm(ui) {
   root.innerHTML = '<div class="rh-hype"><b>손님들 흥</b><i><u></u></i></div>'
     + `<div class="rh-lane"><div class="rh-ring">${ACORN}</div><div class="rh-notes"></div></div>`
     + '<div class="rh-judge" aria-live="polite"></div><div class="rh-count"></div><div class="rh-combo"></div>'
-    + '<div class="rh-hint">도토리가 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!</div>';
+    + '<div class="rh-hint">도토리가 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!</div>';
   ui.appendChild(root);
   const lane = root.querySelector('.rh-lane'), notesEl = root.querySelector('.rh-notes'), ring = root.querySelector('.rh-ring');
   const judgeEl = root.querySelector('.rh-judge'), countEl = root.querySelector('.rh-count'), comboEl = root.querySelector('.rh-combo');
@@ -86,7 +86,7 @@ export function createRhythm(ui) {
     },
     update() {
       if (!run) return;
-      const t = now() - run.t0, W = lane.clientWidth, ringX = 34;
+      const t = now() - run.t0, W = lane.clientWidth;
       // 카운트: 처음 4박
       const beat = Math.floor(t / run.spb);
       countEl.textContent = beat >= 0 && beat < 3 ? COUNT[beat] : beat === 3 ? look.go : '';
@@ -99,9 +99,11 @@ export function createRhythm(ui) {
         flash('miss');
         run.cb.onMiss?.();
       }
+      // 음표 시각(판정 한가운데)에 음표 한가운데가 동그라미 한가운데에 온다: 둘 다 줄 왼쪽에서 39px(동그라미 left 10 + 반지름 29 = 음표 margin 17 + 반지름 22)라 이동 0
+      // (전에는 이동 34px 자리 — 음표가 동그라미 가장자리에 막 닿을 때가 퍼펙트여서, 한가운데에서 누르면 0.1초 남짓 늦었다)
       for (const n of run.notes) {
         if (n.hit) continue;
-        const x = ringX + ((n.at - t) / APPROACH) * (W - ringX - 20);
+        const x = ((n.at - t) / APPROACH) * (W - 20);
         n.el.style.transform = `translateX(${Math.round(x)}px)`;
         n.el.style.opacity = x > W - 10 ? '0' : '1';
       }

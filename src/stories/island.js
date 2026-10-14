@@ -146,7 +146,7 @@ export function createIslandTrip(ctx) {
     },
     /** 인어 합창(박자): 우사기 노래에 박자를 맞춰 인어가 따라 부르게. */
     chorus(done) {
-      startRhythm(CHORUS_BPM, CHORUS, { label: '인어 합창', hint: '음표가 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!', go: '라~♪', icon: NOTE_SVG }, 'soft', () => sound.play('chime'), 'chorus', done);
+      startRhythm(CHORUS_BPM, CHORUS, { label: '인어 합창', hint: '음표가 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!', go: '라~♪', icon: NOTE_SVG }, 'soft', () => sound.play('chime'), 'chorus', done);
     },
     /** 바닷속 헤엄(타이밍 3번): 시마지로의 파도에 맞춰 앞으로. */
     swim(done) {
@@ -163,7 +163,7 @@ export function createIslandTrip(ctx) {
     },
     /** 결전(박자): 맥주 캔 · 랩 · 고함으로 인어들의 합창을 흐트러뜨린다. */
     battle(done) {
-      startRhythm(BATTLE_BPM, BATTLE, { label: '노래 흐트러뜨리기', hint: '캔이 동그라미에 닿을 때 <kbd>Space</kbd> 또는 탭!', go: '야하!', icon: CAN_SVG }, 'beat', () => sound.play('can'), 'battle', done);
+      startRhythm(BATTLE_BPM, BATTLE, { label: '노래 흐트러뜨리기', hint: '캔이 동그라미 한가운데에 올 때 <kbd>Space</kbd> 또는 탭!', go: '야하!', icon: CAN_SVG }, 'beat', () => sound.play('can'), 'battle', done);
     },
     /** 카레 던지기(타이밍 1번): 세이렌의 입이 크게 벌어졌을 때. 빗나가면 칸이 넓어진다. */
     throw(done) {

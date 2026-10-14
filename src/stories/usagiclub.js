@@ -225,7 +225,7 @@ export function createUsagiClub(ctx) {
       ? [{ who: U(), text: '야하~!!' }, '(오늘도 우사기의 DJ 타임이 시작됐다!)', { who: U(), text: '우라! (춤추라는 듯 손짓한다)' }]
       : [{ who: H(), text: '여, 여기가… 우사기 집…?!' }, { who: C(), text: '……!! (반짝반짝)' }, { who: U(), text: '우라!' },
         '(우사기가 무대 위로 올라가 도토리에 나뭇잎을 문지르기 시작했다…! 끽끽♪)',
-        { who: H(), text: '{name}, 우리도 춤추자~! 도토리가 동그라미에 닿을 때 맞춰서!' }];
+        { who: H(), text: '{name}, 우리도 춤추자~! 도토리가 동그라미 한가운데에 올 때 맞춰서!' }];
     setTimeout(() => S && say(lines, startDance), 900);
   }
   function startDance() {
