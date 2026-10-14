@@ -22,6 +22,7 @@ import { isValidHunters } from './hunters.js';
 import { isValidStarfall } from './starfall.js';
 import { isValidBosses } from './bosses.js';
 import { isValidBounty } from './bounty.js';
+import { isValidWorks } from './works.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -75,6 +76,7 @@ export function isValidState(s) {
   if (s.starfall !== undefined && !isValidStarfall(s.starfall)) return false; // 별똥별에 소원을 빈 날
   if (s.bosses !== undefined && !isValidBosses(s.bosses)) return false; // 구역 보스(마주침 · 쓰러뜨린 날)
   if (s.bounty !== undefined && !isValidBounty(s.bounty)) return false; // 오늘 현상금 몬스터(쓰러뜨렸는지 · 받았는지)
+  if (s.works !== undefined && !isValidWorks(s.works)) return false; // 마을 가꾸기 모금(낸 돈 · 다 모인 날)
   return true;
 }
 

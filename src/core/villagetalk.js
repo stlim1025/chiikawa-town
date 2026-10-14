@@ -9,7 +9,7 @@ import { josa } from './weeding.js';
  * 사건(ev) = { type, who, with?, title?, mon?, n?, lic?, day, hour }
  *   meal 라멘(with 같이 먹은 친구) · chat 수다 · job 일감 끝 · hunt 토벌 일감 끝 · examPass / examFail 토벌 자격증 시험
  *   · sing 하치와레 공연(n 관객 수) · watch 공연 구경 · train 수련장 수련(with) · comfort 달래 줌 · congrats 축하해 줌
- *   · theft 모몽가 소매치기 · partyHunt 나와 같이 토벌 · playerBoss / playerRanker / playerLicense(lic) 내가 한 큰일(who 'me')
+ *   · theft 모몽가 소매치기 · partyHunt 나와 같이 토벌 · playerBoss / playerRanker / playerLicense(lic) / playerWork(work) 내가 한 큰일(who 'me')
  */
 
 export const nameOf = (kind, me = '나') => (kind === 'me' ? me : FRIENDS[kind] ? FRIENDS[kind].name : kind);
@@ -121,7 +121,8 @@ const STEM = {
   partyHunt: (e, N) => `${josa(N(e.who), '이/가')} ${josa(N('me'), '이랑/랑')} 같이 토벌했`,
   playerBoss: (e, N) => `${josa(N('me'), '이/가')} ${josa(e.boss || '왕버섯', '을/를')} 쓰러뜨렸`, // boss: 쓰러뜨린 보스 짧은 이름(없으면 이야기 속 왕버섯)
   playerRanker: (e, N) => `${josa(N('me'), '이/가')} 토벌 랭커가 됐`,
-  playerLicense: (e, N) => `${josa(N('me'), '이/가')} ${e.lic || '자격증'} 땄`
+  playerLicense: (e, N) => `${josa(N('me'), '이/가')} ${e.lic || '자격증'} 땄`,
+  playerWork: (e, N) => `${josa(N('me'), '이/가')} ${josa(e.work || '새 시설', '을/를')} 만들었`
 };
 /** 소문 끝맺음: 친구 말투. 우사기는 몸짓뿐. */
 const GOSSIP = {
@@ -136,7 +137,8 @@ const GOSSIP = {
 const PRAISE = {
   playerBoss: { chiikawa: '…{boss} 잡았다며…!! 대단해…!', hachiware: '{me}! {boss} 잡았다며?! 대단해~!', usagi: '(박수를 친다) 우라!!', kurimanju: '하아~ {boss} 잡았다며? 한 잔 해야지', rakko: '…{boss} 쓰러뜨렸다고 들었다 훗', momonga: '{boss}? 흥! 나도 할 수 있거든!' },
   playerRanker: { chiikawa: '…랭커…! 멋있어…!', hachiware: '랭커가 됐다며? 역시 {me}!', usagi: '(박수를 친다) 우라!!', kurimanju: '하아~ 랭커라니 대단하네', rakko: '…랭커가 됐군 기대하겠다', momonga: '랭커? 흥 운이 좋았네!' },
-  playerLicense: { chiikawa: '…{lic} 땄다며…! 축하해…!', hachiware: '{lic} 땄다며? 축하해~!', usagi: '(박수를 친다) 야하!!', kurimanju: '하아~ {lic} 축하해', rakko: '…{lic}인가 잘했다', momonga: '{lic}? 흥 별거 아니네!' }
+  playerLicense: { chiikawa: '…{lic} 땄다며…! 축하해…!', hachiware: '{lic} 땄다며? 축하해~!', usagi: '(박수를 친다) 야하!!', kurimanju: '하아~ {lic} 축하해', rakko: '…{lic}인가 잘했다', momonga: '{lic}? 흥 별거 아니네!' },
+  playerWork: { chiikawa: '…{work} 생겼다…! {me} 덕분이야…!', hachiware: '{work} 봤어? {me} 덕분이래~ 고마워!', usagi: '(신나서 뛰어다닌다) 야하!!', kurimanju: '하아~ {work} 좋더라 고마워', rakko: '…{work}인가 좋은 일을 했군', momonga: '{work}? 흥 나쁘진 않네!' }
 };
 /** 이야기를 들은 친구의 반응(좋은 일 · 슬픈 일). */
 const REACT = {
@@ -163,7 +165,7 @@ export function storyLine(kind, ev, me = '나', random = Math.random) {
 /** 내가 한 큰일(playerBoss 등)을 친구가 나에게 말해 줄 때. */
 export function praiseLine(kind, ev, me = '나') {
   const P = PRAISE[ev.type] && PRAISE[ev.type][kind];
-  return P ? fill(P, { me, lic: ev.lic || '자격증', boss: ev.boss || '왕버섯' }) : null;
+  return P ? fill(P, { me, lic: ev.lic || '자격증', boss: ev.boss || '왕버섯', work: ev.work || '새 시설' }) : null;
 }
 /** 사건을 내 쪽에서 본 소문(친구가 내 이야기를 다른 친구에게 할 때). */
 export function gossipLine(kind, ev, me = '나') {
@@ -293,7 +295,8 @@ export function newsLine(ev, me = '나') {
     partyHunt: () => `${josa(A, '이/가')} ${josa(N('me'), '과/와')} 같이 토벌했어요`,
     playerBoss: () => `${josa(N('me'), '이/가')} 왕버섯을 쓰러뜨렸어요`,
     playerRanker: () => `${josa(N('me'), '이/가')} 토벌 랭커가 됐어요`,
-    playerLicense: () => `${josa(N('me'), '이/가')} ${josa(ev.lic || '자격증', '을/를')} 땄어요`
+    playerLicense: () => `${josa(N('me'), '이/가')} ${josa(ev.lic || '자격증', '을/를')} 땄어요`,
+    playerWork: () => `${N('me')} 덕분에 마을에 ${josa(ev.work || '새 시설', '이/가')} 생겼어요`
   }[ev.type];
   const text = T ? T() : null;
   return text ? { text, kinds: [ev.who, ev.with].filter((k) => k && k !== 'me' && FRIENDS[k]) } : null;

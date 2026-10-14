@@ -98,6 +98,8 @@ import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
+import { WORKS, donate, dueWorks, markWorksOpen, worksView, packWorks, unpackWorks } from './core/works.js';
+import { createWorks } from './world/works.js';
 import { talkMenu, subAsk, BACK } from './core/talkmenu.js';
 import { createMonsters } from './world/monsters.js';
 import { canWish, makeWish, WISHES, WISH_MONEY, WISH_STAMINA, isStarfallNight, isStarHour } from './core/starfall.js';
@@ -190,6 +192,7 @@ function boot() {
   const glows = createGlowShrooms(scene, village); // 서쪽 숲 빛나는 버섯(밤에 반짝 털뭉치) — 잡초가 버섯 위에 돋지 않게 먼저
   const weeds = createWeeds(scene, village);
   const monsters = createMonsters(scene, village); // 마을 밖 몬스터(4단계)
+  const works = createWorks(village); // 마을 가꾸기 시설(모금함에 돈을 모아 생긴 꽃밭 · 벤치 · 가로등 · 시계탑 · 정자)
   // 가려진 몬스터 실루엣은 스텐실 버퍼로 '제 몸이 보이는 곳'을 빼고 칠한다. 기기 · 브라우저가 스텐실을 안 주면
   // 실루엣이 몬스터 몸 위를 분홍으로 덮어 모습이 안 보이므로, 그런 화면에서는 실루엣을 끈다
   {
@@ -426,6 +429,7 @@ function boot() {
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
     if (Array.isArray(w.w)) { visiting.weeds = w.w.slice(0, 400); if (!visiting.arriving) weeds.showGuest(visiting.weeds, multi.you); }
     if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
+    if (Array.isArray(w.k)) visiting.works = unpackWorks(w.k); // 마을 가꾸기 시설
     if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r }); // 바깥에서 같이 토벌
     if (Array.isArray(w.g)) visiting.ground = parseGround(w.g);
     if (Array.isArray(w.z) && Number.isFinite(w.z[0]) && w.z[0] !== visiting.slept && !visiting.arriving && !visiting.leaving
@@ -907,6 +911,7 @@ function boot() {
       w.b = berries.snapshot();
       w.g = groundOf(state).map((e) => [e.g, e.id, e.n, e.clean || 0, e.weapon ? 1 : 0, r2(e.x), r2(e.z)]); // 바닥 물건(손님도 주울 수 있다)
       w.h = homeOf(state).placed.map((q) => [q.id, q.cx, q.cz, q.rot || 0]); // 내 집 가구(손님이 구경한다)
+      w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
     }
     multi.sendWorld(w);
   }
@@ -981,6 +986,16 @@ function boot() {
       sound.play('coin');
       player.cheerTime = 1.0;
       hud.toast('현상금을 받았어요!', 3200, { chips: [{ icon: 'coin', text: won(r.reward) }] });
+    },
+    // 마을 가꾸기(core/works.js): 모금함에 낸다. 다 모이면 그 자리에 '공사 중' 간판이 서고 다음 날 아침에 생긴다
+    donateWork: (id, amount) => {
+      const r = donate(state, id, amount);
+      if (!r.ok) return;
+      commit(r.state);
+      sound.play('coin');
+      const paid = [{ icon: 'coin', text: `−${won(r.amount)}` }];
+      if (r.full) { player.cheerTime = 1.0; hud.toast(`${josa(WORKS[id].name, '이/가')} 다 모였어요! 내일 아침에 생겨요`, 3600, { chips: paid }); }
+      else hud.toast(`${WORKS[id].name}에 보탰어요`, 2200, { chips: paid });
     },
     // 사이드스토리 '수상한 섬 합숙': 친구 다섯과 친해지면 게시판에 '보수 100배' 전단지가 붙는다. 떼면 친구들이 모여들어 보고 이야기 시작
     boardStory: () => (state ? boardStory(state) : null),
@@ -2439,6 +2454,7 @@ function boot() {
     else if (target.type === 'salon') panels.openSalon();
     else if (target.type === 'tools') panels.openTools();
     else if (target.type === 'raffle') panels.openRaffle();
+    else if (target.type === 'donation') panels.openWorks();
     else if (target.type === 'wake') wakeAlly(target.npc);
     else if (target.type === 'wish') startWish();
     else if (target.type === 'pit') hachiPit.press();
@@ -2961,6 +2977,15 @@ function boot() {
       hud.announce({ kicker, title: QUESTS[id].title, sub: `${to ? to.name : ''}에게 ${verb}`, to: 'quest', id });
     }
   }
+  /** 마을 가꾸기(core/works.js): 다 모인 다음 날 아침 시설이 생기면 한 번 알린다(마을 친구들도 이야기한다). */
+  function checkWorks() {
+    const due = dueWorks(state);
+    if (!due.length) return;
+    commit(markWorksOpen(state, due));
+    due.forEach((id) => happen({ type: 'playerWork', who: 'me', work: WORKS[id].name }));
+    sound.play('job');
+    hud.banner('마을이 달라졌어요!', `${josa(due.map((id) => WORKS[id].name).join(', '), '이/가')} 생겼어요`, 4200);
+  }
   function updateQuests(dt) {
     questT -= dt;
     if (questT > 0 || !state) return;
@@ -2983,6 +3008,7 @@ function boot() {
     if (free && !talking) studyReport();
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
     if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
+    if (free && !talking) checkWorks();
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
       commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
       hud.toast('라멘 로우에 새 메뉴가 나왔대요!', 4200, { chips: [{ icon: itemSvg('pizzabun'), text: '피자호빵' }] });
@@ -5355,7 +5381,7 @@ function boot() {
   }
 
   // ---------- 상호작용 대상 ----------
-  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업'], ['raffle', '경품 추첨'], ['salon', '변신 살롱']];
+  const PLACES = [['board', '게시판'], ['exam', '검정소'], ['ramen', '라멘 로우'], ['furniture', '가구점'], ['realty', '부동산'], ['pochette', '포셰트 가게'], ['books', '카니 헌책방'], ['tools', '도구점'], ['pub', '맥주집'], ['home', '집에 들어가기'], ['factory', '스티커 작업'], ['raffle', '경품 추첨'], ['salon', '변신 살롱'], ['donation', '마을 가꾸기']];
   // 가장 가까운 대상을 고른다. 건물은 거리를 0.6 깎아 조금 우선한다.
   function findTarget() {
     const p = player.position;
@@ -6097,6 +6123,10 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
+    // 마을 가꾸기 시설: 내 마을은 내 모금대로, 친구 마을에서는 주인이 보낸 모습대로(들어가는 커튼 뒤에서 바꾼다)
+    const worksGuest = visiting && !visiting.arriving;
+    works.show(!state ? {} : worksGuest ? visiting.works || {} : worksView(state));
+    works.update(dt, worksGuest ? visiting.clock : state && state.clock, player ? player.position : null);
 
     const focus = player && mode !== 'title' ? player.position : village.spots.plaza;
     // 몬스터: 돌아다니는 중에만 나를 노린다(창 · 대화 · 잠 · 기절 · 쓰러짐 중에는 멈칫). 내 마을에 놀러 온 친구도 노린다

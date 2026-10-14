@@ -33,6 +33,7 @@ import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
 import { PRIZES, RAFFLE_PRICE, DAILY_TICKETS, raffleOf } from '../core/raffle.js';
 import { HUNTER_PROFILES, RANKER_TOP, RANKER_MIN, ENGRAVE_PRICE, ranking, hunterOf, licensed, isRanker, engravedOf } from '../core/hunters.js';
+import { WORKS, WORK_IDS, WORK_STEP, workOf, workStatus, leftOf } from '../core/works.js';
 
 // 마을폰 앱 아이콘
 const APP_ICON = {
@@ -112,6 +113,15 @@ function svgSpan(cls, html) {
 const head = (title, money) => h('div', { class: 'panel-head' }, h('h2', {}, title),
   money == null ? null : h('div', { class: 'wallet' }, svgSpan('wallet-ico', COIN), won(money)));
 
+/** 마을 가꾸기 시설 그림(core/works.js): 꽃밭 · 벤치 · 가로등 · 시계탑 · 정자. */
+const WORK_ART = {
+  flowers: '<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="29" rx="14" ry="5" fill="#d9cfc0" stroke="#5a4431" stroke-width="2"/><ellipse cx="20" cy="27.6" rx="10.5" ry="3.2" fill="#8a6a4a"/><path d="M13 27v-5M20 27v-9M27 27v-5" stroke="#5fa04f" stroke-width="2" stroke-linecap="round"/><circle cx="13" cy="20.5" r="3.4" fill="#ffa8c6" stroke="#5a4431" stroke-width="2"/><circle cx="20" cy="16" r="3.6" fill="#ffe36e" stroke="#5a4431" stroke-width="2"/><circle cx="27" cy="20.5" r="3.4" fill="#c9a8ff" stroke="#5a4431" stroke-width="2"/></svg>',
+  benches: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 28v6M30 28v6M10 13v11M30 13v11" stroke="#5a5560" stroke-width="3" stroke-linecap="round"/><rect x="6" y="13" width="28" height="4" rx="1.5" fill="#c98a4a" stroke="#5a4431" stroke-width="2"/><rect x="6" y="18.5" width="28" height="4" rx="1.5" fill="#c98a4a" stroke="#5a4431" stroke-width="2"/><rect x="5" y="24.5" width="30" height="4.5" rx="1.5" fill="#c98a4a" stroke="#5a4431" stroke-width="2"/></svg>',
+  lamps: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="12" r="10" fill="#ffe36e" opacity=".4"/><path d="M20 34V16" stroke="#4a3f48" stroke-width="3" stroke-linecap="round"/><rect x="14.5" y="32" width="11" height="3.4" rx="1.7" fill="#4a3f48"/><circle cx="20" cy="12" r="5" fill="#fff3c4" stroke="#5a4431" stroke-width="2"/><path d="M13.5 8.5h13L20 4z" fill="#4a3f48" stroke="#4a3f48" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  clock: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="13" y="13" width="14" height="22" fill="#f7efe0" stroke="#5a4431" stroke-width="2"/><path d="M10.5 14 20 5l9.5 9z" fill="#d9675b" stroke="#5a4431" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="21" r="4.6" fill="#fff" stroke="#5a4431" stroke-width="1.6"/><path d="M20 21v-3M20 21h2.4" stroke="#3a2a28" stroke-width="1.4" stroke-linecap="round"/><rect x="17.5" y="28" width="5" height="7" rx="2.5" fill="#a77a52"/></svg>',
+  pavilion: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 19v14M31 19v14" stroke="#a8743c" stroke-width="3" stroke-linecap="round"/><rect x="13" y="26" width="14" height="2.8" rx="1" fill="#c98a4a"/><rect x="5" y="32" width="30" height="3" rx="1" fill="#d8c3a0" stroke="#5a4431" stroke-width="1.6"/><path d="M4 17.5 20 7l16 10.5z" fill="#6f9a6a" stroke="#5a4431" stroke-width="2" stroke-linejoin="round"/><rect x="5" y="17" width="30" height="3" rx="1" fill="#7a5233"/><circle cx="20" cy="6" r="1.8" fill="#f6c453"/></svg>'
+};
+
 /** 토벌 랭킹 왕관. */
 const CROWN = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 31 5 14l9 7 6-12 6 12 9-7-2 17z" fill="#fcd95b" stroke="#c98a2e" stroke-width="2.2" stroke-linejoin="round"/><path d="M8 31h24" stroke="#c98a2e" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="22" r="2.6" fill="#ff8aa6"/><circle cx="12" cy="24" r="1.8" fill="#9fd3ff"/><circle cx="28" cy="24" r="1.8" fill="#9fd3ff"/></svg>';
 /** 친구 얼굴(랭킹 · 알림). */
@@ -178,7 +188,8 @@ function monsterCards(s, withCount) {
  *   buyHouse(), applyLottery(), buyByLottery(), dayLabel(day), nextDay(요일) → 그 요일이 오는 날,
  *   buyPochette(id) (사면 바로 멘다), wearPochette(id | null) (null 이면 벗기),
  *   buyTool(id: 'map' | 'lantern' | 'flashlight'), setLight(id) (들 불 고르기), playerPos() → { x, z, yaw }, mapLabels() → [{ x, z, text }],
- *   getSound() → { sfx, music }, toggleSound(kind), onOpen(), onClose() }
+ *   getSound() → { sfx, music }, toggleSound(kind), onOpen(), onClose(),
+ *   donateWork(id, amount) (마을 가꾸기 모금함에 내기, core/works.js) }
  */
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
@@ -1127,6 +1138,26 @@ export function createPanels(ui, handlers) {
           h('span', { class: 'prize-name' }, itemInfo(P.item).name)))),
         h('div', { class: 'actions' }, closeBtn())];
     },
+    // 마을 가꾸기 모금함(core/works.js): 시설마다 모은 돈 막대와 내기 단추. 다 모이면 다음 날 아침에 마을에 생긴다
+    works(s) {
+      const out = [head('마을 가꾸기', s.money), h('p', { class: 'sub' }, '돈을 모아 내면 다 모인 다음 날 아침에 마을에 생겨요')];
+      for (const id of WORK_IDS) {
+        const W = WORKS[id], st = workStatus(s, id), paid = workOf(s, id).paid, left = leftOf(s, id), step = Math.min(WORK_STEP, left);
+        const right = st === 'open' ? h('span', { class: 'lic-badge done' }, ico('check'), '완성')
+          : st === 'building' ? h('span', { class: 'lic-badge' }, '공사 중')
+            : h('div', { class: 'work-btns' },
+              h('button', { class: 'btn', type: 'button', disabled: s.money < step, onClick: after(() => handlers.donateWork(id, step)) }, `${won(step)} 내기`),
+              left > step ? h('button', { class: 'btn pink', type: 'button', disabled: s.money < left, onClick: after(() => handlers.donateWork(id, left)) }, `다 내기 ${won(left)}`) : null);
+        out.push(h('div', { class: `row pochette work${st === 'open' ? ' done' : ''}` }, svgSpan('pochette-art', WORK_ART[id]),
+          h('div', {}, h('div', { class: 't' }, W.name), h('div', { class: 'd' }, W.note),
+            h('div', { class: 'work-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(W.price), 'aria-valuenow': String(paid), 'aria-label': `${W.name} 모은 돈` },
+              h('i', { style: `width:${Math.round((paid / W.price) * 100)}%` })),
+            h('div', { class: 'work-sum' }, `${won(paid)} / ${won(W.price)}`)),
+          right));
+      }
+      out.push(h('div', { class: 'actions' }, closeBtn()));
+      return out;
+    },
     tools(s) {
       const out = [head('도구점', s.money), h('h3', { class: 'shop-sec' }, '불')];
       const LIGHT_ART = {
@@ -1406,6 +1437,7 @@ export function createPanels(ui, handlers) {
     openSalon: () => show('salon'),
     openTools: () => show('tools'),
     openRaffle: () => show('raffle'),
+    openWorks: () => show('works'),
     openMap: () => show('map'),
     openWeeds: () => show('weeds'),
     openMonsters: () => show('monsters'),

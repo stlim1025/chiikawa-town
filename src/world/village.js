@@ -473,6 +473,39 @@ export function buildVillage(scene) {
     labels.push({ x, y: 2.6, z, text: lot.label });
   }
 
+  /**
+   * 마을 가꾸기 모금함(core/works.js): 다리 넷 달린 나무 상자(뚜껑에 동전 넣는 틈, 앞에 새싹 그림) 뒤로 기둥 둘에 '모금' 간판,
+   * 상자 위에 작은 새싹 화분. 나무 · 꽃 자리를 흐트러뜨리지 않게 rand() 를 쓰지 않는다.
+   */
+  function donation(lot) {
+    const { x, z } = lot, g = new THREE.Group(), wood = '#c98a4a', dark = '#7a5233', leaf = '#78b765';
+    g.position.set(x, 0, z);
+    // 상자: 다리 넷 · 몸통 · 뚜껑 · 동전 틈
+    [[-0.3, -0.08], [0.3, -0.08], [-0.3, 0.28], [0.3, 0.28]].forEach(([px, pz]) => place(g, toonMesh(GEO.box, dark, { position: [px, 0.15, pz], scale: [0.07, 0.3, 0.07], shell: true, shadow: false })));
+    place(g, toonMesh(GEO.box, wood, { position: [0, 0.55, 0.1], scale: [0.8, 0.5, 0.5], shell: true }));
+    place(g, toonMesh(GEO.box, '#e2b77f', { position: [0, 0.83, 0.1], scale: [0.88, 0.07, 0.58], shell: true }));
+    place(g, toonMesh(GEO.box, '#3a2a28', { position: [-0.08, 0.87, 0.12], scale: [0.36, 0.02, 0.06], outline: false, shadow: false }));
+    // 앞면: 동그란 크림 판에 새싹
+    place(g, toonMesh(GEO.cylinder, '#fbfaf5', { position: [0, 0.56, 0.35], rotation: [Math.PI / 2, 0, 0], scale: [0.17, 0.02, 0.17], outline: 0.012, shadow: false }));
+    place(g, toonMesh(GEO.box, leaf, { position: [0, 0.51, 0.375], scale: [0.025, 0.12, 0.01], outline: false, shadow: false }));
+    [-1, 1].forEach((sd) => place(g, toonMesh(GEO.sphere, leaf, { position: [sd * 0.055, 0.59, 0.375], rotation: [0, 0, sd * 0.6], scale: [0.06, 0.03, 0.012], outline: false, shadow: false })));
+    // 상자 위 새싹 화분
+    place(g, toonMesh(GEO.cylinder, '#e0805a', { position: [0.27, 0.865, 0.02], scale: [0.08, 0.1, 0.08], outline: 0.012, shadow: false }));
+    place(g, toonMesh(GEO.box, leaf, { position: [0.27, 1.0, 0.02], scale: [0.02, 0.1, 0.02], outline: false, shadow: false }));
+    [-1, 1].forEach((sd) => place(g, toonMesh(GEO.sphere, leaf, { position: [0.27 + sd * 0.05, 1.06, 0.02], rotation: [0, 0, sd * 0.5], scale: [0.055, 0.028, 0.03], outline: 0.01, shadow: false })));
+    // 뒤 기둥 둘 · '모금' 간판
+    [-0.55, 0.55].forEach((px) => place(g, toonMesh(GEO.box, dark, { position: [px, 0.95, -0.28], scale: [0.08, 1.9, 0.08], shell: true })));
+    place(g, toonMesh(GEO.box, '#fbfaf5', { position: [0, 1.62, -0.26], scale: [1.3, 0.5, 0.07], shell: true }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.42), new THREE.MeshBasicMaterial({ map: signTexture('모금', { w: 400 }) }));
+    sign.position.set(0, 1.62, -0.22);
+    g.add(sign);
+    signs.push(sign.material);
+    world.add(g);
+    obstacles.push({ x, z, r: lotRadius(lot), soft: true });
+    solid(g, g.children.filter((m) => m !== sign), true);
+    labels.push({ x, y: 2.3, z, text: lot.label });
+  }
+
   /** 랏코 수련장: 나무 기둥 셋과 짚 인형. */
   function dojo(lot) {
     const g = new THREE.Group();
@@ -565,6 +598,7 @@ export function buildVillage(scene) {
     else if (lot.kind === 'pub') pub(lot);
     else if (lot.kind === 'raffle') raffle(lot);
     else if (lot.kind === 'salon') salon(lot);
+    else if (lot.kind === 'donation') donation(lot);
     if (lot.home) homes[lot.home] = doorSpot(lot);
     else spots[lot.id] = doorSpot(lot);
   }
@@ -707,7 +741,9 @@ export function buildVillage(scene) {
     g.add(pool);
     lampGlows.push(halo, pool);
     world.add(g);
-    obstacles.push({ x, z, r: 0.22 });
+    const ob = { x, z, r: 0.22 };
+    obstacles.push(ob);
+    return { group: g, obstacle: ob };
   }
   // 마을 안 길가 가로등: 자리는 core/layout.js 의 lampSpots(길 따라 고른 간격 · 가로등끼리 띄우기 · 가게 앞과 라멘 손님 자리 비우기)
   for (const p of lampSpots({ isFree: (x, z) => isFree(x, z, 0.6, true) })) lamp(p.x, p.z);
@@ -842,6 +878,12 @@ export function buildVillage(scene) {
     },
     /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
+    /** 가로등을 하나 더 세운다(마을 가꾸기 '바깥 길 가로등'): { group, obstacle }. 숨길 때는 group.visible 과 obstacle.off. */
+    lamp: (x, z) => lamp(x, z),
+    /** 글씨 간판 재질(다른 간판처럼 밤에는 어두워진다). opts: signTexture 와 같다. */
+    signMaterial(text, opts) { const m = new THREE.MeshBasicMaterial({ map: signTexture(text, opts) }); signs.push(m); return m; },
+    /** 장애물이 생기거나 꺼졌을 때(마을 가꾸기 시설): 길찾기 격자를 처음부터 다시 본다. */
+    refreshNav() { nav.fill(0); },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */
     get raffleDrum() { return raffleDrum; },
     group: world,

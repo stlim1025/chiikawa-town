@@ -1,6 +1,7 @@
 /**
  * 장애물 공간 해시: 원 { x, z, r, soft } 과 네모 { x, z, box: { hx, hz, yaw }, soft } 를 cell 크기 칸에 나눠 담아 주변 칸만 검사한다.
  * 숲의 나무 · 바위처럼 장애물이 수천 개여도 isFree 가 빠르다. push 로 넣고, 모두 보려면 list 를 읽는다.
+ * off 가 참인 장애물은 없는 것으로 친다(나중에 생기는 마을 시설처럼 보였다 숨었다 하는 것).
  * 네모는 건물 벽처럼 반듯한 것: 가운데 (x, z), 반폭 hx · 반깊이 hz, y 축으로 yaw 만큼 돌아 있다(three.js rotation.y 와 같은 방향).
  */
 export function createObstacleIndex(cell = 4) {
@@ -66,7 +67,7 @@ export function createObstacleIndex(cell = 4) {
   }
   /** (x, z) 에 반지름 radius 인 원이 장애물과 겹치는지. soft 면 지나갈 수 있는 덤불도 장애물로 본다. */
   function hits(x, z, radius, soft = false) {
-    return near(x, z, radius + maxR, (o) => (soft || !o.soft) && !!contact(o, x, z, radius));
+    return near(x, z, radius + maxR, (o) => (soft || !o.soft) && !o.off && !!contact(o, x, z, radius));
   }
   /**
    * 겹친 단단한 장애물에서 밀어낸 자리 { x, z } (겹친 게 없으면 null). 가장 깊이 겹친 것 하나만 민다(여러 번 부르면 모두 풀린다).
@@ -75,7 +76,7 @@ export function createObstacleIndex(cell = 4) {
   function pushOut(x, z, radius) {
     let best = null;
     near(x, z, radius + maxR, (o) => {
-      if (o.soft) return;
+      if (o.soft || o.off) return;
       const k = contact(o, x, z, radius);
       if (k && (!best || k.pen > best.pen)) best = k;
     });
