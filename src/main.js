@@ -140,6 +140,7 @@ import { eatStyle } from './core/eating.js';
 import { createGround } from './world/ground.js';
 import { groundOf, dropItem as dropToGround, dropWeapon, pickUp, groundName, placeItem, MAX_GROUND } from './core/ground.js';
 import { pantryOf, addToPantry, takeFromPantry, snackOf, shareOf, sellPantry, thanksOf, hatedOf, SNACK_ENERGY } from './core/pantry.js';
+import { createUpdateCheck } from './ui/update.js';
 import { QUESTS, PLACES as QUEST_PLACES, questsFor, markOf, startQuest, completeStep, stepOf, reportTo, goalText, shortGoal, pickTrack, activeQuests, arrived, isDone, isActive, bond, logAct, stepReady, pizzaNewsDue, staleScenes, dropQuest, ACTS, boardStory } from './core/quests.js';
 
 const ui = document.getElementById('ui');
@@ -249,6 +250,8 @@ function boot() {
     store.save({ ...state, player: { x: p.x, z: p.z } });
   };
   const commit = (next, persist = true) => { state = next; if (persist) save(); };
+  // 새 버전이 올라오면 화면 위에 알림 띠: 「새로고침」은 지금 진행을 저장하고 새로고침(ui/update.js)
+  const updateCheck = createUpdateCheck(ui, { onReload: save });
   const seen = (tip) => state.seenTips.includes(tip);
   const markSeen = (tip) => { state = { ...state, seenTips: [...state.seenTips, tip] }; };
 
@@ -6292,6 +6295,8 @@ function boot() {
       idolPlay: () => { if (!idolStory.active) idolStory.play(() => hud.toast('테스트: 공연 끝', 2400)); },
       /** 무대 카메라(디버그: zoom 을 올려 아이돌 얼굴을 가까이 본다). */
       idolCam: () => (idolStage ? idolStage.camera : null),
+      /** 새 버전 확인을 바로 한 번(디버그: version.json 이 바뀌었으면 알림 띠). */
+      checkUpdate: () => updateCheck.check(),
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },

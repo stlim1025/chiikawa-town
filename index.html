@@ -1583,6 +1583,14 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .hud-quest-over::after { content: "▸"; font-size: 12px; line-height: 1; }
 .hud-quest-over:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
 .hud-quest-over[hidden] { display: none; }
+/* 새 버전 알림 띠(src/ui/update.js): 화면 위 가운데. 「새로고침」은 저장하고 새로고침, 「나중에」는 닫기. 연출 중에는 숨긴다 */
+.update-bar { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 16px; border-radius: 999px; background: var(--paper); box-shadow: 0 3px 0 var(--shadow), 0 6px 18px rgba(0, 0, 0, 0.12); color: var(--ink); font-size: 15px; white-space: nowrap; }
+.update-bar[hidden] { display: none; }
+.update-bar button { font: inherit; font-size: 14px; border: 2px solid #fff; border-radius: 999px; padding: 3px 12px 5px; cursor: pointer; }
+.update-bar .ub-go { background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-deep); color: var(--ink); }
+.update-bar .ub-go:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
+.update-bar .ub-later { background: transparent; border-color: transparent; color: var(--ink-soft); padding: 3px 8px 5px; }
+.cinematic .update-bar, .cutscene .update-bar { display: none !important; }
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
   .hud-quest { grid-template-columns: 1fr; padding: 4px 12px 6px 10px; }

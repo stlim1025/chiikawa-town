@@ -1,0 +1,2 @@
+# 커밋 훅은 sh 로 돌아서 어느 PC 에서 받아도 LF 그대로
+.githooks/* text eol=lf

@@ -15,6 +15,15 @@ python3 -m http.server 8765
 node --test tests/*.test.mjs
 ```
 
+## 새 버전 알림
+
+커밋할 때마다 `version.json` 이 그 시각으로 바뀌고(`.githooks/pre-commit`), 게임은 이 값이 바뀌면 화면 위에 「새 버전이 나왔어요」 알림 띠를 띄워요(`src/ui/update.js`).
+저장소를 새로 받은 PC 에서는 훅을 한 번 켜 주세요.
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## 구조
 
 | 폴더 | 내용 |
