@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FISH, SIZE_RULES, waterAt, fishFor, pickFish, rulesOf } from '../src/core/fishing.js';
+import { FISH, SIZE_RULES, REEL, waterAt, fishFor, pickFish, rulesOf, startReel, stepReel, fishLength, logFish, fishLogOf, isValidFishLog } from '../src/core/fishing.js';
+import { createState } from '../src/core/state.js';
+import { isValidState } from '../src/core/save.js';
 import { POND, LAKE, BRIDGES, riverZ, isWater } from '../src/core/layout.js';
 import { itemInfo } from '../src/core/inventory.js';
 import { sellPrice } from '../src/core/market.js';
@@ -30,14 +32,77 @@ test('낚시: 물 · 시각마다 잡히는 물고기가 다르다', () => {
   }
 });
 
-test('낚시: 물고기는 가방 물건이고 팔 수 있다, 큰 고기일수록 누를 틈이 짧고 감기가 길다', () => {
+test('낚시: 물고기는 가방 물건이고 팔 수 있다, 큰 고기일수록 누를 틈이 짧고 끌어올리기가 어렵다', () => {
   for (const [id, f] of Object.entries(FISH)) {
     assert.equal(itemInfo(id).name, f.name);
     assert.equal(sellPrice(id), f.sell);
     assert.ok(SIZE_RULES[f.size]);
+    assert.ok(f.junk || (f.cm && f.cm[0] > 0 && f.cm[1] > f.cm[0]), `${id} 크기`);
   }
-  assert.equal(rulesOf('minnow').reel, null, '작은 고기는 바로 올라온다');
   assert.ok(rulesOf('octopus').window < rulesOf('crucian').window && rulesOf('crucian').window < rulesOf('minnow').window);
-  assert.ok(rulesOf('octopus').reel.drain > rulesOf('crucian').reel.drain);
+  const [s, m, b] = SIZE_RULES.map((r) => r.game);
+  assert.ok(s.zone > m.zone && m.zone > b.zone, '큰 고기일수록 초록 칸이 좁다');
+  assert.ok(s.speed < m.speed && m.speed < b.speed, '큰 고기일수록 빠르다');
   assert.equal(TOOLS.rod.shop, 'tools');
+});
+
+// 같은 결과가 나오게 정해진 난수
+const seeded = (seed) => () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+
+test('낚시 놀이: 누르면 초록 칸이 올라가고 떼면 내려오며, 물길 밖으로 나가지 않는다', () => {
+  let r = startReel('crucian', () => 0.5);
+  const z0 = r.zone;
+  for (let k = 0; k < 20; k++) r = stepReel(r, 1 / 60, true, () => 0.5);
+  assert.ok(r.zone > z0, '누르면 올라간다');
+  for (let k = 0; k < 600; k++) r = stepReel({ ...r, done: null, progress: 0.5 }, 1 / 60, true, () => 0.5);
+  assert.ok(r.zone <= 1 - rulesOf('crucian').game.zone + 1e-9, '위 끝에서 멈춘다');
+  for (let k = 0; k < 600; k++) r = stepReel({ ...r, done: null, progress: 0.5 }, 1 / 60, false, () => 0.5);
+  assert.ok(r.zone >= 0 && r.zone < 0.05, '아래 끝에서 멈춘다');
+});
+
+test('낚시 놀이: 물고기를 따라 누르면 낚고, 손을 놓고 있으면 놓친다(처음 잠깐은 봐준다)', () => {
+  for (const id of ['minnow', 'crucian', 'catfish']) {
+    const rnd = seeded(5), g = rulesOf(id).game;
+    let won = 0;
+    for (let n = 0; n < 10; n++) {
+      let r = startReel(id, rnd), hold = false, acc = 0;
+      while (!r.done && r.t < 60) {
+        acc += 1 / 60;
+        if (acc >= 0.15) { acc = 0; hold = r.fish > r.zone + g.zone / 2; } // 사람처럼 조금 늦게 반응한다
+        r = stepReel(r, 1 / 60, hold, rnd);
+      }
+      if (r.done === 'caught') won++;
+    }
+    assert.ok(won >= 8, `${id}: ${won}/10`);
+  }
+  let r = startReel('catfish', () => 0.95);
+  const p0 = r.progress;
+  for (let k = 0; k < Math.floor(REEL.grace * 60) - 2; k++) r = stepReel(r, 1 / 60, false, () => 0.95);
+  assert.ok(r.progress >= p0 - 1e-9, '처음 잠깐은 게이지가 빠지지 않는다');
+  while (!r.done && r.t < 30) r = stepReel(r, 1 / 60, false, () => 0.95);
+  assert.equal(r.done, 'lost');
+  assert.equal(stepReel(r, 1, true).done, 'lost', '끝난 놀이는 그대로');
+});
+
+test('낚시 기록: 처음 잡은 것 · 가장 큰 것을 남기고 저장에서 확인한다', () => {
+  for (let k = 0; k < 50; k++) {
+    const cm = fishLength('catfish', seeded(k + 1));
+    assert.ok(cm >= FISH.catfish.cm[0] && cm <= FISH.catfish.cm[1] && Number.isInteger(cm));
+  }
+  assert.equal(fishLength('can'), null);
+  let s = createState({ name: '나', look: {} });
+  let r = logFish(s, 'catfish', 40);
+  assert.ok(r.first && !r.best);
+  r = logFish(r.state, 'catfish', 38);
+  assert.ok(!r.first && !r.best);
+  r = logFish(r.state, 'catfish', 52);
+  assert.ok(!r.first && r.best);
+  r = logFish(r.state, 'can', null);
+  s = r.state;
+  assert.deepEqual(fishLogOf(s), { catfish: { n: 3, best: 52 }, can: { n: 1 } });
+  assert.ok(isValidFishLog(s.fishLog) && isValidState(s));
+  assert.equal(isValidFishLog({ nope: { n: 1 } }), false);
+  assert.equal(isValidFishLog({ minnow: { n: 0 } }), false);
+  assert.equal(isValidFishLog({ minnow: { n: 1, best: -3 } }), false);
+  assert.equal(isValidState({ ...s, fishLog: [] }), false);
 });

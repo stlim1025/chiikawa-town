@@ -161,6 +161,35 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--yellow-deep
 .hud-meter .zone { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; background: var(--mint-deep); }
 .hud-meter .fill { position: absolute; top: 2px; bottom: 2px; left: 2px; border-radius: 999px; background: rgba(255, 159, 180, 0.45); }
 .hud-meter .needle { position: absolute; top: -5px; bottom: -5px; width: 4px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+/* 낚시 끌어올리기 놀이(ui/fishgame.js): 오른쪽 세로 물길 + 초록 칸(누르면 올라간다) + 물고기 그림자 + 낚기 게이지 */
+#ui > .fishgame, #ui > .fish-catch { pointer-events: none !important; }
+.fishgame { position: absolute; right: max(18px, 9vw); top: 50%; transform: translateY(-58%); display: flex; align-items: stretch; gap: 8px; padding: 10px; border-radius: 22px 24px 22px 20px; background: var(--paper-soft); box-shadow: var(--lift); }
+.fishgame[hidden], .fish-catch[hidden] { display: none; }
+.fg-track { position: relative; width: 48px; height: min(300px, 46vh); border-radius: 16px; overflow: hidden; background: linear-gradient(#c6ecfa, #63b2dd 50%, #2f6f9e); box-shadow: inset 0 0 0 3px var(--ink); }
+.fg-zone { position: absolute; left: 4px; right: 4px; border-radius: 10px; background: rgba(150, 232, 140, 0.5); box-shadow: inset 0 0 0 3px #4fae5d; transition: background-color 0.15s; }
+.fishgame.in .fg-zone { background: rgba(176, 248, 150, 0.85); }
+.fg-fish { position: absolute; left: 50%; width: 42px; height: 28px; }
+.fg-fish svg { display: block; width: 100%; height: 100%; }
+.fg-bar { position: relative; width: 14px; border-radius: 999px; overflow: hidden; background: var(--paper-3); box-shadow: inset 0 0 0 2px var(--ink); }
+.fg-bar i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#ffe36e, #74c868); }
+.fg-tip { position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 4px 12px 6px; border-radius: 999px; background: var(--paper-soft); box-shadow: var(--lift); font-size: 17px; }
+.fg-tip[hidden] { display: none; }
+/* 잡은 물고기 카드: 빙글 도는 빛살 위에 물고기, 이름 · 크기 · 값, 처음 잡으면 분홍 띠 */
+.fish-catch { position: absolute; left: 50%; top: 13%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 26px 16px; border-radius: var(--r); background: var(--paper); box-shadow: var(--lift), 0 0 0 4px var(--yellow); text-align: center; transform: translateX(-50%); }
+.fish-catch.pop { animation: fishPop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes fishPop { from { opacity: 0; transform: translateX(-50%) scale(0.3); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+.fish-catch .fc-art { position: relative; width: 104px; height: 104px; }
+.fish-catch .fc-rays { position: absolute; inset: -28px; border-radius: 50%; background: repeating-conic-gradient(rgba(252, 217, 91, 0.6) 0 12deg, transparent 12deg 24deg); -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%); mask: radial-gradient(circle, #000 30%, transparent 70%); animation: fishRays 6s linear infinite; }
+@keyframes fishRays { to { transform: rotate(1turn); } }
+.fish-catch .fc-img, .fish-catch .fc-img svg { position: relative; display: block; width: 100%; height: 100%; }
+.fish-catch .fc-title { font-size: 26px; line-height: 1.2; }
+.fish-catch .fc-ribbon { padding: 2px 14px 4px; border-radius: 999px; background: #ff8aa6; color: #fff; font-size: 16px; }
+.fish-catch .fc-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.fish-catch .fc-chips span { padding: 2px 10px 4px; border-radius: 999px; background: var(--paper-2); font-size: 17px; }
+.fish-catch.junk { box-shadow: var(--lift); }
+@media (prefers-reduced-motion: reduce) { .fish-catch .fc-rays, .fish-catch.pop { animation: none; } }
+/* 낮은 화면(가로로 든 휴대폰): 카드를 작게 위쪽에(캐릭터와 들어 올린 물고기를 가리지 않게) */
+@media (max-height: 520px) { .fish-catch { top: 8px; padding: 6px 18px 10px; } .fish-catch .fc-art { width: 64px; height: 64px; } .fish-catch .fc-rays { inset: -16px; } .fish-catch .fc-title { font-size: 21px; } .fg-track { height: min(240px, 52vh); } }
 /* 알림: 위 가운데로 톡 떨어진다 */
 .hud-toasts { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(440px, 50vw); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; z-index: 3; }
 .toast { display: flex; align-items: center; gap: 8px; padding: 5px 18px 7px 18px; border-radius: 999px; background: var(--paper); box-shadow: var(--lift); font-size: 19px; line-height: 1.25; text-align: center; animation: toast-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1); }

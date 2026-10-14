@@ -92,7 +92,8 @@ import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core
 import { VILLAGE_R, REGION_NAMES, GATES, POND, BRIDGES, riverZ, regionAt, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
-import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf } from './core/fishing.js';
+import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish } from './core/fishing.js';
+import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
@@ -950,6 +951,7 @@ function boot() {
     updateCombat(dt); // 휘두르기 · 맞은 뒤 잠깐 무적
     if (pulling) updatePull(dt);
     if (fishing) updateFish(dt);
+    updateCatchFx(dt);
     target = pulling || fishing || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || downed ? null : findGuestTarget();
     const p = player.position, swingable = !target && !downed && weaponNow() && monsters.nearest(p.x, p.z, 6);
     hud.setAction(pulling ? '뽑는 중' : fishing ? fishLabel() : target ? target.label : swingable ? '휘두르기' : null);
@@ -1850,7 +1852,7 @@ function boot() {
   const clickRay = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), clickHit = new THREE.Vector3();
   canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0 || mode !== 'play' || !state || !weaponNow()) return;
-    if (panels.isOpen() || guide.open || sleeping || funBusy() || fainting || sticker || pulling || talking) return;
+    if (panels.isOpen() || guide.open || sleeping || funBusy() || fainting || sticker || pulling || talking || fishing || glowTry) return; // 낚시 · 털뭉치 따기 중에는 휘두르지 않는다
     const p = ndc(e);
     clickRay.setFromCamera(p, cam.camera);
     const hit = clickRay.ray.intersectPlane(groundPlane, clickHit);
@@ -2014,9 +2016,11 @@ function boot() {
   }
 
   /** 결과 없이 뽑기를 멈춘다(창이 열리거나 다시 시작할 때). 기운은 쓰지 않는다. */
-  // ---------- 낚시(core/fishing.js, 게임 오리지널): 낚싯대를 들고 물가에서 '낚시하기' ----------
-  // 던지면 찌가 물에 뜨고, 한두 번 톡톡 건드리다가(속지 말 것) 퐁 잠기면 바로 행동 버튼. 큰 고기는 '감기!' 연타로 끌어올린다
-  let fishing = null; // { phase: 'cast' | 'wait' | 'bite' | 'reel', water, spot, t, biteAt, nibbles: [초], fish, power, left }
+  // ---------- 낚시(core/fishing.js, 게임 오리지널): 낚싯대를 들고 물가에서 '낚싯대 펼치기' ----------
+  // 던지면 찌가 물에 뜨고, 한두 번 톡톡 건드리다가(속지 말 것) 퐁 잠기면 바로 행동 버튼 → 끌어올리기 놀이(ui/fishgame.js):
+  // 행동 버튼을 누르고 있으면 초록 칸이 올라가고 떼면 내려온다. 물고기를 칸 안에 두어 게이지를 채우면 물 밖으로 튀어 올라 머리 위로
+  let fishing = null; // { phase: 'cast' | 'wait' | 'bite' | 'reel', water, spot, t, biteAt, nibbles: [초], fish, reel: stepReel 상태, hold: 누르고 있다 }
+  const fishGame = createFishGame(ui);
   const bobber = new THREE.Group();
   bobber.add(toonMesh(GEO.sphere, '#ffffff', { scale: [0.08, 0.06, 0.08], outline: 0.012, shadow: false }));
   bobber.add(toonMesh(GEO.sphere, '#e0524f', { position: [0, 0.05, 0], scale: [0.075, 0.055, 0.075], outline: 0.012, shadow: false }));
@@ -2026,13 +2030,13 @@ function boot() {
   fishLine.visible = false;
   fishLine.frustumCulled = false;
   scene.add(fishLine);
-  /** 물가인지: 바라보는 쪽부터 둘러보며 1.5 ~ 2.7 앞에 물이 있으면 그 자리 { x, z, water }(내가 물속이면 null). */
+  /** 물가인지: 바라보는 쪽부터 둘러보며 1.5 ~ 2.7 앞에 물이 있으면 그 자리 { x, z, water, front: 바로 앞이 물 }(내가 물속이면 null). */
   function fishSpotNear(p, yaw) {
     if (waterAt(p.x, p.z)) return null;
     for (const da of [0, 0.45, -0.45, 0.9, -0.9, 1.5, -1.5, 2.2, -2.2, Math.PI]) {
       for (const d of [1.5, 2.1, 2.7]) {
         const a = yaw + da, x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d, water = waterAt(x, z);
-        if (water) return { x, z, water };
+        if (water) return { x, z, water, front: Math.abs(da) < 0.5 && d < 2.2 };
       }
     }
     return null;
@@ -2054,9 +2058,9 @@ function boot() {
     player.setRod(true);
     const wait = BITE_WAIT[0] + Math.random() * (BITE_WAIT[1] - BITE_WAIT[0]);
     const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.8 + Math.random() * Math.max(0.2, wait - 1.4)).sort((a, b) => a - b); // 톡톡 건드리기(속지 말 것)
-    fishing = { phase: 'cast', t: 0, spot, water: spot.water, biteAt: wait, nibbles, fish: null, power: 0, left: 0 };
+    fishing = { phase: 'cast', t: 0, spot, water: spot.water, biteAt: wait, nibbles, fish: null, reel: null, hold: false };
     sound.play('swing');
-    if (!seen('fishing')) { markSeen('fishing'); hud.toast('찌가 퐁 잠기면 바로 눌러요. 톡톡 건드릴 때는 참아요', 4200); }
+    if (!seen('fishing')) { markSeen('fishing'); hud.toast('찌가 퐁 잠기면 바로 눌러요. 그다음 꾹 눌렀다 뗐다 하며 초록 칸에 물고기를 담아요', 5200); }
   }
   function cancelFish() {
     if (!fishing) return;
@@ -2067,44 +2071,129 @@ function boot() {
     player.power = 0;
     bobber.visible = false;
     fishLine.visible = false;
+    fishGame.hide();
     hud.hideMeter();
   }
   function fishFail(text) {
     const s = fishing.spot;
     hud.floatText({ x: s.x, y: 0.9, z: s.z, text, kind: 'tip' });
     sound.play('none');
+    splash(s, 0.5);
     cancelFish();
   }
+
+  // 낚시 연출: 물보라(퍼지는 고리 · 튀는 물방울), 낚은 물고기가 물에서 튀어 올라 머리 위로(잠깐 들고 있다가 가방으로)
+  const splashes = [], splashRing = new THREE.RingGeometry(0.75, 1, 32).rotateX(-Math.PI / 2);
+  function splash(at, k = 1) {
+    const ring = new THREE.Mesh(splashRing, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
+    ring.position.set(at.x, waterY(at.x, at.z) + 0.01, at.z);
+    ring.scale.setScalar(0.1);
+    scene.add(ring);
+    const drops = Array.from({ length: Math.round(7 * k) }, () => {
+      const m = toonMesh(GEO.sphere, '#e8f6ff', { scale: [0.045, 0.055, 0.045], outline: false, shadow: false }), a = Math.random() * Math.PI * 2, v = (0.7 + Math.random()) * k;
+      m.position.copy(ring.position);
+      scene.add(m);
+      return { m, vx: Math.cos(a) * v, vy: (2.2 + Math.random() * 1.4) * Math.sqrt(k), vz: Math.sin(a) * v };
+    });
+    splashes.push({ ring, drops, t: 0, k });
+  }
+  let heldFish = null; // { g, t, from }
+  /** 낚은 것 모형: 몸통 · 꼬리 · 눈(크기만큼 크게), 문어는 둥근 머리에 다리, 빈 깡통은 깡통. 몸 길이는 z 쪽. */
+  function fishModel(id) {
+    const F = FISH[id], g = new THREE.Group(), s = [0.8, 1.1, 1.45][F.size];
+    const part = (geo, c, o) => g.add(toonMesh(geo, c, { shadow: false, ...o }));
+    if (id === 'can') {
+      part(GEO.cylinder, F.color, { position: [0, -0.13, 0], scale: [0.09, 0.26, 0.09], outline: 0.015 });
+      part(GEO.cylinder, '#e0524f', { position: [0, -0.06, 0], scale: [0.093, 0.1, 0.093], outline: false });
+      return g;
+    }
+    if (id === 'octopus') {
+      part(GEO.sphere, F.color, { position: [0, 0.06, 0], scale: [0.16, 0.15, 0.16], outline: 0.015 });
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        part(GEO.cone, F.color, { position: [Math.cos(a) * 0.08, 0.02, Math.sin(a) * 0.08], rotation: [Math.PI - Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5], scale: [0.035, 0.2, 0.035], outline: 0.01 });
+      }
+      [-1, 1].forEach((sd) => part(GEO.dot, '#3a2a28', { position: [sd * 0.06, 0.08, 0.135], scale: [0.025, 0.025, 0.02], outline: false }));
+      return g;
+    }
+    part(GEO.sphere, F.color, { scale: [0.07 * s, 0.1 * s, 0.2 * s], outline: 0.015 });
+    part(GEO.cone, F.color, { position: [0, 0, -0.3 * s], rotation: [Math.PI / 2, 0, 0], scale: [0.03 * s, 0.13 * s, 0.11 * s], outline: 0.012 });
+    if (id === 'rainbow') part(GEO.sphere, '#f7c6d4', { scale: [0.072 * s, 0.03 * s, 0.17 * s], outline: false });
+    [-1, 1].forEach((sd) => part(GEO.dot, '#3a2a28', { position: [sd * 0.058 * s, 0.03 * s, 0.12 * s], scale: [0.018, 0.018, 0.018], outline: false }));
+    return g;
+  }
+  function jumpFish(id, from) {
+    if (heldFish) scene.remove(heldFish.g);
+    const g = fishModel(id);
+    g.position.copy(from);
+    scene.add(g);
+    heldFish = { g, t: 0, from: from.clone() };
+  }
+  const fishTop = new THREE.Vector3();
+  /** 매 프레임: 물보라를 퍼뜨리고, 낚은 물고기를 머리 위로 날려 잠깐 들고 있다가 치운다. */
+  function updateCatchFx(dt) {
+    for (let i = splashes.length - 1; i >= 0; i--) {
+      const sp = splashes[i];
+      sp.t += dt;
+      sp.ring.scale.setScalar(0.1 + sp.t * 2.4 * sp.k);
+      sp.ring.material.opacity = Math.max(0, 0.85 * (1 - sp.t / 0.7));
+      for (const d of sp.drops) { d.vy -= 9 * dt; d.m.position.x += d.vx * dt; d.m.position.y += d.vy * dt; d.m.position.z += d.vz * dt; }
+      if (sp.t > 0.7) { scene.remove(sp.ring); sp.ring.material.dispose(); sp.drops.forEach((d) => scene.remove(d.m)); splashes.splice(i, 1); }
+    }
+    if (!heldFish) return;
+    const h = heldFish, g = h.g, p = player.position;
+    h.t += dt;
+    fishTop.set(p.x, 1.8, p.z);
+    if (h.t < 0.6) {
+      const k = h.t / 0.6;
+      g.position.lerpVectors(h.from, fishTop, k);
+      g.position.y += Math.sin(k * Math.PI) * 1.3;
+      g.rotation.set(h.t * 14, Math.PI / 2, 0);
+    } else if (h.t < 2.4) {
+      g.position.set(fishTop.x, fishTop.y + Math.sin(h.t * 5) * 0.04, fishTop.z);
+      g.rotation.set(0, Math.PI / 2, Math.sin(h.t * 4) * 0.18);
+      g.scale.setScalar(1.5 + Math.max(0, 0.25 - (h.t - 0.6)) * 1.6); // 들어 올리면 크게 보이게(잡는 순간 살짝 더 커졌다 돌아온다)
+    } else if (h.t < 2.7) {
+      g.scale.setScalar(Math.max(0.01, 1.5 * (1 - (h.t - 2.4) / 0.3)));
+    } else { scene.remove(g); heldFish = null; }
+  }
   function fishCatch() {
-    const id = fishing.fish, F = FISH[id];
+    const id = fishing.fish, F = FISH[id], from = bobber.position.clone();
     cancelFish();
     const r = addItem(state, id, 1);
     if (!r.added) { hud.toast('가방이 꽉 찼어요'); return; }
-    commit(r.state);
-    sound.play(F.junk ? 'can' : 'clean');
+    const cm = fishLength(id), lg = logFish(r.state, id, cm);
+    commit(lg.state);
     hud.bagBump();
-    player.cheerTime = F.junk ? 0 : 0.9;
-    hud.floatText({ x: player.position.x, y: 1.75, z: player.position.z, text: F.junk ? `${F.name}…` : `${F.name}!`, kind: 'mini', icon: itemSvg(id) });
-  }
-  /** 행동 버튼: 기다릴 때 누르면 너무 일러 놓치고, 찌가 잠기면 낚아채고, 감을 때는 연타. */
-  function fishPress() {
-    const f = fishing;
-    if (f.phase === 'cast') return;
-    if (f.phase === 'wait') { fishFail('너무 일렀어요…'); return; }
-    if (f.phase === 'bite') {
-      const R = rulesOf(f.fish);
-      if (!R.reel) { fishCatch(); return; }
-      f.phase = 'reel';
-      f.t = 0;
-      f.power = 0.35;
-      f.left = R.reel.time;
-      player.mode = 'pull';
-      sound.play('splash');
+    splash(from, F.junk ? 0.6 : 1.3);
+    jumpFish(id, from);
+    if (F.junk) {
+      sound.play('can');
+      fishGame.catchCard({ title: `${F.name}…`, art: itemSvg(id), chips: ['물이 깨끗해졌어요'], junk: true });
       return;
     }
-    f.power = Math.min(1, f.power + rulesOf(f.fish).reel.tap);
-    sound.play('click');
-    if (f.power >= 1) fishCatch();
+    sound.play('done');
+    player.cheerTime = 2.0;
+    fishGame.catchCard({ title: `${josa(F.name, '을/를')} 낚았어요!`, art: itemSvg(id), chips: [`${cm}cm`, `팔면 ${won(F.sell)}`], ribbon: lg.first ? '처음 잡았어요!' : lg.best ? '최고 기록!' : null });
+  }
+  /**
+   * 행동 버튼(down: 눌렀다 · 뗐다): 기다릴 때 누르면 너무 일러 놓치고, 찌가 잠기면 낚아채 끌어올리기 놀이로,
+   * 놀이 중에는 누르고 있는 동안 초록 칸이 올라간다.
+   */
+  function fishPress(down) {
+    const f = fishing;
+    if (f.phase === 'reel') { f.hold = down; return; }
+    if (!down || f.phase === 'cast') return;
+    if (f.phase === 'wait') { fishFail('너무 일렀어요…'); return; }
+    // 찌가 잠겼을 때 낚아챘다: 쓰레기는 바로 올라오고, 물고기는 끌어올리기 놀이
+    if (FISH[f.fish].junk) { fishCatch(); return; }
+    f.phase = 'reel';
+    f.t = 0;
+    f.reel = startReel(f.fish);
+    f.hold = true; // 낚아챈 손을 그대로 누르고 있다
+    player.mode = 'pull';
+    sound.play('splash');
+    splash(bobber.position, 0.8);
   }
   function updateFish(dt) {
     const f = fishing;
@@ -2117,7 +2206,7 @@ function boot() {
       const k = Math.min(1, f.t / 0.45);
       bobber.position.set(tip.x + (s.x - tip.x) * k, tip.y + (wy - tip.y) * k + Math.sin(k * Math.PI) * 0.9, tip.z + (s.z - tip.z) * k);
       bobber.visible = true;
-      if (k >= 1) { f.phase = 'wait'; f.t = 0; sound.play('splash'); }
+      if (k >= 1) { f.phase = 'wait'; f.t = 0; sound.play('splash'); splash(s, 0.4); }
     } else {
       let by = wy, ox = 0, oz = 0;
       if (f.phase === 'wait') {
@@ -2128,21 +2217,22 @@ function boot() {
           f.t = 0;
           f.fish = pickFish(f.water, hourOf(state.clock));
           sound.play('splash');
+          splash(s, 0.7);
           hud.floatText({ x: s.x, y: 0.8, z: s.z, text: '!', kind: 'tip' });
         }
       } else if (f.phase === 'bite') {
         by = wy - 0.12; // 퐁 잠겼다
         if (f.t > rulesOf(f.fish).window) { fishFail('도망갔다…'); return; }
       } else {
-        const R = rulesOf(f.fish).reel;
-        f.power -= R.drain * dt;
-        f.left -= dt;
-        by = wy - 0.08;
-        ox = Math.sin(f.t * 17) * 0.12;
-        oz = Math.cos(f.t * 13) * 0.08;
-        player.power = Math.max(0, f.power);
-        hud.showMeter(Math.max(0, f.power), { from: 0.96, to: 1 }, [{ text: '감기! 연타해요' }]);
-        if (f.power <= 0 || f.left <= 0) { fishFail('놓쳤어요…'); return; }
+        f.reel = stepReel(f.reel, dt, f.hold);
+        const R = f.reel;
+        by = wy - (R.inside ? 0.1 : 0.05);
+        ox = (R.fish - 0.5) * 0.8 + Math.sin(f.t * 17) * 0.05; // 물고기가 도망치는 쪽으로 찌가 끌려 다닌다
+        oz = Math.cos(f.t * 13) * 0.06;
+        player.power = R.progress;
+        fishGame.show(R, rulesOf(f.fish).game.zone, FISH[f.fish].size, f.hold);
+        if (R.done === 'caught') { fishCatch(); return; }
+        if (R.done === 'lost') { fishFail('놓쳤어요…'); return; }
       }
       bobber.position.set(s.x + ox, by, s.z + oz);
     }
@@ -2153,7 +2243,7 @@ function boot() {
     pos.needsUpdate = true;
     fishLine.visible = true;
   }
-  const fishLabel = () => (fishing.phase === 'reel' ? '감기!' : fishing.phase === 'bite' ? '지금!' : '기다리는 중');
+  const fishLabel = () => (fishing.phase === 'reel' ? '꾹 누르기' : fishing.phase === 'bite' ? '지금!' : '기다리는 중');
   function cancelPull() {
     cancelGlow(); // 털뭉치에 손을 뻗던 중이어도(창이 열리거나 연출이 시작되면) 그만둔다
     cancelFish(); // 낚시하던 중이어도
@@ -2452,7 +2542,7 @@ function boot() {
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
-    if (fishing) { if (down && !panels.isOpen()) fishPress(); return; } // 낚시: 찌가 잠길 때 · 감기 연타
+    if (fishing) { if (!panels.isOpen()) fishPress(down); return; } // 낚시: 찌가 잠길 때 낚아채기 · 끌어올리기 놀이(누르고 있기)
     if (!down) {
       if (glowTry) { if (panels.isOpen()) cancelGlow(); else endGlow(); return; } // 털뭉치: 손을 뗀 순간의 빛으로
       if (pulling) { if (panels.isOpen()) cancelPull(); else endPull(); }
@@ -2467,6 +2557,7 @@ function boot() {
     else if (target.type === 'pickup') pickUpGround(target.g);
     else if (target.type === 'weed') beginPull(target.weed);
     else if (target.type === 'fish') beginFish(target.spot);
+    else if (target.type === 'noRod') hud.toast('낚싯대가 있어야 낚시할 수 있어요', 3200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.rod.price)}` }] });
     else if (target.type === 'friendHome') knockHome(target.kind);
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
@@ -3283,7 +3374,7 @@ function boot() {
    */
   function doSwing(aim) {
     const id = weaponNow();
-    if (!id || swingCool > 0 || player.swinging || fainting || downed) return;
+    if (!id || swingCool > 0 || player.swinging || fainting || downed || fishing) return; // 낚시 중에는 휘두르지 않는다
     const W = WEAPONS[id], p = player.position;
     let near = monsters.nearest(p.x, p.z, W.range + 1.2);
     if (aim) {
@@ -5464,10 +5555,17 @@ function boot() {
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
-    if (hasTool(state, 'rod')) { const fs = fishSpotNear(p, player.yaw); if (fs) options.push({ d: 1.2, t: { type: 'fish', spot: fs, label: '낚시하기' } }); } // 물가(가까운 다른 대상이 먼저)
+    fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저)
     playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
+  }
+  /** 물가 대상: 낚싯대가 있으면 '낚싯대 펼치기'(물을 바로 보고 있으면 둘레 풀 · 열매보다 먼저), 없으면 누를 때 어디서 사는지 알려 준다. */
+  function fishOption(p, options) {
+    const fs = fishSpotNear(p, player.yaw);
+    if (!fs) return;
+    if (hasTool(state, 'rod')) options.push({ d: fs.front ? 0.6 : 1.2, t: { type: 'fish', spot: fs, label: '낚싯대 펼치기' } });
+    else options.push({ d: 1.25, t: { type: 'noRod', label: '낚시하기' } });
   }
   /** 같이 놀기: 친구 마을에서도 쓰는 건물(내 돈 · 내 일감 · 내 자격으로. 토벌 실기만 내 마을 검정소에서). 집은 친구 집이라 따로. */
   const GUEST_PLACES = new Set(['board', 'exam', 'ramen', 'furniture', 'realty', 'pochette', 'books', 'tools', 'pub', 'factory', 'raffle', 'salon']);
@@ -5497,7 +5595,7 @@ function boot() {
     }
     const bush = berries.nearestReady(p.x, p.z, 1.4);
     if (bush) options.push({ d: Math.hypot(bush.x - p.x, bush.z - p.z), t: { type: 'berry', bush, label: '열매 따기' } });
-    if (hasTool(state, 'rod')) { const fs = fishSpotNear(p, player.yaw); if (fs) options.push({ d: 1.2, t: { type: 'fish', spot: fs, label: '낚시하기' } }); } // 친구 마을에서도 낚시(내 가방으로)
+    fishOption(p, options); // 친구 마을에서도 낚시(내 가방으로)
     for (const [key, label] of PLACES) {
       if (!GUEST_PLACES.has(key)) continue;
       const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
@@ -6201,6 +6299,7 @@ function boot() {
       updateCryFx(dt);
       if (pulling) updatePull(dt);
       if (fishing) updateFish(dt);
+      updateCatchFx(dt);
       target = usagiClub.active ? (guide.open || panels.isOpen() ? null : usagiClub.target(player.position))
         : pulling || fishing || panels.isOpen() || guide.open || sleeping || sticker || funBusy() || fainting || downed ? null : findTarget();
       updateFun(dt);

@@ -3,24 +3,26 @@ import { POND, LAKE, RIVER, SOUTH_SHORE, BRIDGES, riverZ } from './layout.js';
 
 /**
  * 낚시(게임 오리지널): 도구점에서 낚싯대를 사면 물가에서 낚시를 한다.
- *  던지기(기운 FISH_STAMINA) → 찌가 퐁 잠기면 바로 행동 버튼(물고기마다 누를 틈이 다르다) → 큰 물고기는 '감기!' 연타로 끌어올린다.
+ *  던지기(기운 FISH_STAMINA) → 찌가 퐁 잠기면 바로 행동 버튼(물고기마다 누를 틈이 다르다) → 끌어올리기 놀이(stepReel):
+ *  행동 버튼을 누르고 있으면 초록 칸이 올라가고 떼면 내려온다. 이리저리 도망치는 물고기를 칸 안에 두면 게이지가 차서 낚는다.
  *  물(연못 · 시냇물 · 호수 · 바다)마다, 낮 · 밤마다 잡히는 물고기가 다르다. 물고기는 가방에 들어가고 노동 접수 '팔기'에서 판다.
- * size: 0 작은 고기(바로 올라온다) · 1 중간 · 2 큰 고기(감기 연타가 더 길다). day · night: 그때만 잡힌다. weight: 잘 잡히는 정도.
+ * size: 0 작은 고기 · 1 중간 · 2 큰 고기(칸이 좁고 물고기가 빠르다). day · night: 그때만 잡힌다. weight: 잘 잡히는 정도.
+ * cm: 잡힐 때 크기 범위(낚시 기록 state.fishLog 에 가장 큰 것을 남긴다). junk: 쓰레기(놀이 없이 바로 올라온다).
  */
 export const FISH = {
-  minnow: { name: '송사리', sell: 12, waters: ['pond', 'river'], weight: 5, size: 0, color: '#c9d6de', note: '작은 물고기. 연못과 시냇물에 많다.' },
-  goldfish: { name: '금붕어', sell: 70, waters: ['pond'], weight: 1, size: 0, color: '#f2884a', note: '마을 연못에 숨어 사는 주황빛 물고기.' },
-  chub: { name: '피라미', sell: 18, waters: ['river'], weight: 5, size: 0, color: '#a9c3cf', note: '시냇물을 재빠르게 오르내리는 물고기.' },
-  crucian: { name: '붕어', sell: 30, waters: ['river', 'lake'], weight: 4, size: 1, color: '#b8a47a', note: '둥글넓적한 민물고기.' },
-  sweetfish: { name: '은어', sell: 60, waters: ['river'], weight: 1.5, size: 1, day: true, color: '#cfe0e8', note: '맑은 낮의 시냇물에서만 잡힌다. 수박 냄새가 난다나?' },
-  catfish: { name: '메기', sell: 90, waters: ['river', 'lake'], weight: 2, size: 2, night: true, color: '#6f6a63', note: '밤에만 어슬렁거리는 수염 난 물고기.' },
-  carp: { name: '잉어', sell: 45, waters: ['lake'], weight: 4, size: 1, color: '#d8a868', note: '호수의 터줏대감.' },
-  trout: { name: '송어', sell: 60, waters: ['lake'], weight: 2.5, size: 1, color: '#9fb7a8', note: '차가운 호숫물을 좋아한다.' },
-  rainbow: { name: '무지개송어', sell: 130, waters: ['lake'], weight: 0.8, size: 2, color: '#e7a0b8', note: '옆구리에 무지개빛 줄이 있는 귀한 송어.' },
-  mackerel: { name: '고등어', sell: 40, waters: ['sea'], weight: 5, size: 1, color: '#6f94bb', note: '바다에서 떼 지어 다닌다.' },
-  puffer: { name: '복어', sell: 80, waters: ['sea'], weight: 2, size: 1, color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
-  seabream: { name: '도미', sell: 120, waters: ['sea'], weight: 1.5, size: 2, color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
-  octopus: { name: '문어', sell: 180, waters: ['sea'], weight: 0.6, size: 2, night: true, color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
+  minnow: { name: '송사리', sell: 12, waters: ['pond', 'river'], weight: 5, size: 0, cm: [3, 6], color: '#c9d6de', note: '작은 물고기. 연못과 시냇물에 많다.' },
+  goldfish: { name: '금붕어', sell: 70, waters: ['pond'], weight: 1, size: 0, cm: [6, 14], color: '#f2884a', note: '마을 연못에 숨어 사는 주황빛 물고기.' },
+  chub: { name: '피라미', sell: 18, waters: ['river'], weight: 5, size: 0, cm: [8, 15], color: '#a9c3cf', note: '시냇물을 재빠르게 오르내리는 물고기.' },
+  crucian: { name: '붕어', sell: 30, waters: ['river', 'lake'], weight: 4, size: 1, cm: [14, 28], color: '#b8a47a', note: '둥글넓적한 민물고기.' },
+  sweetfish: { name: '은어', sell: 60, waters: ['river'], weight: 1.5, size: 1, day: true, cm: [15, 25], color: '#cfe0e8', note: '맑은 낮의 시냇물에서만 잡힌다. 수박 냄새가 난다나?' },
+  catfish: { name: '메기', sell: 90, waters: ['river', 'lake'], weight: 2, size: 2, night: true, cm: [35, 70], color: '#6f6a63', note: '밤에만 어슬렁거리는 수염 난 물고기.' },
+  carp: { name: '잉어', sell: 45, waters: ['lake'], weight: 4, size: 1, cm: [30, 65], color: '#d8a868', note: '호수의 터줏대감.' },
+  trout: { name: '송어', sell: 60, waters: ['lake'], weight: 2.5, size: 1, cm: [25, 45], color: '#9fb7a8', note: '차가운 호숫물을 좋아한다.' },
+  rainbow: { name: '무지개송어', sell: 130, waters: ['lake'], weight: 0.8, size: 2, cm: [35, 60], color: '#e7a0b8', note: '옆구리에 무지개빛 줄이 있는 귀한 송어.' },
+  mackerel: { name: '고등어', sell: 40, waters: ['sea'], weight: 5, size: 1, cm: [25, 40], color: '#6f94bb', note: '바다에서 떼 지어 다닌다.' },
+  puffer: { name: '복어', sell: 80, waters: ['sea'], weight: 2, size: 1, cm: [12, 28], color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
+  seabream: { name: '도미', sell: 120, waters: ['sea'], weight: 1.5, size: 2, cm: [30, 55], color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
+  octopus: { name: '문어', sell: 180, waters: ['sea'], weight: 0.6, size: 2, night: true, cm: [40, 90], color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
   can: { name: '빈 깡통', sell: 3, waters: ['pond', 'river', 'lake', 'sea'], weight: 0.8, size: 0, junk: true, color: '#b9bec6', note: '누가 버렸담. 물이 깨끗해졌다.' }
 };
 registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { name: f.name, kind: 'fish', sell: f.sell, note: f.note }])));
@@ -29,12 +31,21 @@ registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { na
 export const FISH_STAMINA = 5;
 /** 찌가 잠기기까지 기다리는 시간(초) 범위. */
 export const BITE_WAIT = [2.5, 7];
-/** 물고기 크기별: 찌가 잠긴 뒤 누를 틈(초), 감기 연타(한 번에 채우는 양 · 버티는 힘(초당 줄어듦) · 제한 시간). */
+/**
+ * 물고기 크기별: 찌가 잠긴 뒤 누를 틈(초)과 끌어올리기 놀이 game —
+ * zone 초록 칸 크기(물길 전체 1 기준) · speed 물고기 빠르기(초당) · turn 방향을 바꾸는 틈(초 범위) ·
+ * gain 칸 안에 있을 때 게이지가 차는 빠르기 · loss 밖일 때 빠지는 빠르기 · start 처음 게이지.
+ */
 export const SIZE_RULES = [
-  { window: 1.0, reel: null },
-  { window: 0.75, reel: { tap: 0.17, drain: 0.32, time: 5 } },
-  { window: 0.55, reel: { tap: 0.12, drain: 0.42, time: 6 } }
+  { window: 1.0, game: { zone: 0.36, speed: 0.38, turn: [0.8, 1.7], gain: 0.5, loss: 0.18, start: 0.4 } },
+  { window: 0.75, game: { zone: 0.3, speed: 0.55, turn: [0.6, 1.3], gain: 0.4, loss: 0.2, start: 0.35 } },
+  { window: 0.55, game: { zone: 0.28, speed: 0.64, turn: [0.5, 1.1], gain: 0.36, loss: 0.2, start: 0.34 } }
 ];
+/**
+ * 초록 칸 움직임: 누르고 있으면 up 만큼 위로, 떼면 down 만큼 아래로 빨라진다(초당 속도 최대 max). 끝에 닿으면 bounce 만큼 튕긴다.
+ * grace: 시작하고 이 시간(초) 동안은 게이지가 빠지지 않는다(손을 버튼에 올릴 틈).
+ */
+export const REEL = { up: 4.5, down: 3.6, max: 1.6, bounce: 0.35, grace: 0.8 };
 const NAMES = { pond: '연못', river: '시냇물', lake: '호수', sea: '바다' };
 export const waterName = (w) => NAMES[w] || '물';
 
@@ -63,5 +74,51 @@ export function pickFish(water, hour, random = Math.random) {
   for (const id of ids) { r -= FISH[id].weight; if (r < 0) return id; }
   return ids[ids.length - 1];
 }
-/** 물고기의 크기 규칙(누를 틈 · 감기 연타). */
+/** 물고기의 크기 규칙(누를 틈 · 끌어올리기 놀이). */
 export const rulesOf = (id) => SIZE_RULES[FISH[id].size];
+
+/** 끌어올리기 놀이 시작: zone 초록 칸 아래 끝(0 ~ 1 − 칸 크기) · fish 물고기 자리(0 ~ 1) · progress 게이지(0 ~ 1). */
+export function startReel(id, random = Math.random) {
+  const g = rulesOf(id).game;
+  return { id, t: 0, zone: 0.5 - g.zone / 2, vz: 0, fish: 0.5, target: 0.3 + random() * 0.4, turnAt: g.turn[0], progress: g.start, inside: true, done: null };
+}
+/**
+ * dt 초 지나기: holding(행동 버튼을 누르고 있다)이면 초록 칸이 올라가고, 떼면 내려온다. 물고기는 정한 자리로 헤엄치다가
+ * 틈마다 새 자리를 고른다. 물고기가 칸 안이면 게이지가 차고 밖이면 빠진다 → done: 'caught'(꽉 참) | 'lost'(바닥) | null.
+ */
+export function stepReel(r, dt, holding, random = Math.random) {
+  if (r.done) return r;
+  const g = rulesOf(r.id).game, top = 1 - g.zone;
+  const t = r.t + dt;
+  let vz = Math.max(-REEL.max, Math.min(REEL.max, r.vz + (holding ? REEL.up : -REEL.down) * dt)), zone = r.zone + vz * dt;
+  if (zone < 0) { zone = 0; if (vz < 0) vz = -vz * REEL.bounce; }
+  if (zone > top) { zone = top; if (vz > 0) vz = -vz * REEL.bounce; }
+  let { target, turnAt, fish } = r;
+  if (t >= turnAt || Math.abs(target - fish) < 0.01) { target = 0.05 + random() * 0.9; turnAt = t + g.turn[0] + random() * (g.turn[1] - g.turn[0]); }
+  const step = g.speed * dt, d = target - fish;
+  fish += Math.abs(d) <= step ? d : Math.sign(d) * step;
+  const inside = fish >= zone && fish <= zone + g.zone;
+  const progress = Math.max(0, Math.min(1, r.progress + (inside ? g.gain : t < REEL.grace ? 0 : -g.loss) * dt));
+  return { ...r, t, vz, zone, fish, target, turnAt, progress, inside, done: progress >= 1 ? 'caught' : progress <= 0 ? 'lost' : null };
+}
+
+/** 잡힌 크기(cm, 정수). 쓰레기는 null. */
+export function fishLength(id, random = Math.random) {
+  const c = FISH[id].cm;
+  return c ? Math.round(c[0] + random() * (c[1] - c[0])) : null;
+}
+/** 낚시 기록 { [id]: { n: 잡은 수, best: 가장 큰 cm } }. */
+export const fishLogOf = (s) => (s.fishLog && typeof s.fishLog === 'object' ? s.fishLog : {});
+/** 낚은 것을 적는다. → { state, first: 처음 잡았다, best: 가장 크게 잡았다(두 번째부터) } */
+export function logFish(s, id, cm) {
+  const log = fishLogOf(s), old = log[id];
+  const best = cm != null && (!old || old.best == null || cm > old.best);
+  const entry = { n: (old ? old.n : 0) + 1, ...(cm != null ? { best: best ? cm : old.best } : {}) };
+  return { state: { ...s, fishLog: { ...log, [id]: entry } }, first: !old, best: !!old && best };
+}
+/** 저장 확인: 아는 물고기만, 잡은 수는 1 이상, 크기는 0 보다 큰 수. */
+export function isValidFishLog(l) {
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return false;
+  return Object.entries(l).every(([id, v]) => Object.hasOwn(FISH, id) && v && typeof v === 'object' && Number.isInteger(v.n) && v.n >= 1
+    && (v.best === undefined || (Number.isFinite(v.best) && v.best > 0)));
+}
