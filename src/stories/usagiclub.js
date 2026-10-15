@@ -1,12 +1,13 @@
 import { CLUB_BPM, clubChart } from '../core/rhythm.js';
 import { hourOf } from '../core/clock.js';
-import { isActive, isDone, sideBusy } from '../core/quests.js';
+import { isActive, isDone, activeQuests, stepOf, inHours } from '../core/quests.js';
 import { hearts, friendOf } from '../core/friends.js';
 import { VILLAGE_R } from '../core/layout.js';
 
 /**
  * 사이드스토리 '우사기의 집'(원작 319 · 320화) 연출. 데이터(부탁 · 보상)는 core/quests.js 의 usagiHome · clubNight.
  *  1) 목격: 밤 7시 반 ~ 9시 반, 우사기(하트 2개 이상)가 내 뒤에서 쌩 달려와 손목시계를 보고 "우라!" → 숲속 큰 나무 구멍으로(story.usagiSeen).
+ *     우사기가 일하거나 집에 들어가 있어도, 다른 이야기를 하는 중이어도 본다(하치와레가 이야기를 꺼내는 건 하던 이야기가 끝난 뒤 — core/quests.js 의 sideBusy).
  *  2) 다음 날 저녁 하치와레에게 이야기 표시: "오늘 밤 셋이서 몰래 따라가 보자"
  *  3) 밤 8 ~ 12시 광장: 치이카와 · 하치와레와 만나 우사기를 몰래 따라간다. 우사기가 뒤돌아보면 멈춰야 한다(움직이면 "…하?").
  *     너무 멀어지면 우사기가 흥얼거리며 기다려 주고, 아예 놓치면(40m) 그날은 접고 다음 밤에 다시.
@@ -14,7 +15,7 @@ import { VILLAGE_R } from '../core/layout.js';
  *  5) 강가 굴로 나온다. 우사기는 "야하!" 하고 집 쪽으로 달려가고, 마지막 대사 · 보상은 퀘스트(done)가.
  *  clubNight(되풀이): 우사기가 가자고 하면 바로 클럽(터널 없이) → 춤 → 강가 굴.
  * ctx: { getState, commit, npcs, player, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged(Set),
- *        who(kind), narrator, fill(lines), setMode, setCinematic, putToBed(kind), homeDoor(kind), myLook, onAbort }
+ *        who(kind), narrator, fill(lines), setMode, setCinematic, putToBed(kind), takeAway(kind), homeDoor(kind), myLook, onAbort }
  */
 const SIGHT_HEARTS = 2;
 const SPB = 60 / CLUB_BPM;
@@ -43,13 +44,19 @@ export function createUsagiClub(ctx) {
   // ---------- 1) 목격 ----------
   function canSight(state) {
     if (S || !state || !state.clock || (state.tutorial && state.tutorial !== 'done')) return false; // 옛 저장(안내 기록 없음)도
-    if (isActive(state, 'usagiHome') || isDone(state, 'usagiHome') || (state.story || {}).usagiSeen || sideBusy(state)) return false;
+    if (isActive(state, 'usagiHome') || isDone(state, 'usagiHome') || (state.story || {}).usagiSeen) return false;
     if (hearts(friendOf(state, 'usagi')) < SIGHT_HEARTS) return false;
     const h = hourOf(state.clock), p = ctx.player.position, u = usagi();
     if (h < 19.5 || h >= 21.5 || Math.hypot(p.x, p.z) > VILLAGE_R - 2) return false;
-    return !!u && !u.away && !u.party && !u.follow && !staged.has('usagi') && !npcs.busy(u);
+    // 다른 이야기를 하는 중이어도 본다(예전에는 사이드스토리가 하나도 없을 때만이라 낮에 다른 이야기를 받으면 늘 밀렸다).
+    // 다만 오늘 밤 장면을 보러 가야 하는 이야기가 있으면 그 장면과 겹치지 않게 그 시간은 건너뛴다
+    if (activeQuests(state).some((id) => { const st = stepOf(state, id); return st && st.type === 'visit' && st.scene && st.hours && inHours(h, st.hours); })) return false;
+    // 우사기가 일하거나 걷거나 집에 들어가 있어도 데려온다(예전에는 한가하게 서 있을 때만이라 저녁에 거의 안 열렸다).
+    // 나랑 같이 다니거나 이야기하는 중, 다른 장면에 나온 중이면 기다린다
+    return !!u && !u.party && !u.follow && !u.lead && !u.flee && !(u.talk > 0) && !u.emote && !staged.has('usagi');
   }
   function sight() {
+    ctx.takeAway('usagi'); // 하던 일을 끊는다(받아 둔 일감은 게시판에 돌려놓는다)
     const u = stage('usagi'), p = ctx.player.position, b = forest();
     const from = village.nearestFree(p.x + 6, p.z + 9, 0.5), by = village.nearestFree(p.x + 1.8, p.z + 0.7, 0.4);
     S = { kind: 'sight', t: 0, seen: false };
@@ -63,6 +70,7 @@ export function createUsagiClub(ctx) {
       { do: 'act', anim: 'hop', time: 0.6, quick: true },
       { do: 'call', fn: () => sightEnd() }
     ]);
+    S.plan = u.plan;
   }
   function sightSeen() {
     const s = ctx.getState();
@@ -75,8 +83,9 @@ export function createUsagiClub(ctx) {
     if (!S || S.kind !== 'sight') return;
     if (!ctx.getState()) { S = null; return; }
     sightSeen();
-    ctx.putToBed('usagi'); // 나무 구멍으로 쏙(다음 날 아침에는 늘 그렇듯 자기 집에서 나온다)
-    unstage('usagi');
+    const u = usagi();
+    // 나무 구멍으로 쏙(다음 날 아침에는 늘 그렇듯 자기 집에서 나온다). 그사이 다른 이야기가 우사기를 데려갔으면 그대로 둔다
+    if (u && (!u.plan || u.plan === S.plan)) { ctx.putToBed('usagi'); unstage('usagi'); }
     S = null;
   }
 

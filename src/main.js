@@ -4139,6 +4139,7 @@ function boot() {
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), putToBed: (k) => putToBed(k), homeDoor: (k) => homeDoor(k),
+    takeAway: (kind) => { dropJob(npcs.byKind(kind)); delete awayInfo[kind]; setDoing(kind, null, null); }, // 목격 장면이 하던 일 · 잠자리에서 데려간다
     myLook: () => myLook(), onAbort: () => unlockAfterScene()
   });
   // 사이드스토리 '수상한 섬 합숙'(stories/island.js): 남쪽 선착장 · 섬 장면 · 섬 놀이 화면(연타 · 타이밍)
@@ -4731,6 +4732,12 @@ function boot() {
       }
     });
     npcs.plan(n, steps);
+    n.plan.job = { typeId, job }; // 연출이 이 일정을 끊으면 받아 둔 일감을 돌려놓는다(dropJob)
+  }
+  /** 연출이 친구를 데려가며 하던 일정을 끊는다: 게시판에서 받아 두고 아직 보수를 안 받은 그날 일감은 다시 건다. */
+  function dropJob(n) {
+    const j = n && n.plan && n.plan.length ? n.plan.job : null;
+    if (j && j.job.day === state.clock.day) commit(returnToBoard(state, j.typeId, j.job.day), false);
   }
   // ---------- 친구들의 토벌: 자격증 시험(검정소) → 토벌 일감(마을 밖에서 진짜 몬스터를) → 랭킹 ----------
   // 그림이 없는 친구(시사 같은 직원)는 이름표 색 동그라미에 첫 글자
@@ -4854,6 +4861,7 @@ function boot() {
         restHere(n.kind, 15 + Math.random() * 20);
       } }
     ]);
+    n.plan.job = { typeId, job }; // 연출이 끊으면 받아 둔 일감을 돌려놓는다(dropJob)
   }
   /**
    * 랭킹이 바뀌었으면 알린다: 새로 랭커가 된 사람(나는 큰 배너 + 얼굴 새기기 안내, 친구는 알림).
