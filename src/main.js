@@ -78,7 +78,7 @@ import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen, asleepSpans, mateEats } from './core/offscreen.js';
 import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob, canTryLiquor, tryLiquor, goalNews, goalPlace, friendLook } from './core/goals.js';
-import { friendPay, friendWorkXp, friendLeaves, pickJob, canTryWeedExam, tryWeedExam, weedOf } from './core/friendweed.js';
+import { friendWorkXp, friendLeaves, canTryWeedExam, tryWeedExam, weedOf } from './core/friendweed.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
@@ -4717,8 +4717,8 @@ function boot() {
       do: 'call',
       fn: () => {
         if (job.done >= T.target) {
-          const pay = friendPay(state, n.kind, typeId); // 그 친구 제초 급수 배율까지(core/friendweed.js)
-          commit(friendWorkXp(payVillager(state, n.kind, pay, state.clock.day), n.kind, typeId, state.clock.day), false); // 풀 일감이면 경험치도 쌓인다
+          const pay = villagerPay(typeId);
+          commit(friendWorkXp(payVillager(state, n.kind, pay, state.clock.day), n.kind, typeId, state.clock.day), false); // 풀 일감이면 제초 경험치도 쌓인다(core/friendweed.js)
           npcs.say(n, lineOf(n.kind, 'jobDone', { pay: `+${won(pay)}` }));
           happen({ type: 'job', who: n.kind, title: T.title });
           setTimeout(() => staffSay('labor', 'paid', 8, n), 1600);
@@ -5217,7 +5217,7 @@ function boot() {
       case 'eat': npcEat(n); break;
       // 같이 라멘: 불린 친구도 사 먹을 만할 때만(배부르거나 목표 값을 모으는 중이면 혼자 먹으러 간다 — 화면 밖 하루와 같은 기준)
       case 'mealWith': if (isFree(mate) && mateEats(state, mate.kind, state.clock.day)) npcMealWith(n, mate); else npcEat(n); break;
-      case 'work': npcWork(n, pickJob(state, kind, jobs)); break; // 보수가 많은 일감일수록 자주
+      case 'work': npcWork(n, jobs[Math.floor(Math.random() * jobs.length)]); break;
       case 'hunt': npcHunt(n, hunts[Math.floor(Math.random() * hunts.length)]); break;
       case 'exam': npcExam(n); break;
       case 'hobby': npcHobby(n, hour); break;

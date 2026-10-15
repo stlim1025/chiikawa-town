@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WEED_START, weedOf, friendGrade, gradeAllows, friendLeaves, friendPay, pickJob, friendWorkXp, weedExamChance, canTryWeedExam, tryWeedExam } from '../src/core/friendweed.js';
-import { NOVICE, XP_TO_EXAM, EXAM_FEE, PAY_MULT } from '../src/core/license.js';
+import { WEED_START, FRIEND_JOB_XP, weedOf, friendGrade, gradeAllows, friendLeaves, friendWorkXp, weedExamChance, canTryWeedExam, tryWeedExam } from '../src/core/friendweed.js';
+import { NOVICE, XP_TO_EXAM, EXAM_FEE } from '../src/core/license.js';
 import { JOB_TYPES } from '../src/core/jobs.js';
 import { VILLAGERS, DAILY_JOBS, villagerOf, isValidVillagers } from '../src/core/villagers.js';
 import { canDoJob } from '../src/core/goals.js';
@@ -46,14 +46,6 @@ test('풀 일감은 급수가 되어야 받는다(낚시 일감은 급수와 상
   assert.ok(canDoJob(up, 'chiikawa', 'clover6'));
 });
 
-test('보수에는 그 친구 급수 배율이 붙는다(낚시 일감은 그대로)', () => {
-  const s = fresh();
-  assert.equal(friendPay(s, 'chiikawa', 'weed8'), JOB_TYPES.weed8.base);
-  assert.equal(friendPay(s, 'usagi', 'thorny3'), Math.round(JOB_TYPES.thorny3.base * PAY_MULT[3]));
-  assert.ok(friendPay(s, 'usagi', 'weed8') > JOB_TYPES.weed8.base, '3급이 뽑은 잡초는 더 받는다');
-  assert.equal(friendPay(withWeed(s, 'hachiware', { grade: 2, xp: 0 }), 'hachiware', 'fishMinnow'), JOB_TYPES.fishMinnow.base);
-});
-
 test('4급부터의 풀 일감은 게시판에 하나는 내 몫으로 남긴다', () => {
   assert.ok(friendLeaves('foxtail6', { foxtail6: 1 }));
   assert.ok(!friendLeaves('foxtail6', { foxtail6: 2 }));
@@ -63,22 +55,11 @@ test('4급부터의 풀 일감은 게시판에 하나는 내 몫으로 남긴다
   assert.ok(!friendLeaves('fishMinnow', { fishMinnow: 1 }));
 });
 
-test('일감 고르기: 받을 수 있는 것 가운데, 보수가 많을수록 자주', () => {
-  const s = fresh();
-  assert.equal(pickJob(s, 'usagi', []), null);
-  assert.equal(pickJob(s, 'usagi', ['weed8', 'thorny3'], () => 0), 'weed8');
-  assert.equal(pickJob(s, 'usagi', ['weed8', 'thorny3'], () => 0.9999), 'thorny3');
-  let seed = 7, thorny = 0;
-  const random = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
-  for (let i = 0; i < 400; i++) if (pickJob(s, 'usagi', ['weed8', 'thorny3'], random) === 'thorny3') thorny++;
-  assert.ok(thorny > 200, `보수가 많은 가시풀을 더 자주(${thorny}/400)`);
-});
-
-test('풀 일감을 끝내면 경험치가 쌓이고, 다음 시험 몫에서 멈춘다(열매 스티커는 안 쌓인다)', () => {
+test('풀 일감을 끝내면 경험치가 일감 하나만큼 쌓이고, 다음 시험 몫에서 멈춘다(열매 스티커는 안 쌓인다)', () => {
   let s = fresh();
   s = friendWorkXp(s, 'chiikawa', 'weed8', 1);
-  assert.ok(weedOf(s, 'chiikawa').xp > 0);
-  for (let i = 0; i < 10; i++) s = friendWorkXp(s, 'chiikawa', 'weed8', 1);
+  assert.equal(weedOf(s, 'chiikawa').xp, FRIEND_JOB_XP);
+  for (let i = 0; i < XP_TO_EXAM[NOVICE] * 2; i++) s = friendWorkXp(s, 'chiikawa', 'weed8', 1);
   assert.equal(weedOf(s, 'chiikawa').xp, XP_TO_EXAM[NOVICE]);
   assert.equal(weedOf(s, 'chiikawa').grade, NOVICE, '경험치만으로는 안 오른다');
   const t = fresh();

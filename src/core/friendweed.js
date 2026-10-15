@@ -1,11 +1,12 @@
-import { NOVICE, EXAM_FEE, PAY_MULT, XP_TO_EXAM, EXAM_STREAK, gainXp } from './license.js';
+import { NOVICE, EXAM_FEE, XP_TO_EXAM, EXAM_STREAK } from './license.js';
 import { JOB_TYPES, gradedJob, isWeedJob } from './jobs.js';
 import { VILLAGERS, villagerOf, villagerSpend, updateVillager } from './villagers.js';
 
 /**
  * 마을 친구들의 제초 급수(게임 오리지널): 나처럼 견습 · 5급 … 1급이 있다.
- * 풀 일감을 끝내면 경험치가 쌓이고(뽑은 풀은 모두 깔끔하게 센다 — 끊어진 풀은 일감에 안 센다), 경험치가 차면 응시료를 내고 검정소에서 승급 시험을 본다.
- * 급수가 오르면 그 급수의 풀 일감(친구마다 할 줄 아는 것 — core/villagers.js 의 VILLAGERS jobs)을 받고, 보수에 급수 배율이 붙는다(토벌 · 낚시 일감은 그대로).
+ * 풀 일감을 끝내면 경험치가 쌓이고(일감 하나에 FRIEND_JOB_XP), 경험치가 차면 응시료를 내고 검정소에서 승급 시험을 본다.
+ * 급수가 오르면 그 급수의 풀 일감(친구마다 할 줄 아는 것 — core/villagers.js 의 VILLAGERS jobs)을 받는다.
+ * 보수는 기본 보수 그대로(나처럼 급수 배율을 붙이면 친구 돈이 두 배 가까이 빨리 불어나, 친구 돈만으로 마을 가꾸기가 반년 안에 다 끝났다).
  * state.villagers[kind].weed = { grade, xp, tries: 이번 급수에서 떨어진 횟수, tryDay: 마지막으로 시험 본 날 }(없으면 WEED_START 급수 · 경험치 0)
  */
 
@@ -39,29 +40,20 @@ export function friendLeaves(id, left) {
   const T = JOB_TYPES[id];
   return (left[id] || 0) <= (T && gradedJob(T) && T.needGrade <= RESERVE_GRADE ? 1 : 0);
 }
-/** 친구가 그 일감으로 받는 보수: 기본 보수 × 그 친구 급수 배율(토벌 · 낚시 일감은 그대로). */
-export function friendPay(state, kind, id) {
-  const T = JOB_TYPES[id];
-  return Math.round(T.base * (gradedJob(T) ? PAY_MULT[friendGrade(state, kind)] : 1));
-}
-/** 받을 수 있는 일감 가운데 하나를 고른다: 보수가 많은 일감일수록 자주(보수의 제곱만큼). */
-export function pickJob(state, kind, ids, random = Math.random) {
-  if (!ids.length) return null;
-  const w = ids.map((id) => friendPay(state, kind, id) ** 2), total = w.reduce((a, b) => a + b, 0);
-  let r = random() * total;
-  for (let i = 0; i < ids.length; i++) { r -= w[i]; if (r < 0) return ids[i]; }
-  return ids[ids.length - 1];
-}
 
-/** 풀 일감을 끝냈다: 뽑은 풀만큼 경험치(어려운 풀일수록 더 — 나와 같은 셈, 다음 시험 몫까지만 쌓인다). 1급이면 그대로. */
+/**
+ * 풀 일감 하나를 끝내면 쌓이는 경험치: 나처럼 한 포기마다 쌓으면 랏코 · 우사기가 일주일 안에 1급이 된다.
+ * 일감 하나에 이만큼으로 두어 급수 하나에 몇 주 ~ 몇 달 걸리게 한다(날마다 시험을 볼 수 있으면 우사기 2급 45일쯤 · 1급 105일쯤, 치이카와 5급 20일쯤 · 4급 40일쯤).
+ */
+export const FRIEND_JOB_XP = 1;
+
+/** 풀 일감을 끝냈다: 경험치 FRIEND_JOB_XP(다음 시험 몫까지만 쌓인다). 1급이면 그대로. */
 export function friendWorkXp(state, kind, id, day) {
   const T = JOB_TYPES[id];
   if (!T || !isWeedJob(T) || !VILLAGERS[kind]) return state;
   const w = weedOf(state, kind);
   if (w.grade <= 1) return state;
-  let lic = { grade: w.grade, xp: w.xp };
-  for (let i = 0; i < T.target; i++) lic = gainXp(lic, 'clean', T.kind);
-  return updateVillager(state, kind, day, { weed: { ...w, xp: lic.xp } });
+  return updateVillager(state, kind, day, { weed: { ...w, xp: Math.min(XP_TO_EXAM[w.grade], w.xp + FRIEND_JOB_XP) } });
 }
 
 /** 지금 승급 시험에 붙을 확률. */
