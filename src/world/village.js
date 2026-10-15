@@ -894,6 +894,20 @@ export function buildVillage(scene) {
     addWindow(m) { windows.push(m); },
     /** 장애물이 생기거나 꺼졌을 때(마을 가꾸기 시설): 길찾기 격자를 처음부터 다시 본다. */
     refreshNav() { nav.fill(0); },
+    /**
+     * 나중에 세우는 건물(숲 어귀 게임센터 — world/arcade.js)도 집처럼 내 캐릭터를 가리면 반투명해지게 등록한다(합치지는 않는다).
+     * → { mat(색): 이 건물 전용 재질, add(메시): 외곽선을 같이 숨길 메시, own(재질): 간판 · 유리처럼 따로 만든 재질도 같이 흐리게 }
+     */
+    fadeBuilding(x, z, half) {
+      const o = { x, z, half, mats: [], meshes: [], fade: 1 }, byColor = new Map();
+      houses.push(o);
+      const own = (m) => { o.mats.push(m); seeThrough(m, false); return m; };
+      return {
+        mat(c) { if (!byColor.has(c)) byColor.set(c, own(toonMaterial(c, { unique: true }))); return byColor.get(c); },
+        add(mesh) { o.meshes.push(mesh); return mesh; },
+        own
+      };
+    },
     /** 경품 추첨 가라가라 통(추첨할 때 돌린다). */
     get raffleDrum() { return raffleDrum; },
     group: world,

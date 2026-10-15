@@ -429,3 +429,72 @@ test('몸이 바뀌었다: 이름표는 몸대로 바꿨다가 그대로 되돌�
   Sw.swapNames(false);
   kinds.forEach((k, i) => assert.deepEqual({ ...F.FRIENDS[k] }, before[i], k));
 });
+
+test('몸이 바뀌었다: 바뀐 동안 지갑 · 가방은 하치와레 것을 들고, 돌아오면 번 것은 나에게(쓴 돈은 내 지갑에서)', async () => {
+  const Sw = await import(G + 'swap.js');
+  const I = await import(G + 'inventory.js');
+  const P = await import(G + 'pantry.js');
+  const base = (money, hachi) => ({ ...fresh(8, 12), money, bag: { items: { riceball: 2 }, clean: {} }, villagers: { hachiware: { money: hachi, jobs: 0, day: 8 } } });
+  let s = P.addToPantry(base(1000, 300), 'hachiware', 'berry', 3).state;
+  s = Sw.wearSwapWallet(s, 8);
+  assert.equal(s.money, 300, '하치와레 지갑');
+  assert.equal(I.countOf(s, 'berry'), 3, '하치와레 가방');
+  assert.equal(I.countOf(s, 'riceball'), 0, '내 가방은 내 몸이 든다');
+  assert.equal(Sw.myBodyMoney(s), 1000);
+  const back = S.deserialize(S.serialize(s));
+  assert.ok(back.ok && back.state.swapWallet.mine.money === 1000, '바뀐 채 저장해도 된다');
+  const eat = Sw.spendMyBody(s, 80);
+  assert.ok(eat.ok);
+  s = eat.state;
+  assert.equal(Sw.myBodyMoney(s), 920, '우사기(내 몸)는 내 지갑으로 라멘');
+  assert.equal(s.money, 300, '내가 든 하치와레 지갑은 그대로');
+  s = { ...s, money: s.money + 250 };
+  s = I.addItem(s, 'pearl', 2).state;
+  s = I.takeItem(s, 'berry', 1).state;
+  const r = Sw.settleSwapWallet(s);
+  assert.equal(r.money, 250);
+  assert.deepEqual(r.items, { pearl: 2 });
+  assert.equal(r.state.money, 920 + 250, '번 돈은 내 지갑으로');
+  assert.equal(I.countOf(r.state, 'pearl'), 2, '얻은 물건도');
+  assert.equal(I.countOf(r.state, 'riceball'), 2, '내 가방을 되찾는다');
+  assert.equal(P.pantryOf(r.state, 'hachiware').berry, 2, '꺼내 쓴 열매는 하치와레 가방에서 빠진다');
+  assert.ok(!r.state.swapWallet);
+  const spent = Sw.settleSwapWallet({ ...Sw.wearSwapWallet(base(500, 300), 8), money: 100 });
+  assert.equal(spent.money, -200);
+  assert.equal(spent.state.money, 300, '하치와레 돈을 쓴 만큼은 내 지갑에서 갚는다');
+});
+
+test('몸이 바뀌었다: 바뀐 동안은 새 부탁이 없고 하던 부탁도 숨는다(돌아오면 다시 보인다)', () => {
+  let s = fresh(8, 12);
+  for (const k of ['usagi', 'hachiware', 'chiikawa']) s = withHearts(s, k, 3);
+  assert.ok(Q.canOffer(s, 'picnic'));
+  s = Q.startQuest(Q.startQuest(s, 'pillow'), 'bodySwap');
+  assert.ok(Q.activeQuests(s).includes('pillow'), '게임센터에 가기 전에는 보인다');
+  s = Q.completeStep(s, 'bodySwap', 8).state;
+  assert.deepEqual(Q.activeQuests(s), ['bodySwap'], '그 이야기만');
+  assert.equal(Q.pickTrack(s), 'bodySwap');
+  assert.ok(!Q.canOffer(s, 'picnic'), '새 부탁 없음');
+  assert.equal(Q.markOf(s, 'chiikawa'), null, '치이카와 베개 부탁도 숨는다');
+  assert.ok(Q.isActive(s, 'pillow'), '숨겨 둘 뿐 그대로');
+  for (let i = 0; i < 4; i++) s = Q.completeStep({ ...s, clock: at(9, 10) }, 'bodySwap', 9).state;
+  assert.ok(Q.isDone(s, 'bodySwap'));
+  assert.ok(Q.activeQuests(s).includes('pillow'), '돌아오면 다시 보인다');
+});
+
+test('몸이 바뀌었다: 친구들끼리는 몸의 이름으로 부른다(대본에 박힌 이름도 조사까지)', async () => {
+  const Sw = await import(G + 'swap.js');
+  const V = await import(G + 'villagetalk.js');
+  assert.equal(Sw.bodyNames('우사기! 오늘도 기운 넘치네~'), '우사기! 오늘도 기운 넘치네~', '바뀌지 않았으면 그대로');
+  Sw.swapNames(true, { name: '민준', tag: '#ffffff', ink: '#5a4a3a' });
+  V.setLineNames(Sw.bodyNames);
+  try {
+    assert.equal(Sw.bodyNames('치이카와랑 하치와레가 놀았다'), '우사기랑 치이카와가 놀았다', '한꺼번에 바꾼다');
+    assert.equal(Sw.bodyNames('우사기는 우사기를'), '민준은 민준을', '받침에 맞는 조사');
+    const conv = V.conversation('hachiware', 'usagi', [], '하치와레', () => 0.1);
+    assert.equal(conv.lines[0][1], '민준! 오늘도 기운 넘치네~', '하치와레가 내 몸에 든 우사기를 내 이름으로');
+    assert.equal(V.newsLine({ type: 'sing', who: 'hachiware', n: 0 }).text, '치이카와가 광장에서 노래했어요', '치이카와 몸으로 노래한 하치와레');
+  } finally {
+    Sw.swapNames(false);
+    V.setLineNames(null);
+  }
+});

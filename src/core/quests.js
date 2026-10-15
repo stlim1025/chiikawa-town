@@ -507,7 +507,7 @@ export const QUESTS = {
       { who: 'hachiware', text: '아직 기계가 움직이려나? 다 같이 가 보자, {name}!' }],
     steps: [
       { type: 'visit', place: 'arcade', hours: [9, 18], scene: 'swapSlot', speaker: 'hachiware', goal: '숲 어귀의 낡은 게임센터로 가 보자! (오전 9시 ~ 오후 6시)',
-        say: ['바깥에서 봐도 진짜 바뀌었네~ 치이카와 몸은 걸음이 엄청 짧아~', '…놀랐더니 배고파졌어. 바뀐 몸 그대로 다 같이 라멘 먹으러 가자!'] },
+        say: ['바깥에서 봐도 진짜 바뀌었네~ 치이카와 몸은 걸음이 엄청 짧아~', '{name}, 내 몸 지갑이랑 가방은 그대로 써도 돼~ 몸이 돌아가면 번 건 돌려줄게!', '…놀랐더니 배고파졌어. 바뀐 몸 그대로 다 같이 라멘 먹으러 가자!'] },
       { type: 'visit', place: 'ramenShop', hours: [11, 21], scene: 'swapRamen', speaker: 'hachiware', goal: '바뀐 몸 그대로 다 같이 라멘 로우에서 라멘을 먹자! (오전 11시 ~ 오후 9시)',
         say: ['맛있었다~ 근데 오늘 밤은 어디서 자지?', '각자 몸의 집에서 자 보자! {name}, 오늘 밤은 하치와레 동굴로 가~', '내일 아침이면… 원래대로 돌아와 있을까~?'] },
       { type: 'talk', to: 'chiikawa', nextDay: true, hours: [7, 20], fx: 'swapCry', ask: '왜 그래…?', goal: '하치와레 동굴에서 하룻밤 자고, 다음 날 우사기 몸이 된 치이카와를 만나 보자! (오전 7시 ~ 오후 8시)',
@@ -635,6 +635,11 @@ export const questsOf = (state) => state.quests || {};
 export const questState = (state, id) => questsOf(state)[id] || null;
 export const isDone = (state, id) => !!(questState(state, id) && questState(state, id).done);
 export const isActive = (state, id) => !!(questState(state, id) && !questState(state, id).done);
+/**
+ * 사이드스토리 '몸이 바뀌었다'(bodySwap)로 몸이 바뀐 채인지: 슬롯을 돌린 단계(1)부터 되돌릴 때까지(core/swap.js 의 isSwapped 도 이것).
+ * 이동안은 친구들이 새 부탁을 하지 않고, 받아 둔 다른 부탁도 숨겨 둔다(그대로 멈춰 있다가 몸이 돌아오면 다시 보인다).
+ */
+export const bodySwapped = (state) => { const q = questState(state, 'bodySwap'); return !!q && !q.done && q.step >= 1; };
 /** 지금 단계(없으면 null). */
 export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
 /** 그 단계를 누구에게 알리는지. */
@@ -763,6 +768,7 @@ export function canOffer(state, id) {
 /** 기본 조건: 안 했고(일상 부탁은 끝내고 again 날이 지났고), 친밀도 · 자격 · 앞 이야기(튜토리얼) 조건을 채웠으면. viaBoard: 게시판 전단지로 여는 이야기(board)를 볼 때. */
 function baseOffer(state, id, viaBoard = false) {
   const Q = QUESTS[id], q = questState(state, id);
+  if (bodySwapped(state)) return false; // 몸이 바뀐 동안은 새 부탁 · 이야기가 없다
   if (Q.noOffer) return false; // 말로는 부탁하지 않는 이야기(숲에서 찾아내는 구덩이 같은)
   if (!!Q.board !== viaBoard) return false; // 게시판 전단지 이야기는 친구가 말로 권하지 않는다
   if (q && !(q.done && Q.again && state.clock && state.clock.day - q.done >= Q.again)) return false;
@@ -787,6 +793,7 @@ export function boardStory(state) {
 export function questsFor(state, kind) {
   const out = { offer: [], report: [], waiting: [] };
   for (const id of QUEST_ORDER) {
+    if (bodySwapped(state) && id !== 'bodySwap') continue; // 몸이 바뀐 동안은 그 이야기만
     if (QUESTS[id].giver === kind && canOffer(state, id)) out.offer.push(id);
     const step = stepOf(state, id);
     if (!step || step.type === 'visit' || step.type === 'boss' || step.type === 'scene' || reportTo(id, step) !== kind) continue;
@@ -885,6 +892,7 @@ export function completeStep(state, id, day) {
 
 /** 화면에 띄울 퀘스트: 정해 둔 것이 끝났으면 이야기 → 다른 진행 중인 부탁. */
 export function pickTrack(state) {
+  if (bodySwapped(state)) return 'bodySwap'; // 몸이 바뀐 동안은 그 이야기만
   if (state.questTrack && isActive(state, state.questTrack)) return state.questTrack;
   return QUEST_ORDER.find((id) => isActive(state, id)) || null;
 }
@@ -909,8 +917,8 @@ export function dropQuest(state, id) {
   const s = { ...state, quests: qs };
   return { ...s, questTrack: s.questTrack === id ? pickTrack({ ...s, questTrack: null }) : s.questTrack };
 }
-/** 진행 중인 퀘스트 목록(이야기가 먼저). */
-export const activeQuests = (state) => QUEST_ORDER.filter((id) => isActive(state, id));
+/** 진행 중인 퀘스트 목록(이야기가 먼저). 몸이 바뀐 동안은 그 이야기만(다른 부탁은 숨겨 둔다). */
+export const activeQuests = (state) => QUEST_ORDER.filter((id) => isActive(state, id) && (id === 'bodySwap' || !bodySwapped(state)));
 export const doneQuests = (state) => QUEST_ORDER.filter((id) => isDone(state, id));
 
 /**

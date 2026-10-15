@@ -29,7 +29,7 @@ import { ACCESSORY_ITEMS, wardrobeOf, SALON_PRICE } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
 import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
-import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack } from '../core/quests.js';
+import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack, activeQuests } from '../core/quests.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
@@ -733,7 +733,7 @@ export function createPanels(ui, handlers) {
             kind === 'done' ? h('div', { class: 'd' }, '다 들어줬어요 ✓') : null));
       };
       // 받은 부탁만: 하는 중 · 끝낸 것(아직 안 받은 부탁은 친구 머리 위 ! 로 알게 된다)
-      const active = QUEST_ORDER.filter((id) => isActive(s, id)), done = QUEST_ORDER.filter((id) => isDone(s, id));
+      const active = activeQuests(s), done = QUEST_ORDER.filter((id) => isDone(s, id)); // 몸이 바뀐 동안은 그 이야기만(core/quests.js)
       const out = [appBar('퀘스트', `끝낸 부탁 ${done.length}`)];
       if (active.length) { out.push(h('h3', { class: 'shop-sec' }, '하는 중')); active.forEach((id) => out.push(card(id, 'active'))); }
       if (done.length) { out.push(h('h3', { class: 'shop-sec' }, '끝낸 부탁')); done.forEach((id) => out.push(card(id, 'done'))); }

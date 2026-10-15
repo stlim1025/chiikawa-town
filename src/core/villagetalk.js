@@ -13,6 +13,9 @@ import { josa } from './weeding.js';
  */
 
 export const nameOf = (kind, me = '나') => (kind === 'me' ? me : FRIENDS[kind] ? FRIENDS[kind].name : kind);
+/** 이름이 박힌 대본(짝 수다 · 내 일 이야기)을 바꿔 부를 때: 몸이 바뀐 동안 main 이 core/swap.js 의 bodyNames 를 걸어 둔다(몸의 이름으로 부른다). */
+let renameLine = (s) => s;
+export const setLineNames = (fn) => { renameLine = fn || ((s) => s); };
 const pick = (list, random = Math.random) => (Array.isArray(list) ? list[Math.floor(random() * list.length) % list.length] : list);
 const fill = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => (v[k] != null ? String(v[k]) : ''));
 
@@ -120,7 +123,7 @@ const STEM = {
   hunt: (e, N) => `${josa(N(e.who), '이/가')} ${e.mon || '몬스터'} 잡았`,
   examPass: (e, N) => `${josa(N(e.who), '이/가')} 토벌 자격증 땄`,
   examFail: (e, N) => `${josa(N(e.who), '이/가')} 시험에 떨어졌`,
-  sing: () => '하치와레가 광장에서 노래했',
+  sing: (e, N) => `${josa(N(e.who || 'hachiware'), '이/가')} 광장에서 노래했`,
   train: (e, N) => (e.with ? `${josa(N(e.who), '이/가')} ${josa(N(e.with), '이랑/랑')} 수련했` : `${josa(N(e.who), '이/가')} 수련했`),
   theft: () => '모몽가가 또 소매치기했',
   buy: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '새 물건'} 샀`,
@@ -170,7 +173,7 @@ export function storyLine(kind, ev, me = '나', random = Math.random) {
   if (ev.who === kind || ev.with === kind) {
     const w = ev.who === kind ? ev.with : ev.who;
     const type = ev.type === 'meal' && !w ? 'mealSolo' : ev.type;
-    const own = OWN[type] && OWN[type][kind];
+    const own = OWN[type] && OWN[type][kind] && renameLine(OWN[type][kind]);
     if (!own) return null;
     if (/\{w\}/.test(own) && !w) return null; // 같이 한 친구 없이 혼자 한 일은 '{w}랑' 대사를 못 쓴다
     return fill(own, { w: w ? N(w) : '', title: ev.title || '일', mon: ev.mon || '몬스터', n: ev.n || 0, item: ev.item || '새 물건' });
@@ -208,7 +211,7 @@ export function conversation(a, b, news = [], me = '나', random = Math.random) 
     const tell = ev.who === 'me' ? gossipLine(a, ev, me) : storyLine(a, ev, me, random);
     if (tell) return { lines: [[a, pick(SMALLTALK.open[a] || ['…'], random)], [a, tell], [b, reactLine(b, ev, random)]], told: ev };
   }
-  if (pair && roll < 0.8) return { lines: pick(pair, random).map(([k, t]) => [k, t]), told: null };
+  if (pair && roll < 0.8) return { lines: pick(pair, random).map(([k, t]) => [k, renameLine(t)]), told: null };
   return { lines: [[a, pick(SMALLTALK.open[a] || ['…'], random)], [b, pick(SMALLTALK.reply[b] || ['…'], random)]], told: null };
 }
 
@@ -324,7 +327,7 @@ export function newsLine(ev, me = '나') {
     hunt: () => `${josa(A, '이/가')} 토벌 일감을 끝냈어요`,
     examPass: () => `${josa(A, '이/가')} 토벌 자격증을 땄어요`,
     examFail: () => `${josa(A, '이/가')} 토벌 시험에 떨어졌어요`,
-    sing: () => (ev.n ? `하치와레 광장 공연에 ${ev.n}명이 왔어요` : '하치와레가 광장에서 노래했어요'),
+    sing: () => { const S = N(ev.who || 'hachiware'); return ev.n ? `${S} 광장 공연에 ${ev.n}명이 왔어요` : `${josa(S, '이/가')} 광장에서 노래했어요`; },
     train: () => `${and()} 수련장에서 수련했어요`,
     comfort: () => `${josa(A, '이/가')} ${josa(B, '을/를')} 달래 줬어요`,
     congrats: () => `${josa(A, '이/가')} ${josa(B, '을/를')} 축하해 줬어요`,

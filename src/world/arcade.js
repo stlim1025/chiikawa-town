@@ -144,7 +144,9 @@ export function createArcadeFront(scene, village) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   scene.add(g);
-  const m = (geo, c, o) => { const mesh = toonMesh(geo, c, { shadow: true, ...o }); g.add(mesh); return mesh; };
+  // 다른 집처럼 내 캐릭터를 가리면(건물 뒤로 가면) 반투명해진다(world/village.js 의 fadeBuilding)
+  const f = village.fadeBuilding(x, z, 2.4);
+  const m = (geo, c, o) => { const mesh = toonMesh(geo, null, { shadow: true, ...o, material: f.mat(c) }); g.add(mesh); f.add(mesh); return mesh; };
   const CON = '#b8b6ae', CON_D = '#9c9a92', VINE = '#5f9a4e', VINE_D = '#4c8040', LEAF = '#7cb85e';
   m(GEO.box, CON, { position: [0, 1.45, 0], scale: [4.6, 2.9, 3.4], outline: 0.03, shell: true });
   m(GEO.box, CON_D, { position: [0, 2.95, 0], scale: [4.8, 0.16, 3.6], outline: 0.025, shell: true }); // 납작한 지붕 테두리
@@ -152,11 +154,11 @@ export function createArcadeFront(scene, village) {
     .forEach(([sx, sy, w, h]) => m(GEO.box, '#a6a49b', { position: [sx, sy, 1.705], scale: [w, h, 0.02], outline: false, shadow: false }));
   // 문 위 간판
   m(GEO.box, '#3c3f48', { position: [0, 2.42, 1.76], scale: [3.0, 0.62, 0.1], outline: 0.025, shell: true });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.86, 0.52), new THREE.MeshBasicMaterial({ map: signTexture() }));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.86, 0.52), f.own(new THREE.MeshBasicMaterial({ map: signTexture() })));
   sign.position.set(0, 2.42, 1.815);
   g.add(sign);
   // 금 간 유리 여닫이문 · 양옆 창
-  const glass = new THREE.MeshBasicMaterial({ map: glassTexture() });
+  const glass = f.own(new THREE.MeshBasicMaterial({ map: glassTexture() }));
   m(GEO.box, '#8d9096', { position: [0, 1.0, 1.72], scale: [1.72, 2.02, 0.06], outline: 0.02, shell: true });
   [-0.41, 0.41].forEach((dx) => {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 1.84), glass);

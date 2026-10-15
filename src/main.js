@@ -81,7 +81,7 @@ import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob, canTryLiqu
 import { friendWorkXp, friendLeaves, canTryWeedExam, tryWeedExam, weedOf } from './core/friendweed.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
-  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
+  FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine, setLineNames
 } from './core/villagetalk.js';
 import { DOING_ICONS } from './ui/doingicons.js';
 import { charSvg, hasCharArt } from './ui/art.js';
@@ -134,7 +134,7 @@ import { createOdeSpot, createOdeStage } from './world/odejail.js';
 import { createOdeStory } from './stories/ode.js';
 import { createArcadeFront, createArcadeStage } from './world/arcade.js';
 import { createSwapStory } from './stories/swap.js';
-import { isSwapped, swapNames, myBodyTag, SWAP_BODY, MY_BODY } from './core/swap.js';
+import { isSwapped, swapNames, myBodyTag, SWAP_BODY, MY_BODY, bodyOf, bodyNames, wearSwapWallet, settleSwapWallet, spendMyBody, myBodyMoney } from './core/swap.js';
 import { createCameraStory } from './stories/camera.js';
 import { createPhotoUi } from './ui/photos.js';
 import { refreshPhotoFrame } from './world/photoframe.js';
@@ -1665,6 +1665,8 @@ function boot() {
       switchStory.reset();
       odeStory.reset();
       swapStory.reset();
+      swapNap = false;
+      swapPayback = null;
       cameraStory.reset();
       loopRewinding = false;
       weather.setRain(false);
@@ -1810,17 +1812,64 @@ function boot() {
   let swapOn = false, homeGuest = false, swapForce = null; // homeGuest: 몸이 바뀐 동안 내 집에 손님으로 들어왔다(우사기가 든 내 몸의 집 — 잠 · 상자 · 꾸미기는 못 한다)
   const myLook = () => (swapOn ? { npc: MY_BODY } : realLook());
   const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(myLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
+  setLineNames(bodyNames); // 친구들끼리의 짝 수다 · 내 일 이야기 대본에 박힌 이름도 몸이 바뀐 동안은 몸의 이름으로(바뀌지 않았으면 그대로)
   /**
    * 몸이 바뀐 채인지 살펴 바뀌었을 때만 갈아 끼운다(매 프레임): 나는 하치와레 몸, 친구들은 몸대로(core/swap.js 의 SWAP_BODY — 우사기는 내 몸),
    * 이름표도 몸대로. 되돌아오면 원래 몸 · 이름표로.
    */
   function syncSwap() {
+    if (state && mode !== 'title') { syncSwapWallet(); swapBedtime(); }
     const on = !!state && mode !== 'title' && (swapForce ?? isSwapped(state));
     if (on === swapOn) return;
     swapOn = on;
     swapNames(on, { name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
     for (const [kind, body] of Object.entries(SWAP_BODY)) npcs.setBody(kind, on ? (body === 'me' ? buildChibi(realLook()) : buildNpc(body)) : null);
     refreshLook();
+  }
+  let swapPayback = null; // 몸이 돌아오며 정산한 것(core/swap.js 의 settleSwapWallet): 마무리 대사가 끝나면 하치와레가 돌려준다고 알린다
+  /** 지갑 · 가방도 몸대로(퀘스트 단계대로 — 장면이 잠깐 정하는 swapForce 와 상관없이): 바뀌면 하치와레 몸의 것을 들고, 돌아오면 정산한다. */
+  function syncSwapWallet() {
+    const want = isSwapped(state), has = !!state.swapWallet;
+    if (want === has) return;
+    if (want) {
+      commit(wearSwapWallet(state, state.clock.day));
+      hud.toast('하치와레 몸이라 지갑과 가방도 하치와레가 들고 있던 그대로예요', 3800, { chips: [{ icon: 'coin', text: won(state.money) }, { text: `내 지갑은 내 몸에 ${won(myBodyMoney(state))}` }] });
+      return;
+    }
+    const r = settleSwapWallet(state);
+    commit(r.state);
+    if (r.money || Object.keys(r.items).length) swapPayback = r;
+  }
+  /** 하치와레가 하치와레 몸으로 번 돈 · 물건을 돌려준다(하치와레 지갑에서 쓴 돈은 내 지갑에서 받아 간다 — 정산은 이미 끝났고 알리기만). */
+  function paybackSwap() {
+    const r = swapPayback, got = Object.entries(r.items);
+    swapPayback = null;
+    const chips = [...(r.money ? [{ icon: 'coin', text: `${r.money > 0 ? '+' : '−'}${won(Math.abs(r.money))}` }] : []), ...got.map(([id, n]) => ({ icon: itemSvg(id), text: `${itemInfo(id).name} ×${n}` }))];
+    const lines = [];
+    if (r.money > 0 || got.length) lines.push('아 맞다~ 내 몸으로 번 거, 이건 다 {name} 거야! 돌려줄게~');
+    if (r.money < 0) lines.push(`내 지갑에서 쓴 ${won(-r.money)}은 {name} 지갑에서 받아 갈게~ 헤헤`);
+    guide.say(lines.map(fillName), () => {
+      sound.play('coin');
+      hud.toast(r.money > 0 || got.length ? '하치와레가 하치와레 몸으로 번 것을 돌려줬어요' : '하치와레 몸으로 쓴 돈을 갚았어요', 3800, { chips });
+    }, whoOf({ kind: MY_BODY }));
+  }
+  let swapNap = false; // 몸이 바뀐 채 밤을 새우다 하치와레 동굴로 가서 자는 중
+  /** 몸이 바뀐 동안 밤 12시가 넘도록 안 자면: 하치와레 동굴(지금은 내 집)로 데려가 재운다(바뀐 몸으로 날을 넘기지 않게). */
+  function swapBedtime() {
+    if (!swapOn || swapForce !== null || swapNap || sleeping || hourOf(state.clock) >= 4) return; // 밤 12시 ~ 새벽 4시
+    if (!['play', 'visit', 'home'].includes(mode) || guide.open || panels.isOpen() || funBusy() || fainting || pulling || fishing || questScene || (visit && visit.lodge)) return;
+    swapNap = true;
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    hud.curtain(true, '(밤 12시가 넘었다… 너무 졸려서, 하치와레 동굴로 돌아가 쓰러지듯 잠들었다)');
+    setTimeout(() => {
+      if (mode === 'home') exitHome();
+      else if (mode === 'visit' && !visit.mine) exitVisit();
+      if (mode !== 'visit') enterVisit(MY_BODY, { mine: true, quiet: true });
+      hud.curtain(false);
+      doSleep('home', () => { swapNap = false; });
+    }, 1400);
   }
 
   /** 내 집 마련! */
@@ -3402,10 +3451,11 @@ function boot() {
     }
     if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
     if (free && !talking) studyReport();
-    if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
+    if (free && !talking && !swapOn) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격) — 몸이 바뀐 동안은 없다
     if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
     if (free && !talking) odeStory.tryDiscover(); // 사이드스토리: 숲속 빈터에서 버섯을 먹는 오데
     if (free && !talking) checkWorks();
+    if (free && !talking && swapPayback && !swapStory.active) paybackSwap(); // 몸이 돌아온 뒤 하치와레가 하치와레 몸으로 번 것을 돌려준다
     if (!talking) worksChatter();
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
       commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
@@ -4312,11 +4362,12 @@ function boot() {
     npcAct: (kind, anim, face, time, at = null) => { const n = npcs.byKind(kind); if (!n) return; if (at) { n.x = at.x; n.z = at.z; } npcs.act(n, anim, { face, time }); },
     ramenSeats: () => ramenAt(RAMEN_SEATS), ramenFace: () => ramenFace(),
     playerEat: () => { const st = eatStyle('ramen'); player.face(player.position.x, player.position.z + 5); player.eat(st.mode, st.prop, 8); }, // 친구들처럼 카메라 쪽으로 돌아앉아 그릇이 보이게
-    payMyBody: () => {
-      if (state.money < MEAL_PRICE) return;
-      commit({ ...state, money: state.money - MEAL_PRICE });
+    payMyBody: () => { // 내 몸(우사기가 든)이 든 내 지갑에서(core/swap.js)
+      const r = spendMyBody(state, MEAL_PRICE);
+      if (!r.ok) return;
+      commit(r.state);
       sound.play('coin');
-      hud.toast('내 몸(속은 우사기)이 내 돈으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }] });
+      hud.toast('내 몸(속은 우사기)이 내 지갑으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }, { text: `내 지갑 ${won(myBodyMoney(state))}` }] });
     }
   });
   /**
@@ -4485,7 +4536,7 @@ function boot() {
     enterHome({ guest: true });
   }
   /** mine: 몸이 바뀐 동안의 하치와레 동굴처럼 내 방으로(집주인 없이, 그 방 잠자리에서 잔다). */
-  function enterVisit(kind, { lodge = false, mine = false } = {}) {
+  function enterVisit(kind, { lodge = false, mine = false, quiet = false } = {}) {
     cancelPull();
     partyEnd(null, 'partyLeave');
     visit = { kind, lodge, mine };
@@ -4497,7 +4548,7 @@ function boot() {
     sound.play('job');
     const F = FRIENDS[kind];
     if (lodge) { setTimeout(() => { if (mode === 'visit') doSleep('lodge', exitVisit); }, 900); return; }
-    if (mine) { hud.toast(`하치와레 동굴(지금은 내 집)이에요. ${(friendLook(state, kind).furniture || []).includes('bed') ? '폭신 침대' : '잎사귀 잠자리'}에서 잘 수 있어요`, 3200); return; }
+    if (mine) { if (!quiet) hud.toast(`하치와레 동굴(지금은 내 집)이에요. ${(friendLook(state, kind).furniture || []).includes('bed') ? '폭신 침대' : '잎사귀 잠자리'}에서 잘 수 있어요`, 3200); return; }
     hud.toast(`${kind === 'hachiware' ? '하치와레네 동굴' : `${F.name}네 집`}에 왔어요`, 2600, HOME_ACTS[kind] ? { chips: [{ text: `✨ ${HOME_ACTS[kind].label}` }] } : null);
   }
   function exitVisit() {
@@ -4948,7 +4999,7 @@ function boot() {
         const r = tryWeedExam(state, n.kind, day), item = `제초 ${next}`;
         commit(r.state, false);
         const ev = happen({ type: r.passed ? 'weedPass' : 'weedFail', who: n.kind, item });
-        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, myName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
+        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, talkName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
         if (r.passed) hud.toast(`${josa(nameOf(n.kind), '이/가')} ${josa(item, '이/가')} 됐어요!`, 3600, { icon: faceIcon(n.kind) });
         else if (Math.hypot(n.x - player.position.x, n.z - player.position.z) < 14) hud.toast(`${josa(nameOf(n.kind), '이/가')} ${item} 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
         restHere(n.kind, 15 + Math.random() * 15);
@@ -4970,7 +5021,7 @@ function boot() {
         const r = tryLiquor(state, n.kind, day);
         commit(r.state, false);
         const ev = happen({ type: r.passed ? 'liquorPass' : 'liquorFail', who: n.kind });
-        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, myName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
+        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, talkName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
         if (r.passed) hud.toast(`${josa(nameOf(n.kind), '이/가')} 술 자격을 땄어요!`, 3600, { icon: faceIcon(n.kind) });
         else if (Math.hypot(n.x - player.position.x, n.z - player.position.z) < 14) hud.toast(`${josa(nameOf(n.kind), '이/가')} 술 자격 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
         restHere(n.kind, 15 + Math.random() * 15);
@@ -5256,9 +5307,9 @@ function boot() {
       do: 'call', ramen: true,
       fn: () => {
         // 몸이 바뀐 동안 우사기(내 몸)는 내 돈으로 사 먹는다(사이드스토리 '몸이 바뀌었다')
-        const mine = swapOn && n.kind === 'usagi' && state.money >= MEAL_PRICE;
-        commit(villagerEnergy(mine ? { ...state, money: state.money - MEAL_PRICE } : villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
-        if (mine) { sound.play('coin'); hud.toast('내 몸(속은 우사기)이 내 돈으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }] }); }
+        const paid = swapOn && n.kind === 'usagi' ? spendMyBody(state, MEAL_PRICE) : null, mine = !!(paid && paid.ok); // 내 몸이 든 내 지갑에서(core/swap.js)
+        commit(villagerEnergy(mine ? paid.state : villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
+        if (mine) { sound.play('coin'); hud.toast('내 몸(속은 우사기)이 내 지갑으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }, { text: `내 지갑 ${won(myBodyMoney(state))}` }] }); }
         happen({ type: 'meal', who: n.kind });
         restHere(n.kind, 8 + Math.random() * 10);
       }
@@ -5313,6 +5364,8 @@ function boot() {
   let show = null; // 하치와레 공연 { by, x, z, until, audience: Set, meT: 내가 들은 시간 }
   let lastGreetAt = -999; // 마지막으로 누가 나에게 다가온 때(한꺼번에 몰려오지 않게)
   const myName = () => (state && state.profile.name) || '나';
+  /** 친구들이 나를 부르는 이름: 몸이 바뀐 동안은 몸(하치와레)의 이름. */
+  const talkName = () => (swapOn ? myBodyTag().name : myName());
   const isVillager = (k) => !!VILLAGERS[k];
   const withName = (k, pair = '이랑/랑') => josa(nameOf(k), pair);
   /** 지금 하는 일(머리 위 아이콘 · 친구 앱). icon 이 없으면 아이콘 없이 글만. */
@@ -5330,8 +5383,8 @@ function boot() {
     if (!state) return null;
     const e = { day: state.clock.day, hour: hourOf(state.clock), ...ev };
     (e.who === 'me' ? Object.keys(VILLAGERS) : [e.who, e.with]).forEach((k) => remember(k, e));
-    const nl = newsLine(e, myName());
-    if (nl) { villageNews.push({ ...nl, day: e.day, hour: e.hour }); if (villageNews.length > 40) villageNews.shift(); }
+    const nl = newsLine(e, talkName());
+    if (nl) { villageNews.push({ ...nl, kinds: swapOn ? nl.kinds.map((k) => bodyOf(k, true)).filter((k) => k !== 'me') : nl.kinds, day: e.day, hour: e.hour }); if (villageNews.length > 40) villageNews.shift(); } // 몸이 바뀐 동안 소식 얼굴도 몸대로
     return e;
   }
   /** 그 친구가 이야기할 거리(어제 · 오늘, 수다 자체는 빼고). */
@@ -5340,7 +5393,7 @@ function boot() {
   function untold(kind) {
     const m = mindOf(kind);
     for (const e of newsOf(kind).filter((x) => !m.told.has(x)).reverse()) {
-      const line = e.who === 'me' ? praiseLine(kind, e, myName()) : storyLine(kind, e, myName());
+      const line = e.who === 'me' ? praiseLine(kind, e, talkName()) : storyLine(kind, e, talkName());
       if (line) return { line, ev: e };
     }
     return null;
@@ -5362,7 +5415,7 @@ function boot() {
   function swapPrank(n, day, hour, left) {
     if (pranks.day !== day) { pranks.day = day; pranks.meals.clear(); pranks.stole = false; }
     const meal = hour >= 11.5 && hour < 14 ? 'lunch' : hour >= 17.5 && hour < 20 ? 'dinner' : null;
-    if (meal && !pranks.meals.has(meal) && state.money >= MEAL_PRICE) { pranks.meals.add(meal); npcEat(n); return 'eat'; }
+    if (meal && !pranks.meals.has(meal) && myBodyMoney(state) >= MEAL_PRICE) { pranks.meals.add(meal); npcEat(n); return 'eat'; }
     if (!pranks.stole && state.job && hour >= 8 && hour < 18 && Math.random() < 0.35) {
       pranks.stole = true;
       const id = state.job.typeId;
@@ -5492,7 +5545,7 @@ function boot() {
   }
   /** 수다: 짝마다 다른 이야기, 오늘 있었던 일이나 소문을 전하기도 한다(들은 친구도 기억한다). */
   function npcChat(a, b) {
-    const conv = conversation(a.kind, b.kind, newsOf(a.kind), myName());
+    const conv = conversation(a.kind, b.kind, newsOf(a.kind), talkName());
     together(a, b, conv.lines, {
       icon: 'dots', text: (o) => `${withName(o)} 수다`,
       done: () => {
@@ -5506,7 +5559,7 @@ function boot() {
   /** 같이 라멘: 데리러 가서 말을 걸고, 라멘 가게 앞에 나란히 앉아 먹고, 먹으면서 수다. */
   function npcMealWith(a, b) {
     const r = village.spots.ramen, face = { x: r.x, z: r.z - 1.5 }, group = { need: 2, here: new Set() };
-    const conv = conversation(a.kind, b.kind, newsOf(a.kind), myName());
+    const conv = conversation(a.kind, b.kind, newsOf(a.kind), talkName());
     let finished = false;
     const end = (n) => {
       const day = state.clock.day, price = Math.min(MEAL_PRICE, villagerOf(state, n.kind, day).money);
@@ -5663,7 +5716,7 @@ function boot() {
     npcs.say(n, SHOW.thanks);
     const steps = [{ do: 'act', anim: 'wave', time: 2.4, quick: true }]; // 공연 끝: 관객에게 손 흔들기
     if (me) steps.push({ do: 'call', fn: () => {
-      npcs.say(n, fillLine(SHOW.thanksMe, { me: myName() }));
+      npcs.say(n, fillLine(SHOW.thanksMe, { me: talkName() }));
       const r = befriend(state, n.kind, 'watch', state.clock.day);
       if (r.gained > 0) { commit(r.state); hud.hearts({ x: n.x, y: n.chibi.height + 0.5, z: n.z, gained: r.gained, up: r.up, hearts: r.hearts, name: FRIENDS[n.kind].name, tag: FRIENDS[n.kind].tag }); sound.play(r.up ? 'heartUp' : 'heart'); }
     } }, { do: 'act', anim: 'talk', time: 2.6, quick: true });
@@ -5686,7 +5739,7 @@ function boot() {
   /** 랏코가 우사기를 수련장으로 불러 같이 수련. */
   function npcTrain(r, u) {
     const d = village.spots.dojo;
-    together(r, u, TRAIN_TALK, {
+    together(r, u, TRAIN_TALK.map(([k, t]) => [k, bodyNames(t)]), { // 몸이 바뀐 동안은 몸의 이름으로
       at: { x: d.x, z: d.z + 0.8 }, anim: 'train', listen: 'train', icon: 'sword', text: (o) => `${withName(o)} 수련`,
       done: () => { happen({ type: 'train', who: r.kind, with: u.kind }); minds[u.kind] = satisfy(mindOf(u.kind), 'train'); }
     });
@@ -5697,7 +5750,7 @@ function boot() {
     m.greetAt = lifeClock;
     lastGreetAt = lifeClock;
     const story = untold(kind), G = GIFT[kind];
-    const line = story ? story.line : fillLine(pickLine(GREET_RUN[kind] || ['{me}!']), { me: myName() });
+    const line = story ? story.line : fillLine(pickLine(GREET_RUN[kind] || ['{me}!']), { me: talkName() });
     // 친한 친구의 선물: 가방에 좋아하지 않는 물건이 있으면 그걸 답례로(없으면 늘 주던 것)
     const back = thanksOf(state, kind);
     const gift = h >= 3 && G && f.giftDay !== state.clock.day && Math.random() < 0.35
@@ -5755,7 +5808,7 @@ function boot() {
       .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
     if (!f || Math.hypot(f.x - p.x, f.z - p.z) > 45) return;
     setDoing(f.kind, 'heart', '나에게 달려오는 중');
-    const line = fillLine(FAINT_RUSH[f.kind] || '괜찮아?!', { me: myName() });
+    const line = fillLine(FAINT_RUSH[f.kind] || '괜찮아?!', { me: talkName() });
     npcs.plan(f, [{ do: 'approach', near: 1.8, max: 40, run: true }, { do: 'call', fn: () => npcs.say(f, line) }, { do: 'act', anim: 'talk', time: npcs.lineTime(line) + 0.3, quick: true }, { do: 'act', anim: 'idle', time: 2, quick: true }, { do: 'call', fn: () => restHere(f.kind, 8) }]);
   }
   /**
@@ -5842,7 +5895,7 @@ function boot() {
   const STAFF = ['labor', 'ramen', 'captain', 'pochette', 'shisa', 'kani'];
   const staffGreetAt = {}; // 나에게 마지막으로 인사한 때
   STAFF.forEach((k) => { restUntil[k] = 3 + Math.random() * 12; });
-  const staffLine = (kind, key) => fillLine(pickLine(STAFF_TALK[kind][key]), { me: myName() });
+  const staffLine = (kind, key) => fillLine(pickLine(STAFF_TALK[kind][key]), { me: talkName() });
   /** 그 갑옷 씨가 가까이(from 에서 maxD 안) 있고 한가하면 한마디. */
   function staffSay(kind, key, maxD, from) {
     const n = npcs.byKind(kind);

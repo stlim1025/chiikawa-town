@@ -24,6 +24,7 @@ import { isValidBosses } from './bosses.js';
 import { isValidBounty } from './bounty.js';
 import { isValidWorks, isValidWorkUse } from './works.js';
 import { isValidFishLog, isValidFishPrize } from './fishing.js';
+import { isValidSwapWallet } from './swap.js';
 
 /** 저장 키와 형식 버전. */
 export const SAVE_KEY = 'chiikawa-town-save';
@@ -78,6 +79,7 @@ export function isValidState(s) {
   if (s.bosses !== undefined && !isValidBosses(s.bosses)) return false; // 구역 보스(마주침 · 쓰러뜨린 날)
   if (s.bounty !== undefined && !isValidBounty(s.bounty)) return false; // 오늘 현상금 몬스터(쓰러뜨렸는지 · 받았는지)
   if (s.works !== undefined && !isValidWorks(s.works)) return false; // 마을 가꾸기 모금(낸 돈 · 다 모인 날)
+  if (s.swapWallet !== undefined && !isValidSwapWallet(s.swapWallet)) return false; // 몸이 바뀐 동안 든 지갑 · 가방(사이드스토리 '몸이 바뀌었다')
   if (s.workUse !== undefined && !isValidWorkUse(s.workUse)) return false; // 마을 가꾸기 시설로 한 일(꽃 딴 날 · 종 친 날)
   if (s.fishLog !== undefined && !isValidFishLog(s.fishLog)) return false; // 낚시 기록(잡은 수 · 가장 큰 cm)
   if (s.fishPrize !== undefined && !isValidFishPrize(s.fishPrize)) return false; // 낚시 도감 보상(받은 가짓수)
