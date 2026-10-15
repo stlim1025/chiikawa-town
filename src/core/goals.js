@@ -92,9 +92,9 @@ function wishes(state, kind) {
   for (const item of W.furniture || []) add('furniture', furniture(item));
   for (const item of W.wall || []) add('decor', { id: `wall-${item}`, kind: 'decor', part: 'wall', item, label: WALLPAPERS[item].name, cost: WALLPAPERS[item].price });
   for (const item of W.floor || []) add('decor', { id: `floor-${item}`, kind: 'decor', part: 'floor', item, label: FLOORS[item].name, cost: FLOORS[item].price });
-  // 집 넓히기: 한 단계씩(넓은 방 → 큰 방), 값은 내 집 넓히기와 같다
+  // 집 넓히기: 한 단계씩(넓은 방 → 큰 방), 값은 친구 살림에 맞춘 friendPrice(내 집 넓히기보다 싸다 — core/home.js)
   const size = HOME_SIZES.findIndex((h, i) => i > 0 && !bought.includes(`h-${i}`));
-  if (size > 0) add('home', { id: `h-${size}`, kind: 'home', item: size, label: HOME_SIZES[size].name, cost: HOME_SIZES[size].price });
+  if (size > 0) add('home', { id: `h-${size}`, kind: 'home', item: size, label: HOME_SIZES[size].name, cost: HOME_SIZES[size].friendPrice });
   add('liquor', { id: 'liquor', kind: 'liquor', label: LICENSES.liquor.name, cost: LICENSES.liquor.fee });
   // 더 센 무기: 지금 힘보다 센 것 가운데 가장 약한 것부터 하나씩
   const next = WEAPON_ORDER.find((w) => WEAPONS[w].dmg > npcPower(state, kind) && !bought.includes(`w-${w}`));

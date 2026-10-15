@@ -4,11 +4,13 @@ import { housingOf } from './housing.js';
 /**
  * 집 크기(게임 오리지널): 처음 방에서, 집을 산 뒤 부동산에서 한 단계씩 넓힌다. 바닥 칸(가로 cols × 세로 rows)이 늘어
  * 가구를 더 놓을 수 있다(가구 하나가 한 칸). roomR: 둥근 방 반지름. home.size: 이 목록의 번호(예전 저장에는 없다 = 0).
+ * price: 내가 부동산에서 넓히는 값(집값 50,000원 다음의 큰 목표 — 넓은 방은 집값만큼, 큰 방은 그 두 배).
+ * friendPrice: 마을 친구가 돈을 모아 자기 집을 넓히는 값(하루 수백 원을 버는 친구 살림에 맞춰 예전 값 그대로 — core/goals.js).
  */
 export const HOME_SIZES = [
-  { name: '처음 방', cols: 5, rows: 4, price: 0, roomR: 4.4 },
-  { name: '넓은 방', cols: 6, rows: 5, price: 15000, roomR: 5.2 },
-  { name: '큰 방', cols: 7, rows: 6, price: 30000, roomR: 6.0 }
+  { name: '처음 방', cols: 5, rows: 4, price: 0, friendPrice: 0, roomR: 4.4 },
+  { name: '넓은 방', cols: 6, rows: 5, price: 50000, friendPrice: 15000, roomR: 5.2 },
+  { name: '큰 방', cols: 7, rows: 6, price: 100000, friendPrice: 30000, roomR: 6.0 }
 ];
 /** 집의 크기 번호 · 칸. */
 export const sizeOf = (home) => (home && Number.isInteger(home.size) && HOME_SIZES[home.size] ? home.size : 0);

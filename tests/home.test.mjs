@@ -9,7 +9,7 @@ const owner = (money = 100000) => ({ ...createState({ name: '나', look: {} }), 
 test('집 크기: 한 단계씩 넓어지고, 방마다 칸 격자가 둥근 방 안에 들어간다', () => {
   for (let i = 1; i < HOME_SIZES.length; i++) {
     const a = HOME_SIZES[i - 1], b = HOME_SIZES[i];
-    assert.ok(b.cols * b.rows > a.cols * a.rows && b.price > a.price && b.roomR > a.roomR, b.name);
+    assert.ok(b.cols * b.rows > a.cols * a.rows && b.price > a.price && b.roomR > a.roomR && b.friendPrice > a.friendPrice && b.friendPrice < b.price, b.name); // 친구가 넓히는 값은 내 값보다 싸다
   }
   HOME_SIZES.forEach((G, size) => {
     const r = roomLayout(size), back = r.Z0, front = r.Z0 + r.rows * HOME_CELL;
@@ -25,12 +25,13 @@ test('집 넓히기: 내 집이어야 하고, 돈을 내고 한 단계씩, 가�
   const renter = { ...owner(), housing: { own: false, unpaid: 0, lottery: null } };
   assert.equal(expandHome(renter).reason, 'own');
   assert.equal(expandHome(owner(HOME_SIZES[1].price - 1)).reason, 'money');
-  let s = owner(100000);
+  const total = HOME_SIZES[1].price + HOME_SIZES[2].price;
+  let s = owner(total);
   assert.equal(sizeOf(homeOf(s)), 0);
   let r = expandHome(s);
   assert.ok(r.ok);
   s = r.state;
-  assert.equal(s.money, 100000 - HOME_SIZES[1].price);
+  assert.equal(s.money, total - HOME_SIZES[1].price);
   assert.equal(gridOf(homeOf(s)).name, '넓은 방');
   assert.deepEqual(homeOf(s).placed, createHome().placed, '가구는 그대로');
   r = expandHome(s);

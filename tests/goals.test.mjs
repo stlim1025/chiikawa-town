@@ -80,7 +80,7 @@ test('차례 목표를 다 이뤄도 바라는 것(포셰트 · 가구 · 벽지
     assert.equal(new Set(once).size, once.length, `${kind}: ${once}`);
     // 값은 그 가게 값 그대로
     for (const g of got) {
-      const want = { pochette: () => POCHETTES[g.item].price, decor: () => (g.part === 'wall' ? WALLPAPERS : FLOORS)[g.item].price, home: () => HOME_SIZES[g.item].price, liquor: () => LICENSES.liquor.fee, donate: () => DONATE_STEP }[g.kind];
+      const want = { pochette: () => POCHETTES[g.item].price, decor: () => (g.part === 'wall' ? WALLPAPERS : FLOORS)[g.item].price, home: () => HOME_SIZES[g.item].friendPrice, liquor: () => LICENSES.liquor.fee, donate: () => DONATE_STEP }[g.kind];
       if (want) assert.equal(g.cost, want(), `${kind} ${g.label}`);
     }
     // 집은 넓은 방 다음에 큰 방
