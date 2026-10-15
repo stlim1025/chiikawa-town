@@ -454,6 +454,7 @@ function boot() {
     if (Array.isArray(w.c) && Number.isFinite(w.c[0]) && Number.isFinite(w.c[1])) visiting.clock = { day: Math.max(1, Math.floor(w.c[0])), t: Math.min(0.99999, Math.max(0, w.c[1])) };
     if (typeof w.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.d)) visiting.startDate = w.d;
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
+    if (Array.isArray(w.sb)) visiting.built = [!!w.sb[0], !!w.sb[1]]; // 주인 마을에 선 이야기 건물(별 세 개 · 게임센터)
     // 몸이 바뀌었다(주인의 사이드스토리): 주인 마을 친구들도 바뀐 몸 · 이름표로(sw 가 없으면 원래대로)
     const sw = w.sw && typeof w.sw === 'object' && w.sw.me && typeof w.sw.me === 'object' ? { me: w.sw.me, name: String(w.sw.name || multi.hostName || '친구').slice(0, 8) } : null;
     visiting.swap = sw;
@@ -1020,6 +1021,7 @@ function boot() {
       const dc = decorOf(homeOf(state));
       w.hl = [sizeOf(homeOf(state)), dc.wall, dc.floor]; // 내 집 크기 · 벽지 · 바닥
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
+      w.sb = [storyBuilt('starDiner') ? 1 : 0, storyBuilt('bodySwap') ? 1 : 0]; // 이야기 건물(별 세 개 · 게임센터)도 손님 화면에
       w.kp = WORK_IDS.map((id) => [id, workOf(state, id).paid]).filter((r) => r[1] > 0); // 시설마다 모인 돈(손님 모금함 창에 내 마을 금액으로)
     }
     multi.sendWorld(w);
@@ -5377,6 +5379,8 @@ function boot() {
   let show = null; // 하치와레 공연 { by, x, z, until, audience: Set, meT: 내가 들은 시간 }
   let lastGreetAt = -999; // 마지막으로 누가 나에게 다가온 때(한꺼번에 몰려오지 않게)
   const myName = () => (state && state.profile.name) || '나';
+  /** 이야기를 받은 뒤로(끝나도) 그 자리에 늘 있는 건물인지(별 세 개 · 게임센터): 받기 전에는 없다. */
+  const storyBuilt = (id) => !!state && (isActive(state, id) || isDone(state, id));
   /** 친구들이 나를 부르는 이름: 몸이 바뀐 동안은 몸(하치와레)의 이름. */
   const talkName = () => (swapOn ? myBodyTag().name : myName());
   const isVillager = (k) => !!VILLAGERS[k];
@@ -7099,8 +7103,10 @@ function boot() {
     berries.update(dt);
     // 빛나는 버섯: 밤이면 숨 쉬듯 빛나고 갓 위에 반짝 털뭉치(이번 밤에 뗀 것 빼고). 친구 마을에서는 털뭉치가 그 마을 주인 몫이라 안 보인다
     glows.update(dt, { night: nightNow, focus: player && mode !== 'title' ? player.position : village.spots.plaza, picked: state ? pickedTonight(state) : [], guest: !!visiting });
-    // 별 세 개 레스토랑 가게: 이야기를 받은 동안만 들판 길가에 있다(친구 마을에서는 안 보인다)
-    dinerFront.visible = !!state && !visiting && isActive(state, 'starDiner');
+    // 별 세 개 레스토랑(들판 길가) · 숲 어귀 게임센터: 이야기를 받은 뒤로(끝나도) 늘 그 자리에, 받기 전에는 없다. 친구 마을에서는 그 주인 마을대로
+    const built = visiting ? visiting.built || [false, false] : [storyBuilt('starDiner'), storyBuilt('bodySwap')];
+    dinerFront.visible = built[0];
+    arcadeFront.visible = built[1];
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);

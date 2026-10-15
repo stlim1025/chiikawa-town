@@ -138,7 +138,7 @@ function glassTexture() {
   return t;
 }
 
-/** 마을: 숲 어귀의 낡은 게임센터(늘 서 있다). → { spot: 문 앞(이야기가 시작되는 자리), sign: 간판 자리 } */
+/** 마을: 숲 어귀의 낡은 게임센터. 이야기를 받기 전에는 없고 받은 뒤로는(끝나도) 늘 서 있다(visible). → { spot: 문 앞(이야기가 시작되는 자리), sign: 간판 자리, visible } */
 export function createArcadeFront(scene, village) {
   const { x, z } = ARCADE; // 숲길 북쪽 빈터(core/layout.js — 둘레에 숲 나무를 심지 않는다): 문(+z)이 길과 카메라 쪽을 본다
   const g = new THREE.Group();
@@ -187,8 +187,16 @@ export function createArcadeFront(scene, village) {
     for (let k = 0; k < 3; k++) m(GEO.sphere, (i + k) % 2 ? LEAF : VINE, { position: [sx, 2.92 - len * (k / 2.2), 1.82], scale: [0.11, 0.1, 0.07], outline: 0.008, shadow: false });
   }
   [[-2.4, 0.2, 1.4], [2.45, 0.15, 1.2], [-2.3, 0.15, -1.2], [1.0, 0.12, 1.85]].forEach(([bx, by, bz]) => m(GEO.sphere, VINE, { position: [bx, by, bz], scale: [0.42, 0.3, 0.38], outline: 0.015 })); // 덤불
-  village.obstacles.push({ x, z, box: { hx: 2.35, hz: 1.75, yaw: 0 } });
-  return { spot: { x, z: z + 2.9 }, sign: { x, y: 3.3, z: z + 1.9 } };
+  g.visible = false;
+  // 막힘: 보일 때만(soft 면 지나갈 수 있고 풀 · 꽃만 비켜 돋는다)
+  const block = { x, z, box: { hx: 2.35, hz: 1.75, yaw: 0 }, soft: true };
+  village.obstacles.push(block);
+  return {
+    spot: { x, z: z + 2.9 },
+    sign: { x, y: 3.3, z: z + 1.9 },
+    get visible() { return g.visible; },
+    set visible(on) { if (g.visible === !!on) return; g.visible = !!on; block.soft = !on; village.refreshNav(); }
+  };
 }
 
 /** 노란 슬롯머신(원작 그림): 앞이 +z, 바닥 가운데가 원점. → { group, top(구름 머리 — 부서질 때 떨어진다), hands, buttons, reels } */

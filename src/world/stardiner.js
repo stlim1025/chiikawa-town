@@ -11,7 +11,7 @@ import { roadDist } from '../core/layout.js';
  *    빵 옷(돌돌 말려 위에 빨간 열매), 커다란 오크 괴물(다리 · 앞치마 · 주먹만 — 윗몸은 천장 너머라 얼굴은 끝까지 안 보인다),
  *    벽의 '장식' 판에 붙잡힌 별똥별 셋(모서리마다 쇠고랑). 쇠고랑을 다 빼내면 오크가 뛰쳐나오고 다 같이 입구로 도망친다.
  *  - createDinerFront(scene, village): 마을 동쪽 들판 길가의 가게 겉모습(낡은 회색 가게 · 삐뚤어진 '별 세 개' 간판 · 판자로 막은 창 · 유리문).
- *    이야기를 받은 동안만 보이고 막힌다.
+ *    이야기를 받기 전에는 없고, 받은 뒤로는(끝나도) 늘 그 자리에 있다. 내 캐릭터를 가리면 반투명해진다.
  *  - buildStarTrio(): 풀려난 별똥별 셋(마을에서 고맙다며 오므라이스를 건네고 하늘로 돌아간다).
  */
 const WALL_Z = -4;
@@ -528,7 +528,7 @@ export function createStarDiner() {
 
 /**
  * 마을 동쪽 들판 길가의 레스토랑 '별 세 개' 겉모습: 낡은 회색 가게, 앞에 삐뚤어진 흰 간판('별 세 개' 손글씨),
- * 판자로 막은 창(모서리에 테이프), 하늘색 유리문. 이야기를 받은 동안만 보이고 막힌다(visible).
+ * 판자로 막은 창(모서리에 테이프), 하늘색 유리문. 이야기를 받은 뒤로 보이고 막힌다(visible — 받기 전에는 없다). 뒤로 가면 반투명해진다.
  * → { spot: 문 앞(이야기가 시작되는 자리), sign: 간판 자리, visible }
  */
 export function createDinerFront(scene, village) {
@@ -539,7 +539,9 @@ export function createDinerFront(scene, village) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   g.rotation.y = face < 0 ? Math.PI : 0;
-  const m = (geo, c, o) => { const mesh = toonMesh(geo, c, { shadow: true, ...o }); g.add(mesh); return mesh; };
+  // 다른 집처럼 내 캐릭터를 가리면(가게 뒤로 가면) 반투명해진다(world/village.js 의 fadeBuilding)
+  const f = village.fadeBuilding(x, z, 2.4);
+  const m = (geo, c, o) => { const mesh = toonMesh(geo, null, { shadow: true, ...o, material: f.mat(c) }); g.add(mesh); f.add(mesh); return mesh; };
   m(GEO.box, '#a9aeb6', { position: [0, 1.4, 0], scale: [4.4, 2.8, 3.4], outline: 0.03, shell: true });
   m(GEO.box, '#959aa2', { position: [0, 2.86, 0], scale: [4.6, 0.14, 3.6], outline: 0.025, shell: true }); // 납작한 지붕 테두리
   // 앞(문 쪽 = +z): 판자로 막은 창 · 하늘색 유리문 · 삐뚤어진 간판
@@ -550,7 +552,7 @@ export function createDinerFront(scene, village) {
   m(GEO.box, '#bfe0ee', { position: [0.95, 0.98, 1.74], scale: [1.08, 1.84, 0.04], outline: false }); // 유리
   m(GEO.box, '#e8edf0', { position: [0.62, 0.95, 1.77], scale: [0.14, 0.2, 0.02], outline: 0.008 }); // 손잡이 판
   m(GEO.box, '#f1f1ec', { position: [-0.15, 2.95, 1.86], rotation: [0, 0, 0.1], scale: [4.4, 1.4, 0.1], outline: 0.03, shell: true });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.31), new THREE.MeshBasicMaterial({ map: sharedSign() }));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.31), f.own(new THREE.MeshBasicMaterial({ map: sharedSign() })));
   sign.position.set(-0.15, 2.95, 1.915);
   sign.rotation.z = 0.1;
   g.add(sign);
