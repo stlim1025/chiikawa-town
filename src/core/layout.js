@@ -35,6 +35,12 @@ export const RIVER = { z: 36, amp: 2.5, freq: 0.06, half: 3 };
 export const BRIDGES = [{ x: 0, half: 1.4 }, { x: -40, half: 1.2 }];
 /** 남서쪽 호수(타원). */
 export const LAKE = { x: -48, z: 60, rx: 15, rz: 10 };
+/**
+ * 숲 어귀의 낡은 게임센터(사이드스토리 '몸이 바뀌었다' — world/arcade.js): 숲길 북쪽, 문(+z)이 길과 카메라 쪽을 본다.
+ * 둘레 빈터(arcadeClear)에는 숲 나무를 심지 않는다(위스키 봉봉 덩굴 자리와는 떨어져 있다).
+ */
+export const ARCADE = { x: -33.5, z: -6.8 };
+export const arcadeClear = (x, z) => Math.abs(x - ARCADE.x) < 4.4 && z > ARCADE.z - 3.6 && z < ARCADE.z + 5;
 /** 이보다 남쪽은 넓은 호수(월드 남쪽 끝). */
 export const SOUTH_SHORE = 72;
 /** 남쪽 바다가 보이는 절벽(잠옷 밤나들이에서 별 보는 곳): 해안 앞 바다를 아래로 낮춘 만(cove: x0 ~ x1, 해안 ~ z1, 수면 y)과 가장자리 통나무(log). */

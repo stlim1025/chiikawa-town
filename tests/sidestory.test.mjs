@@ -385,3 +385,47 @@ test('파자마 파티즈: 잠옷 밤나들이를 끝낸 뒤 여덟째 날부터
   for (const k of ['chiikawa', 'hachiware', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > 0, k);
   assert.equal(r.state.story.pajamaParty, 8, '본 날을 적어 둔다');
 });
+
+test('몸이 바뀌었다: 우사기 · 하치와레 · 치이카와 하트 3개면 낮에 우사기 → 게임센터 → 라멘 → 다음 날 우는 치이카와 → 메달 → 게임센터에서 원래대로', async () => {
+  const Sw = await import(G + 'swap.js');
+  let s = fresh(8, 12);
+  for (const k of ['usagi', 'hachiware', 'chiikawa']) s = withHearts(s, k, 3);
+  assert.ok(Q.canOffer(s, 'bodySwap'));
+  assert.equal(Q.markOf(s, 'usagi'), 'story', '우사기 머리 위에 이야기 표시');
+  assert.ok(!Q.canOffer(withHearts(s, 'chiikawa', 2), 'bodySwap'), '치이카와와도 하트 3개부터');
+  assert.ok(!Q.canOffer(withHearts(s, 'hachiware', 2), 'bodySwap'), '하치와레와도 하트 3개부터');
+  assert.ok(!Q.canOffer({ ...s, clock: at(8, 19) }, 'bodySwap'), '낮에만');
+  const steps = Q.QUESTS.bodySwap.steps;
+  assert.deepEqual(steps.map((st) => st.scene || st.fx), ['swapSlot', 'swapRamen', 'swapCry', 'swapChase', 'swapBack']);
+  assert.ok(Q.PLACES.arcade && Q.PLACES.ramenShop);
+  s = Q.startQuest(s, 'bodySwap');
+  assert.ok(!Sw.isSwapped(s), '게임센터에 가기 전에는 그대로');
+  s = Q.completeStep(s, 'bodySwap', 8).state;
+  assert.ok(Sw.isSwapped(s), '슬롯을 돌린 뒤부터 바뀐 채');
+  s = Q.completeStep(s, 'bodySwap', 8).state;
+  assert.ok(!Q.stepReady(s, 'bodySwap'), '우는 치이카와는 하치와레 동굴에서 잔 다음 날');
+  s = { ...s, clock: at(9, 10) };
+  assert.ok(Q.stepReady(s, 'bodySwap'));
+  s = Q.completeStep(s, 'bodySwap', 9).state;
+  s = Q.completeStep(s, 'bodySwap', 9).state;
+  assert.ok(Sw.isSwapped(s), '되돌리기 전까지는 바뀐 채');
+  const r = Q.completeStep(s, 'bodySwap', 9);
+  assert.ok(r.finished);
+  assert.ok(!Sw.isSwapped(r.state), '되돌리면 원래 몸');
+  assert.ok(r.state.money > s.money, '보상');
+  for (const k of ['chiikawa', 'hachiware', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > F.ptsForHearts(3), k);
+});
+
+test('몸이 바뀌었다: 이름표는 몸대로 바꿨다가 그대로 되돌린다', async () => {
+  const Sw = await import(G + 'swap.js');
+  const kinds = ['chiikawa', 'hachiware', 'usagi'], before = kinds.map((k) => ({ ...F.FRIENDS[k] }));
+  const me = { name: '나', tag: '#ffffff', ink: '#5a4a3a' };
+  Sw.swapNames(true, me);
+  assert.equal(F.FRIENDS.chiikawa.name, before[2].name, '치이카와(속)는 우사기 몸');
+  assert.equal(F.FRIENDS.hachiware.name, before[0].name, '하치와레(속)는 치이카와 몸');
+  assert.equal(F.FRIENDS.usagi.name, '나', '우사기(속)는 내 몸');
+  assert.equal(Sw.myBodyTag().name, before[1].name, '나는 하치와레 몸');
+  Sw.swapNames(true, me); // 두 번 켜도 원래 값을 잃지 않는다
+  Sw.swapNames(false);
+  kinds.forEach((k, i) => assert.deepEqual({ ...F.FRIENDS[k] }, before[i], k));
+});

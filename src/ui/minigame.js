@@ -6,6 +6,8 @@
  * timing({ label, button, need, zone: [from, to], speed, grow, wobble, onTick(p), onHit(n), onMiss(), onDone(misses) }):
  *   바늘이 왔다 갔다 하는 동안 초록 칸에서 누른다. need 번 맞히면 끝. 빗나가면 칸이 grow 만큼 넓어진다.
  *   wobble(0 ~ 1, 없으면 0): 바늘이 취한 듯 빨라졌다 느려졌다 한다(위스키 봉봉의 취권 펀치).
+ * button({ label, button, need, onPress() }): 버튼만(몸이 바뀌었다 — 슬롯 릴 멈추기). 누를 때마다 onPress() 가 돌려준 판정('good' · 'miss')을 띄운다.
+ *   need 칸은 setHits(n) 으로 채우고, 끝내기는 부르는 쪽이 done().
  * update(dt) · stop() · active · setLabel(text, tone): 위 안내 글을 바꾼다(tone 'warn' 노랑 · 'alert' 빨강)
  */
 const WORDS = { good: '좋아!', miss: '빗나감…', caught: '들켰다!' };
@@ -37,6 +39,7 @@ export function createMinigame(ui) {
   function draw() {
     if (!run) return;
     if (run.kind === 'mash') { fill.style.width = run.p * 100 + '%'; zone.style.left = '96%'; zone.style.width = '4%'; needle.style.left = run.p * 100 + '%'; return; }
+    if (run.kind === 'press') { pips.replaceChildren(...Array.from({ length: run.need }, (_, i) => { const e = document.createElement('i'); if (i < run.hits) e.className = 'on'; return e; })); return; }
     zone.style.left = run.zone[0] * 100 + '%';
     zone.style.width = (run.zone[1] - run.zone[0]) * 100 + '%';
     fill.style.width = '0';
@@ -58,6 +61,11 @@ export function createMinigame(ui) {
       pips.replaceChildren();
       draw();
     },
+    button({ label, button = '멈춰!', need = 3, ...cb }) {
+      run = { kind: 'press', need, hits: 0, cb, lock: 0 };
+      show(label, button, 'press');
+      draw();
+    },
     timing({ label, button = '지금!', need = 3, zone: z = [0.42, 0.58], speed = 0.9, grow = 0.04, wobble = 0, ...cb }) {
       run = { kind: 'timing', p: 0, ph: 0, speed, zone: [...z], grow, need, hits: 0, misses: 0, cb, lock: 0, wobble, wt: 0 };
       show(label, button, 'timing');
@@ -74,6 +82,12 @@ export function createMinigame(ui) {
         return;
       }
       if (run.lock > 0) return; // 맞힌 직후 잠깐은 무시(두 번 눌림 방지)
+      if (run.kind === 'press') {
+        const word = run.cb.onPress?.();
+        btn.classList.remove('hit'); void btn.offsetWidth; btn.classList.add('hit');
+        if (word) { flash(word); run.lock = 0.25; }
+        return;
+      }
       if (run.p >= run.zone[0] && run.p <= run.zone[1]) {
         run.hits++;
         run.lock = 0.35;
@@ -93,6 +107,7 @@ export function createMinigame(ui) {
     update(dt) {
       if (!run) return;
       if (run.kind === 'mash') run.p = Math.max(0.02, run.p - run.decay * dt);
+      else if (run.kind === 'press') run.lock = Math.max(0, run.lock - dt);
       else {
         run.lock = Math.max(0, run.lock - dt);
         run.wt += dt;
@@ -103,6 +118,9 @@ export function createMinigame(ui) {
       draw();
     },
     stop() { run = null; root.hidden = true; },
+    /** 버튼만 놀이: 채운 칸 수 · 끝내기(사라지며 onDone). */
+    setHits(n) { if (run && run.kind === 'press') { run.hits = n; draw(); } },
+    done() { if (run) end(); },
     setLabel(text, tone = '') { lab.textContent = text; root.classList.toggle('warn', tone === 'warn'); root.classList.toggle('alert', tone === 'alert'); }
   };
   btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); api.press(); });

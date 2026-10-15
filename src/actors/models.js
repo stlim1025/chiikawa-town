@@ -1314,6 +1314,8 @@ function mergeDetails(pivots, props, roles) {
 
 /** 내 캐릭터 모델. 빠진 항목은 기본값을 쓴다. */
 export function buildChibi(look) {
+  // 다른 친구 몸에 든 나(사이드스토리 '몸이 바뀌었다' — core/swap.js): 그 친구 모델 그대로(마을 · 집 · 친구 방 · 이야기 장면의 나 모두)
+  if (look && look.npc && DEFS[look.npc]) return buildNpc(look.npc);
   const c = buildFromDef(playerDef(look));
   if (look && look.accessory === 'pajama') wearPajama(c, true, PAJAMA_COLORS.me); // 귀 달린 잠옷은 온몸에 입힌다
   if (look && look.accessory === 'jailsuit') wearStripes(c, true); // 줄무늬 죄수복은 온몸에, 줄무늬 모자까지 한 벌(옷장은 한 번에 하나라)

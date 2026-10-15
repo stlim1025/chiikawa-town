@@ -139,6 +139,8 @@ export function createInterior() {
   const pos = { x: room.DOOR.x, z: room.DOOR.z - 0.5 };
   let yaw = Math.PI, phase = 0, moving = false;
   let mePose = null; // 잠깐 하는 몸짓(먹기) { mode, t, dur, prop }
+  let lastHome = null; // 마지막으로 그린 집(집주인이 설 빈자리를 찾을 때)
+  let host = null, hostAt = null; // 집주인: 몸이 바뀐 동안(사이드스토리 '몸이 바뀌었다') 내 집에 사는 우사기(내 몸) — 손님으로 들어오면 방 안에 서 있다
 
   /** 그 크기(core/home.js HOME_SIZES 번호)의 방을 짓는다. 카메라도 방 크기만큼 물러선다. */
   function buildRoom(size) {
@@ -330,6 +332,7 @@ export function createInterior() {
     if (sh && sh.kind === 'rect' ? Math.abs(x) > sh.hx - 0.45 || z < sh.z0 + 0.5 || z > sh.z1 - 0.12 : Math.hypot(x, z) > room.R - 0.55) return true; // 벽(둥근 방 · 네모난 방)
     if (Math.hypot(x - room.WARDROBE.x, z - room.WARDROBE.z) < 0.75 + r) return true;
     if (Math.hypot(x - room.CHEST.x, z - room.CHEST.z) < 0.55 + r) return true;
+    if (host && Math.hypot(x - hostAt.x, z - hostAt.z) < 0.5 + r) return true; // 집주인
     return home.placed.some((p) => {
       if (WALKABLE.has(p.id)) return false;
       const c = cellCenter(p.cx, p.cz, room.size);
@@ -346,6 +349,7 @@ export function createInterior() {
     camera,
     /** 놓인 가구를 다시 그린다. 집 크기가 바뀌었으면 방을 다시 짓고, 벽지 · 바닥 색을 붙인다. */
     setHome(home) {
+      lastHome = home;
       const size = sizeOf(home), d = decorOf(home);
       if (size !== room.size) buildRoom(size);
       wallMat.color.set(WALLPAPERS[d.wall].color);
@@ -426,6 +430,23 @@ export function createInterior() {
     free(home, x, z, r = 0.2) { return !blocked(home, x, z, r); },
     /** 그 자리에 바로 선다(확인용). */
     standAt(x, z) { pos.x = x; pos.z = z; },
+    /**
+     * 집주인(몸이 바뀐 동안 내 집에 사는 우사기 — 내 몸)을 방 가운데쯤 빈자리에 세운다. look 이 없으면 치운다.
+     * 가구 · 옷장 · 상자를 피해 방 안쪽부터 찾고, 손님(나)을 바라본다.
+     */
+    setHost(look) {
+      if (host) { scene.remove(host.root); host = null; }
+      if (!look || !lastHome) return;
+      const chibi = buildChibi(look), h = lastHome;
+      hostAt = { x: 0, z: 0 };
+      host = null; // 빈자리를 찾는 동안은 집주인과 부딪히지 않게
+      for (const [x, z] of [[0, -0.6], [0.9, -0.9], [-0.9, -0.9], [0, -1.6], [1.6, -0.2], [-1.6, -0.2], [0, 0.4], [1.2, 0.8], [-1.2, 0.8]]) {
+        if (!blocked(h, x, z, 0.45) && Math.hypot(x - room.DOOR.x, z - room.DOOR.z) > 1.2) { hostAt = { x, z }; break; }
+      }
+      host = chibi;
+      host.root.position.set(hostAt.x, 0, hostAt.z);
+      scene.add(host.root);
+    },
     /** 같이 놀기: 문간에 먼저 와 있는 사람(others [{ x, z }])과 겹치지 않게 옆 빈자리로 비켜 선다(가구 · 벽은 피한다). */
     stepAside(home, others) {
       if (!others.length) return;
@@ -491,6 +512,10 @@ export function createInterior() {
       if (mePose) { mePose.t -= dt; if (mePose.t <= 0 || moving) { if (mePose.prop) showOnlyProp(me, null); mePose = null; } } // 걸어가면 그만 먹는다
       if (mePose) animateChibi(me, mePose.mode, t, { phase, eat: 1 - mePose.t / mePose.dur });
       else animateChibi(me, moving ? 'walk' : 'idle', t, { phase });
+      if (host) { // 집주인(속은 우사기)은 나를 바라보며 가끔 깡충
+        host.root.rotation.y = Math.atan2(pos.x - hostAt.x, pos.z - hostAt.z);
+        animateChibi(host, Math.sin(t * 0.7) > 0.6 ? 'hop' : 'idle', t, {});
+      }
     }
   };
 }

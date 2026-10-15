@@ -17,6 +17,9 @@ const MELODY = [
 const BASS = [48, 45, 41, 43, 48, 45, 41, 48]; // 마디마다 근음(1·3박에 친다)
 const TEMPO = 100;
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+// 「위풍당당 행진곡」 1번 가운데 부분 선율(몸이 바뀌었다): [MIDI, 몇 박째, 길이(박)] — 네 마디, 베이스는 근음
+const POMP = [[76, 0, 2], [74, 2, 1], [72, 3, 1], [71, 4, 2], [69, 6, 1], [71, 7, 1], [72, 8, 2], [74, 10, 1], [71, 11, 1], [72, 12, 4]];
+const POMP_BASS = [[48, 0, 4], [43, 4, 4], [41, 8, 2], [43, 10, 2], [48, 12, 4]];
 
 /**
  * 보스전 곡(보스가 깨어 가까이 있을 때 · main.js 가 bossMusic(true)): 라단조 · 빠른 템포, 8마디 반복.
@@ -240,6 +243,15 @@ export function createSound(storage) {
       tone({ freq: midi(n), type: 'triangle', start: i * 0.24, dur: 0.3, vol: 0.12 });
       if (i % 2 === 0) tone({ freq: midi(n - 12), type: 'sine', start: i * 0.24, dur: 0.45, vol: 0.06 });
     }),
+    // 몸이 돌아왔다(사이드스토리 '몸이 바뀌었다'): 엘가 「위풍당당 행진곡」 1번 가운데 부분 선율을 짧게(1901년 곡이라 저작권이 끝났다 — 기억에 기대 옮겨 원곡과 조금 다를 수 있다)
+    pomp: () => {
+      const beat = 0.5;
+      POMP.forEach(([n, at, len]) => {
+        tone({ freq: midi(n), type: 'triangle', start: at * beat, dur: len * beat * 0.95, vol: 0.13, attack: 0.03 });
+        tone({ freq: midi(n), type: 'square', start: at * beat, dur: len * beat * 0.7, vol: 0.025, attack: 0.03 });
+      });
+      POMP_BASS.forEach(([n, at, len]) => tone({ freq: midi(n), type: 'triangle', start: at * beat, dur: len * beat * 0.95, vol: 0.12 }));
+    },
     // 몬스터 공격 예고(짧게 올라가는 삐-) · 땅을 쿵 치는 소리
     warn: () => tone({ freq: 520, slideTo: 880, type: 'triangle', dur: 0.14, vol: 0.06 }),
     thud: () => { tone({ freq: 110, slideTo: 55, type: 'sine', dur: 0.22, vol: 0.2 }); noise({ dur: 0.12, vol: 0.12, freq: 300, sweepTo: 120, q: 0.8 }); },

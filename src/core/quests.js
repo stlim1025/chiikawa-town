@@ -83,6 +83,8 @@ export const PLACES = {
   dojo: { name: '수련장', r: 3.4 },
   bonbonVine: { name: '초콜릿 덩굴', r: 2.8 }, // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
   switchRock: { name: '바위산 끝 절벽 동굴', r: 3 }, // 바위산 북쪽 끝 절벽(창살로 막힌 동굴 입구가 늘 있다 — world/switchcave.js)
+  arcade: { name: '낡은 게임센터', r: 3 }, // 숲 어귀의 낡은 게임센터(늘 서 있다 — world/arcade.js)
+  ramenShop: { name: '라멘 로우', r: 3.2 }, // 라멘 로우 앞
   // 마을 가꾸기(core/works.js)로 생긴 곳
   bench: { name: '연못 쉼터', r: 2.6 },
   pavilion: { name: '강가 정자', r: 2.8 },
@@ -491,6 +493,33 @@ export const QUESTS = {
       say: ['헤헤… 오데, 진짜 힘 세더라~ 또 만날 수 있을까?', { who: 'chiikawa', text: '…감옥은… 이제 싫어…' }, '줄무늬 옷이랑 모자는 기념으로 가져가, {name}! 잘 어울려~']
     }],
     reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, accessory: ['jailcap', 'jailsuit'] }
+  },
+  // 몸이 바뀌었다(원작 애니 202 ~ 210화 「슬롯」): 우사기를 따라간 낡은 게임센터의 슬롯을 돌렸더니 처음엔 눈썹만, 다시 돌리자 속이 통째로 바뀐다 →
+  // 바뀐 채 라멘(우사기 몸의 치이카와가 처음으로 마늘 추가) → 제초 시험을 앞둔 치이카와가 자격증 사진 걱정에 울고 → 우사기가 숨긴 메달로 다시 돌려 원래대로 →
+  // 이야기를 들은 모몽가가 슬롯을 부순다. 바뀌는 동안의 일은 core/swap.js, 장면은 stories/swap.js · world/arcade.js.
+  // 게임에서 정한 부분: 나까지 휘말린 것(우사기는 내 몸, 나는 하치와레 몸), 이야기를 여는 하트 조건, 게임센터 자리, 바뀐 동안 하치와레 동굴에서 자고
+  // 우사기(내 몸)가 내 돈으로 라멘을 사 먹고 일감을 뺏는 것, 메달을 숨긴 우사기 붙잡기, 슬롯 놀이, 대사 전부와 보상
+  bodySwap: {
+    title: '몸이 바뀌었다', giver: 'usagi', side: true, hours: [9, 17], needHearts: 3, needFriends: { chiikawa: 3, hachiware: 3 }, ask: '그거 뭐야?',
+    offer: ['(우사기가 반짝반짝한 동그란 걸 흔들며 방방 뛴다)', '우라! 야하!',
+      { who: 'hachiware', text: '그거 메달이야? 숲 어귀 낡은 게임센터에서 주웠구나~' },
+      { who: 'chiikawa', text: '…게임센터…? (두근두근)' },
+      { who: 'hachiware', text: '아직 기계가 움직이려나? 다 같이 가 보자, {name}!' }],
+    steps: [
+      { type: 'visit', place: 'arcade', hours: [9, 18], scene: 'swapSlot', speaker: 'hachiware', goal: '숲 어귀의 낡은 게임센터로 가 보자! (오전 9시 ~ 오후 6시)',
+        say: ['바깥에서 봐도 진짜 바뀌었네~ 치이카와 몸은 걸음이 엄청 짧아~', '…놀랐더니 배고파졌어. 바뀐 몸 그대로 다 같이 라멘 먹으러 가자!'] },
+      { type: 'visit', place: 'ramenShop', hours: [11, 21], scene: 'swapRamen', speaker: 'hachiware', goal: '바뀐 몸 그대로 다 같이 라멘 로우에서 라멘을 먹자! (오전 11시 ~ 오후 9시)',
+        say: ['맛있었다~ 근데 오늘 밤은 어디서 자지?', '각자 몸의 집에서 자 보자! {name}, 오늘 밤은 하치와레 동굴로 가~', '내일 아침이면… 원래대로 돌아와 있을까~?'] },
+      { type: 'talk', to: 'chiikawa', nextDay: true, hours: [7, 20], fx: 'swapCry', ask: '왜 그래…?', goal: '하치와레 동굴에서 하룻밤 자고, 다음 날 우사기 몸이 된 치이카와를 만나 보자! (오전 7시 ~ 오후 8시)',
+        say: ['…제초 시험… 보려고 했는데…', '…자격증 사진이… 우사기 얼굴로 나오면… (훌쩍)', '…원래대로… 돌아가고 싶어… (엉엉)', { who: 'hachiware', text: '치이카와… 그래, 돌아가자! 근데 메달이 없잖아~', cue: 'swapCalm' },
+          { who: 'hachiware', text: '…앗, 우사기가 하나 몰래 숨겨 둔 걸 봤어! {name}, 우사기를 붙잡아 줘!' }] },
+      { type: 'talk', to: 'usagi', hours: [7, 20], fx: 'swapChase', ask: '메달 돌려줘!', goal: '메달을 숨긴 우사기(내 몸)를 붙잡자! (오전 7시 ~ 오후 8시)',
+        say: ['하아…?! (주머니에서 메달을 꺼낸다)', '…우라. (메달을 내민다)', { who: 'hachiware', text: '찾았다~! 다 같이 게임센터로 가자!' }] },
+      { type: 'visit', place: 'arcade', hours: [8, 20], scene: 'swapBack', speaker: 'usagi', goal: '메달을 들고 다 같이 게임센터로 가서 원래대로 돌아가자! (오전 8시 ~ 오후 8시)',
+        say: ['…하아. (연기 나는 게임센터를 돌아본다)', { who: 'hachiware', text: '이제 그 기계로 몸이 바뀔 일은 없겠다~ 다행인가?' }, { who: 'chiikawa', text: '…응. 내 몸이… 제일 좋아…' },
+          { who: 'hachiware', text: '{name}도 하치와레 몸으로 고생 많았어~ 고마워!' }] }
+    ],
+    reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2 } }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, toonInstances, GEO } from '../render/toon.js';
-import { WORLD_HALF, VILLAGE_R, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, CANYON, canyonLen, canyonCoords, canyonAt, onLairLead, riverZ, roadDist, shoreDist } from '../core/layout.js';
+import { WORLD_HALF, VILLAGE_R, arcadeClear, RIVER, BRIDGES, BRIDGE_LEN, BRIDGE_TOP, BRIDGE_RAMP, LAKE, SOUTH_SHORE, CAVE, CLIFF, PIER, BOSS_LAIRS, ARENAS, ARENA_WALL, CANYON, canyonLen, canyonCoords, canyonAt, onLairLead, riverZ, roadDist, shoreDist } from '../core/layout.js';
 import { buildLairs, edgeMounds } from './lairs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -63,7 +63,7 @@ export function buildOutdoors(ctx) {
       const rd = roadDist(px, pz);
       if (rd < 2.2 || (!edge && rand() < 0.22)) continue; // 길과 숲속 빈터
       const s = 0.95 + rand() * 0.45, leaf = rand() < 0.5 ? '#5fb36e' : '#6cc77e';
-      if (arenaClear(px, pz)) rand(); // 고목 거인 마당 · 입구 앞: 나무는 빼되 난수(나무 방향 — tree · forestTree 둘 다 한 번)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
+      if (arenaClear(px, pz) || arcadeClear(px, pz)) rand(); // 고목 거인 마당 · 입구 앞 · 숲 어귀 게임센터 빈터: 나무는 빼되 난수(나무 방향 — tree · forestTree 둘 다 한 번)는 그대로 써서 뒤 나무 · 바위 자리가 바뀌지 않게
       else if (rd < 5) tree(px, pz, s, leaf, zones.groupAt(px, pz));
       // 빈터 남쪽(카메라 쪽) · 북쪽 숲 들판 나무는 싸움을 가리면 반투명해지는 나무로(이것도 난수를 한 번 쓴다)
       else if (elderFade(px, pz)) tree(px, pz, s, leaf, zones.groupAt(px, pz));

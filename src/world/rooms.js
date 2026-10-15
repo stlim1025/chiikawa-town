@@ -23,7 +23,7 @@ const ROOMS = {
   momonga: { shell: 'house', wall: '#dcecf8', floor: '#e2c6a8', items: [['bed', -2.0, -1.7, 0], ['lamp', -0.6, -2.1, 0], ['rug', 0.6, 0.3, 0], ['cushion', 1.6, -1.2, 0]], prop: 'mirror', host: [0.2, -0.9], act: [2.4, -2.6, 1.25, '거울 보며 꾸미기'], slots: {} },
   rakko: { shell: 'house', wall: '#e9dcc6', floor: '#b98c5e', items: [['shelf', -2.1, -2.1, 0], ['table', 1.7, -1.8, 0], ['bed', -2.2, -0.2, 1], ['rug', 0.4, 0.4, 0]], prop: 'dojo', host: [0.4, -1.0], act: [1.8, 0.2, 1.1, '같이 수련하기'],
     slots: { plant: [-0.6, -2.4, 0], lamp: [2.4, 1.5, 0] } },
-  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', host: [-0.2, -0.9], act: [1.0, -1.6, 1.05, '같이 노래하기'],
+  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', sleep: [-1.85, -1.55], host: [-0.2, -0.9], act: [1.0, -1.6, 1.05, '같이 노래하기'],
     slots: { rug: [-1.0, 1.1, 0], stove: [2.4, 0.5, 0], plant: [-2.3, 1.3, 0], table: [1.5, 1.5, 0], bed: [0.3, -2.3, 0] } }
 };
 /** 집을 넓히면(core/home.js 의 HOME_SIZES 번호) 방이 이만큼 커진다(가구 자리는 그대로, 카메라가 그만큼 물러난다). */
@@ -52,6 +52,7 @@ export function createRooms() {
   let yaw = Math.PI, phase = 0, moving = false;
   // 잠깐 하는 몸짓(휘두르기 · 춤 · 만세): { mode, t, dur }
   let mePose = null, hostPose = null;
+  let own = false; // 내 방처럼(몸이 바뀐 동안의 하치와레 동굴 — 사이드스토리 '몸이 바뀌었다'): 집주인 없이 그 방 잠자리(spec.sleep)에서 잔다
   const add = (o, x = 0, z = 0) => { o.position.x += x; o.position.z += z; room.add(o); return o; };
   const mesh = (geo, c, o) => add(toonMesh(geo, c, { shadow: false, ...o }));
 
@@ -168,7 +169,8 @@ export function createRooms() {
      * extra: 집주인이 돈을 모아 이룬 것(core/goals.js 의 friendLook) — 산 가구는 slots 자리에, 벽지 · 바닥은 그 색으로(동굴 벽은 바위 그대로),
      * 넓힌 집이면 방이 커지고, 멘 포셰트는 집 안에서도 멘다.
      */
-    setRoom(kind, look, extra = {}) {
+    setRoom(kind, look, extra = {}, { mine = false } = {}) {
+      own = mine;
       room.clear();
       obst = [];
       spec = { ...ROOMS[kind] };
@@ -181,6 +183,7 @@ export function createRooms() {
       door = spec.bounds.door;
       const items = [...spec.items];
       for (const id of extra.furniture || []) if (spec.slots && spec.slots[id]) items.push([id, ...spec.slots[id]]);
+      if (own && (extra.furniture || []).includes('bed') && spec.slots && spec.slots.bed) spec.sleep = spec.slots.bed.slice(0, 2); // 내 방: 산 침대가 있으면 그 침대에서 잔다
       for (const [id, x, z, rot] of items) {
         const f = furnitureModel(id);
         f.position.set(x, 0, z);
@@ -196,9 +199,11 @@ export function createRooms() {
       scene.add(me.root);
       pos.x = door.x; pos.z = door.z - 0.6; yaw = Math.PI;
       if (host) scene.remove(host.root);
+      host = null;
+      hostAt = { x: spec.host[0], z: spec.host[1] };
+      if (own) return; // 내 방: 집주인 없이
       host = buildNpc(kind);
       if (extra.pochette) wearPochette(host, extra.pochette);
-      hostAt = { x: spec.host[0], z: spec.host[1] };
       host.root.position.set(hostAt.x, 0, hostAt.z);
       scene.add(host.root);
     },
@@ -222,11 +227,12 @@ export function createRooms() {
     actSpot() { return spec && spec.act ? { x: spec.act[0], z: spec.act[1], label: spec.act[3] } : null; },
     /** 지금 할 수 있는 일: 집주인과 이야기 · 그 집의 놀이 · 문(나가기). */
     target() {
-      const opts = [
-        { type: 'host', x: hostAt.x, z: hostAt.z, r: 0.75, label: '말 걸기', reach: 1.45, y: host ? host.height + 0.35 : 1.4 },
-        { type: 'door', x: door.x, z: door.z - 0.2, r: 0.6, label: '나가기', reach: 0.9, y: 1.1 }
-      ];
-      if (spec && spec.act) { const [x, z, reach, label] = spec.act; opts.push({ type: 'act', x, z, r: 0.7, label, reach, y: 1.3 }); }
+      const opts = [{ type: 'door', x: door.x, z: door.z - 0.2, r: 0.6, label: '나가기', reach: 0.9, y: 1.1 }];
+      if (own) { if (spec && spec.sleep) opts.push({ type: 'bed', x: spec.sleep[0], z: spec.sleep[1], r: 0.85, label: '자기', reach: 1.5, y: 1.1 }); } // 내 방: 잠자리에서 자기
+      else {
+        opts.push({ type: 'host', x: hostAt.x, z: hostAt.z, r: 0.75, label: '말 걸기', reach: 1.45, y: host ? host.height + 0.35 : 1.4 });
+        if (spec && spec.act) { const [x, z, reach, label] = spec.act; opts.push({ type: 'act', x, z, r: 0.7, label, reach, y: 1.3 }); }
+      }
       let best = null, bd = Infinity;
       for (const o of opts) { const d = Math.hypot(o.x - pos.x, o.z - pos.z); if (d < o.reach && d < bd) { bd = d; best = o; } }
       return best;
@@ -251,6 +257,8 @@ export function createRooms() {
         }
       }
     },
+    /** 그 자리에 바로 선다(확인용). */
+    standAt(x, z) { pos.x = x; pos.z = z; },
     /** 내 캐릭터가 (x, z) 를 바라본다. */
     face(x, z) { yaw = Math.atan2(x - pos.x, z - pos.z); },
     /** 방 안의 내 캐릭터 자리(따라다니는 풍뎅이가 쫓아온다). */

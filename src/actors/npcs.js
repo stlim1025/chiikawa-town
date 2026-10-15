@@ -499,6 +499,24 @@ export function createNpcs(scene, village, weeds, berries) {
     setCar(kind, on) { const n = list.find((m) => m.kind === kind); if (n) n.hasCar = !!on; },
     /** 돈을 모아 산 포셰트를 멘다(core/goals.js 의 friendLook, 바뀌었을 때만 다시 단다). id 가 없으면 벗는다. */
     setPochette(kind, id) { const n = list.find((m) => m.kind === kind); if (n && n.chibi.pochetteId !== (id || null)) wearPochette(n.chibi, id); },
+    /**
+     * 몸을 바꿔 단다(사이드스토리 '몸이 바뀌었다': 속은 그대로 움직이고 말하고, 생김새만 바뀐다). chibi 가 없으면 원래 몸(buildNpc)으로.
+     * 타고 있던 차는 새 몸으로 옮겨 태우고, 들고 있던 소품은 새 몸에 맞게 다시 고른다.
+     */
+    setBody(kind, chibi = null) {
+      const n = list.find((m) => m.kind === kind);
+      if (!n) return;
+      const next = chibi || buildNpc(kind), old = n.chibi;
+      scene.remove(old.root);
+      next.root.visible = old.root.visible;
+      next.root.position.copy(old.root.position);
+      next.root.rotation.copy(old.root.rotation);
+      if (n.car) next.root.add(n.car.root);
+      for (const tag in next.props || {}) next.props[tag].forEach((m) => { m.visible = tag === 'sheathed'; });
+      n.chibi = next;
+      n.prop = undefined;
+      scene.add(next.root);
+    },
     /** 일정이 있거나 따라다니기 · 앞장서기 · 도망 · 대화 중이라 다른 걸 시킬 수 없는지. */
     busy(n) { return !!((n.plan && n.plan.length) || n.follow || n.lead || n.flee || n.talk > 0 || n.emote); },
     /** 말풍선 한 줄. */

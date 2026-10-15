@@ -20,7 +20,7 @@ import { createLod } from './render/lod.js';
 import { createFollowCamera } from './render/camera.js';
 import { buildVillage } from './world/village.js';
 import { createWeeds, stageLabel } from './world/weeds.js';
-import { buildChibi, setCrying, wearPajama, PAJAMA_COLORS, SEAT_LIFT } from './actors/models.js';
+import { buildChibi, buildNpc, setCrying, wearPajama, PAJAMA_COLORS, SEAT_LIFT } from './actors/models.js';
 import { setCelLight, toonMesh, GEO } from './render/toon.js';
 import { createPlayer } from './actors/player.js';
 import { createNpcs } from './actors/npcs.js';
@@ -132,6 +132,9 @@ import { createSwitchFront, createBeetleBuddy, createSwitchStage, buildSwitchGad
 import { createSwitchStory } from './stories/switch.js';
 import { createOdeSpot, createOdeStage } from './world/odejail.js';
 import { createOdeStory } from './stories/ode.js';
+import { createArcadeFront, createArcadeStage } from './world/arcade.js';
+import { createSwapStory } from './stories/swap.js';
+import { isSwapped, swapNames, myBodyTag, SWAP_BODY, MY_BODY } from './core/swap.js';
 import { createCameraStory } from './stories/camera.js';
 import { createPhotoUi } from './ui/photos.js';
 import { refreshPhotoFrame } from './world/photoframe.js';
@@ -1300,6 +1303,8 @@ function boot() {
       beetleSwitch: (at) => devBeetleSwitch(at),
       /** 오데와 함께 감옥: 'spot' 열흘째 오전 11시 숲속 빈터 근처(말을 걸면 시작 · 보상까지), 'show' · 'dig' · 'fight' · 'momonga' 그 장면부터(보상 없음). */
       odePrison: (at) => devOde(at),
+      /** 몸이 바뀌었다: 'slot' · 'ramen' · 'cry' · 'chase' · 'back' 그 단계 앞(보상까지), 'show' · 'showBack' 장면만(보상 없음). */
+      bodySwap: (at) => devSwap(at),
       /**
        * 하치와레의 카메라: 'plaza' 부탁을 받은 채 오전 11시 광장 남쪽(걸어 들어가면 시작 · 보상까지),
        * 'prints' 사진을 찍은 다음 날 오전 10시 하치와레 옆(말을 걸면 뽑은 사진 · 보상), 'show' 광장 장면만(보상 없음).
@@ -1659,6 +1664,7 @@ function boot() {
       bonbonStory.reset();
       switchStory.reset();
       odeStory.reset();
+      swapStory.reset();
       cameraStory.reset();
       loopRewinding = false;
       weather.setRain(false);
@@ -1691,7 +1697,7 @@ function boot() {
     hud.setAction(null);
     guide.ask(`${SLEEP_HOURS}시간 푹 잘까요?`, ['잘래요', '아직이요'], (i) => {
       if (i === 0) doSleep();
-      else if (mode === 'home') input.setEnabled(true);
+      else if (mode === 'home' || mode === 'visit') input.setEnabled(true);
     }, BED);
   }
   /** after: 잠 연출이 다 끝난 뒤, dark: 화면이 깜깜한 동안(친구들이 제자리로 간 다음 — 이야기 장면이 아침 자리를 미리 잡는다). */
@@ -1709,7 +1715,7 @@ function boot() {
       playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(next.clock), phase: 'morning' },
         () => { commit(next); villageOvernight(); dark?.(); }, () => sound.play('morning')).then(() => {
         sleeping = false;
-        if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
+        if (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
         homeUI.refresh();
         after?.();
         hud.toast('…또 같은 날 아침?', 3600);
@@ -1734,7 +1740,7 @@ function boot() {
     shareSleep(to, phase); // 놀러 온 친구도 같이 잔다
     playSleep(ui, { dateText: dateLabel(next.startDate || todayISO(), next.clock.day), timeText: timeLabel(to), phase }, onDark, () => { if (light) sound.play('morning'); }).then(() => {
       sleeping = false;
-      if (mode === 'play' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true);
+      if (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) input.setEnabled(true); // visit: 몸이 바뀐 동안 하치와레 동굴에서 잤다
       homeUI.refresh();
       after?.();
       hud.toast(how === 'rough' ? '바닥에서 잤더니 몸이 쑤셔요…' : how === 'lodge' ? '친구 집에서 푹 잤어요!' : '푹 잤어요!', 3400);
@@ -1798,8 +1804,24 @@ function boot() {
   }
   /** 내 모습 + 멘 포셰트. */
   // 내 모습: 만들 때 고른 몸 · 얼굴에 지금 단 소품과 멘 포셰트(옷장에서 바꾼다)
-  const myLook = () => ({ ...state.profile.look, accessory: wardrobeOf(state).wear, pochette: worn(state) });
+  const realLook = () => ({ ...state.profile.look, accessory: wardrobeOf(state).wear, pochette: worn(state) });
+  // 몸이 바뀐 동안(사이드스토리 '몸이 바뀌었다' — core/swap.js)은 하치와레 몸: 마을 · 집 · 친구 방 · 이야기 장면의 나도 그 몸으로
+  // swapForce: 게임센터 장면이 몸을 잠깐 정해 둔다(바뀌는 · 돌아오는 순간부터 마을로 나와 마무리 대사가 끝날 때까지, null 이면 퀘스트 단계대로)
+  let swapOn = false, homeGuest = false, swapForce = null; // homeGuest: 몸이 바뀐 동안 내 집에 손님으로 들어왔다(우사기가 든 내 몸의 집 — 잠 · 상자 · 꾸미기는 못 한다)
+  const myLook = () => (swapOn ? { npc: MY_BODY } : realLook());
   const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(myLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
+  /**
+   * 몸이 바뀐 채인지 살펴 바뀌었을 때만 갈아 끼운다(매 프레임): 나는 하치와레 몸, 친구들은 몸대로(core/swap.js 의 SWAP_BODY — 우사기는 내 몸),
+   * 이름표도 몸대로. 되돌아오면 원래 몸 · 이름표로.
+   */
+  function syncSwap() {
+    const on = !!state && mode !== 'title' && (swapForce ?? isSwapped(state));
+    if (on === swapOn) return;
+    swapOn = on;
+    swapNames(on, { name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
+    for (const [kind, body] of Object.entries(SWAP_BODY)) npcs.setBody(kind, on ? (body === 'me' ? buildChibi(realLook()) : buildNpc(body)) : null);
+    refreshLook();
+  }
 
   /** 내 집 마련! */
   function celebrateHouse() {
@@ -1839,23 +1861,27 @@ function boot() {
     ghost: (id, cell) => interior.ghost(id, cell)
   });
   /** 집에 들어간다: 마을 대신 집 안을 그리고, 집 안 버튼을 띄운다. */
-  function enterHome() {
+  function enterHome({ guest = false } = {}) {
     cancelPull();
     partyEnd(null, 'partyLeave'); // 같이 토벌하던 친구들은 집 앞에서 헤어진다
     mode = 'home';
     setCinematic(true);
     document.body.classList.add('in-home');
     hud.setAction(null);
+    homeGuest = guest;
     interior.setHome(homeOf(state));
     interior.setPlayer(myLook());
+    interior.setHost(guest ? realLook() : null); // 손님으로 왔으면 집주인(내 몸에 든 우사기)이 집 안에
     interior.stepAside(homeOf(state), homeRemotes.players().filter((p) => p.area === 'home')); // 같이 놀기: 집에 와 있는 친구와 겹치지 않게
-    homeUI.open();
+    if (!guest) homeUI.open(); // 손님은 자기 · 옷장 · 상자 · 꾸미기 단추가 없다
     sound.play('job');
-    const unpaid = housingOf(state).unpaid;
+    const unpaid = guest ? 0 : housingOf(state).unpaid;
     if (unpaid > 0) hud.toast('밀린 집세가 있어요', 3200, { chips: [{ icon: 'coin', text: won(unpaid) }, { icon: ICO.pin, text: '부동산에서 내기' }] });
   }
   function exitHome() {
     homeUI.close();
+    homeGuest = false;
+    interior.setHost(null);
     mode = 'play';
     setCinematic(false);
     document.body.classList.remove('in-home');
@@ -1979,7 +2005,7 @@ function boot() {
     setTimeout(() => {
       recalling = false;
       if (!state || mode !== 'play') { hud.curtain(false); return; }
-      const h = !visiting && isEvicted(state) ? village.spots.plaza : village.spots.home, at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5);
+      const h = swapOn ? village.spots.hachiCave : !visiting && isEvicted(state) ? village.spots.plaza : village.spots.home, at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5); // 몸이 바뀐 동안은 하치와레 동굴 앞
       player.setPosition(at.x, at.z);
       player.face(at.x, at.z + 3);
       cam.snap(player.position);
@@ -2671,6 +2697,7 @@ function boot() {
       if (homeTarget.type === 'door') exitVisit();
       else if (homeTarget.type === 'host') talkTo(npcs.byKind(visit.kind));
       else if (homeTarget.type === 'act') doHomeAct(visit.kind);
+      else if (homeTarget.type === 'bed') askSleep(); // 몸이 바뀐 동안 하치와레 동굴(내 집)의 잎사귀 침대
       return;
     }
     // 친구 집: 나가기만(친구 보관 상자는 열 수 없다)
@@ -2684,6 +2711,7 @@ function boot() {
       if (homeTarget.type === 'bed') askSleep();
       else if (homeTarget.type === 'wardrobe') { interior.faceCamera(); panels.openWardrobe(); }
       else if (homeTarget.type === 'chest') { sound.play('click'); panels.openStorage(); }
+      else if (homeTarget.type === 'chestLocked') { sound.play('none'); hud.toast('지금은 내 몸(속은 우사기)이 사는 집이라 상자를 열 수 없어요', 2800); }
       else if (homeTarget.type === 'door') exitHome();
       return;
     }
@@ -2693,6 +2721,7 @@ function boot() {
     if (mode === 'bonbon') { if (down && bonbonStory && !guide.open) bonbonStory.press(); return; } // 위스키 봉봉 숲속 빈터: 배 두드리기(박자 · 펀치 화면도 스스로 받는다)
     if (mode === 'beetle') return; // 스위치 바위산 기슭: 대사 · 고르기 창만
     if (mode === 'odejail') return; // 오데와 함께 감옥: 땅 파기 · 응원 연타 · 싸움 타이밍은 놀이 화면이 스스로 받는다
+    if (mode === 'arcade') return; // 몸이 바뀌었다 게임센터: 대사 · 고르기 창, 릴 멈추기는 놀이 화면이 스스로 받는다
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
@@ -2721,6 +2750,7 @@ function boot() {
     else if (target.type === 'rest') startRest(target.seat);
     else if (target.type === 'bell') ringClockBell();
     else if (target.type === 'friendHome') knockHome(target.kind);
+    else if (target.type === 'myCave') enterVisit('hachiware', { mine: true }); // 몸이 바뀐 동안 하치와레 동굴은 내 집
     else if (target.type === 'npc' && target.npc.kind === 'hachiware' && tutorialActive(state.tutorial) && TUTORIAL_LINES[state.tutorial]) {
       sayGuide(TUTORIAL_LINES[state.tutorial]); // 안내 중에 하치와레에게 말을 걸면 지금 할 일을 다시 알려 준다
     } else if (target.type === 'npc') talkTo(target.npc);
@@ -2730,7 +2760,8 @@ function boot() {
     else if (target.type === 'furniture') panels.openFurniture();
     else if (target.type === 'realty') panels.openRealty();
     else if (target.type === 'home') {
-      if (isEvicted(state)) hud.toast('쫓겨나서 못 들어가요', 3400, { chips: [{ text: '부동산으로' }] });
+      if (swapOn) knockMine(); // 몸이 바뀐 동안 내 집은 우사기(내 몸)가 사는 친구 집처럼
+      else if (isEvicted(state)) hud.toast('쫓겨나서 못 들어가요', 3400, { chips: [{ text: '부동산으로' }] });
       else enterHome();
     } else if (target.type === 'pochette') panels.openPochette();
     else if (target.type === 'pub') panels.openPub();
@@ -2770,10 +2801,11 @@ function boot() {
   let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
   let switchStory = null; // 사이드스토리 '스위치'(stories/switch.js — 아래에서 만든다)
   let odeStory = null; // 사이드스토리 '오데와 함께 감옥'(stories/ode.js — 아래에서 만든다)
+  let swapStory = null; // 사이드스토리 '몸이 바뀌었다'(stories/swap.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2994,6 +3026,22 @@ function boot() {
     shisaQuiz(n, finish) { shisaStory.quiz(finish); return true; },
     cameraPrints(n, finish) { cameraStory.prints(finish); return true; }, // 하치와레의 카메라: 뽑은 사진을 펼쳐 본다
     // 스위치: 따라다니던 풍뎅이가 하품을 하는데… ω 입속에 뾰족한 이빨이 빼곡하다
+    // 몸이 바뀌었다: 우사기 몸이 된 치이카와가 엉엉(얼굴로 다가간다 — 하치와레의 '돌아가자!' 대사 신호 swapCalm 에서 그친다)
+    swapCry(n) {
+      cryFx = { n, t: 0, crying: true };
+      npcs.emote(n, 'sob', 30);
+      startCloseup(n);
+    },
+    // 몸이 바뀌었다: 메달을 숨긴 우사기(내 몸)가 달아난다. 20초 안에 붙잡으면 메달을 내밀고(마무리), 놓치면 다시 말을 걸어 한 번 더
+    swapChase(n, finish) {
+      sayAs(n, ['하아?! (메달을 등 뒤로 숨긴다)', '…야하! (쌩 하고 달아난다)'], () => {
+        endTalk();
+        startTag(n);
+        tag.t = 20;
+        tag.medal = finish;
+      });
+      return true;
+    },
     beetleTeeth(n, finish) {
       if (beetleBuddy.on && mode === 'play') { // 카메라가 풍뎅이 얼굴로 다가가고, 풍뎅이는 카메라 쪽을 보고 하품한다
         // 작은 풍뎅이: 머리 가운데(키의 0.62쯤) 높이로, 더 가까이(1.2m), 시선은 조금만 내린다
@@ -3022,6 +3070,7 @@ function boot() {
   function finishQuestStep(id, n, lines) {
     const Q = QUESTS[id], r = completeStep(state, id, state.clock.day);
     commit(r.state);
+    syncSwap(); // 몸이 바뀌었다: 이 단계로 몸이 바뀌었거나 돌아왔으면 마무리 대사의 이름표부터 몸대로
     const say = (ls, then) => (n ? sayAs(n, ls, then) : guide.say(ls.map(fillName), then, lines.speaker ? whoOf(npcs.byKind(lines.speaker)) : NARRATOR));
     say(lines, () => {
       if (!r.finished) {
@@ -3048,6 +3097,7 @@ function boot() {
     else if (cue === 'pizzaFreeze') npcs.emote(n, 'idle', 30);
     else if (cue === 'pizzaCry') { F.crying = true; npcs.emote(n, 'sob', 30); }
     else if (cue === 'pizzaSmile') { F.crying = false; setCrying(n.chibi, false); npcs.emote(n, 'hop', 2.5); endCloseup(); }
+    else if (cue === 'swapCalm') { F.crying = false; setCrying(n.chibi, false); npcs.emote(n, 'idle', 1); endCloseup(); } // 몸이 바뀌었다: 하치와레가 '돌아가자!' 하면 울음을 그친다
   }
   /** 얼굴로 다가간다: 내 캐릭터에 가리지 않게 비스듬한 쪽에서. 그 친구는 카메라 쪽을 본다. */
   function startCloseup(n) {
@@ -3110,6 +3160,7 @@ function boot() {
       else if (step.scene === 'switchOpen' || step.scene === 'switchFinale') switchStory.play(step.scene, done);
       else if (step.scene === 'odePrison') odeStory.play(done);
       else if (step.scene === 'hachiCamera') cameraStory.play(done);
+      else if (step.scene.startsWith('swap')) swapStory.play(step.scene, done); // 몸이 바뀌었다: swapSlot · swapRamen · swapBack
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
       return;
@@ -3221,7 +3272,7 @@ function boot() {
   const WORK_PLACES = { bench: WORK_SPOTS.benches[0], pavilion: WORK_SPOTS.pavilion[0], clockTower: { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z + 1.1 }, gateNorth: { x: GATES.north.x, z: GATES.north.z + 2 }, gateEast: { x: GATES.east.x - 2, z: GATES.east.z } };
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
     : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : place === 'switchRock' ? switchFront.spot
-    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
+    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : place === 'arcade' ? arcadeFront.spot : place === 'ramenShop' ? village.spots.ramen : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
@@ -3721,9 +3772,9 @@ function boot() {
     setTimeout(() => {
       if (!state) { fainting = false; hud.curtain(false); return; }
       const r = faint(state), p = player.position; // 시간도 FAINT_HOURS 만큼 흐른다(core/combat.js)
-      const home = !isEvicted(state);
+      const home = swapOn || !isEvicted(state);
       let at;
-      if (home) { const h = village.spots.home; at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5); }
+      if (home) { const h = swapOn ? village.spots.hachiCave : village.spots.home; at = village.nearestFree(h.x + 0.6, h.z + 1.4, 0.5); } // 몸이 바뀐 동안은 하치와레 동굴 앞에서 깬다
       else {
         const gate = Object.values(GATES).reduce((a, g) => (Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? g : a));
         const k = (VILLAGE_R - 2.5) / VILLAGE_R;
@@ -4010,14 +4061,22 @@ function boot() {
     sound.play('job');
   }
   function endTag(caught) {
-    const n = tag.n, stolen = tag.thief;
+    const n = tag.n, stolen = tag.thief, medal = tag.medal;
     tag = null;
     hud.setTimer(null);
     npcs.flee(n, false);
     if (stolen) { endThiefChase(n, stolen, caught); return; }
+    if (medal) { endMedalChase(n, medal, caught); return; }
     beginTalk(n);
     if (caught) { player.cheerTime = 1.6; sound.play('pass'); } else npcs.emote(n, joyAnim(n.kind), 1.6);
     sayAs(n, [playLine(n, caught ? 'tagCaught' : 'tagEscaped')], () => reward(n, 'play'));
+  }
+  /** 몸이 바뀌었다: 메달을 숨긴 우사기(내 몸) 붙잡기가 끝났다. 잡으면 메달을 내밀고(퀘스트 마무리), 놓치면 다시 말을 걸어 한 번 더. */
+  function endMedalChase(n, finish, caught) {
+    beginTalk(n);
+    if (caught) { player.cheerTime = 1.6; sound.play('pass'); finish(); return; }
+    npcs.emote(n, 'hop', 1.6);
+    sayAs(n, ['우라~! (저만치서 메달을 흔들며 방방 뛴다)'], () => { endTalk(); hud.toast('놓쳤어요… 우사기(내 몸)에게 다시 말을 걸어 붙잡아요', 3400); });
   }
   /** 같이 춤추기: 둘이 4초 동안 춤춘다. */
   function startDance(n) {
@@ -4034,7 +4093,7 @@ function boot() {
       if (ready && tag.head <= 0) input.setEnabled(true); // 출발!
       if (!ready) tag.t -= dt;
       const secs = { icon: ICO.clock, text: `${Math.max(0, Math.ceil(tag.t))}초` };
-      hud.setTimer(tag.thief ? ['소매치기 모몽가 잡기!', secs, { icon: 'coin', text: won(tag.thief) }]
+      hud.setTimer(tag.medal ? (ready ? '메달을 숨긴 우사기(내 몸)가 도망간다… 준비!' : ['메달 되찾기!', secs]) : tag.thief ? ['소매치기 모몽가 잡기!', secs, { icon: 'coin', text: won(tag.thief) }]
         : ready ? `${FRIENDS[tag.n.kind].name}가 도망간다… 준비!` : [`${FRIENDS[tag.n.kind].name} 잡기!`, secs]);
       const caught = tag.head <= 0 && Math.hypot(tag.n.x - player.position.x, tag.n.z - player.position.z) < tag.n.chibi.radius + 0.45;
       if (caught || tag.t <= 0) endTag(caught);
@@ -4238,6 +4297,47 @@ function boot() {
       setDoing('momonga', 'pot', '고블린 감옥에 갇힌 중');
     }
   });
+  // 사이드스토리 '몸이 바뀌었다'(stories/swap.js): 숲 어귀의 낡은 게임센터(늘 서 있다) · 게임센터 안 장면(처음 들어갈 때 만든다) · 라멘 로우 앞 장면
+  const arcadeFront = createArcadeFront(scene, village);
+  let arcadeStage = null;
+  swapStory = createSwapStory({
+    hud, guide, sound, input, minigame, get stage() { return arcadeStage || (arcadeStage = createArcadeStage()); }, cam, getPlayer: () => player,
+    narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), realLook: () => realLook(), front: arcadeFront,
+    // 장면이 몸을 정한다(바뀌는 · 돌아오는 순간): 이름표 · 마을의 몸이 바로 바뀌어야 다음 대사 이름표가 맞는다
+    forceSwap: (on) => { swapForce = on; syncSwap(); }, isSwapped: () => swapOn,
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); },
+    // 라멘 로우 앞 의자에 그대로 앉히고(at) 몸짓을 시킨다
+    npcAct: (kind, anim, face, time, at = null) => { const n = npcs.byKind(kind); if (!n) return; if (at) { n.x = at.x; n.z = at.z; } npcs.act(n, anim, { face, time }); },
+    ramenSeats: () => ramenAt(RAMEN_SEATS), ramenFace: () => ramenFace(),
+    playerEat: () => { const st = eatStyle('ramen'); player.face(player.position.x, player.position.z + 5); player.eat(st.mode, st.prop, 8); }, // 친구들처럼 카메라 쪽으로 돌아앉아 그릇이 보이게
+    payMyBody: () => {
+      if (state.money < MEAL_PRICE) return;
+      commit({ ...state, money: state.money - MEAL_PRICE });
+      sound.play('coin');
+      hud.toast('내 몸(속은 우사기)이 내 돈으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }] });
+    }
+  });
+  /**
+   * 테스트 앱 '몸이 바뀌었다'(디버그 swap 도 같다): 'slot' 부탁을 받은 채 오전 10시 게임센터 앞(걸어 들어가면 시작), 'ramen' 바뀐 몸으로 낮 12시 라멘 로우 앞,
+   * 'cry' 하치와레 동굴에서 잔 다음 날 오전 9시 치이카와(우사기 몸) 옆, 'chase' 메달을 숨긴 우사기(내 몸) 옆, 'back' 게임센터 앞(되돌리기 · 보상까지),
+   * 'show' · 'showBack' 처음 · 되돌리는 장면만(보상 없음).
+   */
+  function devSwap(at) {
+    if (swapStory.active) return;
+    if (at === 'show' || at === 'showBack') { swapStory.play(at === 'show' ? 'swapSlot' : 'swapBack', () => hud.toast('테스트: 몸이 바뀌었다 끝', 2400)); return; }
+    const qs = { ...(state.quests || {}) };
+    delete qs.bodySwap;
+    const step = { slot: 0, ramen: 1, cry: 2, chase: 3, back: 4 }[at] ?? 0, hour = { ramen: 12, cry: 9, chase: 9 }[at] ?? 10, day = Math.max(5, state.clock.day);
+    let s = startQuest({ ...state, quests: qs }, 'bodySwap');
+    s = { ...s, quests: { ...s.quests, bodySwap: { ...s.quests.bodySwap, step, at: day - 1 } }, clock: { day, t: (hour - 6) / 24 } };
+    commit(s);
+    syncSwap();
+    const beside = (kind) => { const n = npcs.byKind(kind); if (!n) return null; if (n.away) { npcs.comeOut(n, n.x, n.z); delete awayInfo[kind]; } return { x: n.x + 1.5, z: n.z + 1 }; };
+    const p = at === 'ramen' ? { x: village.spots.ramen.x, z: village.spots.ramen.z + 4.5 } : at === 'cry' ? beside('chiikawa') : at === 'chase' ? beside('usagi') : { x: arcadeFront.spot.x, z: arcadeFront.spot.z + 4 };
+    if (p) { player.setPosition(p.x, p.z); cam.snap(player.position); }
+  }
   /**
    * 스위치 풍뎅이(창살을 연 뒤 마지막 장면 전까지): 지금 있는 곳(마을 · 내 집 · 친구 방)의 장면 where 로 옮겨 가 내 자리 me 를 따라온다.
    * hidden: 그 장면을 그리지 않는 동안(마을 화면이 아닐 때) 숨는다. canStand(x, z): 집 안에서 설 수 있는지(가구를 돌아서 온다).
@@ -4349,8 +4449,13 @@ function boot() {
     input.setEnabled(false);
     blackStar.rewindFx(() => { commit(loopRewind(state)); afterLoopRewind(); }, () => { loopRewinding = false; if (mode === 'play' || mode === 'home') input.setEnabled(true); });
   }
-  let visit = null; // { kind, lodge }
-  const friendDoors = () => ({ ...(village.homes || {}), hachiware: village.spots.hachiCave });
+  let visit = null; // { kind, lodge, mine }
+  // 몸이 바뀐 동안: 하치와레 동굴은 내 집(따로 '동굴로 들어가기'), 우사기(내 몸)는 내 집에 산다(우사기네 집은 비어 있다)
+  const friendDoors = () => {
+    const d = { ...(village.homes || {}), hachiware: village.spots.hachiCave };
+    if (swapOn) { delete d.hachiware; delete d.usagi; }
+    return d;
+  };
   /** 문을 두드린다: 집주인이 안에 있으면 들어가고(낮잠 중이면 반겨 준다), 밤잠 중이면 쫓겨났을 때만 재워 달라고 할 수 있다. */
   function knockHome(kind) {
     const n = npcs.byKind(kind), F = FRIENDS[kind], a = awayInfo[kind];
@@ -4372,24 +4477,33 @@ function boot() {
     }
     enterVisit(kind);
   }
-  function enterVisit(kind, { lodge = false } = {}) {
+  /** 몸이 바뀐 동안 내 집 문: 우사기(내 몸)가 사는 친구 집처럼 — 안에 있어야 들어가고, 밤잠 중이면 못 들어간다. 들어가면 손님(잠 · 상자 · 꾸미기 없음). */
+  function knockMine() {
+    const n = npcs.byKind('usagi'), a = awayInfo.usagi, F = FRIENDS.usagi;
+    if (!n || !n.away) { hud.toast(`${josa(F.name, '은/는')} 집에 없어요`, 2600); return; }
+    if (a && a.why === 'sleep') { hud.toast(`${josa(F.name, '은/는')} 쿨쿨 자고 있어요… 쉿!`, 2600); return; }
+    enterHome({ guest: true });
+  }
+  /** mine: 몸이 바뀐 동안의 하치와레 동굴처럼 내 방으로(집주인 없이, 그 방 잠자리에서 잔다). */
+  function enterVisit(kind, { lodge = false, mine = false } = {}) {
     cancelPull();
     partyEnd(null, 'partyLeave');
-    visit = { kind, lodge };
+    visit = { kind, lodge, mine };
     mode = 'visit';
     setCinematic(true);
     document.body.classList.add('in-home');
     hud.setAction(null);
-    rooms.setRoom(kind, myLook(), VILLAGERS[kind] ? friendLook(state, kind) : {}); // 돈을 모아 산 가구 · 벽지 · 바닥 · 넓힌 방 · 포셰트
+    rooms.setRoom(kind, myLook(), VILLAGERS[kind] ? friendLook(state, kind) : {}, { mine }); // 돈을 모아 산 가구 · 벽지 · 바닥 · 넓힌 방 · 포셰트
     sound.play('job');
     const F = FRIENDS[kind];
     if (lodge) { setTimeout(() => { if (mode === 'visit') doSleep('lodge', exitVisit); }, 900); return; }
+    if (mine) { hud.toast(`하치와레 동굴(지금은 내 집)이에요. ${(friendLook(state, kind).furniture || []).includes('bed') ? '폭신 침대' : '잎사귀 잠자리'}에서 잘 수 있어요`, 3200); return; }
     hud.toast(`${kind === 'hachiware' ? '하치와레네 동굴' : `${F.name}네 집`}에 왔어요`, 2600, HOME_ACTS[kind] ? { chips: [{ text: `✨ ${HOME_ACTS[kind].label}` }] } : null);
   }
   function exitVisit() {
     if (!visit) return;
     if (drill) endDrill();
-    const d = friendDoors()[visit.kind];
+    const d = friendDoors()[visit.kind] || homeDoor(visit.kind); // 몸이 바뀐 동안의 하치와레 동굴(내 집)은 문 목록에 없다
     visit = null;
     mode = 'play';
     setCinematic(false);
@@ -4566,7 +4680,7 @@ function boot() {
   // ---------- 친구들의 기운 · 잠(3단계) ----------
   /** 집에 들어가 있는 친구: kind → { why: 'sleep' | 'nap', until: 낮잠이 끝나는 마을 살림 시각 } */
   const awayInfo = {};
-  const homeDoor = (kind) => (kind === 'hachiware' ? village.spots.hachiCave : village.homes && village.homes[kind]);
+  const homeDoor = (kind) => (swapOn && kind === 'usagi' ? village.spots.home : kind === 'hachiware' ? village.spots.hachiCave : village.homes && village.homes[kind]); // 몸이 바뀐 동안 우사기(내 몸)는 내 집에서
   const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다', momonga: '졸려! 말 걸지 마!' };
   const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 귀찮게 하지 마!' };
   const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다', momonga: '…뭘 봐? 아침부터' };
@@ -4631,7 +4745,7 @@ function boot() {
     partyEnd(null, null);
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
-      if (!n || (visit && visit.kind === kind) || (kind === 'hachiware' && tutorialActive(state.tutorial))) continue;
+      if (!n || (visit && visit.kind === kind && !visit.mine) || (kind === 'hachiware' && tutorialActive(state.tutorial))) continue;
       npcs.lead(kind, null);
       if (n.flee) npcs.flee(n, false);
       npcs.goIn(n);
@@ -4662,7 +4776,7 @@ function boot() {
       const n = npcs.byKind(kind);
       if (!n) continue;
       npcs.setCar(kind, hasCar(state, kind)); // 하늘색 자동차를 샀으면(랏코) 마을 밖 먼 길은 차로
-      npcs.setPochette(kind, friendLook(state, kind).pochette); // 돈을 모아 산 포셰트는 메고 다닌다
+      if (!(swapOn && SWAP_BODY[kind])) npcs.setPochette(kind, friendLook(state, kind).pochette); // 돈을 모아 산 포셰트는 메고 다닌다(몸이 바뀐 동안은 남의 몸이라 메지 않는다)
       if (staged.has(kind) || (starShow && starShow.pals && starShow.pals.includes(kind))) continue; // 연출 중(별똥별 · 사이드스토리): 끝나면 일과대로(밤이면 하품하고 집으로)
       if (!n.away) minds[kind] = growNeeds(mindOf(kind), kind, 1.5); // 깨어 있으면 심심함 · 외로움이 조금씩 찬다
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
@@ -4670,7 +4784,7 @@ function boot() {
         const a = awayInfo[kind] || { why: 'sleep', until: 0 };
         // 저녁에 든 잠 · 고블린 감옥(오데와 함께 감옥의 모몽가)은 날이 바뀐 뒤 아침에
         const wake = !isSleepHour(hour) && (a.why === 'sleep' || a.why === 'jail' ? hour >= wakeHourOf(kind) && !(a.day != null && day <= a.day) : lifeClock >= a.until);
-        if (wake && !(visit && visit.kind === kind)) {
+        if (wake && !(visit && visit.kind === kind && !visit.mine) && !(homeGuest && mode === 'home' && kind === 'usagi')) { // 내가 놀러 와 있으면 기다린다
           const d = homeDoor(kind);
           npcs.comeOut(n, d.x, d.z + 0.6);
           const e = villagerOf(state, kind, day).energy;
@@ -5141,7 +5255,10 @@ function boot() {
     npcs.plan(n, [...ramenSeatSteps(n), { do: 'call', ramen: true, fn: () => staffSay('ramen', 'welcome', 7, r) }, { do: 'act', anim: 'slurp', face: { x: r.x, z: r.z - 1.5 }, time: 4, say: lineOf(n.kind, 'eat'), ramen: true }, {
       do: 'call', ramen: true,
       fn: () => {
-        commit(villagerEnergy(villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
+        // 몸이 바뀐 동안 우사기(내 몸)는 내 돈으로 사 먹는다(사이드스토리 '몸이 바뀌었다')
+        const mine = swapOn && n.kind === 'usagi' && state.money >= MEAL_PRICE;
+        commit(villagerEnergy(mine ? { ...state, money: state.money - MEAL_PRICE } : villagerSpend(state, n.kind, MEAL_PRICE, state.clock.day), n.kind, MEAL_ENERGY, state.clock.day), false); // 라멘을 먹으면 기운이 찬다
+        if (mine) { sound.play('coin'); hud.toast('내 몸(속은 우사기)이 내 돈으로 라멘을 사 먹었어요!', 3600, { chips: [{ icon: 'coin', text: `-${won(MEAL_PRICE)}` }] }); }
         happen({ type: 'meal', who: n.kind });
         restHere(n.kind, 8 + Math.random() * 10);
       }
@@ -5237,6 +5354,30 @@ function boot() {
   }
   const otherVillagers = (kind) => Object.keys(VILLAGERS).filter((k) => k !== kind).map((k) => npcs.byKind(k)).filter(Boolean);
 
+  /**
+   * 몸이 바뀐 동안 우사기(내 몸)의 장난: 점심 · 저녁마다 내 돈으로 라멘, 내가 받아 둔 일감을 하루 한 번 가져가 버리고,
+   * 게시판 일감도 하루 한도 없이 마구 가져간다. 할 일을 시켰으면 그 이름, 아니면 null.
+   */
+  const pranks = { day: -1, meals: new Set(), stole: false };
+  function swapPrank(n, day, hour, left) {
+    if (pranks.day !== day) { pranks.day = day; pranks.meals.clear(); pranks.stole = false; }
+    const meal = hour >= 11.5 && hour < 14 ? 'lunch' : hour >= 17.5 && hour < 20 ? 'dinner' : null;
+    if (meal && !pranks.meals.has(meal) && state.money >= MEAL_PRICE) { pranks.meals.add(meal); npcEat(n); return 'eat'; }
+    if (!pranks.stole && state.job && hour >= 8 && hour < 18 && Math.random() < 0.35) {
+      pranks.stole = true;
+      const id = state.job.typeId;
+      commit({ ...returnToBoard(state, id, day), job: null }); // 내 일감은 사라지고(한 만큼도), 우사기가 게시판에서 그 일감을 받아 간다
+      sound.play('none');
+      hud.toast('내 몸(속은 우사기)이 내가 받아 둔 일감을 가져가 버렸어요!', 3800);
+      npcWork(n, id);
+      return 'work';
+    }
+    if (hour >= 7 && hour < 18 && Math.random() < 0.5) {
+      const ids = VILLAGERS.usagi.jobs.filter((id) => left[id] > 0 && canDoJob(state, 'usagi', id));
+      if (ids.length) { npcWork(n, ids[Math.floor(Math.random() * ids.length)]); return 'work'; }
+    }
+    return null;
+  }
   /** 두뇌가 다음 할 일을 고르고 그 일을 시킨다. */
   function lifeDecide(n, kind, day, hour) {
     const v = villagerOf(state, kind, day), spec = VILLAGERS[kind], m = mindOf(kind), H = HUNTER_PROFILES[kind];
@@ -5244,6 +5385,7 @@ function boot() {
     // 낚시 일감은 낚싯대를 산 뒤에만, 풀 일감은 그 친구 제초 급수가 되어야(4급부터의 풀 일감은 하나는 내 몫으로 남긴다 — core/friendweed.js)
     const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && !friendLeaves(id, left) && canDoJob(state, kind, id)) : [];
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
+    if (swapOn && kind === 'usagi') { const prank = swapPrank(n, day, hour, left); if (prank) return prank; } // 몸이 바뀐 동안 우사기(내 몸)의 장난
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
@@ -6003,7 +6145,7 @@ function boot() {
     if (npc && !staged.has(npc.kind)) options.push({ d: Math.hypot(npc.x - p.x, npc.z - p.z) - (markOf(state, npc.kind) ? 1.2 : 0), t: { type: 'npc', npc, label: '말 걸기' } });
     for (const [key, label] of PLACES) {
       const s = village.spots[key], d = Math.hypot(s.x - p.x, s.z - p.z);
-      if (d < 1.8) options.push({ d: d - 0.6, t: { type: key, label: key === 'home' && isEvicted(state) ? '집(잠김)' : label } });
+      if (d < 1.8) options.push({ d: d - 0.6, t: { type: key, label: key === 'home' && swapOn ? '문 두드리기' : key === 'home' && isEvicted(state) ? '집(잠김)' : label } }); // 몸이 바뀐 동안 내 집은 우사기(내 몸)의 집
     }
     // 쫓겨났으면 밤에는 아무 데서나 노숙할 수 있다(가까운 다른 대상이 먼저)
     // 친구 집 · 하치와레 동굴 문 앞(3단계): 두드리기
@@ -6011,6 +6153,7 @@ function boot() {
       const dd = Math.hypot(d.x - p.x, d.z - p.z);
       if (dd < 1.8) options.push({ d: dd - 0.5, t: { type: 'friendHome', kind, label: kind === 'hachiware' ? '동굴 들여다보기' : '문 두드리기' } });
     }
+    if (swapOn) { const c = village.spots.hachiCave, dc = Math.hypot(c.x - p.x, c.z - p.z); if (dc < 1.8) options.push({ d: dc - 0.5, t: { type: 'myCave', label: '동굴로 들어가기' } }); } // 몸이 바뀐 동안 내 집
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
@@ -6193,7 +6336,7 @@ function boot() {
   const RAIN_TOP = new THREE.Color('#5b6470'), RAIN_HOR = new THREE.Color('#8b939d');
   let starNotice = 0, shakeT = 0;
   const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
-  const meWho = () => ({ kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
+  const meWho = () => (swapOn ? { kind: 'me', ...myBodyTag() } : { kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' }); // 몸이 바뀐 동안 내 이름표는 하치와레
   const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
   const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓
   // 원작처럼 셋이 같이 별똥별을 본다: 내 옆자리 [dx, dz]. 별똥별맨이 발광하면 우사기는 따라 발광, 둘은 소원을 빈다
@@ -6363,6 +6506,7 @@ function boot() {
     if (tg.type === 'glow') return { x: tg.shroom.x, z: tg.shroom.z, r: 0.8, y: 1.55, id: 'g' + tg.shroom.id };
     if (tg.type === 'npc') return { x: tg.npc.x, z: tg.npc.z, r: tg.npc.chibi.radius + 0.25, y: tg.npc.chibi.height + 0.35, id: 'n' + tg.npc.kind, skipLabel: !!tg.npc.bubble };
     if (tg.type === 'friendHome') { const d = friendDoors()[tg.kind]; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'f' + tg.kind }; }
+    if (tg.type === 'myCave') { const d = village.spots.hachiCave; return { x: d.x, z: d.z, r: 0.6, y: 1.5, id: 'myCave' }; } // 몸이 바뀐 동안의 내 집(하치와레 동굴)
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
     if (tg.type === 'pit') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'pit' };
@@ -6519,7 +6663,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage) && !(odeStory && odeStory.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage) && !(odeStory && odeStory.onStage) && !(swapStory && swapStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -6528,6 +6672,7 @@ function boot() {
     if (pauseLoop) return; // 디버그: 화면을 멈춰 두고 연출을 찍을 때
     drawNow = perf.drawDue(dt, covered()); // 창이 화면을 덮고 있으면 뒤 3D 는 초당 30번만(render/perf.js 의 COVERED_FPS)
     try {
+      syncSwap(); // 몸이 바뀐 채인지(사이드스토리 '몸이 바뀌었다')
       tick(dt);
     } catch (e) {
       // 한 프레임의 오류로 화면 전체가 멈추지 않게 한다
@@ -6565,6 +6710,7 @@ function boot() {
       ally: (kind) => ({ hp: allyHp[kind], down: !!(npcs.byKind(kind) || {}).down }),
       monsterHp: (id, hp) => { const m = monsters.list.find((o) => o.id === id); if (m) m.hp = hp; },
       npcEat: (kind) => npcEat(npcs.byKind(kind)),
+      npcHome: (kind, why = 'nap') => npcGoHome(npcs.byKind(kind), why), // 친구를 집으로 들여보내기(문 두드리기 확인용)
       npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),
       npcExam: (kind) => npcExam(npcs.byKind(kind)),
       npcWeedExam: (kind) => npcWeedExam(npcs.byKind(kind)), // 친구 제초 승급 시험(경험치 · 응시료가 모자라면 그냥 돌아온다)
@@ -6587,7 +6733,7 @@ function boot() {
       visitRoom: (kind) => enterVisit(kind),
       homeAct: (kind) => doHomeAct(kind),
       drill: () => drill && { k: drillK(), hits: drill.hits, tries: drill.tries },
-      homeStand: (x, z) => interior.standAt(x, z),
+      homeStand: (x, z) => (mode === 'visit' ? rooms.standAt(x, z) : interior.standAt(x, z)), // 친구 방에서도
       homeTarget: () => homeTarget && homeTarget.type,
       leaveRoom: () => exitVisit(),
       free: (x, z, r) => village.isFree(x, z, r),
@@ -6615,6 +6761,8 @@ function boot() {
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
       beetleSwitch: (at) => devBeetleSwitch(at), // 스위치: 'open' · 'teeth' · 'finale' · 'show' · 'showEnd'(테스트 앱과 같다)
       ode: (at) => devOde(at), // 오데와 함께 감옥: 'spot' · 'show' · 'dig' · 'fight' · 'momonga'(테스트 앱과 같다)
+      swap: (at) => devSwap(at), // 몸이 바뀌었다: 'slot' · 'ramen' · 'cry' · 'chase' · 'back' · 'show' · 'showBack'(테스트 앱과 같다)
+      swapInfo: () => ({ phase: swapStory.phase, mode, swapped: swapOn, force: swapForce, mood: arcadeStage ? arcadeStage.mood : null, spot: arcadeFront.spot, reels: arcadeStage ? [0, 1, 2].map((i) => arcadeStage.cell(i)) : null, mini: minigame.active }),
       odeInfo: () => ({ phase: odeStory.phase, mode, mood: odeStage ? odeStage.mood : null, spot: odeSpot.spot, shown: odeSpot.visible }),
       beetle: () => ({ phase: switchStory.phase, mode, step: beetleStep(), buddy: beetleBuddy.on, mood: switchStage ? switchStage.mood : null }),
       bonbon: () => ({ phase: bonbonStory.phase, mode, swallowed: bonbonGlade ? bonbonGlade.swallowed : null, drunk: bonbonGlade ? bonbonGlade.drunkLevel : null }),
@@ -6711,7 +6859,7 @@ function boot() {
       lights.update('off', player.position, player.yaw, 0);
       if (!skipRender && drawNow) gfx.renderer.render(rooms.scene, rooms.camera);
       // 놀이 자리 표시(오늘 아직 안 했으면 ✨), 가까이 가면 행동 안내
-      const act = rooms.actSpot(), vLabels = [];
+      const act = visit.mine ? null : rooms.actSpot(), vLabels = []; // 내 방(몸이 바뀐 동안의 하치와레 동굴)에는 놀이가 없다
       if (act && !drill && (!homeTarget || homeTarget.type !== 'act') && (visit.kind === 'momonga' || !doneToday(visit.kind))) vLabels.push({ id: 'vact', x: act.x, y: 1.9, z: act.z, text: '✨ ' + act.label, kind: 'mark' });
       if (homeTarget) vLabels.push({ id: 'prompt:v' + homeTarget.type, x: homeTarget.x, y: homeTarget.y, z: homeTarget.z, text: homeTarget.label, key: input.mode === 'desk' ? 'Space' : null, kind: 'prompt' });
       hud.placeLabels(vLabels, rooms.camera);
@@ -6807,6 +6955,16 @@ function boot() {
       hud.placeLabels(odeStage.labels(), odeStage.camera);
       return;
     }
+    // 몸이 바뀌었다(사이드스토리): 낡은 게임센터 안. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'arcade' && state) {
+      arcadeStage.resize(aspect);
+      swapStory.tick(dt, t);
+      setCelLight(arcadeStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(arcadeStage.scene, arcadeStage.camera);
+      hud.placeLabels([], arcadeStage.camera);
+      return;
+    }
     if (mode === 'diner' && state) {
       dinerStage.resize(aspect);
       starDiner.tick(dt, t);
@@ -6829,7 +6987,7 @@ function boot() {
       // 집 안을 걷는다(꾸미기 · 창 · 잠자기 중에는 멈춘다). 침대 · 옷장 · 문 앞이면 행동 안내
       const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay && !guide.open;
       if (free) interior.walk(dt, input.vector(), homeOf(state));
-      homeTarget = free ? interior.target(homeOf(state)) : null;
+      homeTarget = free ? interior.target(homeOf(state), { guest: homeGuest }) : null;
       interior.setCue(homeTarget, t);
       hud.setAction(homeTarget ? homeTarget.label : null);
       interior.update(dt, t);
@@ -6936,6 +7094,7 @@ function boot() {
       bonbonStory.update(dt);
       switchStory.update(dt);
       odeStory.update(dt);
+      swapStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);
