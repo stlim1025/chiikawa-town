@@ -81,6 +81,7 @@ export const PLACES = {
   crabGate: { name: '강가 진흙밭 입구', r: 4 },
   dojo: { name: '수련장', r: 3.4 },
   bonbonVine: { name: '초콜릿 덩굴', r: 2.8 }, // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
+  switchRock: { name: '바위산 기슭 돌문', r: 3 }, // 북쪽 바위산 길 옆(이야기를 받은 동안만 돌문 바위가 있다 — world/switchcave.js)
   // 마을 가꾸기(core/works.js)로 생긴 곳
   bench: { name: '연못 쉼터', r: 2.6 },
   pavilion: { name: '강가 정자', r: 2.8 },
@@ -450,6 +451,30 @@ export const QUESTS = {
         say: ['이건 {name} 거야! 액자에 넣어서 집에 둬~', '다음에 또 같이 찍자~!'] }
     ],
     reward: { bond: 4, friends: { chiikawa: 2, usagi: 2 }, furniture: 'photo' }
+  },
+  // 스위치(원작 애니 시즌1 「스위치」): 우사기가 바위에서 우연히 찾은 스위치를 누르자 동굴 돌문이 열리고 그 안에 작은 풍뎅이가 있었다 →
+  // 며칠 같이 다니며 친구가 됐는데 이빨이 날카롭다 → 갑옷 씨에게 상담하니 의태형 같다 → 풍뎅이가 음식을 불러내 의심을 벗었다가 → 괴물로 커져 날아가며 "의태형이다!".
+  // 장면은 stories/switch.js · world/switchcave.js, 이빨을 보는 장면은 main 의 STEP_FX.beetleTeeth. 돌문을 연 뒤 마지막 장면 전까지 풍뎅이가 마을에서 나를 따라다닌다.
+  // 게임에서 정한 부분: 날마다 한 친구씩 만나는 차례, 상담하는 갑옷 씨(노동 갑옷 씨), 마지막 대사와 보상
+  beetleSwitch: {
+    title: '스위치', giver: 'usagi', side: true, minDay: 11, hours: [9, 16], needHearts: 2, ask: '뭐 찾았어?',
+    offer: ['(우사기가 북쪽 바위산 쪽을 가리키며 방방 뛴다)', '우라! 야하!',
+      { who: 'hachiware', text: '우사기가 바위산 기슭에서 이상한 걸 찾았대~ 바위에 빨간 버튼이 붙어 있다나 봐!' },
+      { who: 'chiikawa', text: '…(누르면 안 될 것 같은 얼굴)…' },
+      { who: 'hachiware', text: '같이 보러 가자! 누르는 건… 보고 나서 생각하자~' }],
+    steps: [
+      { type: 'visit', place: 'switchRock', hours: [9, 17], scene: 'switchOpen', speaker: 'hachiware', goal: '북쪽 바위산 기슭의 수상한 바위로 가 보자! (오전 9시 ~ 오후 5시)',
+        say: ['풍뎅이가 졸졸 따라와~ 귀엽다!', '(풍뎅이가 {name} 뒤를 아장아장 따라온다)', '오늘부터 우리 친구야, 풍뎅이~!'] },
+      { type: 'talk', to: 'chiikawa', nextDay: true, hours: [8, 19], ask: '풍뎅이랑 놀러 왔어!', goal: '다음 날, 풍뎅이랑 같이 치이카와를 만나러 가자! (오전 8시 ~ 오후 7시)',
+        say: ['…!! (풍뎅이랑 나란히 앉아 꾸벅 인사한다)', '…(풍뎅이 머리를 살살 쓰다듬는다)…♪', '…우리… 친구…'] },
+      { type: 'talk', to: 'usagi', nextDay: true, hours: [8, 19], fx: 'beetleTeeth', ask: '풍뎅이랑 놀러 왔어!', goal: '또 하루가 지나면, 풍뎅이랑 우사기를 만나러 가자! (오전 8시 ~ 오후 7시)',
+        say: ['하아…?! (풍뎅이 입을 가리키며 굳었다)', { who: 'chiikawa', text: '…!! (부들부들)' }, { who: 'hachiware', text: '이, 이빨이 엄청 뾰족해… 갑옷 씨한테 물어보자~' }] },
+      { type: 'talk', to: 'labor', hours: [8, 19], ask: '풍뎅이 이빨이 이상해요', goal: '노동 갑옷 씨에게 풍뎅이 이빨 이야기를 해 보자! (오전 8시 ~ 오후 7시)',
+        say: ['날카로운 이빨이라… 흐음.', '귀여운 모습으로 다가와서 친해진 다음… 그런 녀석들이 있어요. 의태형이라고 하죠.', '…아직은 몰라요. 그 바위 앞에서 저도 같이 지켜볼게요.'] },
+      { type: 'visit', place: 'switchRock', hours: [9, 17], scene: 'switchFinale', speaker: 'hachiware', goal: '바위산 기슭 돌문 앞에서 갑옷 씨랑 풍뎅이를 지켜보자! (오전 9시 ~ 오후 5시)',
+        say: ['…날아가 버렸어~', '맛있는 거 잔뜩 불러 줘서… 착한 줄 알았는데~', { who: 'chiikawa', text: '…(하늘을 올려다본다)' }, '…그래도 같이 다녀서 재밌었어. 그치, {name}?'] }
+    ],
+    reward: { bond: 3, money: 300, friends: { usagi: 3, chiikawa: 2, hachiware: 2, labor: 2 }, story: 'beetleSwitch' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

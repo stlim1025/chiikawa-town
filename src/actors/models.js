@@ -8,6 +8,7 @@ const WHITE = '#fbfaf5', CHEEK = '#f5a3b5', EYE = '#2b2224', SHINE = '#ffffff', 
 const NAVY = '#6f94bb', USAGI = '#f6e8b6', EAR_PINK = '#f4b6c2'; // 하치와레 무늬는 원작처럼 연한 파랑
 const MOMO_BLUE = '#bfe0f5', KURI_TOP = '#b8743d', KURI_BOT = '#f4dcab', RAKKO = '#fbe7c2', RAKKO_PAW = '#4a3a34', STAR_SCAR = '#bfae8c', INK = '#3a2a28';
 const SHISA = '#f7cf5e', SHISA_MANE = '#e8833a', KANI = '#fbd1d8', KANI_DARK = '#f297a6', CLAW = '#ef6f7f';
+const BEETLE = '#9b6b4b', BEETLE_FACE = '#f3f0eb', BEETLE_WING = '#6b4430'; // 스위치의 풍뎅이: 갈색 몸 · 하얀 얼굴 · 괴물 날개
 
 /** 내 캐릭터 선택지. */
 export const EAR_TYPES = [
@@ -383,6 +384,44 @@ const DEFS = {
     });
     face(parts, hc, hr, { eyeX: 0.14, eyeY: 0.0, eye: [0.04, 0.055, 0.02], cheekX: 0.25, cheekY: -0.09, mouthY: -0.1, mouth: [0.06, 0.026, 0.012], brows: true, teeth: true });
     return { label: '카니', parts, neck: [0, 0.5, 0], height: 1.2, radius: 0.45 };
+  },
+  beetle() {
+    // 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」)의 풍뎅이: 다른 친구들처럼 머리와 몸이 따로다. 갈색 머리에 테두리만 남긴 커다란 하얀 얼굴과
+    // 머리 위 꼭지, 그 아래(얼굴 밑 ‿ 턱선이 머리와 몸의 경계) 하얀 배가 보이는 갈색 몸에 짧은 팔다리와 가는 꼬리.
+    // ω 입이 쩍 벌어지면 날카로운 이빨(tag 'teeth'), 괴물로 커지면 등에 날개(tag 'wings') — world/switchcave.js 가 켠다.
+    // 원작에서는 아주 작아서 쓰는 쪽이 캐릭터 절반쯤으로 줄여 세운다(BEETLE_SCALE)
+    // 하얀 얼굴은 머리 아래 끝까지, 하얀 배는 그 바로 밑부터: 얼굴에서 배까지 하얀 부분이 이어지고 사이로 턱선(머리 외곽선)만 지나간다
+    const parts = [], hc = [0, 0.64, 0.09], hr = [0.29, 0.27, 0.24];
+    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.29, 0], s: [0.28, 0.26, 0.25], n: 'body' });
+    parts.push({ m: 'sphere', c: BEETLE_FACE, p: [0, 0.3, 0.07], s: [0.22, 0.24, 0.2], n: 'body' }); // 하얀 배
+    [[0.2, 0.18, -0.18], [0.3, 0.19, -0.21], [0.37, 0.25, -0.22], [0.39, 0.33, -0.2], [0.35, 0.38, -0.18]].forEach((p) => parts.push({ m: 'sphere', c: BEETLE, p, s: [0.024, 0.024, 0.024], n: 'body' })); // 동그랗게 말린 꼬리
+    limbs(parts, BEETLE, 0.3, 0.27);
+    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.68, 0], s: [0.36, 0.3, 0.31], n: 'head' });
+    parts.push({ m: 'sphere', c: BEETLE_FACE, p: hc, s: hr, n: 'head' });
+    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.98, -0.02], s: [0.05, 0.06, 0.05], n: 'head' }); // 꼭지 줄기
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.065, 1.03, -0.02], s: [0.075, 0.045, 0.05], n: 'head' })); // 꼭지 양쪽 볼록
+    face(parts, hc, hr, { eyeX: 0.08, eyeY: 0.07, eye: [0.026, 0.03, 0.013], cheekX: 0.18, cheekY: 0.015, mouthY: -0.015, cat: true });
+    [-1, 1].forEach((sd) => [-0.02, 0, 0.02].forEach((dx) => { // 볼의 빗금 셋
+      const q = onHead(hc, hr, sd * 0.18 + dx, 0.015, 0.004);
+      parts.push({ m: 'dot', c: '#d0707f', p: q.p, r: [q.r[0], q.r[1], -0.5], s: [0.005, 0.015, 0.004], n: 'head', o: false });
+    }));
+    // 쩍 벌어진 ω 입: 검붉은 입속과 위아래로 뾰족한 이빨(처음엔 숨김)
+    const hole = onHead(hc, hr, 0, -0.055, 0.006);
+    parts.push({ m: 'dot', c: '#4a1c22', p: hole.p, r: hole.r, s: [0.075, 0.045, 0.012], n: 'head', o: false, tag: 'teeth' });
+    [-0.045, -0.015, 0.015, 0.045].forEach((x) => {
+      const q = onHead(hc, hr, x, -0.025, 0.014);
+      parts.push({ m: 'cone', c: SHINE, p: q.p, r: [Math.PI + q.r[0], q.r[1], 0], s: [0.011, 0.028, 0.008], n: 'head', o: false, tag: 'teeth' });
+    });
+    [-0.03, 0, 0.03].forEach((x) => {
+      const q = onHead(hc, hr, x, -0.088, 0.014);
+      parts.push({ m: 'cone', c: SHINE, p: q.p, r: [q.r[0], q.r[1], 0], s: [0.01, 0.024, 0.008], n: 'head', o: false, tag: 'teeth' });
+    });
+    // 괴물 날개: 등의 딱지날개 둘이 양옆으로 벌어지고, 그 밑으로 투명한 속날개(처음엔 숨김)
+    [-1, 1].forEach((sd) => {
+      parts.push({ m: 'sphere', c: BEETLE_WING, p: [sd * 0.2, 0.42, -0.22], r: [-0.35, 0, sd * 0.85], s: [0.26, 0.05, 0.36], n: 'body', tag: 'wings' });
+      parts.push({ m: 'sphere', c: '#dfeaf0', p: [sd * 0.44, 0.5, -0.26], r: [-0.25, sd * 0.35, sd * 0.45], s: [0.4, 0.02, 0.26], n: 'body', tag: 'wings' });
+    });
+    return { label: '풍뎅이', parts, neck: [0, 0.48, 0], height: 1.06, radius: 0.36, pivots: { armL: [-0.22, 0.36, 0.02], armR: [0.22, 0.36, 0.02] } };
   },
   pochette: () => knight('포셰트 갑옷 씨', '#cdd2d8', '#9aa1aa', [
     { m: 'box', c: '#f7a8c4', p: [0.3, 0.7, 0.24], r: [0, -0.4, 0], s: [0.2, 0.16, 0.08], n: 'body' },

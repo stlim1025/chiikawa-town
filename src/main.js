@@ -127,6 +127,8 @@ import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardi
 import { createStarDinerStory } from './stories/stardiner.js';
 import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
 import { createBonbonStory } from './stories/bonbon.js';
+import { createSwitchFront, createBeetleBuddy, createSwitchStage, BEETLE_SCALE } from './world/switchcave.js';
+import { createSwitchStory } from './stories/switch.js';
 import { createCameraStory } from './stories/camera.js';
 import { createPhotoUi } from './ui/photos.js';
 import { refreshPhotoFrame } from './world/photoframe.js';
@@ -1288,6 +1290,11 @@ function boot() {
         cam.snap(player.position);
       },
       /**
+       * 스위치: 'open' 부탁을 받은 채 오전 10시 바위산 돌문 앞(걸어 들어가면 시작), 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨),
+       * 'finale' 갑옷 씨와 상담한 뒤 돌문 앞(걸어 들어가면 마지막 장면 · 보상까지), 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
+       */
+      beetleSwitch: (at) => devBeetleSwitch(at),
+      /**
        * 하치와레의 카메라: 'plaza' 부탁을 받은 채 오전 11시 광장 남쪽(걸어 들어가면 시작 · 보상까지),
        * 'prints' 사진을 찍은 다음 날 오전 10시 하치와레 옆(말을 걸면 뽑은 사진 · 보상), 'show' 광장 장면만(보상 없음).
        */
@@ -1644,6 +1651,7 @@ function boot() {
       starDiner.reset();
       blackStar.reset();
       bonbonStory.reset();
+      switchStory.reset();
       cameraStory.reset();
       loopRewinding = false;
       weather.setRain(false);
@@ -2676,6 +2684,7 @@ function boot() {
     if (mode === 'idol') { if (down && idolStory && !guide.open) idolStory.press(); return; } // 파자마 파티즈 무대: 박자(박자 화면도 스스로 스페이스 · 탭을 받는다)
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'bonbon') { if (down && bonbonStory && !guide.open) bonbonStory.press(); return; } // 위스키 봉봉 숲속 빈터: 배 두드리기(박자 · 펀치 화면도 스스로 받는다)
+    if (mode === 'beetle') return; // 스위치 바위산 기슭: 대사 · 고르기 창만
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
@@ -2750,10 +2759,11 @@ function boot() {
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
   let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
+  let switchStory = null; // 사이드스토리 '스위치'(stories/switch.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2973,6 +2983,18 @@ function boot() {
   const STEP_FX = {
     shisaQuiz(n, finish) { shisaStory.quiz(finish); return true; },
     cameraPrints(n, finish) { cameraStory.prints(finish); return true; }, // 하치와레의 카메라: 뽑은 사진을 펼쳐 본다
+    // 스위치: 따라다니던 풍뎅이가 하품을 하는데… ω 입속에 뾰족한 이빨이 빼곡하다
+    beetleTeeth(n, finish) {
+      if (beetleBuddy.on) { // 카메라가 풍뎅이 얼굴로 다가가고, 풍뎅이는 카메라 쪽을 보고 하품한다
+        // 작은 풍뎅이: 머리 가운데(키의 0.62쯤) 높이로, 더 가까이(1.2m), 시선은 조금만 내린다
+        const b = beetleBuddy.position, bug = { get x() { return b.x; }, get z() { return b.z; }, chibi: { height: beetleBuddy.chibi.height * BEETLE_SCALE * 1.32 }, closeDist: 1.2, aimDrop: 0.08, faceYaw: null };
+        startCloseup(bug);
+        beetleBuddy.yawn(true, bug.faceYaw);
+      }
+      sound.play('growl');
+      guide.say(['(곁에 있던 풍뎅이가 쩌억 하품을 했다…)', '(…입속에 뾰족뾰족한 이빨이 빼곡하다!?)'], () => { endCloseup(); beetleBuddy.yawn(false); finish(); }, NARRATOR);
+      return true;
+    },
     pizzaCry(n) {
       cryFx = { n, t: 0, crying: false }; // 대사 줄 신호(storyCue)로: 한 입 → 클로즈업 → 굳기 → 울기 → 활짝
       ['hachiware', 'chiikawa'].forEach((kind, i) => {
@@ -3029,9 +3051,9 @@ function boot() {
     const C = closeup, n = C.n;
     C.t += dt;
     const ease = (u) => u * u * (3 - 2 * u);
-    const face = new THREE.Vector3(n.x, n.chibi.height * 0.47, n.z);
-    const near = face.clone().add(new THREE.Vector3(Math.sin(C.a) * 2.15, 0.1, Math.cos(C.a) * 2.15));
-    const aim = face.clone().add(new THREE.Vector3(0, -0.28, 0)); // 얼굴이 화면 위쪽에(아래 대화 상자에 안 가리게)
+    const face = new THREE.Vector3(n.x, n.chibi.height * 0.47, n.z), d = n.closeDist || 2.15; // closeDist: 작은 풍뎅이처럼 더 다가갈 때
+    const near = face.clone().add(new THREE.Vector3(Math.sin(C.a) * d, 0.1, Math.cos(C.a) * d));
+    const aim = face.clone().add(new THREE.Vector3(0, -(n.aimDrop ?? 0.28), 0)); // 얼굴이 화면 위쪽에(아래 대화 상자에 안 가리게)
     const home = cam.poseFor(player.position.x, player.position.z);
     let pos, look;
     if (!C.out) { const k = ease(Math.min(1, C.t / 0.9)); pos = C.fromPos.clone().lerp(near, k); look = C.fromLook.clone().lerp(aim, k); }
@@ -3075,6 +3097,7 @@ function boot() {
       else if (step.scene === 'islandCamp') islandTrip.play({ done });
       else if (step.scene === 'starDiner') starDiner.play(done);
       else if (step.scene === 'whiskeyBonbon') bonbonStory.play(done);
+      else if (step.scene === 'switchOpen' || step.scene === 'switchFinale') switchStory.play(step.scene, done);
       else if (step.scene === 'hachiCamera') cameraStory.play(done);
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
@@ -3186,7 +3209,7 @@ function boot() {
   // 마을 가꾸기로 생긴 곳(퀘스트 visit): 연못 쉼터 · 강가 정자 · 시계탑 앞 · 북쪽 · 동쪽 문 돌기둥
   const WORK_PLACES = { bench: WORK_SPOTS.benches[0], pavilion: WORK_SPOTS.pavilion[0], clockTower: { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z + 1.1 }, gateNorth: { x: GATES.north.x, z: GATES.north.z + 2 }, gateEast: { x: GATES.east.x - 2, z: GATES.east.z } };
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
-    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot
+    : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : place === 'switchRock' ? switchFront.spot
     : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
@@ -4160,6 +4183,38 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
+  // 사이드스토리 '스위치'(stories/switch.js): 바위산 길 옆 돌문 바위(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 · 바위산 기슭 장면(처음 들어갈 때 만든다)
+  const switchFront = createSwitchFront(scene, village);
+  const beetleBuddy = createBeetleBuddy(scene);
+  let switchStage = null;
+  switchStory = createSwitchStory({
+    hud, guide, sound, input, get stage() { return switchStage || (switchStage = createSwitchStage()); }, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(), front: switchFront,
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
+  });
+  /** 스위치 이야기에서 지금 단계(받지 않았거나 끝났으면 -1): 1 ~ 4 는 돌문을 연 뒤 마지막 장면 전(풍뎅이가 따라다닌다). */
+  const beetleStep = () => (state && isActive(state, 'beetleSwitch') ? (state.quests.beetleSwitch || {}).step ?? -1 : -1);
+  /**
+   * 테스트 앱 '스위치'(디버그 beetleSwitch 도 같다): 'open' 부탁을 받은 채 오전 10시 바위산 돌문 앞(걸어 들어가면 시작),
+   * 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨), 'finale' 갑옷 씨와 상담한 뒤 돌문 앞(걸어 들어가면 마지막 장면 · 보상까지),
+   * 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
+   */
+  function devBeetleSwitch(at) {
+    if (switchStory.active) return;
+    if (at === 'show' || at === 'showEnd') { switchStory.play(at === 'show' ? 'switchOpen' : 'switchFinale', () => hud.toast('테스트: 스위치 끝', 2400)); return; }
+    const qs = { ...(state.quests || {}) };
+    delete qs.beetleSwitch;
+    const step = { open: 0, teeth: 2, finale: 4 }[at] ?? 0, day = Math.max(11, state.clock.day);
+    let s = startQuest({ ...state, quests: qs }, 'beetleSwitch');
+    s = { ...s, quests: { ...s.quests, beetleSwitch: { ...s.quests.beetleSwitch, step, at: day - 1 } }, clock: { day, t: (10 - 6) / 24 } };
+    commit(s);
+    const usagi = npcs.byKind('usagi');
+    const p = at === 'teeth' && usagi && !usagi.away ? { x: usagi.x + 1.5, z: usagi.z + 1 } : { x: switchFront.spot.x, z: switchFront.spot.z + 3.5 };
+    player.setPosition(p.x, p.z);
+    cam.snap(player.position);
+  }
   // 사이드스토리 '하치와레의 카메라'(stories/camera.js): 광장에서 사진 찍기(뷰파인더 · 찍은 사진은 이 브라우저에) · 다음 날 뽑은 사진
   const photoUi = createPhotoUi(ui);
   /**
@@ -6359,7 +6414,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -6451,6 +6506,8 @@ function boot() {
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
+      beetleSwitch: (at) => devBeetleSwitch(at), // 스위치: 'open' · 'teeth' · 'finale' · 'show' · 'showEnd'(테스트 앱과 같다)
+      beetle: () => ({ phase: switchStory.phase, mode, step: beetleStep(), buddy: beetleBuddy.on, mood: switchStage ? switchStage.mood : null }),
       bonbon: () => ({ phase: bonbonStory.phase, mode, swallowed: bonbonGlade ? bonbonGlade.swallowed : null, drunk: bonbonGlade ? bonbonGlade.drunkLevel : null }),
       camera: () => ({ phase: cameraStory.phase, shooting: photoUi.shooting, mode }), // 하치와레의 카메라 진행(뷰파인더가 셔터를 기다리는지)
       /** 검은 별똥별 장면 하나를 바로(보상 없음): 'blackWish' · 'blackMorning' · 'blackDejavu' · 'blackWatch' · 'blackSleepover' · 'blackSoak' · 'blackRain'. */
@@ -6620,6 +6677,16 @@ function boot() {
       hud.placeLabels([], bonbonGlade.camera);
       return;
     }
+    // 스위치(사이드스토리): 바위산 기슭. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'beetle' && state) {
+      switchStage.resize(aspect);
+      switchStory.tick(dt, t);
+      setCelLight(switchStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(switchStage.scene, switchStage.camera);
+      hud.placeLabels([], switchStage.camera);
+      return;
+    }
     if (mode === 'diner' && state) {
       dinerStage.resize(aspect);
       starDiner.tick(dt, t);
@@ -6692,6 +6759,12 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
+    // 스위치 돌문 바위: 이야기를 받은 동안만 바위산 길 옆에(돌문을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
+    const bstep = visiting ? -1 : beetleStep(), follow = bstep >= 1 && bstep <= 4;
+    switchFront.visible = bstep >= 0;
+    switchFront.setOpen(bstep >= 1);
+    if (follow !== beetleBuddy.on) beetleBuddy.show(follow, player ? player.position : null);
+    beetleBuddy.update(dt, t, player, mode !== 'play');
     // 마을 가꾸기 시설: 내 마을은 내 모금대로, 친구 마을에서는 주인이 보낸 모습대로(들어가는 커튼 뒤에서 바꾼다)
     const worksGuest = visiting && !visiting.arriving;
     works.show(!state ? {} : worksGuest ? visiting.works || {} : worksView(state));
@@ -6739,6 +6812,7 @@ function boot() {
       idolStory.update(dt);
       starDiner.update(dt, t);
       bonbonStory.update(dt);
+      switchStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);
