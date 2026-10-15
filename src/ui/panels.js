@@ -1309,8 +1309,8 @@ export function createPanels(ui, handlers) {
         row('위스키 봉봉', '오전 11시 숲길 옆 초콜릿 덩굴 앞, 또는 숲속 장면만(보상 없음)', go('덩굴 앞', () => D.whiskeyBonbon()), go('장면만', () => D.whiskeyBonbon('show'))),
         row('하치와레의 카메라', '오전 11시 광장 남쪽, 사진 찍은 다음 날 하치와레 옆(뽑은 사진), 또는 광장 장면만(보상 없음)',
           go('광장', () => D.hachiCamera('plaza')), go('뽑은 사진', () => D.hachiCamera('prints')), go('장면만', () => D.hachiCamera('show'))),
-        row('스위치', '오전 10시 바위산 돌문 앞, 셋째 날 우사기 옆(이빨), 갑옷 씨와 상담한 뒤 돌문 앞, 또는 장면만(보상 없음)',
-          go('돌문 앞', () => D.beetleSwitch('open')), go('이빨', () => D.beetleSwitch('teeth')), go('마지막', () => D.beetleSwitch('finale')),
+        row('스위치', '오전 10시 바위산 동굴 앞, 셋째 날 우사기 옆(이빨), 갑옷 씨와 상담한 뒤 동굴 앞, 또는 장면만(보상 없음)',
+          go('동굴 앞', () => D.beetleSwitch('open')), go('이빨', () => D.beetleSwitch('teeth')), go('마지막', () => D.beetleSwitch('finale')),
           go('처음 장면', () => D.beetleSwitch('show')), go('마지막 장면', () => D.beetleSwitch('showEnd')))];
     },
     // 마을폰 '낚시 도감' 앱(게임 오리지널): 맨 위에 가짓수 보상(받기), 물고기마다 그림 · 잡히는 곳 · 때 · 잡은 수 · 가장 큰 것.

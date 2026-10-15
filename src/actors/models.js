@@ -82,6 +82,66 @@ function paintedSphere(key, field, paint, base) {
   patternGeoCache.set(key, g);
   return g;
 }
+/**
+ * 여러 색으로 칠한 구(스위치의 풍뎅이 머리 · 몸): cuts 의 함수마다 값이 0 인 자리에서 삼각형을 잘라 경계를 매끈하게 하고,
+ * 잘린 조각마다 가운데 점의 색 colorAt(x, y, z) 으로 칠한다. paintedSphere 의 두 색 경계를 여러 겹으로(가장자리 선 · 등의 가는 선까지).
+ */
+function cutSphere(key, cuts, colorAt) {
+  if (patternGeoCache.has(key)) return patternGeoCache.get(key);
+  const src = new THREE.SphereGeometry(1, 96, 64), P = src.attributes.position, I = src.index;
+  let tris = [];
+  for (let t = 0; t < I.count; t += 3) tris.push([0, 1, 2].map((k) => new THREE.Vector3().fromBufferAttribute(P, I.getX(t + k))));
+  src.dispose();
+  const cut = (a, b, fa, fb) => a.clone().lerp(b, fa / (fa - fb)).normalize();
+  for (const fn of cuts) {
+    const out = [];
+    for (const v of tris) {
+      const f = v.map((p) => fn(p.x, p.y, p.z)), s = f.map((x) => x > 0);
+      if (s[0] === s[1] && s[1] === s[2]) { out.push(v); continue; }
+      const k = s[0] !== s[1] && s[0] !== s[2] ? 0 : s[1] !== s[0] && s[1] !== s[2] ? 1 : 2, k1 = (k + 1) % 3, k2 = (k + 2) % 3;
+      const ab = cut(v[k], v[k1], f[k], f[k1]), ac = cut(v[k], v[k2], f[k], f[k2]);
+      out.push([v[k], ab, ac], [ab, v[k1], v[k2]], [ab, v[k2], ac]);
+    }
+    tris = out;
+  }
+  const pos = [], col = [], c = new THREE.Color(), mid = new THREE.Vector3();
+  for (const v of tris) {
+    c.set(colorAt(...mid.copy(v[0]).add(v[1]).add(v[2]).normalize().toArray()));
+    for (const p of v) { pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  patternGeoCache.set(key, g);
+  return g;
+}
+// ---------- 스위치의 풍뎅이 칠: 갈색 껍질에 잠옷 후드처럼 동그랗게 트인 하얀 얼굴 · 배(가장자리에 가는 선), 등은 접힌 딱지날개 ----------
+const BUG_LINE = '#2b2224', BUG_LW = 0.07; // 가장자리 선 색 · 굵기(창 반폭에 대한 비율)
+/** 앞(+z)에서 el 만큼 올려다본 방향을 가운데로 한 둥근 창: 가운데 0, 가장자리 1. a 옆 · up 위 · down 아래 반폭(각, 라디안). */
+function bugWindow(x, y, z, [el, a, up, down]) {
+  const s = Math.sin(el), c = Math.cos(el), w = y * s + z * c, v = y * c - z * s;
+  if (w < 0.05) return 3;
+  const be = Math.atan2(v, w);
+  return Math.hypot(Math.atan2(x, w) / a, be / (be > 0 ? up : down));
+}
+// 창: [가운데 높이각, 옆, 위, 아래]. 머리 얼굴은 아래로 턱 밑까지(하얀 배와 이어진다), 몸의 배는 위로 목 밑까지, 괴물 얼굴은 갈색 테가 빙 둘러싼다
+const BUG_FACE = [-0.3, 0.92, 1.15, 1.35], BUG_BELLY = [0.2, 0.85, 1.45, 0.85], BUG_MASK = [0, 0.78, 0.8, 0.85];
+const ELYTRA = 1.0, ELYTRA_LW = 0.035, SEAM = 0.035; // 딱지날개: 등 한가운데에서 이 각까지 · 아랫단 선 굵기 · 가운데 접힌 선 반폭
+/** 얼굴(배) 창 하나를 칠한 구: 안은 하양, 가장자리는 선, 밖은 갈색. back 이면 등에 접힌 딱지날개(가운데 선 · 아랫단 선)도. */
+function bugGeometry(key, win, back = false) {
+  const r = (x, y, z) => bugWindow(x, y, z, win), ang = (z) => Math.acos(Math.max(-1, Math.min(1, -z)));
+  const cuts = [(x, y, z) => r(x, y, z) - 1, (x, y, z) => r(x, y, z) - 1 - BUG_LW];
+  if (back) cuts.push((x, y, z) => ang(z) - ELYTRA + ELYTRA_LW, (x, y, z) => ang(z) - ELYTRA - ELYTRA_LW, (x, y) => y + 0.25, (x) => x - SEAM, (x) => x + SEAM);
+  return cutSphere(key, cuts, (x, y, z) => {
+    const k = r(x, y, z);
+    if (k < 1) return BEETLE_FACE;
+    if (k < 1 + BUG_LW) return BUG_LINE;
+    if (back && Math.abs(ang(z) - ELYTRA) < ELYTRA_LW && y < -0.25) return BUG_LINE; // 딱지날개 아랫단
+    if (back && Math.abs(x) < SEAM && ang(z) < ELYTRA) return BUG_LINE; // 접힌 날개 가운데 선
+    return BEETLE;
+  });
+}
 // 정수리를 모자처럼 덮는 무늬. 이마 가운데에 작은 홈이 파인다(하치와레).
 function partPattern(dark, light) {
   return (x, y, z) => {
@@ -188,6 +248,9 @@ function geometryFor(m) {
     case 'hachi': return patternGeometry('hachi', partPattern(NAVY, WHITE));
     case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.12 + Math.sin(x * 5) * 0.04 ? KURI_TOP : KURI_BOT));
     case 'kani': return patternGeometry('kani', (x, y, z) => (y > 0.32 && z > 0.15 ? KANI_DARK : KANI));
+    case 'bugHead': return bugGeometry('bugHead', BUG_FACE);
+    case 'bugBody': return bugGeometry('bugBody', BUG_BELLY, true);
+    case 'bugMask': return bugGeometry('bugMask', BUG_MASK);
     default:
       if (m.startsWith('pat:')) { const [, kind, tone, base, accent] = m.split(':'), [field, paint] = lookPattern(kind, tone, accent); return paintedSphere(m, field, paint, base); }
       return lookGeometry(m); // 내 캐릭터 꾸미기 도형(호 · 반달 · 머리카락 · 수염 껍질), 모르면 오류
@@ -386,42 +449,81 @@ const DEFS = {
     return { label: '카니', parts, neck: [0, 0.5, 0], height: 1.2, radius: 0.45 };
   },
   beetle() {
-    // 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」)의 풍뎅이: 다른 친구들처럼 머리와 몸이 따로다. 갈색 머리에 테두리만 남긴 커다란 하얀 얼굴과
-    // 머리 위 꼭지, 그 아래(얼굴 밑 ‿ 턱선이 머리와 몸의 경계) 하얀 배가 보이는 갈색 몸에 짧은 팔다리와 가는 꼬리.
-    // ω 입이 쩍 벌어지면 날카로운 이빨(tag 'teeth'), 괴물로 커지면 등에 날개(tag 'wings') — world/switchcave.js 가 켠다.
+    // 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」)의 풍뎅이: 다른 친구들처럼 머리와 몸이 따로다. 잠옷 후드처럼 갈색 껍질의 앞이 동그랗게 트여
+    // 커다란 하얀 얼굴(머리) · 하얀 배(몸)가 보이고, 그 사이로 턱선(머리 외곽선)만 지나간다. 머리 위엔 꼭지, 짧은 팔다리.
+    // 꼬리는 없고 등은 접힌 딱지날개(가운데 접힌 선 · 아랫단 선) — 칠은 bugGeometry.
+    // ω 입이 쩍 벌어지면 날카로운 이빨(tag 'teeth') — world/switchcave.js 가 켠다. 괴물로 커진 모습은 따로(beetleMonster).
     // 원작에서는 아주 작아서 쓰는 쪽이 캐릭터 절반쯤으로 줄여 세운다(BEETLE_SCALE)
-    // 하얀 얼굴은 머리 아래 끝까지, 하얀 배는 그 바로 밑부터: 얼굴에서 배까지 하얀 부분이 이어지고 사이로 턱선(머리 외곽선)만 지나간다
-    const parts = [], hc = [0, 0.64, 0.09], hr = [0.29, 0.27, 0.24];
-    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.29, 0], s: [0.28, 0.26, 0.25], n: 'body' });
-    parts.push({ m: 'sphere', c: BEETLE_FACE, p: [0, 0.3, 0.07], s: [0.22, 0.24, 0.2], n: 'body' }); // 하얀 배
-    [[0.2, 0.18, -0.18], [0.3, 0.19, -0.21], [0.37, 0.25, -0.22], [0.39, 0.33, -0.2], [0.35, 0.38, -0.18]].forEach((p) => parts.push({ m: 'sphere', c: BEETLE, p, s: [0.024, 0.024, 0.024], n: 'body' })); // 동그랗게 말린 꼬리
+    const parts = [], hc = [0, 0.68, 0], hr = [0.36, 0.3, 0.31];
+    parts.push({ m: 'bugBody', c: '#ffffff', p: [0, 0.29, 0], s: [0.28, 0.26, 0.25], n: 'body' });
     limbs(parts, BEETLE, 0.3, 0.27);
-    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.68, 0], s: [0.36, 0.3, 0.31], n: 'head' });
-    parts.push({ m: 'sphere', c: BEETLE_FACE, p: hc, s: hr, n: 'head' });
+    parts.push({ m: 'bugHead', c: '#ffffff', p: hc, s: hr, n: 'head' });
     parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.98, -0.02], s: [0.05, 0.06, 0.05], n: 'head' }); // 꼭지 줄기
     [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.065, 1.03, -0.02], s: [0.075, 0.045, 0.05], n: 'head' })); // 꼭지 양쪽 볼록
-    face(parts, hc, hr, { eyeX: 0.08, eyeY: 0.07, eye: [0.026, 0.03, 0.013], cheekX: 0.18, cheekY: 0.015, mouthY: -0.015, cat: true });
+    face(parts, hc, hr, { eyeX: 0.08, eyeY: 0.03, eye: [0.026, 0.03, 0.013], cheekX: 0.17, cheekY: -0.025, mouthY: -0.055, cat: true });
     [-1, 1].forEach((sd) => [-0.02, 0, 0.02].forEach((dx) => { // 볼의 빗금 셋
-      const q = onHead(hc, hr, sd * 0.18 + dx, 0.015, 0.004);
+      const q = onHead(hc, hr, sd * 0.17 + dx, -0.025, 0.004);
       parts.push({ m: 'dot', c: '#d0707f', p: q.p, r: [q.r[0], q.r[1], -0.5], s: [0.005, 0.015, 0.004], n: 'head', o: false });
     }));
     // 쩍 벌어진 ω 입: 검붉은 입속과 위아래로 뾰족한 이빨(처음엔 숨김)
-    const hole = onHead(hc, hr, 0, -0.055, 0.006);
+    const hole = onHead(hc, hr, 0, -0.095, 0.006);
     parts.push({ m: 'dot', c: '#4a1c22', p: hole.p, r: hole.r, s: [0.075, 0.045, 0.012], n: 'head', o: false, tag: 'teeth' });
     [-0.045, -0.015, 0.015, 0.045].forEach((x) => {
-      const q = onHead(hc, hr, x, -0.025, 0.014);
+      const q = onHead(hc, hr, x, -0.065, 0.014);
       parts.push({ m: 'cone', c: SHINE, p: q.p, r: [Math.PI + q.r[0], q.r[1], 0], s: [0.011, 0.028, 0.008], n: 'head', o: false, tag: 'teeth' });
     });
     [-0.03, 0, 0.03].forEach((x) => {
-      const q = onHead(hc, hr, x, -0.088, 0.014);
+      const q = onHead(hc, hr, x, -0.128, 0.014);
       parts.push({ m: 'cone', c: SHINE, p: q.p, r: [q.r[0], q.r[1], 0], s: [0.01, 0.024, 0.008], n: 'head', o: false, tag: 'teeth' });
     });
-    // 괴물 날개: 등의 딱지날개 둘이 양옆으로 벌어지고, 그 밑으로 투명한 속날개(처음엔 숨김)
-    [-1, 1].forEach((sd) => {
-      parts.push({ m: 'sphere', c: BEETLE_WING, p: [sd * 0.2, 0.42, -0.22], r: [-0.35, 0, sd * 0.85], s: [0.26, 0.05, 0.36], n: 'body', tag: 'wings' });
-      parts.push({ m: 'sphere', c: '#dfeaf0', p: [sd * 0.44, 0.5, -0.26], r: [-0.25, sd * 0.35, sd * 0.45], s: [0.4, 0.02, 0.26], n: 'body', tag: 'wings' });
-    });
     return { label: '풍뎅이', parts, neck: [0, 0.48, 0], height: 1.06, radius: 0.36, pivots: { armL: [-0.22, 0.36, 0.02], armR: [0.22, 0.36, 0.02] } };
+  },
+  beetleMonster() {
+    // 마지막에 괴물로 커진 풍뎅이(원작: 우락부락한 근육질로 책상다리를 하고 앉는다). 머리는 작은 풍뎅이처럼 갈색 테가 빙 두른 하얀 얼굴
+    // (눈썹을 찌푸린 동그란 눈 · 송곳니를 드러내고 씩 웃는 입) 위로 꼭지가 길게 솟았고, 목 없이 어깨에 얹혔다.
+    // 몸은 갈색 근육: 가슴 · 복근 · 굵은 팔(팔꿈치를 굽혀 주먹을 가슴 높이로), 다리는 앞에서 엇갈린 책상다리.
+    // 날아갈 때 등에 날개(tag 'wings': 갈색 딱지날개 둘 + 연한 속날개 둘) — world/switchcave.js 가 켜고 퍼덕인다.
+    // 크기는 다른 친구 키의 두 배쯤으로 만들고 장면에서 더 키운다. 팔은 관절(armL · armR)로 따로 움직인다.
+    const parts = [], hc = [0, 1.76, 0.02], hr = [0.52, 0.5, 0.44], tc = [0, 0.9, 0], tr = [0.5, 0.56, 0.36];
+    parts.push({ m: 'sphere', c: BEETLE, p: tc, s: tr, n: 'body' }); // 몸통
+    parts.push({ m: 'sphere', c: BEETLE, p: [0, 0.4, 0.04], s: [0.48, 0.28, 0.36], n: 'body' }); // 엉덩이
+    [-1, 1].forEach((sd) => {
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.2, 1.16, 0.24], s: [0.24, 0.16, 0.14], n: 'body' }); // 가슴
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.5, 1.22, 0], s: [0.22, 0.2, 0.2], n: 'body' }); // 어깨
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.41, 0.24, 0.27], r: [0, -sd * 0.6, 0], s: [0.27, 0.16, 0.18], n: 'body' }); // 허벅지(무릎은 양옆 앞으로)
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.225, sd > 0 ? 0.2 : 0.13, 0.52], r: [0, sd * 0.26, 0], s: [0.4, 0.13, 0.14], n: 'body' }); // 정강이(앞에서 엇갈린다)
+      parts.push({ m: 'sphere', c: BEETLE, p: [-sd * 0.2, sd > 0 ? 0.17 : 0.11, 0.64], r: [0, -sd * 0.3, 0], s: [0.1, 0.1, 0.15], n: 'body' }); // 발
+    });
+    // 복근: 가운데 세로 선 · 가로 세 줄씩 양쪽, 옆구리 비스듬한 선
+    const onBody = (x, y, w, h, rz = 0) => { const q = onHead(tc, tr, x, y - tc[1], 0.004); parts.push({ m: 'dot', c: BUG_LINE, p: q.p, r: [q.r[0], q.r[1], rz], s: [w, h, 0.01], n: 'body', o: false }); };
+    onBody(0, 0.72, 0.008, 0.2);
+    [0.92, 0.78, 0.64].forEach((y) => [-1, 1].forEach((sd) => onBody(sd * 0.1, y, 0.07, 0.008, sd * 0.08)));
+    [-1, 1].forEach((sd) => onBody(sd * 0.3, 0.72, 0.008, 0.12, -sd * 0.35));
+    // 팔: 어깨에서 옆 아래로 팔꿈치, 앞 위로 주먹
+    [-1, 1].forEach((sd) => {
+      const nm = sd < 0 ? 'armL' : 'armR';
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.735, 1.035, 0.02], r: [0, 0, sd * 0.785], s: [0.18, 0.28, 0.18], n: nm }); // 위팔(알통)
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.87, 1.04, 0.24], r: [0.785, 0, sd * 0.19], s: [0.15, 0.27, 0.15], n: nm }); // 아래팔
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.82, 1.27, 0.45], s: [0.15, 0.14, 0.15], n: nm }); // 주먹
+    });
+    // 머리 · 길게 솟은 꼭지
+    parts.push({ m: 'bugMask', c: '#ffffff', p: hc, s: hr, n: 'head' });
+    parts.push({ m: 'cylinder', c: BEETLE, p: [0, 2.18, -0.02], s: [0.08, 0.32, 0.08], n: 'head' });
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.1, 2.52, -0.02], s: [0.14, 0.08, 0.09], n: 'head' }));
+    // 얼굴: 찌푸린 눈썹, 동그란 눈(속이 빈 o), 송곳니를 드러내고 씩 웃는 입
+    const put = (m, c, x, y, s, rz = 0, push = 0.004) => { const q = onHead(hc, hr, x, y, push); parts.push({ m, c, p: q.p, r: [q.r[0], q.r[1], rz], s, n: 'head', o: false }); };
+    [-1, 1].forEach((sd) => {
+      put('ring:0.2', EYE, sd * 0.12, 0.04, [0.032, 0.032, 0.032]);
+      put('dot', EYE, sd * 0.13, 0.14, [0.065, 0.012, 0.006], sd * 0.4);
+      put('cone', SHINE, sd * 0.055, -0.062, [0.015, 0.036, 0.008], Math.PI, 0.01); // 송곳니
+    });
+    put('arc:1.7:0.14', EYE, 0, -0.072, [0.1, 0.06, 0.02], Math.PI); // ∪ 씩 웃는 입
+    // 날개(날아갈 때만): 등에서 양옆 위로 벌어진 딱지날개와 그 밑의 연한 속날개
+    [-1, 1].forEach((sd) => {
+      parts.push({ m: 'sphere', c: BEETLE_WING, p: [sd * 0.45, 1.3, -0.42], r: [-0.3, 0, sd * 0.7], s: [0.5, 0.06, 0.32], n: 'body', tag: 'wings' });
+      parts.push({ m: 'sphere', c: '#efe6d8', p: [sd * 0.95, 1.2, -0.48], r: [-0.2, sd * 0.25, sd * 0.3], s: [0.75, 0.025, 0.4], n: 'body', tag: 'wings' });
+    });
+    return { label: '괴물 풍뎅이', parts, neck: [0, 1.36, 0], height: 2.6, radius: 1.0, pivots: { armL: [-0.55, 1.22, 0], armR: [0.55, 1.22, 0] } };
   },
   pochette: () => knight('포셰트 갑옷 씨', '#cdd2d8', '#9aa1aa', [
     { m: 'box', c: '#f7a8c4', p: [0.3, 0.7, 0.24], r: [0, -0.4, 0], s: [0.2, 0.16, 0.08], n: 'body' },
@@ -1043,6 +1145,8 @@ function pivotOf(def, name, p) {
   return p || [0, 0, 0];
 }
 
+/** 꼭짓점 색으로 무늬를 칠한 구 부품(하얀 재질에 꼭짓점 색, 외곽선은 보통 구로). */
+const PAINTED_PARTS = new Set(['hachi', 'kuri', 'kani', 'bugHead', 'bugBody', 'bugMask']);
 /** 부품 정의로 Three.js 모델을 만든다. */
 function buildFromDef(def) {
   const root = new THREE.Group();
@@ -1068,7 +1172,7 @@ function buildFromDef(def) {
   def.parts.forEach((pt) => {
     const holder = getPivot(pt.n, pt.par);
     const pv = pivotOf(def, pt.n, pt.p);
-    const patterned = pt.m === 'hachi' || pt.m === 'kuri' || pt.m === 'kani' || pt.m.startsWith('pat:');
+    const patterned = PAINTED_PARTS.has(pt.m) || pt.m.startsWith('pat:');
     // 2D 손그림처럼: 단색 칠(얼굴 부품은 그늘도 없이) + 붓펜 같은 외곽선
     const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned, doubleSide: !!pt.ds, flat: pt.o === false });
     const size = Math.max(Math.abs(pt.s[0]), Math.abs(pt.s[1]), Math.abs(pt.s[2]));
@@ -1497,6 +1601,12 @@ function basePose(mode, t, opts) {
     a.armL = [-0.95, 0, 0.55]; a.armR = [-0.95, 0, -0.55];
     a.head = [0.26, 0, Math.sin(t * 4 + phase) * 0.05];
     lean = 0.1; bob = -0.02;
+  } else if (mode === 'cower') {
+    // 숨어서 덜덜(나무 뒤에서 괴물을 올려다본다): 두 손을 가슴 앞에 모아 웅크린 채 고개만 들고 파르르 떤다
+    a.armL = [-1.1, 0, 0.5]; a.armR = [-1.1, 0, -0.5];
+    a.head = [-0.3, 0, Math.sin(t * 37 + phase) * 0.04];
+    waddle = Math.sin(t * 41 + phase) * 0.035;
+    bob = -0.02;
   } else if (mode === 'peek') {
     // 우사기의 전설의 포즈(원작: 뒤돌아 다리를 벌리고 숙여 다리 사이로 내다보기). 둥근 몸에 맞게 거꾸로 서서
     // 다리를 V 자로 벌리고, 두 팔로 땅을 짚은 채 거꾸로 된 얼굴로 이쪽을 본다(등을 카메라 쪽으로 두면 얼굴이 카메라를 본다)

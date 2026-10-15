@@ -127,7 +127,7 @@ import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardi
 import { createStarDinerStory } from './stories/stardiner.js';
 import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
 import { createBonbonStory } from './stories/bonbon.js';
-import { createSwitchFront, createBeetleBuddy, createSwitchStage, BEETLE_SCALE } from './world/switchcave.js';
+import { createSwitchFront, createBeetleBuddy, createSwitchStage, buildSwitchGadget, holdSwitch, BEETLE_SCALE } from './world/switchcave.js';
 import { createSwitchStory } from './stories/switch.js';
 import { createCameraStory } from './stories/camera.js';
 import { createPhotoUi } from './ui/photos.js';
@@ -1290,8 +1290,8 @@ function boot() {
         cam.snap(player.position);
       },
       /**
-       * 스위치: 'open' 부탁을 받은 채 오전 10시 바위산 돌문 앞(걸어 들어가면 시작), 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨),
-       * 'finale' 갑옷 씨와 상담한 뒤 돌문 앞(걸어 들어가면 마지막 장면 · 보상까지), 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
+       * 스위치: 'open' 부탁을 받은 채 오전 10시 바위산 동굴 앞(걸어 들어가면 시작), 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨),
+       * 'finale' 갑옷 씨와 상담한 뒤 동굴 앞(걸어 들어가면 마지막 장면 · 보상까지), 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
        */
       beetleSwitch: (at) => devBeetleSwitch(at),
       /**
@@ -4183,9 +4183,11 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
-  // 사이드스토리 '스위치'(stories/switch.js): 바위산 길 옆 돌문 바위(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 · 바위산 기슭 장면(처음 들어갈 때 만든다)
+  // 사이드스토리 '스위치'(stories/switch.js): 바위산 길 옆 창살로 막힌 동굴 바위벽(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 ·
+  // 우사기가 들고 다니는 스위치(동굴에 가기 전까지) · 바위산 기슭 장면(처음 들어갈 때 만든다)
   const switchFront = createSwitchFront(scene, village);
   const beetleBuddy = createBeetleBuddy(scene);
+  const villageSwitch = buildSwitchGadget();
   let switchStage = null;
   switchStory = createSwitchStory({
     hud, guide, sound, input, get stage() { return switchStage || (switchStage = createSwitchStage()); }, cam, getPlayer: () => player,
@@ -4194,11 +4196,11 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
-  /** 스위치 이야기에서 지금 단계(받지 않았거나 끝났으면 -1): 1 ~ 4 는 돌문을 연 뒤 마지막 장면 전(풍뎅이가 따라다닌다). */
+  /** 스위치 이야기에서 지금 단계(받지 않았거나 끝났으면 -1): 0 은 동굴에 가기 전(우사기가 스위치를 들고 다닌다), 1 ~ 4 는 창살을 연 뒤 마지막 장면 전(풍뎅이가 따라다닌다). */
   const beetleStep = () => (state && isActive(state, 'beetleSwitch') ? (state.quests.beetleSwitch || {}).step ?? -1 : -1);
   /**
-   * 테스트 앱 '스위치'(디버그 beetleSwitch 도 같다): 'open' 부탁을 받은 채 오전 10시 바위산 돌문 앞(걸어 들어가면 시작),
-   * 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨), 'finale' 갑옷 씨와 상담한 뒤 돌문 앞(걸어 들어가면 마지막 장면 · 보상까지),
+   * 테스트 앱 '스위치'(디버그 beetleSwitch 도 같다): 'open' 부탁을 받은 채 오전 10시 바위산 동굴 앞(걸어 들어가면 시작),
+   * 'teeth' 풍뎅이와 다닌 셋째 날 오전 10시 우사기 옆(말을 걸면 이빨), 'finale' 갑옷 씨와 상담한 뒤 동굴 앞(걸어 들어가면 마지막 장면 · 보상까지),
    * 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
    */
   function devBeetleSwitch(at) {
@@ -6759,12 +6761,14 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
-    // 스위치 돌문 바위: 이야기를 받은 동안만 바위산 길 옆에(돌문을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
+    // 스위치 동굴 바위벽: 이야기를 받은 동안만 바위산 길 옆에(창살을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep(), follow = bstep >= 1 && bstep <= 4;
     switchFront.visible = bstep >= 0;
     switchFront.setOpen(bstep >= 1);
     if (follow !== beetleBuddy.on) beetleBuddy.show(follow, player ? player.position : null);
     beetleBuddy.update(dt, t, player, mode !== 'play');
+    const usagiNpc = npcs.byKind('usagi');
+    if (usagiNpc) holdSwitch(usagiNpc.chibi, villageSwitch, bstep === 0); // 동굴에 가기 전: 우사기가 주운 스위치를 손에 들고 다닌다
     // 마을 가꾸기 시설: 내 마을은 내 모금대로, 친구 마을에서는 주인이 보낸 모습대로(들어가는 커튼 뒤에서 바꾼다)
     const worksGuest = visiting && !visiting.arriving;
     works.show(!state ? {} : worksGuest ? visiting.works || {} : worksView(state));

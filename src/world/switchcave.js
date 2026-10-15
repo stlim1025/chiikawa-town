@@ -1,52 +1,78 @@
 import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
+import { mergeUnit } from '../render/batch.js';
 import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
 import { roadDist, groundY } from '../core/layout.js';
 
 /**
  * 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」 — stories/switch.js)의 장소와 장면.
- *  createSwitchFront: 북쪽 바위산 기슭의 돌문 바위(이야기를 받은 동안만). 문 옆 바위 받침에 빨간 버튼.
- *  createBeetleBuddy: 마을에서 나를 졸졸 따라다니는 풍뎅이(돌문을 연 뒤부터 마지막 장면 전까지).
- *  createSwitchStage: 바위산 기슭 장면(우사기가 버튼을 누르면 돌문이 열리고 풍뎅이가 나온다 · 소풍 · 괴물로 커져 날아간다).
+ *  createSwitchFront: 북쪽 바위산 기슭의 바위벽(이야기를 받은 동안만). 가운데 둥근 동굴 입구가 창살로 막혀 있다.
+ *  buildSwitchGadget · holdSwitch: 우사기가 주워 들고 다니는 스위치(하얀 상자에 빨간 버튼).
+ *  createBeetleBuddy: 마을에서 나를 졸졸 따라다니는 풍뎅이(창살을 연 뒤부터 마지막 장면 전까지).
+ *  createSwitchStage: 바위산 기슭 장면(우사기가 스위치를 누르면 창살이 올라가고 풍뎅이가 나온다 · 소풍 · 근육질 괴물로 커져 날아간다).
  */
-/** 풍뎅이 크기: 원작에서는 아주 작다. 캐릭터 절반쯤으로 세운다(괴물이 되면 여기서 여섯 배까지 커진다). */
+/** 풍뎅이 크기: 원작에서는 아주 작다. 캐릭터 절반쯤으로 세운다. */
 export const BEETLE_SCALE = 0.5;
-const MONSTER_GROW = 6;
+const MONSTER_S = 2; // 괴물 풍뎅이 크기(모델 앉은키 2.6 → 5.2쯤: 친구들의 네 배 남짓)
 const ROCK = ['#a29a90', '#8f877e', '#b3aba1'];
-const STONE = '#c2b8aa', STONE_DARK = '#7d756c';
+const STONE = '#cfc7bb', BAR = '#8d5a48', CRACK = '#8a6656', CAVE = '#2c2628';
+const ARCH_W = 0.72, ARCH_LEG = 1.05, ARCH_TOP = ARCH_LEG + ARCH_W; // 동굴 입구: 반폭 · 곧은 옆벽 높이(그 위는 반원)
 const ease = (u) => u * u * (3 - 2 * u);
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
+const lerp = (a, b, u) => a + (b - a) * u;
 
-/** 돌문 바위: 둥근 바위벽 · 가운데 두 짝 돌문(열면 양옆 바위 속으로 밀려 들어간다) · 오른쪽 바위 받침 위 빨간 버튼. 앞은 +z. */
+/** 동굴 입구 모양(아래는 땅속까지, 위는 반원). w: 반폭. */
+function archPath(path, w = ARCH_W, bottom = -0.15) {
+  path.moveTo(-w, bottom);
+  path.lineTo(w, bottom);
+  path.lineTo(w, ARCH_LEG);
+  path.absarc(0, ARCH_LEG, w, 0, Math.PI, false);
+  path.lineTo(-w, bottom);
+  return path;
+}
+
+/**
+ * 바위벽: 동굴 입구가 뚫린 두툼한 돌판 · 뒤로 둘러선 바위 · 금 간 자국, 입구 안은 깜깜하다. 앞은 +z.
+ * 입구는 창살(원작 그림처럼 가로세로 살 + 칸마다 X 빗금)로 막혀 있고, 열면 창살이 돌판 속으로 쑥 올라간다.
+ */
 function buildSwitchRock() {
   const group = new THREE.Group();
   const t = (geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); group.add(m); return m; };
-  [[-1.9, 1.0, -0.35, 1.3, 1.25], [1.9, 1.0, -0.35, 1.3, 1.3], [0, 2.15, -0.4, 1.9, 0.8], [-1.0, 2.0, -0.5, 1.1, 0.9], [1.1, 2.0, -0.5, 1.1, 0.95],
-    [-2.9, 0.6, -0.1, 0.9, 0.8], [2.9, 0.55, -0.15, 0.85, 0.75]].forEach(([x, y, z, sx, sy], i) => t(GEO.sphere, ROCK[i % 3], { position: [x, y, z], scale: [sx, sy, 0.9], outline: 0.03 }));
-  t(GEO.box, '#1f1a18', { position: [0, 0.8, -0.25], scale: [1.5, 1.6, 0.3], outline: false }); // 문 너머 어두운 동굴 속
-  const doors = [-1, 1].map((sd) => {
-    const g = new THREE.Group();
-    g.position.set(sd * 0.38, 0, 0);
-    g.add(toonMesh(GEO.box, STONE, { position: [0, 0.8, 0], scale: [0.76, 1.6, 0.18], outline: 0.025, shadow: false }));
-    g.add(toonMesh(GEO.box, STONE_DARK, { position: [0, 0.8, 0.095], scale: [0.5, 0.04, 0.02], outline: false, shadow: false })); // 가로 홈
-    g.add(toonMesh(GEO.sphere, STONE_DARK, { position: [-sd * 0.22, 0.85, 0.1], scale: [0.05, 0.05, 0.02], outline: false, shadow: false })); // 손잡이 홈
-    group.add(g);
-    return g;
-  });
-  t(GEO.box, STONE_DARK, { position: [0, 1.68, 0], scale: [1.7, 0.18, 0.3], outline: 0.025 }); // 문 위 들보 돌
-  t(GEO.cylinder, ROCK[2], { position: [1.5, 0, 0.75], scale: [0.26, 0.6, 0.26], outline: 0.02 }); // 버튼 받침 바위
-  const button = toonMesh(GEO.cylinder, '#e0524f', { position: [1.5, 0.6, 0.75], scale: [0.12, 0.08, 0.12], outline: 0.012, shadow: false });
-  group.add(button);
+  [[-2.3, 1.4, -0.5, 1.0, 1.4], [2.3, 1.3, -0.5, 1.0, 1.3], [-1.3, 3.3, -0.75, 1.2, 0.85], [1.4, 3.3, -0.75, 1.25, 0.9], [0, 3.9, -0.8, 1.1, 0.6],
+    [-3.1, 0.5, -0.1, 0.8, 0.6], [3.1, 0.5, -0.15, 0.8, 0.6]].forEach(([x, y, z, sx, sy], i) => t(GEO.sphere, ROCK[i % 3], { position: [x, y, z], scale: [sx, sy, 0.9], outline: 0.03 }));
+  // 돌판(앞뒤 두께 0.56, 가장자리는 둥글게 깎였다): 입구 자리만 뚫렸다
+  const face = new THREE.Shape();
+  face.moveTo(-2.3, -0.3);
+  face.lineTo(2.3, -0.3);
+  face.splineThru([[2.55, 1.1], [2.3, 2.3], [1.7, 3.3], [0.7, 3.9], [-0.4, 3.85], [-1.5, 3.45], [-2.25, 2.5], [-2.55, 1.2], [-2.3, -0.3]].map(([x, y]) => new THREE.Vector2(x, y)));
+  face.holes.push(archPath(new THREE.Path()));
+  t(new THREE.ExtrudeGeometry(face, { depth: 0.36, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 2, curveSegments: 18 }).translate(0, 0, -0.18), STONE, { outline: 0.03 });
+  [[-1.55, 2.2, 0.5, 0.5], [-1.2, 2.36, 0.3, -0.3], [1.6, 1.0, 0.45, -0.6], [1.86, 0.84, 0.25, 0.2], [1.25, 2.9, 0.35, 0.3], [-1.9, 0.75, 0.3, 1.2]]
+    .forEach(([x, y, len, rz]) => t(GEO.box, CRACK, { position: [x, y, 0.29], scale: [len, 0.025, 0.02], rotation: [0, 0, rz], outline: false })); // 금 간 자국
+  t(new THREE.ShapeGeometry(archPath(new THREE.Shape(), ARCH_W + 0.02), 12), CAVE, { position: [0, 0, -0.2], outline: false }); // 입구 안 깜깜한 동굴 속
+  // 창살: 돌판 두께 한가운데(옆 · 위 끝은 돌 속에 묻혔다). 열리면 위로 올라가 돌판 속에 숨는다
+  const bars = new THREE.Group();
+  const bar = (x, y, w, h, rz = 0, line = true) => bars.add(toonMesh(GEO.box, BAR, { position: [x, y, 0], scale: [w, h, 0.06], rotation: [0, 0, rz], outline: line ? 0.012 : false, shell: true, shadow: false }));
+  const half = (y) => (y <= ARCH_LEG ? ARCH_W : Math.sqrt(Math.max(0, ARCH_W * ARCH_W - (y - ARCH_LEG) ** 2)));
+  const COLS = [-0.6, -0.36, -0.12, 0.12, 0.36, 0.6], ROWS = [0.32, 0.64, 0.96, 1.28, 1.56];
+  COLS.forEach((x) => { const top = ARCH_LEG + Math.sqrt(ARCH_W * ARCH_W - x * x) + 0.06; bar(x, (top - 0.2) / 2, 0.065, top + 0.2); });
+  ROWS.forEach((y) => bar(0, y, half(y) * 2 + 0.12, 0.06));
+  for (let i = 0; i <= COLS.length; i++) for (let j = 0; j <= ROWS.length; j++) { // 칸마다 엇갈려 그은 X(가장자리의 좁은 칸 · 반원 밖은 건너뛴다)
+    const x0 = i ? COLS[i - 1] : -ARCH_W, x1 = i < COLS.length ? COLS[i] : ARCH_W, y0 = j ? ROWS[j - 1] : 0, y1 = j < ROWS.length ? ROWS[j] : ARCH_TOP;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, len = Math.min(x1 - x0, y1 - y0) * 0.75;
+    if (x1 - x0 < 0.2 || Math.abs(cx) + 0.08 > half(cy + 0.08)) continue;
+    [-0.78, 0.78].forEach((rz) => bar(cx, cy, len, 0.012, rz, false));
+  }
+  mergeUnit(bars, bars.children.slice());
+  group.add(bars);
   return {
     group,
-    /** 돌문이 열린 정도(0 닫힘 ~ 1 활짝). */
-    open(u) { doors.forEach((g, i) => { g.position.x = (i ? 1 : -1) * (0.38 + u * 0.8); }); },
-    /** 버튼이 눌린 정도(0 ~ 1). */
-    press(u) { button.position.y = 0.6 - u * 0.05; }
+    /** 창살이 열린 정도(0 닫힘 ~ 1 다 올라가 입구가 트였다). */
+    open(u) { bars.position.y = u * (ARCH_TOP + 0.15); }
   };
 }
 
-/** 마을에 둔 돌문 바위: 바위산 길 옆 빈자리(앞이 마을 쪽). spot 은 그 앞에 서는 자리. */
+/** 마을에 둔 바위벽: 바위산 길 옆 빈자리(앞이 마을 쪽). spot 은 그 앞에 서는 자리. */
 export function createSwitchFront(scene, village) {
   const tries = [[-4, -40], [-3, -44], [-6, -38], [-12, -42]];
   const [x, z] = tries.find(([tx, tz]) => village.isFree(tx, tz, 1.6, true) && village.isFree(tx, tz + 2.4, 0.8) && roadDist(tx, tz) > 2) || tries[0];
@@ -58,12 +84,29 @@ export function createSwitchFront(scene, village) {
     spot: { x, z: z + 2.4 },
     get visible() { return rock.group.visible; },
     set visible(v) { rock.group.visible = !!v; },
-    /** 돌문을 연 뒤로는 열린 채(이야기 속에서 우사기가 버튼을 눌렀다). */
+    /** 창살을 연 뒤로는 열린 채(이야기 속에서 우사기가 스위치를 눌렀다). */
     setOpen(on) { rock.open(on ? 1 : 0); }
   };
 }
 
-/** 그 풍뎅이의 쩍 벌린 입(이빨) · 날개를 켠다. */
+/** 들고 다니는 스위치(원작: 우사기가 주운 하얀 상자 위에 빨간 버튼). press(u): 버튼이 눌린 정도(0 ~ 1). */
+export function buildSwitchGadget() {
+  const group = new THREE.Group();
+  const t = (geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); group.add(m); return m; };
+  t(GEO.box, '#f4f1ea', { scale: [0.2, 0.1, 0.13], outline: 0.012, shell: true });
+  const button = t(GEO.cylinder, '#e0524f', { position: [0, 0.05, 0], scale: [0.05, 0.03, 0.05], outline: 0.008 });
+  const shine = t(GEO.box, '#a8322f', { position: [0, 0.081, 0], scale: [0.055, 0.004, 0.012], outline: false }); // 버튼 위 한 줄
+  return { group, press(u) { button.position.y = 0.05 - u * 0.022; shine.position.y = 0.081 - u * 0.022; } };
+}
+/** 그 친구가 스위치를 오른손에 든다(on = false 면 내려놓는다). */
+export function holdSwitch(chibi, gadget, on) {
+  const hand = chibi && chibi.pivots && chibi.pivots.armR;
+  if (!hand) return;
+  if (on && gadget.group.parent !== hand) { hand.add(gadget.group); gadget.group.position.set(0.05, -0.2, 0.14); gadget.group.rotation.set(0.3, 0, 0); }
+  else if (!on && gadget.group.parent === hand) hand.remove(gadget.group);
+}
+
+/** 풍뎅이의 쩍 벌린 입(이빨) · 괴물의 날개를 켠다. */
 const showTag = (c, tag, on) => (c.props[tag] || []).forEach((m) => { m.visible = !!on; });
 
 /** 마을에서 나를 따라다니는 풍뎅이: 떨어지면 아장아장 쫓아오고, 가까우면 나를 바라본다. 너무 멀어지면(순간 이동) 옆에 나타난다. */
@@ -111,16 +154,18 @@ export function createBeetleBuddy(scene) {
 }
 
 // ---------- 바위산 기슭 장면 ----------
-const ROCK_AT = [0, -2.4], ROCK_S = 1.3; // 돌문 바위 자리 · 크기
-const SWITCH = [1.5 * ROCK_S, ROCK_AT[1] + 0.75 * ROCK_S]; // 빨간 버튼(바닥 자리)
+const ROCK_AT = [0, -2.4], ROCK_S = 1.3; // 바위벽 자리 · 크기
+const USAGI_AT = [1.6, 0.4]; // 스위치를 든 우사기(바위벽 오른쪽 앞, 우리 쪽을 본다)
+const MONSTER_AT = [0, -1.6]; // 괴물이 책상다리하고 앉는 자리(등은 바위벽에 기댄다)
+const SKY = [0, 30]; // 나무 뒤에 숨어 올려다보는 하늘 쪽(괴물이 날아가는 쪽)
 const KINDS = ['me', 'chiikawa', 'hachiware', 'usagi', 'labor', 'beetle'];
 const SIT_LIFT = 0.12;
 const CLOTH = [0, 0.5];
-// 장면마다 서는 자리 [x, z, 몸짓, 바라보는 곳('door' | 'cam' | 'beetle' | [x, z])]
+// 장면마다 서는 자리 [x, z, 몸짓, 바라보는 곳('door' | 'cam' | 'beetle' | 'monster' | [x, z])]
 const SPOTS = {
-  arrive: { me: [-1.4, 1.6, 'idle', 'door'], chiikawa: [-0.5, 1.9, 'shy', 'door'], hachiware: [0.5, 1.7, 'look', 'door'], usagi: [1.6, 0.2, 'hop', SWITCH] },
-  press: { me: [-1.4, 1.6, 'idle', SWITCH], chiikawa: [-0.5, 1.9, 'shy', SWITCH], hachiware: [0.5, 1.7, 'talk', SWITCH], usagi: [1.75, -0.7, 'idle', SWITCH] },
-  open: { me: [-2.0, 1.2, 'look', 'door'], chiikawa: [-1.3, 2.2, 'shy', 'door'], hachiware: [-1.0, 1.45, 'look', 'door'], usagi: [1.5, 0.6, 'look', 'door'] }, // 문 앞을 비우고 양옆으로(치이카와는 하치와레 뒤로 쏙)
+  arrive: { me: [-1.4, 1.6, 'idle', 'door'], chiikawa: [-0.5, 1.9, 'shy', 'door'], hachiware: [0.5, 1.7, 'look', 'door'], usagi: [...USAGI_AT, 'hop', [0.4, 3.0]] },
+  press: { me: [-1.4, 1.6, 'idle', USAGI_AT], chiikawa: [-0.5, 1.9, 'shy', USAGI_AT], hachiware: [0.5, 1.7, 'talk', USAGI_AT], usagi: [...USAGI_AT, 'idle', [0.4, 3.0]] },
+  open: { me: [-2.0, 1.2, 'look', 'door'], chiikawa: [-1.3, 2.2, 'shy', 'door'], hachiware: [-1.0, 1.45, 'look', 'door'], usagi: [1.5, 0.6, 'look', 'door'] }, // 입구 앞을 비우고 양옆으로(치이카와는 하치와레 뒤로 쏙)
   // 걸어 나온 풍뎅이를 반원으로 둘러싼다(카메라 쪽은 비워 풍뎅이 얼굴과 다 같이 보이게)
   meet: { me: [-1.15, -0.1, 'idle', 'beetle'], chiikawa: [-0.45, -0.75, 'shy', 'beetle'], hachiware: [0.5, -0.7, 'wave', 'beetle'], usagi: [1.2, -0.1, 'hop', 'beetle'], beetle: [0, 0.3, 'wave', 'cam'] },
   pet: { me: [-0.6, 0.6, 'talk', 'beetle'], chiikawa: [-0.45, -0.75, 'idle', 'beetle'], hachiware: [0.5, -0.7, 'clap', 'beetle'], usagi: [1.2, -0.1, 'hop', 'beetle'], beetle: [0, 0.3, 'hop', [-0.6, 0.6]] },
@@ -128,18 +173,19 @@ const SPOTS = {
   picnic: { me: [-1.3, 0.2, 'sit', CLOTH], chiikawa: [-1.25, 0.95, 'sit', CLOTH], hachiware: [1.25, 0.95, 'sit', CLOTH], usagi: [1.3, 0.2, 'sit', CLOTH], labor: [2.6, -0.3, 'lean', 'beetle'], beetle: [0, -0.35, 'idle', 'cam'] },
   feast: { me: [-1.3, 0.2, 'nibble', CLOTH], chiikawa: [-1.25, 0.95, 'nibble', CLOTH], hachiware: [1.25, 0.95, 'nibble', CLOTH], usagi: [1.3, 0.2, 'nibble', CLOTH], labor: [2.6, -0.3, 'idle', 'beetle'], beetle: [0, -0.35, 'sway', 'cam'] },
   // 괴물: 다들 뒤로 물러서고(치이카와는 털썩), 갑옷 씨는 앞으로 나서 지켜본다
-  monster: { me: [-1.9, 2.1, 'look', 'beetle'], chiikawa: [-0.9, 2.6, 'faint', 'cam'], hachiware: [0.5, 2.45, 'look', 'beetle'], usagi: [1.7, 2.0, 'look', 'beetle'], labor: [2.3, 0.7, 'idle', 'beetle'], beetle: [0, -0.6, 'idle', 'cam'] },
-  gone: { me: [-1.9, 2.1, 'gaze', 'cam'], chiikawa: [-0.9, 2.6, 'sit', 'cam'], hachiware: [0.5, 2.45, 'gaze', 'cam'], usagi: [1.7, 2.0, 'gaze', 'cam'], labor: [2.3, 0.7, 'look', 'cam'] }
+  monster: { me: [-1.9, 2.1, 'look', 'monster'], chiikawa: [-0.9, 2.6, 'faint', 'cam'], hachiware: [0.5, 2.45, 'look', 'monster'], usagi: [1.7, 2.0, 'look', 'monster'], labor: [2.3, 0.9, 'idle', 'monster'] },
+  // 조금 떨어진 숲가: 두 나무 뒤에 숨어 날아가는 괴물을 올려다본다(카메라는 우리 등 뒤 — 원작 구도처럼)
+  hide: { me: [-1.4, 11.45, 'cower', SKY], chiikawa: [1.55, 11.4, 'cower', SKY], hachiware: [-2.15, 11.75, 'cower', SKY], usagi: [2.15, 11.6, 'hug', SKY], labor: [-3.3, 11.0, 'look', SKY] }
 };
 const SHOTS = {
-  wide: { pos: [4.4, 2.4, 4.6], look: [-0.2, 0.9, -0.5], portrait: { pos: [6.0, 3.0, 7.0], look: [-0.2, 1.0, -0.5] } }, // 비스듬히 옆에서: 돌문과 얼굴이 함께 보이게
-  switch: { pos: [0.6, 1.5, 1.9], look: [1.8, 0.7, -1.2], portrait: { pos: [0.4, 2.0, 3.6], look: [1.6, 0.7, -1.2] } },
-  door: { pos: [0, 2.0, 4.4], look: [0, 0.8, -2.0], portrait: { pos: [0, 2.5, 7.0], look: [0, 0.9, -2.0] } },
+  wide: { pos: [4.4, 2.4, 4.6], look: [-0.2, 0.9, -0.5], portrait: { pos: [6.0, 3.0, 7.0], look: [-0.2, 1.0, -0.5] } }, // 비스듬히 옆에서: 바위벽과 얼굴이 함께 보이게
+  switch: { pos: [1.9, 1.0, 2.3], look: [1.45, 0.5, 0.4], portrait: { pos: [1.9, 1.4, 3.4], look: [1.45, 0.5, 0.4] } }, // 스위치를 든 우사기(오른쪽 앞에서 — 친구들이 가리지 않게)
+  door: { pos: [0, 2.0, 4.4], look: [0, 0.9, -2.0], portrait: { pos: [0, 2.5, 7.0], look: [0, 1.0, -2.0] } },
   beetle: { pos: [0, 1.05, 2.5], look: [0, 0.35, -0.1], portrait: { pos: [0, 1.4, 3.8], look: [0, 0.4, -0.1] } },
   picnic: { pos: [0, 2.9, 5.6], look: [0, 0.45, 0.2], portrait: { pos: [0, 3.6, 8.6], look: [0, 0.5, 0.2] } },
-  monster: { pos: [0, 2.4, 8.2], look: [0, 2.0, -0.6], portrait: { pos: [0, 3.0, 11.6], look: [0, 2.2, -0.6] } },
-  sky: { pos: [0, 1.4, 7.4], look: [0, 6.0, -7], portrait: { pos: [0, 1.6, 10.4], look: [0, 6.5, -7] } },
-  gone: { pos: [0, 1.5, 7.6], look: [0.2, 1.2, 1.2], portrait: { pos: [0, 1.9, 10.6], look: [0.2, 1.3, 1.2] } } // 하늘을 올려다보는 넷과 갑옷 씨를 앞에서
+  monster: { pos: [0, 1.7, 7.6], look: [0, 2.4, -1.2], portrait: { pos: [0, 2.4, 11.2], look: [0, 2.6, -1.2] } }, // 책상다리한 괴물과 발치의 우리
+  sky: { pos: [0, 1.0, 6.8], look: [0, 5.0, -1.4], portrait: { pos: [0, 1.2, 9.6], look: [0, 5.4, -1.4] } }, // 날개를 펴고 떠오르는 괴물을 올려다본다
+  gone: { pos: [0, 0.85, 7.4], look: [0, 3.0, 22], portrait: { pos: [0, 1.1, 3.8], look: [0, 3.6, 22] } } // 나무 뒤에 숨은 우리 등 뒤에서 하늘 저편으로
 };
 // 풍뎅이가 불러낸 음식(돗자리 위): [x, z, 종류]
 const DISHES = [[-0.62, 0.32, 'onigiri'], [-0.2, 0.62, 'cake'], [0.22, 0.32, 'skewer'], [0.62, 0.62, 'pudding'], [0, 0.85, 'onigiri'], [-0.45, 0.82, 'pudding']];
@@ -170,20 +216,34 @@ export function createSwitchStage() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#d6e6ee');
   scene.fog = new THREE.Fog('#d6e6ee', 14, 34);
-  scene.add(new THREE.HemisphereLight(0xfffbe8, 0x7d7a6a, 1.5));
+  scene.add(new THREE.HemisphereLight(0xfffbe8, 0xb5ad9c, 1.4)); // 원작처럼 하얗게 밝은 돌벽 · 땅(앞에서 비추는 해와 함께)
+  const sun = new THREE.DirectionalLight(0xfff1d6, 1.4);
+  sun.position.set(4, 9, 7);
+  scene.add(sun);
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
   const light = new THREE.Color(1, 0.98, 0.94);
   const toon = (geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); scene.add(m); return m; };
 
-  // ---------- 바위산 기슭: 거친 땅 · 바위 · 듬성듬성한 풀 ----------
-  toon(GEO.cylinder, '#a8b394', { position: [0, -0.1, 0], scale: [16, 0.1, 16], outline: false });
-  toon(GEO.cylinder, '#b9b39f', { position: [0, 0, 0.6], scale: [3.4, 0.02, 2.6], outline: false }); // 문 앞 맨땅
+  // ---------- 바위산 기슭: 거친 땅 · 바위 · 듬성듬성한 풀, 앞쪽 멀리 숲가와 먼 산 ----------
+  toon(GEO.cylinder, '#a8b394', { position: [0, -0.1, 0], scale: [34, 0.1, 34], outline: false });
+  toon(GEO.cylinder, '#b9b39f', { position: [0, 0, 0.6], scale: [3.4, 0.02, 2.6], outline: false }); // 입구 앞 맨땅
   [[-5.4, -3.4, 1.2], [5.2, -3.0, 1.4], [-6.6, 0.6, 1.0], [6.4, 1.4, 0.9], [-3.6, -5.4, 1.6], [3.8, -5.6, 1.7], [0, -7.4, 2.6], [-7.6, -4.6, 2.0], [7.4, -4.2, 2.2]]
     .forEach(([x, z, s], i) => toon(GEO.sphere, ROCK[i % 3], { position: [x, s * 0.45, z], scale: [s, s * 0.8, s * 0.9], outline: 0.03 }));
   for (let i = 0; i < 22; i++) { // 풀 포기
     const a = i * 2.31, r = 2.6 + (i % 5) * 0.9;
     toon(GEO.cone, '#7da05e', { position: [Math.sin(a) * r, 0.08, Math.cos(a) * r - 0.2], scale: [0.05, 0.16, 0.05], outline: false });
   }
+  // 숲가(괴물이 날아갈 때 숨는 곳): 굵은 나무 둘 · 풀, 그 너머 먼 산과 구름
+  const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff' }), hillMat = new THREE.MeshBasicMaterial({ color: '#c6cbdc' });
+  [[2.6, 12.3], [-2.7, 12.5]].forEach(([x, z]) => {
+    toon(GEO.cylinder, '#eee2cd', { position: [x, 0, z], scale: [0.42, 6.2, 0.42], outline: 0.03 });
+    [[-0.2, 1.6, 0.9], [0.15, 3.0, 1.2], [-0.1, 4.4, 0.8]].forEach(([dx, y, len]) => toon(GEO.box, '#b59f86', { position: [x + dx, y, z - 0.4], scale: [0.03, len, 0.02], outline: false })); // 나무껍질 결
+    [[0, 6.6, 0, 1.5], [-0.9, 6.1, 0.3, 1.0], [0.9, 6.2, -0.2, 1.1]].forEach(([dx, y, dz, s]) => toon(GEO.sphere, '#8fbf72', { position: [x + dx, y, z + dz], scale: [s, s * 0.75, s], outline: 0.03 }));
+  });
+  for (let i = 0; i < 14; i++) toon(GEO.cone, '#7da05e', { position: [Math.sin(i * 1.9) * (1.2 + (i % 4) * 0.8), 0.08, 12 + Math.cos(i * 1.9) * 1.6], scale: [0.05, 0.16, 0.05], outline: false });
+  [[-13, 31, 8], [0, 35, 10], [13, 30, 7.5]].forEach(([x, z, r]) => toon(GEO.sphere, '#c6cbdc', { position: [x, 0, z], scale: [r, r * 0.42, r * 0.6], outline: false, material: hillMat })); // 먼 산(빛 그늘 없이 연한 보랏빛 회색)
+  [[-4.5, 9.0, 28], [6.0, 10.5, 31]].forEach(([x, y, z]) => [[0, 0, 1.3], [-1.3, -0.3, 0.9], [1.3, -0.25, 1.0]]
+    .forEach(([dx, dy, s]) => toon(GEO.sphere, '#ffffff', { position: [x + dx, y + dy, z], scale: [s * 1.2, s * 0.7, s * 0.5], outline: false, material: cloudMat }))); // 구름(빛 그늘 없이 새하얗게)
   const rock = buildSwitchRock();
   rock.group.position.set(ROCK_AT[0], 0, ROCK_AT[1]);
   rock.group.scale.setScalar(ROCK_S);
@@ -196,23 +256,28 @@ export function createSwitchStage() {
   const sparks = Array.from({ length: 10 }, (_, i) => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.06, 5), sparkMat); m.userData.a = i * 0.63; scene.add(m); return m; });
   const heartMat = new THREE.MeshBasicMaterial({ color: '#ff8fae', transparent: true, opacity: 0, depthWrite: false });
   const hearts = Array.from({ length: 3 }, (_, i) => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), heartMat); m.userData.ph = i / 3; scene.add(m); return m; });
-  const dust = Array.from({ length: 10 }, () => { const m = toon(GEO.sphere, '#b6ad9f', { scale: [0.1, 0.08, 0.1], outline: 0.008 }); m.visible = false; return m; });
+  const dust = Array.from({ length: 14 }, () => { const m = toon(GEO.sphere, '#b6ad9f', { scale: [0.1, 0.08, 0.1], outline: 0.008 }); m.visible = false; return m; });
 
-  // ---------- 우리 넷 · 노동 갑옷 씨 · 풍뎅이 ----------
+  // ---------- 우리 넷 · 노동 갑옷 씨 · 풍뎅이 · 괴물이 된 풍뎅이 ----------
   let me = null;
   const pals = { chiikawa: buildNpc('chiikawa'), hachiware: buildNpc('hachiware'), usagi: buildNpc('usagi'), labor: buildNpc('labor'), beetle: buildNpc('beetle') };
   Object.values(pals).forEach((c) => { Object.values(c.props || {}).flat().forEach((m) => { m.visible = false; }); scene.add(c.root); });
   const beetle = pals.beetle;
-  const wings = beetle.props.wings || [];
+  const gadget = buildSwitchGadget();
+  holdSwitch(pals.usagi, gadget, true);
+  const mon = buildNpc('beetleMonster');
+  Object.values(mon.props || {}).flat().forEach((m) => { m.visible = false; });
+  scene.add(mon.root);
+  const wings = mon.props.wings || [];
   wings.forEach((m) => { m.userData.rz = m.rotation.z; });
   const charOf = (k) => (k === 'me' ? me : pals[k]);
 
-  let shot = SHOTS.wide, snapNext = true, shakeT = 0, sparkT = 9, heartT = 9, flap = false, mood = 'arrive';
+  let shot = SHOTS.wide, snapNext = true, shakeT = 0, sparkT = 9, heartT = 9, flap = false, flight = null, mood = 'arrive';
   const anims = {};
   let tweens = [];
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
   const tween = (dur, step, end) => { tweens.push({ t: 0, dur, step, end }); };
-  const faceOf = (face, x, z) => (face === 'door' ? ROCK_AT : face === 'cam' ? [x, z + 5] : face === 'beetle' ? [beetle.root.position.x, beetle.root.position.z] : face);
+  const faceOf = (face, x, z) => (face === 'door' ? ROCK_AT : face === 'monster' ? MONSTER_AT : face === 'cam' ? [x, z + 5] : face === 'beetle' ? [beetle.root.position.x, beetle.root.position.z] : face);
 
   function place(k, x, z, anim, face) {
     const c = charOf(k);
@@ -228,24 +293,30 @@ export function createSwitchStage() {
   /** 흙먼지가 튀고 화면이 흔들린다. */
   function rumble(x, z, power = 1) {
     shakeT = 0.9 * power;
-    dust.forEach((m, i) => { const a = i * 0.7; m.visible = true; m.userData.v = new THREE.Vector3(Math.cos(a) * 1.4, 2.4 + (i % 3) * 0.8, Math.sin(a) * 1.4); m.position.set(x, 0.1, z); });
+    dust.forEach((m, i) => { const a = i * 0.7; m.visible = true; m.userData.v = new THREE.Vector3(Math.cos(a) * 1.4 * power, (2.4 + (i % 3) * 0.8) * power, Math.sin(a) * 1.4 * power); m.position.set(x, 0.1, z); });
   }
 
   const api = {
     scene,
     camera,
     light,
-    /** 새로 들어왔다: 내 생김새 look. at: 'open'(처음 — 돌문이 닫혀 있고 풍뎅이는 안에) · 'finale'(마지막 — 돌문은 열린 채, 갑옷 씨도 같이 왔다). */
+    /** 새로 들어왔다: 내 생김새 look. at: 'open'(처음 — 창살이 닫혀 있고 풍뎅이는 안에, 우사기가 스위치를 들었다) · 'finale'(마지막 — 창살은 열린 채, 갑옷 씨도 같이 왔다). */
     start(look, at = 'open') {
       if (me) scene.remove(me.root);
       me = buildChibi(look);
       Object.values(me.props || {}).flat().forEach((m) => { m.visible = false; });
       scene.add(me.root);
-      tweens = []; shakeT = 0; sparkT = 9; heartT = 9; flap = false;
+      tweens = []; shakeT = 0; sparkT = 9; heartT = 9; flap = false; flight = null;
       rock.open(at === 'finale' ? 1 : 0);
-      rock.press(0);
+      gadget.group.visible = at !== 'finale';
+      gadget.press(0);
       beetle.root.scale.setScalar(BEETLE_SCALE);
-      showTag(beetle, 'teeth', false); showTag(beetle, 'wings', false);
+      beetle.root.rotation.set(0, 0, 0);
+      showTag(beetle, 'teeth', false);
+      mon.root.visible = false;
+      mon.root.scale.setScalar(MONSTER_S);
+      mon.root.rotation.set(0, 0, 0);
+      showTag(mon, 'wings', false);
       wings.forEach((m) => { m.rotation.z = m.userData.rz; });
       cloth.visible = at === 'finale';
       dishes.forEach((d) => { d.visible = false; });
@@ -258,6 +329,8 @@ export function createSwitchStage() {
     /** 서는 자리 · 몸짓(그 장면에 없는 사람은 숨긴다. 풍뎅이는 자리가 없으면 그대로). */
     setMood(m) {
       mood = m;
+      // 숲가에서 하늘을 올려다볼 때는 안개를 멀리(날아가는 괴물 · 먼 산이 뿌옇게 묻히지 않게), 바위산 기슭에서는 가까이
+      scene.fog.near = m === 'hide' ? 26 : 14; scene.fog.far = m === 'hide' ? 70 : 34;
       const spots = SPOTS[m] || {};
       for (const k of KINDS) {
         const c = charOf(k);
@@ -269,11 +342,11 @@ export function createSwitchStage() {
     get mood() { return mood; },
     /** 그 사람의 몸짓을 바꾼다. */
     pose(k, anim) { if (charOf(k)) anims[k] = anim; },
-    /** 우사기가 빨간 버튼을 꾹(버튼이 쑥 들어갔다 나온다). */
-    press() { anims.usagi = 'cheer'; tween(0.5, (u) => rock.press(Math.sin(u * Math.PI)), () => { anims.usagi = 'hop'; }); },
-    /** 쿠구구궁: 땅이 울리며 돌문이 양옆으로 열린다. */
+    /** 우사기가 스위치를 번쩍 들고 빨간 버튼을 꾹(버튼이 쑥 들어갔다 나온다). */
+    press() { anims.usagi = 'cheer'; tween(0.5, (u) => gadget.press(Math.sin(u * Math.PI)), () => { anims.usagi = 'hop'; }); },
+    /** 쿠구구궁: 땅이 울리며 창살이 바위벽 속으로 천천히 올라간다. */
     open() { rumble(ROCK_AT[0], ROCK_AT[1] + 0.6); tween(2.2, (u) => rock.open(ease(u)), null); },
-    /** 어두운 돌문 안에서 풍뎅이가 아장아장 걸어 나온다(meet 자리까지). */
+    /** 어두운 동굴 안에서 풍뎅이가 아장아장 걸어 나온다(meet 자리까지). */
     beetleOut() {
       const to = SPOTS.meet.beetle, from = [ROCK_AT[0], ROCK_AT[1] - 0.2];
       beetle.root.visible = true;
@@ -292,27 +365,38 @@ export function createSwitchStage() {
         tween(0.3, (u) => d.scale.setScalar(Math.max(0.01, Math.sin(u * Math.PI * 0.75) / Math.sin(Math.PI * 0.75))), () => d.scale.setScalar(1));
       }));
     },
-    /** ω 입이 쩍 벌어지며 부르르 → 쿠오오: 날개를 펴고 커다란 괴물로. */
+    /** ω 입이 쩍 벌어지며 부르르 → 펑: 흙먼지 속에서 우락부락한 근육질 괴물이 부풀어 올라 책상다리하고 앉는다. */
     monster() {
       anims.beetle = 'idle';
       showTag(beetle, 'teeth', true);
       tween(0.8, (u) => { beetle.root.rotation.z = Math.sin(u * Math.PI * 10) * 0.08; }, () => {
         beetle.root.rotation.z = 0;
-        rumble(0, -0.6, 1.4);
-        showTag(beetle, 'wings', true);
-        flap = true;
-        tween(1.8, (u) => { beetle.root.scale.setScalar(BEETLE_SCALE * (1 + ease(u) * (MONSTER_GROW - 1))); beetle.root.position.y = Math.sin(u * Math.PI) * 0.15; }, () => { anims.beetle = 'cheer'; });
+        beetle.root.visible = false;
+        rumble(MONSTER_AT[0], MONSTER_AT[1] + 1.2, 1.4);
+        mon.root.visible = true;
+        mon.root.position.set(MONSTER_AT[0], 0, MONSTER_AT[1]);
+        mon.root.rotation.set(0, 0, 0);
+        tween(1.4, (u) => mon.root.scale.setScalar(MONSTER_S * (0.12 + 0.88 * ease(u)) * (1 + Math.sin(u * Math.PI) * 0.08)), () => mon.root.scale.setScalar(MONSTER_S));
       });
     },
-    /** 날개를 퍼덕이며 하늘 저편으로 날아간다(그대로 사라진다). */
+    /** 등에서 날개가 펼쳐지고 퍼덕퍼덕 떠오른다. */
     fly() {
-      const from = beetle.root.position.clone();
-      anims.beetle = 'cheer';
-      tween(3.2, (u) => {
-        const e = u * u;
-        beetle.root.position.set(from.x + Math.sin(u * 4) * 0.4, from.y + e * 11, from.z - e * 16);
-        beetle.root.rotation.x = -0.35 * Math.min(1, u * 3);
-      }, () => { beetle.root.visible = false; flap = false; });
+      showTag(mon, 'wings', true);
+      flap = true;
+      flight = 'up';
+      tween(2.4, (u) => { if (flight !== 'up') return; mon.root.position.y = ease(u) * 3.2; mon.root.rotation.x = 0.15 * ease(u); }, null);
+    },
+    /** (숲가로 숨은 뒤) 하늘 저편으로 날아가 멀어진다(먼 산 너머에서 사라진다). 우리 등 뒤 카메라에는 괴물 등과 날개가 보인다. */
+    flyAway() {
+      flight = 'away';
+      showTag(mon, 'wings', true);
+      flap = true;
+      mon.root.visible = true;
+      mon.root.scale.setScalar(MONSTER_S);
+      mon.root.rotation.set(0.35, 0, 0);
+      const from = [0.3, 4.0, 26], to = [1.6, 11, 82]; // 끝에는 안개 너머로 묻힌다
+      tween(9, (u) => { const e = u * u * 0.7 + u * 0.3; mon.root.position.set(lerp(from[0], to[0], e) + Math.sin(u * 5) * 0.3, lerp(from[1], to[1], e), lerp(from[2], to[2], e)); },
+        () => { mon.root.visible = false; flap = false; });
     },
     /** 움직임(걸어 나오기 · 음식 · 커지기 · 날기)이 아직 끝나지 않았는지. */
     get busy() { return tweens.length > 0; },
@@ -352,7 +436,16 @@ export function createSwitchStage() {
         m.lookAt(camera.position);
       });
       heartMat.opacity = heartT < 2.2 ? Math.min(1, (2.2 - heartT) * 1.5) * 0.9 : 0;
-      if (flap) wings.forEach((m, i) => { m.rotation.z = m.userData.rz + Math.sin(t * 22 + i) * 0.25; }); // 날개 퍼덕퍼덕
+      // 괴물: 숨 쉬듯 들썩이며 주먹에 힘을 줬다 뺐다, 날 때는 날개를 퍼덕퍼덕
+      if (mon.root.visible) {
+        const P = mon.pivots;
+        mon.inner.position.y = Math.sin(t * 2.2) * 0.012;
+        if (P.armL) P.armL.rotation.x = Math.sin(t * 2.2) * 0.06;
+        if (P.armR) P.armR.rotation.x = Math.sin(t * 2.2 + 0.6) * 0.06;
+        if (P.head) P.head.rotation.z = Math.sin(t * 1.3) * 0.05;
+        if (flap) wings.forEach((m, i) => { m.rotation.z = m.userData.rz + Math.sin(t * 22 + i) * 0.25; });
+        if (flight === 'up' && !tweens.length) mon.root.position.y = 3.2 + Math.sin(t * 3) * 0.12; // 떠오른 채 둥실
+      }
       // 몸짓
       for (const k of KINDS) {
         const c = charOf(k);
