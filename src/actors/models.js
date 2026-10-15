@@ -121,19 +121,19 @@ const BUG_LINE = '#2b2224', BUG_LW = 0.07; // 가장자리 선 색 · 굵기(창
 /**
  * 앞(+z)에서 el 만큼 올려다본 방향을 가운데로 한 둥근 창: 가운데 0, 가장자리 1. a 옆 · up 위 · down 아래 반폭(각, 라디안).
  * round: 위 절반을 둥글게 펴는 정도(2 면 보통 타원, 클수록 위가 넓고 둥글다 — 2 면 구 위에서 위쪽이 뾰족해 보인다).
- * dip: 위쪽 가운데(꼭지 밑)로 갈색이 동그랗게 살짝 파고든 깊이(원작 풍뎅이 얼굴).
+ * dip: 위쪽 가운데(꼭지 밑)로 갈색이 동그랗게 살짝 파고든 깊이(원작 풍뎅이 얼굴). roundDown: 아래 절반의 둥글기(갈색 테가 빙 두른 괴물 얼굴은 아래도 둥글게).
  */
-function bugWindow(x, y, z, [el, a, up, down, round = 2, dip = 0]) {
+function bugWindow(x, y, z, [el, a, up, down, round = 2, dip = 0, roundDown = 2]) {
   const s = Math.sin(el), c = Math.cos(el), w = y * s + z * c, v = y * c - z * s;
   if (w < 0.05) return 3;
   const al = Math.atan2(x, w), be = Math.atan2(v, w);
-  if (be <= 0) return Math.hypot(al / a, be / down);
+  if (be <= 0) return ((Math.abs(al) / a) ** roundDown + (-be / down) ** roundDown) ** (1 / roundDown);
   const r = ((Math.abs(al) / a) ** round + (be / up) ** round) ** (1 / round);
   return dip ? r + dip * Math.exp(-((al / 0.24) ** 2)) * (be / up) ** 5 : r;
 }
-// 창: [가운데 높이각, 옆, 위, 아래, 위쪽 둥글기, 위 가운데 파임]. 머리 얼굴은 위가 둥글고(가운데는 꼭지 밑으로 살짝 파였다) 아래로 턱 밑까지(하얀 배와 이어진다).
-// 몸의 배는 위로 목 밑까지, 괴물 얼굴은 갈색 테가 빙 둘러싼다
-const BUG_FACE = [-0.3, 0.84, 0.95, 1.35, 3.2, 0.1], BUG_BELLY = [0.2, 0.85, 1.45, 0.85], BUG_MASK = [0, 0.78, 0.8, 0.85];
+// 창: [가운데 높이각, 옆, 위, 아래, 위쪽 둥글기, 위 가운데 파임, 아래쪽 둥글기]. 머리 얼굴은 위가 둥글고(가운데는 꼭지 밑으로 살짝 파였다) 아래로 턱 밑까지(하얀 배와 이어진다).
+// 몸의 배는 위로 목 밑까지, 괴물 얼굴은 갈색 테가 빙 둘러싸고 작은 풍뎅이처럼 위가 둥글게 살짝 파였다(아래도 둥글게)
+const BUG_FACE = [-0.3, 0.84, 0.95, 1.35, 3.2, 0.1], BUG_BELLY = [0.2, 0.85, 1.45, 0.85], BUG_MASK = [0, 0.76, 0.76, 0.82, 3.2, 0.1, 2.6];
 const ELYTRA = 1.0, ELYTRA_LW = 0.035, SEAM = 0.035; // 딱지날개: 등 한가운데에서 이 각까지 · 아랫단 선 굵기 · 가운데 접힌 선 반폭
 /** 얼굴(배) 창 하나를 칠한 구: 안은 하양, 가장자리는 선, 밖은 갈색. back 이면 등에 접힌 딱지날개(가운데 선 · 아랫단 선)도. */
 function bugGeometry(key, win, back = false) {
