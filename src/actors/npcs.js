@@ -1,4 +1,4 @@
-import { buildNpc, animateChibi, propFor } from './models.js';
+import { buildNpc, animateChibi, propFor, wearPochette } from './models.js';
 import { EAT_ANIMS } from './eatmotion.js';
 import { VILLAGE_R, groundY, lotById } from '../core/layout.js';
 import { gotWeed } from '../core/weeding.js';
@@ -497,6 +497,8 @@ export function createNpcs(scene, village, weeds, berries) {
     plan(n, steps) { if (n.task) endTask(n); if (n.state === 'walk') { clearRoute(n); n.state = 'idle'; } n.plan = steps; n.timer = 0.2; n.dash = false; },
     /** 하늘색 자동차를 가졌는지(랏코가 돈을 모아 사면, core/goals.js 의 hasCar): 먼 길은 차로 다닌다. */
     setCar(kind, on) { const n = list.find((m) => m.kind === kind); if (n) n.hasCar = !!on; },
+    /** 돈을 모아 산 포셰트를 멘다(core/goals.js 의 friendLook, 바뀌었을 때만 다시 단다). id 가 없으면 벗는다. */
+    setPochette(kind, id) { const n = list.find((m) => m.kind === kind); if (n && n.chibi.pochetteId !== (id || null)) wearPochette(n.chibi, id); },
     /** 일정이 있거나 따라다니기 · 앞장서기 · 도망 · 대화 중이라 다른 걸 시킬 수 없는지. */
     busy(n) { return !!((n.plan && n.plan.length) || n.follow || n.lead || n.flee || n.talk > 0 || n.emote); },
     /** 말풍선 한 줄. */

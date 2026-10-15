@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, GEO } from '../render/toon.js';
-import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
+import { buildChibi, buildNpc, animateChibi, showOnlyProp, wearPochette } from '../actors/models.js';
+import { WALLPAPERS, FLOORS } from '../core/home.js';
 import { furnitureModel, placeOnDome } from './interior.js';
 
 /**
@@ -9,15 +10,24 @@ import { furnitureModel, placeOnDome } from './interior.js';
  * prop: 집주인마다 다른 물건(마시던 머그 · 풀 다발 · 술병과 화로 · 거울 · 수련 인형 · 나뭇잎 침대).
  * 걷기 · 행동 안내는 내 집(interior.js)과 같다: 집주인 옆이면 '말 걸기', 문간이면 '나가기'.
  * act: 그 집에서만 할 수 있는 놀이 자리 [x, z, 닿는 거리, 글] — 침대에서 같이 낮잠 · 풀 다발 정리 · 화로 구이 · 거울 · 짚 인형 수련 · 악보대 노래.
+ * slots: 집주인이 돈을 모아 사면(core/goals.js 의 friendLook) 놓이는 가구 자리 { 가구 id: [x, z, 돌린 칸] }. 사기 전에는 없다
+ * (쿠리만쥬의 작은 난로 · 책장은 원래 방에 있던 자리 그대로, 목표로 사면 생긴다).
  */
 const ROOMS = {
-  chiikawa: { shell: 'dome', wall: '#fbfaf5', floor: '#e8c9a0', items: [['bed', -1.6, -1.7, 0], ['cushion', 0.5, -0.6, 0], ['plant', 2.1, -1.8, 0], ['table', 1.0, -1.5, 0]], prop: 'mug', host: [-0.4, -0.7], act: [-1.6, -1.7, 1.35, '같이 낮잠 자기'] },
-  usagi: { shell: 'house', wall: '#fbe6a6', floor: '#d9b07a', items: [['bed', -2.0, -1.7, 0], ['rug', 0.3, 0.2, 0], ['shelf', 2.0, -2.0, 0]], prop: 'grass', host: [0.4, -0.8], act: [-0.05, -2.1, 1.3, '풀 다발 정리하기'] },
-  kurimanju: { shell: 'house', wall: '#f3d6b0', floor: '#c99a6a', items: [['table', 0.2, -1.0, 0], ['stove', -2.1, -2.0, 0], ['shelf', 2.1, -2.0, 0], ['rug', 0.2, 0.7, 0], ['bed', 2.2, -0.2, 3]], prop: 'bottles', host: [-0.9, -0.6], act: [-1.2, 0.6, 1.1, '안주 구워 먹기'] },
-  momonga: { shell: 'house', wall: '#dcecf8', floor: '#e2c6a8', items: [['bed', -2.0, -1.7, 0], ['lamp', -0.6, -2.1, 0], ['rug', 0.6, 0.3, 0], ['cushion', 1.6, -1.2, 0]], prop: 'mirror', host: [0.2, -0.9], act: [2.4, -2.6, 1.25, '거울 보며 꾸미기'] },
-  rakko: { shell: 'house', wall: '#e9dcc6', floor: '#b98c5e', items: [['shelf', -2.1, -2.1, 0], ['table', 1.7, -1.8, 0], ['bed', -2.2, -0.2, 1], ['rug', 0.4, 0.4, 0]], prop: 'dojo', host: [0.4, -1.0], act: [1.8, 0.2, 1.1, '같이 수련하기'] },
-  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', host: [-0.2, -0.9], act: [1.0, -1.6, 1.05, '같이 노래하기'] }
+  chiikawa: { shell: 'dome', wall: '#fbfaf5', floor: '#e8c9a0', items: [['bed', -1.6, -1.7, 0], ['cushion', 0.5, -0.6, 0], ['plant', 2.1, -1.8, 0], ['table', 1.0, -1.5, 0]], prop: 'mug', host: [-0.4, -0.7], act: [-1.6, -1.7, 1.35, '같이 낮잠 자기'],
+    slots: { doll: [2.4, 0.3, 0], lamp: [-2.6, -0.1, 0], rug: [-1.3, 1.1, 0], shelf: [0.2, -2.75, 0] } },
+  usagi: { shell: 'house', wall: '#fbe6a6', floor: '#d9b07a', items: [['bed', -2.0, -1.7, 0], ['rug', 0.3, 0.2, 0], ['shelf', 2.0, -2.0, 0]], prop: 'grass', host: [0.4, -0.8], act: [-0.05, -2.1, 1.3, '풀 다발 정리하기'],
+    slots: { cushion: [-2.2, 0.6, 0], doll: [2.3, -0.6, 0] } },
+  kurimanju: { shell: 'house', wall: '#f3d6b0', floor: '#c99a6a', items: [['table', 0.2, -1.0, 0], ['rug', 0.2, 0.7, 0], ['bed', 2.2, -0.2, 3]], prop: 'bottles', host: [-0.9, -0.6], act: [-1.2, 0.6, 1.1, '안주 구워 먹기'],
+    slots: { stove: [-2.1, -2.0, 0], shelf: [2.1, -2.0, 0], plant: [-2.4, 1.6, 0], lamp: [-1.0, -2.4, 0], cushion: [1.4, 1.6, 0] } },
+  momonga: { shell: 'house', wall: '#dcecf8', floor: '#e2c6a8', items: [['bed', -2.0, -1.7, 0], ['lamp', -0.6, -2.1, 0], ['rug', 0.6, 0.3, 0], ['cushion', 1.6, -1.2, 0]], prop: 'mirror', host: [0.2, -0.9], act: [2.4, -2.6, 1.25, '거울 보며 꾸미기'], slots: {} },
+  rakko: { shell: 'house', wall: '#e9dcc6', floor: '#b98c5e', items: [['shelf', -2.1, -2.1, 0], ['table', 1.7, -1.8, 0], ['bed', -2.2, -0.2, 1], ['rug', 0.4, 0.4, 0]], prop: 'dojo', host: [0.4, -1.0], act: [1.8, 0.2, 1.1, '같이 수련하기'],
+    slots: { plant: [-0.6, -2.4, 0], lamp: [2.4, 1.5, 0] } },
+  hachiware: { shell: 'cave', wall: '#7a6f64', floor: '#9b8c7c', items: [['lamp', 1.9, -1.6, 0], ['cushion', 0.8, 0.2, 0]], prop: 'leafbed', host: [-0.2, -0.9], act: [1.0, -1.6, 1.05, '같이 노래하기'],
+    slots: { rug: [-1.0, 1.1, 0], stove: [2.4, 0.5, 0], plant: [-2.3, 1.3, 0], table: [1.5, 1.5, 0], bed: [0.3, -2.3, 0] } }
 };
+/** 집을 넓히면(core/home.js 의 HOME_SIZES 번호) 방이 이만큼 커진다(가구 자리는 그대로, 카메라가 그만큼 물러난다). */
+const ROOM_GROW = [1, 1.15, 1.3];
 const WALKABLE = new Set(['rug', 'cushion']);
 export const ROOM_OWNERS = Object.keys(ROOMS);
 
@@ -45,55 +55,60 @@ export function createRooms() {
   const add = (o, x = 0, z = 0) => { o.position.x += x; o.position.z += z; room.add(o); return o; };
   const mesh = (geo, c, o) => add(toonMesh(geo, c, { shadow: false, ...o }));
 
-  function shell(s) {
+  /** 방 껍데기(바닥 · 벽 · 창)를 짓고 걸을 수 있는 테두리를 돌려준다. g: 집을 넓힌 만큼 커지는 배율(ROOM_GROW, 옆 · 뒤 · 앞으로 고르게). */
+  function shell(s, g = 1) {
     if (s.shell === 'house') {
       scene.background = new THREE.Color('#f3e2c8');
-      mesh(GEO.box, s.floor, { position: [0, -0.1, 0], scale: [7.2, 0.2, 6], receive: true, shell: true, outline: 0.03 });
-      mesh(GEO.box, s.wall, { position: [0, 1.6, -3.05], scale: [7.2, 3.2, 0.12], shell: true, outline: 0.03 });
-      [-1, 1].forEach((k) => mesh(GEO.box, s.wall, { position: [k * 3.62, 1.6, -0.1], scale: [0.12, 3.2, 6], shell: true, outline: 0.03 }));
+      const W = 7.2 * g, D = 6 * g, bz = -3.05 * g; // 뒷벽 자리
+      mesh(GEO.box, s.floor, { position: [0, -0.1, 0], scale: [W, 0.2, D], receive: true, shell: true, outline: 0.03 });
+      mesh(GEO.box, s.wall, { position: [0, 1.6, bz], scale: [W, 3.2, 0.12], shell: true, outline: 0.03 });
+      [-1, 1].forEach((k) => mesh(GEO.box, s.wall, { position: [k * (W / 2 + 0.02), 1.6, -0.1 * g], scale: [0.12, 3.2, D], shell: true, outline: 0.03 }));
       // 뒷벽 창(밖이 보이는 하늘색)과 걸레받이
-      // (벽 안쪽 면 z = −2.99 보다 앞으로: 창틀 · 유리 · 살)
-      mesh(GEO.box, '#ffffff', { position: [-0.9, 1.9, -2.96], scale: [1.22, 1.02, 0.05], shell: true, outline: 0.02 });
-      mesh(GEO.box, '#c6e7f5', { position: [-0.9, 1.9, -2.93], scale: [1.08, 0.88, 0.02], outline: false });
-      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.91], scale: [0.05, 0.86, 0.02], outline: false });
-      mesh(GEO.box, '#3a3236', { position: [-0.9, 1.9, -2.91], scale: [1.06, 0.05, 0.02], outline: false });
-      mesh(GEO.box, '#b08a62', { position: [0, 0.08, -2.97], scale: [7.1, 0.16, 0.04], outline: false });
-      return { kind: 'rect', hx: 3.05, z0: -2.45, z1: 2.55, door: { x: 0, z: 2.55 } };
+      // (벽 안쪽 면 z = 뒷벽 + 0.06 보다 앞으로: 창틀 · 유리 · 살)
+      mesh(GEO.box, '#ffffff', { position: [-0.9 * g, 1.9, bz + 0.09], scale: [1.22, 1.02, 0.05], shell: true, outline: 0.02 });
+      mesh(GEO.box, '#c6e7f5', { position: [-0.9 * g, 1.9, bz + 0.12], scale: [1.08, 0.88, 0.02], outline: false });
+      mesh(GEO.box, '#3a3236', { position: [-0.9 * g, 1.9, bz + 0.14], scale: [0.05, 0.86, 0.02], outline: false });
+      mesh(GEO.box, '#3a3236', { position: [-0.9 * g, 1.9, bz + 0.14], scale: [1.06, 0.05, 0.02], outline: false });
+      mesh(GEO.box, '#b08a62', { position: [0, 0.08, bz + 0.08], scale: [W - 0.1, 0.16, 0.04], outline: false });
+      const z1 = 2.9 * g - 0.35;
+      return { kind: 'rect', hx: W / 2 - 0.55, z0: bz + 0.6, z1, door: { x: 0, z: z1 } };
     }
     if (s.shell === 'cave') {
       scene.background = new THREE.Color('#3d342d');
-      mesh(GEO.cylinder, s.floor, { position: [0, -0.1, 0], scale: [4.2, 0.1, 4.2], receive: true, outline: 0.04 });
-      const wall = toonMesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), s.wall, { scale: [4.3, 3.2, 4.3], outline: false });
+      const R = 4.2 * g;
+      mesh(GEO.cylinder, s.floor, { position: [0, -0.1, 0], scale: [R, 0.1, R], receive: true, outline: 0.04 });
+      const wall = toonMesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), s.wall, { scale: [4.3 * g, 3.2 * g, 4.3 * g], outline: false });
       wall.material = wall.material.clone();
       wall.material.side = THREE.BackSide;
       room.add(wall);
       // 울퉁불퉁한 바위 · 바닥 돌 · 천장에 빛나는 버섯
       for (let i = 0; i < 9; i++) {
-        const a = Math.PI + (i / 8) * Math.PI, r = 3.7;
+        const a = Math.PI + (i / 8) * Math.PI, r = 3.7 * g;
         mesh(GEO.sphere, i % 2 ? '#8f8174' : '#6f665c', { position: [Math.cos(a) * r, 0.2, Math.sin(a) * r * 0.9], scale: [0.8, 0.7 + (i % 3) * 0.25, 0.7], outline: 0.04 });
       }
       const glow = toonMaterial('#9fe0ff', { unique: true });
       glow.emissive.setRGB(0.35, 0.7, 0.9);
       [[-2.4, -2.2], [2.6, -1.4], [-2.9, 0.4]].forEach(([x, z]) => {
-        mesh(GEO.cylinder, '#f3eedf', { position: [x, 0, z], scale: [0.05, 0.25, 0.05], outline: 0.015 });
-        add(toonMesh(GEO.sphere, null, { material: glow, position: [x, 0.28, z], scale: [0.17, 0.1, 0.17], outline: 0.015, shadow: false }));
+        mesh(GEO.cylinder, '#f3eedf', { position: [x * g, 0, z * g], scale: [0.05, 0.25, 0.05], outline: 0.015 });
+        add(toonMesh(GEO.sphere, null, { material: glow, position: [x * g, 0.28, z * g], scale: [0.17, 0.1, 0.17], outline: 0.015, shadow: false }));
       });
-      return { kind: 'circle', r: 3.6, door: { x: 0, z: 3.0 } };
+      return { kind: 'circle', r: R - 0.6, door: { x: 0, z: R - 1.2 } };
     }
     // dome
     scene.background = new THREE.Color('#f3e2c8');
-    mesh(GEO.cylinder, s.floor, { position: [0, -0.1, 0], scale: [4.0, 0.1, 4.0], receive: true, outline: 0.04 });
-    const wall = toonMesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), s.wall, { scale: [4.0, 3.6, 4.0], outline: false });
+    const R = 4.0 * g, H = 3.6 * g;
+    mesh(GEO.cylinder, s.floor, { position: [0, -0.1, 0], scale: [R, 0.1, R], receive: true, outline: 0.04 });
+    const wall = toonMesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), s.wall, { scale: [R, H, R], outline: false });
     wall.material = wall.material.clone();
     wall.material.side = THREE.BackSide;
     room.add(wall);
     const win = new THREE.Group();
-    placeOnDome(win, 4.0, 3.6, 0.44, 2.0); // 돔 벽면에 딱 붙게
+    placeOnDome(win, R, H, 0.44, 2.0); // 돔 벽면에 딱 붙게
     win.add(toonMesh(GEO.box, '#c6e7f5', { scale: [0.8, 0.8, 0.05], shell: true, outline: 0.03 }));
     win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.06, 0.76, 0.03], outline: false }));
     win.add(toonMesh(GEO.box, '#3a3236', { position: [0, 0, 0.03], scale: [0.76, 0.06, 0.03], outline: false }));
     room.add(win);
-    return { kind: 'circle', r: 3.45, door: { x: 0, z: 2.8 } };
+    return { kind: 'circle', r: R - 0.55, door: { x: 0, z: R - 1.2 } };
   }
 
   /** 집주인마다 다른 물건. 막히는 자리를 돌려준다. */
@@ -148,14 +163,25 @@ export function createRooms() {
   return {
     scene,
     camera,
-    /** 집주인 kind 의 방을 짓고, 내 캐릭터를 문간에, 집주인을 방 안에 세운다. */
-    setRoom(kind, look) {
+    /**
+     * 집주인 kind 의 방을 짓고, 내 캐릭터를 문간에, 집주인을 방 안에 세운다.
+     * extra: 집주인이 돈을 모아 이룬 것(core/goals.js 의 friendLook) — 산 가구는 slots 자리에, 벽지 · 바닥은 그 색으로(동굴 벽은 바위 그대로),
+     * 넓힌 집이면 방이 커지고, 멘 포셰트는 집 안에서도 멘다.
+     */
+    setRoom(kind, look, extra = {}) {
       room.clear();
       obst = [];
       spec = { ...ROOMS[kind] };
-      spec.bounds = shell(spec);
+      if (extra.wall && WALLPAPERS[extra.wall] && spec.shell !== 'cave') spec.wall = WALLPAPERS[extra.wall].color;
+      if (extra.floor && FLOORS[extra.floor]) spec.floor = FLOORS[extra.floor].color;
+      const g = ROOM_GROW[extra.size] || 1;
+      spec.bounds = shell(spec, g);
+      camera.position.set(0, 7.4 * g, 8.6 * g); // 넓힌 방도 한눈에 보이게 물러난다
+      camera.lookAt(0, 0.6, -0.5 * g);
       door = spec.bounds.door;
-      for (const [id, x, z, rot] of spec.items) {
+      const items = [...spec.items];
+      for (const id of extra.furniture || []) if (spec.slots && spec.slots[id]) items.push([id, ...spec.slots[id]]);
+      for (const [id, x, z, rot] of items) {
         const f = furnitureModel(id);
         f.position.set(x, 0, z);
         f.rotation.y = -rot * Math.PI / 2;
@@ -171,6 +197,7 @@ export function createRooms() {
       pos.x = door.x; pos.z = door.z - 0.6; yaw = Math.PI;
       if (host) scene.remove(host.root);
       host = buildNpc(kind);
+      if (extra.pochette) wearPochette(host, extra.pochette);
       hostAt = { x: spec.host[0], z: spec.host[1] };
       host.root.position.set(hostAt.x, 0, hostAt.z);
       scene.add(host.root);

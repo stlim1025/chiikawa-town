@@ -354,7 +354,8 @@ const DEFS = {
     const st = onHead(hc, hr, -0.17, 0.16, 0.002), sf = onHead(hc, hr, -0.17, 0.16, 0.006);
     parts.push({ m: 'star4', c: INK, p: st.p, r: [st.r[0], st.r[1], 0.25], s: [0.088, 0.088, 0.012], n: 'head', o: false });
     parts.push({ m: 'star4', c: STAR_SCAR, p: sf.p, r: [sf.r[0], sf.r[1], 0.25], s: [0.066, 0.066, 0.012], n: 'head', o: false });
-    return { label: '랏코', parts, neck: [0, 0.5, 0], height: 1.15, radius: 0.47 };
+    // fit: 포셰트를 메는 겉면(몸을 감싼 망토 크기, wearPochette). 몸통 공은 망토와 한 덩어리로 합쳐져 따로 잴 수 없다
+    return { label: '랏코', parts, neck: [0, 0.5, 0], height: 1.15, radius: 0.47, fit: { c: [0, 0.33, -0.02], r: [0.47, 0.38, 0.44] } };
   },
   shisa() {
     const parts = [], hc = [0, 0.74, 0], hr = [0.42, 0.37, 0.38];
@@ -1051,7 +1052,7 @@ function buildFromDef(def) {
     }
   });
   mergeDetails(pivots, props, roles);
-  return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label };
+  return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label, fit: def.fit || null };
 }
 
 const partVolume = (m) => m.scale.x * m.scale.y * m.scale.z;
@@ -1166,6 +1167,39 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me, { ownEars = fals
   }
   chibi.pajama = added;
   chibi.pajamaHidden = hidden;
+}
+
+/**
+ * 다 만든 모델에 멘 포셰트(core/pochette.js 의 id)를 덧붙인다: 마을 친구가 돈을 모아 산 포셰트(core/goals.js 의 friendLook). id 가 없으면 벗긴다.
+ * 내 캐릭터의 pochetteParts 와 같은 모양(왼쪽 어깨에서 오른쪽 옆구리로 끈, 오른쪽 배에 가방)을 몸통(가장 큰 부품) 크기에 맞춰 붙인다.
+ */
+export function wearPochette(chibi, id) {
+  (chibi.pochetteParts || []).forEach((m) => m.parent && m.parent.remove(m));
+  chibi.pochetteParts = null;
+  chibi.pochetteId = id || null;
+  const P = id ? POCHETTES[id] : null, pivot = chibi.pivots && chibi.pivots.body;
+  if (!P || !pivot) return;
+  // 메는 겉면: 모델이 정해 둔 것(fit, 랏코의 망토)이 없으면 몸통 관절의 가장 큰 부품(합친 덩어리는 크기를 잴 수 없어 빼고)
+  let body = null;
+  if (!chibi.fit) pivot.children.forEach((m) => { if (m.isMesh && !m.userData.merged && (!body || partVolume(m) > partVolume(body))) body = m; });
+  if (!chibi.fit && !body) return;
+  // 내 캐릭터 몸통(가운데 [0, 0.34, 0], 반지름 [0.34, 0.32, 0.31])에서 잰 자리를 이 몸통 크기로 옮긴다
+  const c = chibi.fit ? chibi.fit.c : body.position.toArray(), r = chibi.fit ? chibi.fit.r : body.scale.toArray(), k = r[0] / 0.34, added = [];
+  const at = (x, y, push) => onHead(c, r, (x / 0.34) * r[0], ((y - 0.34) / 0.32) * r[1], push * k);
+  const put = (m, color, q, s, outline) => {
+    const mesh = new THREE.Mesh(partGeometry(m, Math.max(...s) * k), celMaterial(color, { flat: !outline }));
+    mesh.position.set(q.p[0], q.p[1], q.p[2]);
+    mesh.rotation.set(q.r[0], q.r[1], 0, 'YXZ');
+    mesh.scale.set(s[0] * k, s[1] * k, s[2] * k);
+    if (outline) addShellOutline(mesh, 0.02);
+    pivot.add(mesh);
+    added.push(mesh);
+  };
+  for (let i = 0; i <= 14; i++) { const t = i / 14; put('dot', P.accent, at(-0.2 + t * 0.4, 0.54 - t * 0.33, 0.004), [0.026, 0.026, 0.012], false); } // 끈
+  put('box', P.color, at(0.2, 0.2, 0.035), [0.17, 0.13, 0.07], true); // 가방
+  put('box', P.accent, at(0.205, 0.235, 0.044), [0.18, 0.065, 0.075], true); // 덮개
+  put('dot', '#fff6dc', at(0.224, 0.21, 0.071), [0.022, 0.022, 0.01], false); // 단추
+  chibi.pochetteParts = added;
 }
 
 /**

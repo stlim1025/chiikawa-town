@@ -47,15 +47,16 @@ export const GOALS = {
  * like 에 없는 종류와 처음부터 가진 것(START_OWN: 쿠리만쥬의 술 자격)은 바라지 않는다.
  */
 export const WISHES = {
-  chiikawa: { pochette: ['strawberry', 'lemon'], furniture: ['cushion', 'plant', 'rug'], wall: ['pink'], floor: ['pink'],
+  // 가구는 그 친구 방(world/rooms.js 의 ROOMS)에 아직 없는 것만: 사면 방에 놓인다. 하치와레는 동굴에 살아서 벽지 대신 바닥에 깔 카펫만
+  chiikawa: { pochette: ['strawberry', 'lemon'], furniture: ['rug', 'shelf'], wall: ['pink'], floor: ['pink'],
     like: { pochette: 1.4, furniture: 1.2, decor: 1, home: 1, donate: 1, weapon: 0.5, liquor: 0.4 } },
-  hachiware: { pochette: ['sky', 'night'], furniture: ['cushion', 'lamp', 'plant'], wall: ['sky'], floor: ['grass'],
+  hachiware: { pochette: ['sky', 'night'], furniture: ['plant', 'table', 'bed'], floor: ['grass'],
     like: { pochette: 1.2, furniture: 1, decor: 1.1, home: 0.9, donate: 1.3, weapon: 0.6, liquor: 0.8 } },
   usagi: { pochette: ['lemon', 'chestnut'], furniture: ['cushion', 'doll'], wall: ['lemon'],
     like: { pochette: 1, furniture: 0.8, decor: 0.8, home: 0.8, donate: 0.9, weapon: 1.4, liquor: 0.7 } },
   kurimanju: { pochette: ['chestnut'], furniture: ['plant', 'lamp', 'cushion'], floor: ['dark'],
     like: { pochette: 0.6, furniture: 1.2, decor: 1, home: 1.2, donate: 1, weapon: 0.6 } },
-  rakko: { pochette: ['night'], furniture: ['plant', 'lamp'], floor: ['dark'],
+  rakko: { pochette: ['mint'], furniture: ['plant', 'lamp'], floor: ['dark'], // 포셰트는 짙은 갈색 몸에 잘 보이는 민트색
     like: { pochette: 0.5, furniture: 0.8, decor: 0.6, home: 1, donate: 1.2, weapon: 1.3, liquor: 0.9 } }
 };
 /** 친구가 마을 가꾸기에 한 번에 보태는 돈: 내 모금 단위(WORK_STEP)의 절반(친구들 돈만으로 시설이 너무 빨리 생기지 않게). */
@@ -152,6 +153,21 @@ export function tryLiquor(state, kind, day, random = Math.random) {
   const paid = villagerSpend(state, kind, LICENSES.liquor.fee, day);
   const patch = { liquorDay: day, liquorTries: tries + 1, ...(passed ? { bought: [...boughtOf(paid, kind), 'liquor'] } : {}) };
   return { state: updateVillager(paid, kind, day, patch), passed };
+}
+
+/**
+ * 친구가 이룬 목표가 눈에 보이는 모습(게임 오리지널): 멘 포셰트(가장 나중에 산 것) · 방에 들인 가구(산 차례대로) · 벽지와 바닥(가장 나중 것) ·
+ * 집 크기(HOME_SIZES 번호, 넓힐수록 방이 커진다). actors/npcs.js 의 setPochette(마을에서 메고 다닌다)와 world/rooms.js 의 setRoom(친구 방)이 쓴다.
+ * → { pochette: id | null, furniture: [id], wall: id | null, floor: id | null, size }
+ */
+export function friendLook(state, kind) {
+  const bought = boughtOf(state, kind);
+  const last = (pre, table) => { const id = [...bought].reverse().find((b) => b.startsWith(pre) && table[b.slice(pre.length)]); return id ? id.slice(pre.length) : null; };
+  return {
+    pochette: last('p-', POCHETTES), wall: last('wall-', WALLPAPERS), floor: last('floor-', FLOORS),
+    furniture: bought.filter((id) => id.startsWith('f-') && FURNITURE[id.slice(2)]).map((id) => id.slice(2)),
+    size: HOME_SIZES.reduce((n, h, i) => (i > 0 && bought.includes(`h-${i}`) ? i : n), 0)
+  };
 }
 
 /** 목표를 이뤘을 때 마을 소식 종류(core/villagetalk.js): 마을 가꾸기에 보탰다 · 집을 넓혔다 · 샀다. */

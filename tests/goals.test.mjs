@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GOALS, WISHES, DONATE_STEP, goalOf, canBuy, buyGoal, npcPower, hasCar, hasLiquor, canTryLiquor, tryLiquor, goalNews, goalPlace, CAMERA_PRICE } from '../src/core/goals.js';
+import { GOALS, WISHES, DONATE_STEP, goalOf, canBuy, buyGoal, npcPower, hasCar, hasLiquor, friendLook, canTryLiquor, tryLiquor, goalNews, goalPlace, CAMERA_PRICE } from '../src/core/goals.js';
 import { POCHETTES } from '../src/core/pochette.js';
 import { HOME_SIZES, WALLPAPERS, FLOORS } from '../src/core/home.js';
 import { WORKS, workOf, workStatus } from '../src/core/works.js';
@@ -92,7 +92,7 @@ test('차례 목표를 다 이뤄도 바라는 것(포셰트 · 가구 · 벽지
 });
 
 test('바라는 것은 싼 것부터, 좋아하는 것은 조금 비싸도 먼저: 처음 몇 개는 가구 · 포셰트처럼 작은 것', () => {
-  const { got } = reach('chiikawa', GOALS.chiikawa.length + 5);
+  const { got } = reach('chiikawa', GOALS.chiikawa.length + 4);
   const first = got.slice(GOALS.chiikawa.length);
   assert.ok(first.every((g) => g.cost <= 400), first.map((g) => `${g.label} ${g.cost}`).join(', '));
   // 무기를 좋아하는 우사기는 가구보다 무기를 먼저 노린다
@@ -103,7 +103,7 @@ test('바라는 것은 싼 것부터, 좋아하는 것은 조금 비싸도 먼�
 test('마을 가꾸기에 보태면 내 모금함과 같은 곳에 모이고, 다 모이면 다음 날 생긴다. 보탤수록 다음 보태기는 뒤로 미룬다', () => {
   const kind = 'hachiware', done = GOALS[kind].map((g) => g.id).filter((id) => id !== 'license');
   // 바라는 것도 마을 가꾸기 말고는 다 이뤘다고 치고, 꽃밭은 내가 2,500원 모아 두었다
-  const other = ['p-sky', 'p-night', 'f-cushion', 'f-lamp', 'f-plant', 'wall-sky', 'floor-grass', 'liquor', 'w-hammer', 'w-star', 'h-1', 'h-2'];
+  const other = ['p-sky', 'p-night', 'f-plant', 'f-table', 'f-bed', 'floor-grass', 'liquor', 'w-hammer', 'w-star', 'h-1', 'h-2'];
   let s = licensedAs(withMoney(fresh(), kind, 0, { bought: [...done, ...other] }), kind);
   s = { ...s, works: { flowers: { paid: 2500 } } };
   const g = goalOf(s, kind);
@@ -125,7 +125,7 @@ test('마을 가꾸기에 보태면 내 모금함과 같은 곳에 모이고, �
 });
 
 test('술 자격은 검정소 시험: 응시료가 모이면 하루 한 번 보고, 떨어질수록 붙기 쉬워진다', () => {
-  const kind = 'rakko', s0 = withMoney(fresh(), kind, 0, { bought: ['rod', 'w-star', 'f-plant', 'f-lamp'], weapon: 'star' });
+  const kind = 'rakko', s0 = withMoney(fresh(), kind, 0, { bought: ['rod', 'w-star', 'f-plant', 'f-lamp', 'p-mint'], weapon: 'star' });
   assert.equal(goalOf(s0, kind).kind, 'liquor');
   assert.equal(goalPlace(goalOf(s0, kind)), 'exam');
   assert.ok(!canTryLiquor(s0, kind, 1), '돈이 모자라면 못 본다');
@@ -142,6 +142,17 @@ test('술 자격은 검정소 시험: 응시료가 모이면 하루 한 번 보�
   const pass = tryLiquor(s, kind, 2, () => 0.8); // 처음엔 0.7 이라 떨어질 값이지만, 한 번 떨어졌으니 붙는다
   assert.ok(pass.passed);
   assert.notEqual(goalOf(pass.state, kind).kind, 'liquor', '붙으면 다음 목표로');
+});
+
+test('이룬 목표는 눈에 보인다: 가장 나중에 산 포셰트를 메고, 산 가구 · 벽지 · 바닥과 넓힌 방이 친구 방에', () => {
+  assert.deepEqual(friendLook(fresh(), 'chiikawa'), { pochette: null, furniture: [], wall: null, floor: null, size: 0 });
+  const s = withMoney(fresh(), 'chiikawa', 0, { bought: ['w-fork', 'f-doll', 'p-strawberry', 'f-rug', 'wall-pink', 'p-lemon', 'h-1', 'floor-pink', 'd-1', 'p-nope'] });
+  assert.deepEqual(friendLook(s, 'chiikawa'), { pochette: 'lemon', furniture: ['doll', 'rug'], wall: 'pink', floor: 'pink', size: 1 });
+  assert.equal(friendLook(withMoney(s, 'chiikawa', 0, { bought: [...villagerOf(s, 'chiikawa', 1).bought, 'h-2'] }), 'chiikawa').size, 2);
+  // 바라는 가구는 그 친구 방에 아직 없는 것(사면 방에 놓인다): 치이카와 방엔 방석 · 화분이, 하치와레 동굴엔 스탠드 · 방석이 있다
+  assert.ok(!WISHES.chiikawa.furniture.some((id) => ['cushion', 'plant', 'bed', 'table'].includes(id)));
+  assert.ok(!WISHES.hachiware.furniture.some((id) => ['lamp', 'cushion'].includes(id)));
+  assert.ok(!WISHES.hachiware.wall, '하치와레는 동굴이라 벽지는 바라지 않는다');
 });
 
 test('목표마다 가는 곳: 무기 · 낚싯대는 도구점, 가구 · 벽지는 가구점, 포셰트는 포셰트 가게, 집은 부동산', () => {
