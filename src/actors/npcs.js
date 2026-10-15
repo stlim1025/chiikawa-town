@@ -57,6 +57,7 @@ function pullOutcome(kind, random = Math.random) {
   return r < k.fail ? 'none' : r < k.fail + k.clean ? 'clean' : 'snapped';
 }
 const STEER = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]; // 가려는 쪽이 막히면 이만큼(라디안) 옆으로 틀어 본다
+const YIELD_WAIT = 1.5; // 내 캐릭터가 길을 막고 있으면 이만큼(초) 기다렸다가 비켜 지나간다
 const MIN_WEEDS_FOR_FRIENDS = 8; // 내 몫을 남기려고 풀이 이보다 적으면 친구들은 뽑지 않는다
 const POST_ROAM = 2.5; // 자리가 정해진 친구가 쉬다가 자리 둘레를 거니는 거리(따로 정하지 않았으면)
 const EATING = new Set([...EAT_ANIMS, 'drink']); // 먹고 마시는 몸짓: 등을 보이지 않게 화면 쪽으로 돌아서 한다
@@ -181,6 +182,7 @@ export function createNpcs(scene, village, weeds, berries) {
     n.stuck = 0;
     n.stuckT = 0;
     n.sx = null;
+    n.yieldT = 0;
   }
   /** 막혔을 때 지금 향한 쪽의 왼쪽이나 오른쪽(무작위)으로 비켜설 빈자리를 길 맨 앞에 끼운다. */
   function sidestep(n) {
@@ -685,11 +687,15 @@ export function createNpcs(scene, village, weeds, berries) {
             setDriving(n, !!n.hasCar && outside && !n.flee && !n.follow && !n.lead && !n.carBlocked && !(n.task && n.task.weed) && (n.driving ? d > DRIVE_STOP : d > DRIVE_FROM));
             // 따라올 때는 내 걸음에 맞춰 빠르게, 앞장설 때는 내가 따라오기 좋게, 도망갈 때는 달린다
             const speed = n.driving ? NPC_CAR_SPEED : n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.dash ? 2.6 : n.speed, step = speed * dt;
+            // 내 캐릭터 바로 옆에서 못 움직이고 선 시간이 쌓이면(물가 · 울타리 틈을 내가 막고 서 있으면) 잠깐 기다렸다가 나를 스치듯 지나간다
+            // (그동안은 아래 '겹치지 않게'도 쉰다). 예전엔 비켜섰다 돌아오기만 되풀이하며 내가 움직일 때까지 영영 서 있었다(조금씩은 움직여 막힘으로 세지도 않았다).
+            // 탁 트인 곳에서는 내 둘레를 돌아 걸어가니(움직이는 동안은 세지 않는다) 지금처럼 비켜 간다
+            const pass = (n.yieldT || 0) > YIELD_WAIT;
             // 늦게 도는 몸 방향이 아니라 가려는 쪽으로 걷고, 막히면 옆으로 틀어 비켜 간다
             let heading = want, moved = false;
             for (const off of STEER) {
               const nx = n.x + Math.sin(want + off) * step, nz = n.z + Math.cos(want + off) * step;
-              if (village.isFree(nx, nz, n.driving ? 0.45 : 0.34) && !crowded(n, nx, nz) && !intoPlayer(n, nx, nz) && (!n.flee || Math.hypot(nx, nz) < Math.max(VILLAGE_R + 12, Math.hypot(n.x, n.z)))) { n.x = nx; n.z = nz; heading = want + off; moved = true; break; }
+              if (village.isFree(nx, nz, n.driving ? 0.45 : 0.34) && !crowded(n, nx, nz) && (pass || !intoPlayer(n, nx, nz)) && (!n.flee || Math.hypot(nx, nz) < Math.max(VILLAGE_R + 12, Math.hypot(n.x, n.z)))) { n.x = nx; n.z = nz; heading = want + off; moved = true; break; }
             }
             let diff = heading - n.yaw;
             while (diff > Math.PI) diff -= Math.PI * 2;
@@ -698,6 +704,7 @@ export function createNpcs(scene, village, weeds, berries) {
             n.yaw += Math.max(-dt * turn, Math.min(dt * turn, diff));
             if (moved) { n.phase += dt * speed * 9; mode = 'walk'; } // 정말 움직였을 때만 걷는 몸짓(막히면 제자리 달리기 없이 서 있는다)
             if (n.driving && moved) rollCar(n.car, step, t);
+            n.yieldT = pd0 < n.chibi.radius + 0.9 ? (n.yieldT || 0) + (moved ? 0 : dt) : 0;
             checkStuck(n, dt);
             if (n.driving && (n.stuck || 0) >= 2) { n.carBlocked = true; setDriving(n, false); } // 차로는 못 빠져나가는 길: 이번엔 내려서 걸어간다
           }
@@ -709,9 +716,9 @@ export function createNpcs(scene, village, weeds, berries) {
           while (dd < -Math.PI) dd += Math.PI * 2;
           n.yaw += Math.max(-dt * 4, Math.min(dt * 4, dd));
         }
-        // 내 캐릭터와 겹치지 않게
+        // 내 캐릭터와 겹치지 않게(길을 막혀 오래 기다린 끝에 비켜 지나가는 중이면 빼고)
         const px = n.x - player.x, pz = n.z - player.z, pd = Math.hypot(px, pz), min = n.chibi.radius + 0.35;
-        if (pd < min && pd > 0.001) {
+        if (pd < min && pd > 0.001 && !(n.state === 'walk' && n.yieldT > YIELD_WAIT)) {
           const nx = player.x + (px / pd) * min, nz = player.z + (pz / pd) * min;
           if (village.isFree(nx, nz, 0.3)) { n.x = nx; n.z = nz; }
         }
