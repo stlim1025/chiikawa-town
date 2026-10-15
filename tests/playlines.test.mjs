@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NPC_LINES, PLAY_KEYS, lineOf } from '../src/core/npclines.js';
 import { FRIENDS } from '../src/core/friends.js';
+import { VILLAGERS } from '../src/core/villagers.js';
 
 const players = Object.keys(FRIENDS).filter((k) => FRIENDS[k].play);
 
@@ -37,4 +38,13 @@ test('가위바위보 대사는 친구가 낸 손을 말하고, 내 이름 자�
   const withName = players.flatMap((k) => PLAY_KEYS.flatMap((key) => [].concat(NPC_LINES[k][key]))).filter((l) => l.includes('{name}'));
   assert.ok(withName.length > 0);
   assert.ok(lineOf('rakko', 'rpsLose', { name: '{name}' }, () => 0.99).includes('{name}'));
+});
+
+test('일하는 친구는 가방 정리(전리품 팔기) 대사도 자기 말투로, 친구마다 다르게', () => {
+  const workers = Object.keys(VILLAGERS).filter((k) => VILLAGERS[k].jobs.length);
+  for (const k of workers) assert.ok(NPC_LINES[k] && NPC_LINES[k].bagSell, k);
+  const all = workers.map((k) => [].concat(NPC_LINES[k].bagSell).join('|'));
+  assert.equal(new Set(all).size, workers.length, all.join(' / '));
+  assert.ok(lineOf('rakko', 'bagSell', { pay: '+50원' }, () => 0).endsWith('+50원'));
+  assert.equal(lineOf('kani', 'bagSell', { pay: '+50원' }), '가방 정리~ +50원');
 });

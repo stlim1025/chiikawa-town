@@ -5087,7 +5087,7 @@ function boot() {
     const r = sellPantry(state, n.kind);
     if (!r.earned) return;
     commit(payVillager(r.state, n.kind, r.earned, state.clock.day), false);
-    setTimeout(() => { if (state) npcs.say(n, `가방 정리~ +${won(r.earned)}`); }, 2600);
+    setTimeout(() => { if (state) npcs.say(n, lineOf(n.kind, 'bagSell', { pay: `+${won(r.earned)}` })); }, 2600); // 친구마다 말투대로(core/npclines.js)
   }
 
   // ---------- 똑똑한 친구들: 마음(욕구) · 하는 일 · 오늘 기억과 소문 · 친구끼리 수다 · 공연 · 먼저 다가오기 ----------
