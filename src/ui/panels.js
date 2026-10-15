@@ -3,7 +3,7 @@ import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
-import { FURNITURE, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, decorOf, hasDecor } from '../core/home.js';
+import { FURNITURE, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, sizeOf, decorOf, hasDecor } from '../core/home.js';
 import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, EVICT_AFTER, LODGING_PRICE, ROUGH_REST, housingOf } from '../core/housing.js';
 import { POCHETTES, THEFT_GUARD, pochetteOf, worn } from '../core/pochette.js';
 import { LICENSES, hasLicense, licensesOf, canWorkRamen } from '../core/licenses.js';
@@ -150,7 +150,13 @@ const decorSvg = (kind, c) => (kind === 'wall'
 /** 집 넓히기 그림: 둥근 집 양옆으로 분홍 화살표. */
 // 빌린 집(마을이 처음부터 세운 하얀 돔 집 — world/homeext.js 의 0단계): 동그란 돔에 네모 창, 옆으로 튀어나온 둥근 현관
 const DOME_ART = '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="49" rx="28" ry="5" fill="#a9dc8c"/><path d="M7 48C7 23 18 12 32 12s25 11 25 36z" fill="#fbfaf5" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><rect x="17" y="24" width="12" height="10" rx="2" fill="#c6e7f5" stroke="#5a4431" stroke-width="2"/><path d="M23 24v10M17 29h12" stroke="#5a4431" stroke-width="1.6"/><path d="M38 48V36a8 8 0 0 1 16 0v12z" fill="#fbfaf5" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M42 48v-10a4 4 0 0 1 8 0v10z" fill="#c49a6c" stroke="#5a4431" stroke-width="1.6"/></svg>';
-const ROOM_ART = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33V19a11 9.5 0 0 1 22 0v14z" fill="#fff3d6" stroke="#5a4431" stroke-width="2"/><path d="M17 33v-6a3 3 0 0 1 6 0v6" fill="#c49a6c" stroke="#5a4431" stroke-width="1.6"/><path d="M2.5 23 6 19.5v7zM37.5 23 34 19.5v7z" fill="#f08fae"/></svg>';
+// 넓은 방(빨간 지붕의 아담한 집 — world/homeext.js 의 1단계): 박공지붕 · 굴뚝 · 초록 덧창 · 꽃 상자 · 작은 현관 지붕
+const COTTAGE_ART = '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="50" rx="29" ry="5" fill="#a9dc8c"/><rect x="42" y="7" width="6" height="11" fill="#c96f5d" stroke="#5a4431" stroke-width="1.8"/><rect x="11" y="24" width="42" height="25" fill="#fff4de" stroke="#5a4431" stroke-width="2"/><path d="M5 26L32 8l27 18z" fill="#e0645a" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M24 23l8-5.5 8 5.5z" fill="#f7d7b5"/><rect x="15" y="30" width="9" height="8" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><rect x="40" y="30" width="9" height="8" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><path d="M12.5 30h2.5v8h-2.5zM24 30h2.5v8H24zM37.5 30H40v8h-2.5zM49 30h2.5v8H49z" fill="#5fae6e"/><rect x="14" y="38.5" width="11" height="3" rx="1" fill="#a8795a"/><rect x="39" y="38.5" width="11" height="3" rx="1" fill="#a8795a"/><circle cx="16.5" cy="38" r="1.3" fill="#f48fb1"/><circle cx="19.5" cy="37.6" r="1.3" fill="#ffd36b"/><circle cx="22.5" cy="38" r="1.3" fill="#f48fb1"/><circle cx="41.5" cy="38" r="1.3" fill="#ffd36b"/><circle cx="44.5" cy="37.6" r="1.3" fill="#f48fb1"/><circle cx="47.5" cy="38" r="1.3" fill="#ffd36b"/><rect x="28" y="35" width="8" height="14" rx="1.5" fill="#a8795a" stroke="#5a4431" stroke-width="1.6"/><path d="M25 35.5l7-4.5 7 4.5z" fill="#e0645a" stroke="#5a4431" stroke-width="1.6" stroke-linejoin="round"/><rect x="26" y="48.5" width="12" height="2.5" rx="1" fill="#e9e2d6" stroke="#5a4431" stroke-width="1.2"/></svg>';
+// 큰 방(2층 저택 — 2단계): 남색 모임지붕 · 굴뚝 둘 · 가운데 박공과 둥근 창 · 기둥 현관 위 발코니 · 두 짝 대문 · 원뿔 나무
+const MANSION_ART = '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="50" rx="30" ry="5" fill="#a9dc8c"/><rect x="13" y="4" width="5" height="10" fill="#9aa3b5" stroke="#5a4431" stroke-width="1.6"/><rect x="46" y="4" width="5" height="10" fill="#9aa3b5" stroke="#5a4431" stroke-width="1.6"/><rect x="8" y="18" width="48" height="31" fill="#fff4de" stroke="#5a4431" stroke-width="2"/><path d="M5 19l9-10h36l9 10z" fill="#4a5f8e" stroke="#5a4431" stroke-width="2" stroke-linejoin="round"/><path d="M24 19l8-9 8 9z" fill="#fff4de" stroke="#5a4431" stroke-width="1.6" stroke-linejoin="round"/><circle cx="32" cy="15.2" r="2.3" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.2"/><path d="M28 30v-6a4 4 0 0 1 8 0v6z" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><rect x="12" y="22" width="7" height="7" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.4"/><rect x="45" y="22" width="7" height="7" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.4"/><rect x="12" y="36" width="7" height="8" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.4"/><rect x="45" y="36" width="7" height="8" rx="1" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.4"/><path d="M10 22h2v7h-2zM19 22h2v7h-2zM43 22h2v7h-2zM52 22h2v7h-2zM10 36h2v8h-2zM19 36h2v8h-2zM43 36h2v8h-2zM52 36h2v8h-2z" fill="#4a5f8e"/><rect x="22" y="31" width="20" height="3" fill="#fbfaf5" stroke="#5a4431" stroke-width="1.4"/><path d="M23 31v-2.5M26.5 31v-2.5M30 31v-2.5M34 31v-2.5M37.5 31v-2.5M41 31v-2.5M22.5 28.5h19" stroke="#5a4431" stroke-width="1.1"/><rect x="23" y="34" width="2.6" height="15" fill="#fbfaf5" stroke="#5a4431" stroke-width="1.2"/><rect x="38.4" y="34" width="2.6" height="15" fill="#fbfaf5" stroke="#5a4431" stroke-width="1.2"/><rect x="28" y="38" width="8" height="11" rx="1" fill="#8a5a3c" stroke="#5a4431" stroke-width="1.4"/><path d="M32 38v11" stroke="#5a4431" stroke-width="1.1"/><path d="M2 49l3.5-11L9 49zM55 49l3.5-11L62 49z" fill="#6fae6a" stroke="#5a4431" stroke-width="1.4" stroke-linejoin="round"/><rect x="25" y="48.5" width="14" height="2.5" rx="1" fill="#e9e2d6" stroke="#5a4431" stroke-width="1.2"/></svg>';
+// 내 집 바깥 모습(집 크기 번호마다)
+const HOUSE_LOOK = ['하얀 돔 집', '빨간 지붕의 아담한 집', '2층 저택'];
+const HOUSE_ART = [DOME_ART, COTTAGE_ART, MANSION_ART];
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
 /** 일감 그림: 풀 · 열매는 그 그림, 스티커는 종이, 토벌은 몬스터 얼굴. */
@@ -916,19 +922,23 @@ export function createPanels(ui, handlers) {
       const out = [head('부동산', s.money)];
       // 돈이 모자라면 얼마 더 모아야 하는지(값 버튼만 흐리게 두면 왜 못 사는지 안 보였다)
       const short = (price) => (s.money < price ? h('div', { class: 'd short' }, `${won(price - s.money)} 더 모아야 해요`) : null);
-      // 집 사기 버튼: 위에 「집 사기」, 아래에 값
-      const buyHouseBtn = () => h('button', { class: 'btn pink price-btn buy-house', type: 'button', disabled: s.money < HOUSE_PRICE, onClick: after(handlers.buyHouse),
-        'aria-label': `집 사기 ${won(HOUSE_PRICE)}${s.money < HOUSE_PRICE ? ' (돈이 부족해요)' : ''}` },
-        h('small', {}, '집 사기'), h('span', { class: 'bh-price' }, svgSpan('coin-ico', COIN), won(HOUSE_PRICE)));
+      // 위에 할 일(「집 사기」, 「넓히기」), 아래에 값을 적은 버튼
+      const bigBtn = (label, price, onClick) => h('button', { class: 'btn pink price-btn buy-house', type: 'button', disabled: s.money < price, onClick,
+        'aria-label': `${label} ${won(price)}${s.money < price ? ' (돈이 부족해요)' : ''}` },
+        h('small', {}, label), h('span', { class: 'bh-price' }, svgSpan('coin-ico', COIN), won(price)));
+      const buyHouseBtn = () => bigBtn('집 사기', HOUSE_PRICE, after(handlers.buyHouse));
       if (hs.own) {
-        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '내 집이에요!'), h('div', { class: 'd' }, '이제 집세를 내지 않아요'))));
-        // 집 넓히기(core/home.js): 한 단계씩, 가구 놓을 칸이 늘어난다
-        const home = homeOf(s), cur = gridOf(home), next = nextSize(home);
-        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', ROOM_ART),
-          h('div', {}, h('div', { class: 't' }, next ? `${josa(next.name, '으로/로')} 넓히기` : cur.name),
-            h('div', { class: 'd' }, next ? `가구 놓을 칸이 ${cur.cols * cur.rows}칸에서 ${next.cols * next.rows}칸으로 늘어요` : `가장 넓은 방이에요. 가구를 ${cur.cols * cur.rows}칸까지 놓아요`),
+        // 내 집(집 넓히기, core/home.js): 넓힐 수 있으면 넓힌 뒤의 집 모습(넓은 방은 빨간 지붕의 아담한 집, 큰 방은 2층 저택)과 넓히기 버튼,
+        // 다 넓혔으면 지금 집(2층 저택). 한 단계씩, 가구 놓을 칸이 늘어난다
+        const home = homeOf(s), size = sizeOf(home), cur = gridOf(home), next = nextSize(home);
+        out.push(h('div', { class: 'row pochette house' }, svgSpan('pochette-art', HOUSE_ART[next ? size + 1 : size]),
+          h('div', {}, h('div', { class: 't' }, next ? `${josa(next.name, '으로/로')} 넓히기` : HOUSE_LOOK[size]),
+            h('div', { class: 'mon-chips' }, chip('check', '', '내 집이에요'), chip('coin', '', '집세 없음')),
+            h('div', { class: 'd' }, next
+              ? `넓히면 ${josa(HOUSE_LOOK[size + 1], '이/가')} 되고, 가구 놓을 칸이 ${cur.cols * cur.rows}칸에서 ${next.cols * next.rows}칸으로 늘어요`
+              : `가장 넓은 방이에요. 가구를 ${cur.cols * cur.rows}칸까지 놓아요`),
             next ? short(next.price) : null),
-          next ? priceBtn(next.price, s.money, after(handlers.expandHome), 'btn pink') : h('span', { class: 'lic-badge done' }, ico('check'), '다 넓혔어요')));
+          next ? bigBtn('넓히기', next.price, after(handlers.expandHome)) : h('span', { class: 'lic-badge done' }, ico('check'), '다 넓혔어요')));
       } else {
         const rentDay = handlers.dayLabel(handlers.nextDay(RENT_DAY));
         if (hs.evicted) {
