@@ -21,7 +21,7 @@ export const CAMERA_PRICE = 500;
 const camera = () => ({ id: 'camera', kind: 'camera', label: '카메라', cost: CAMERA_PRICE, story: 'hachiCamera' });
 /** 낚싯대(게임 오리지널): 도구점에서 사면 쉬는 틈에 물가에서 낚시하고, 노동 접수 낚시 일감도 받는다(hasRod). */
 const rod = () => ({ id: 'rod', kind: 'rod', item: 'rod', label: TOOLS.rod.name, cost: TOOLS.rod.price });
-/** 하늘색 자동차(원작에서 랏코만 가진 차): 도구점 값 그대로 모아서 사고, 산 뒤로는 먼 길을 차로 다닌다(actors/npcs.js 의 setCar). */
+/** 하늘색 자동차(원작에서 랏코만 가진 차): 도구점 값 그대로 모아서 사고, 산 뒤로는 마을 밖 먼 길을 차로 다닌다(마을 안은 걸어서, actors/npcs.js 의 setCar). */
 const car = () => ({ id: 'car', kind: 'car', item: 'car', label: TOOLS.car.name, cost: TOOLS.car.price });
 
 export const GOALS = {

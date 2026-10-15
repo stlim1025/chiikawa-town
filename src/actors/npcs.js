@@ -61,7 +61,7 @@ const MIN_WEEDS_FOR_FRIENDS = 8; // 내 몫을 남기려고 풀이 이보다 적
 const POST_ROAM = 2.5; // 자리가 정해진 친구가 쉬다가 자리 둘레를 거니는 거리(따로 정하지 않았으면)
 const EATING = new Set([...EAT_ANIMS, 'drink']); // 먹고 마시는 몸짓: 등을 보이지 않게 화면 쪽으로 돌아서 한다
 const VIEW_Z = 7; // 카메라는 늘 내 캐릭터 뒤(+z)에서 본다(render/camera.js)
-/** 하늘색 자동차(랏코가 돈을 모아 산다, core/goals.js): 이만큼 넘는 길은 차로 가고 이만큼 남으면 내린다, 달리는 빠르기(내 차보다 조금 느긋하게). */
+/** 하늘색 자동차(랏코가 돈을 모아 산다, core/goals.js): 마을 밖에서 이만큼 넘는 길은 차로 가고 이만큼 남으면 내린다, 달리는 빠르기(내 차보다 조금 느긋하게). */
 const DRIVE_FROM = 8, DRIVE_STOP = 1.2, NPC_CAR_SPEED = CAR_SPEED * 0.85;
 
 /** 마을 친구 12명. 자리가 정해진 친구는 그 주변에서만 움직인다. 각자 할 일(WORK)을 하다가 돌아다닌다. */
@@ -676,8 +676,10 @@ export function createNpcs(scene, village, weeds, berries) {
             while (path && path.length && Math.hypot(path[0].x - n.x, path[0].z - n.z) < 0.35) path.shift(); // 지나온 꺾이는 점
             const goal = path && path.length ? path[0] : { x: n.tx, z: n.tz };
             const want = Math.atan2(goal.x - n.x, goal.z - n.z);
-            // 하늘색 자동차가 있으면(랏코) 먼 길은 차로, 다 와 가면 내린다. 따라다니기 · 앞장서기 · 도망 · 풀 뽑으러 가기와 차로 막힌 길은 걸어서
-            setDriving(n, !!n.hasCar && !n.flee && !n.follow && !n.lead && !n.carBlocked && !(n.task && n.task.weed) && (n.driving ? d > DRIVE_STOP : d > DRIVE_FROM));
+            // 하늘색 자동차가 있으면(랏코) 마을 밖에서 먼 길만 차로 다닌다: 마을 안에서는 걸어서(나갈 때는 문까지 걸어 나가 타고, 돌아오면 마을에 들어서며 내린다),
+            // 다 와 가면 내린다. 따라다니기 · 앞장서기 · 도망 · 풀 뽑으러 가기와 차로 막힌 길은 걸어서
+            const outside = Math.hypot(n.x, n.z) > VILLAGE_R + 1;
+            setDriving(n, !!n.hasCar && outside && !n.flee && !n.follow && !n.lead && !n.carBlocked && !(n.task && n.task.weed) && (n.driving ? d > DRIVE_STOP : d > DRIVE_FROM));
             // 따라올 때는 내 걸음에 맞춰 빠르게, 앞장설 때는 내가 따라오기 좋게, 도망갈 때는 달린다
             const speed = n.driving ? NPC_CAR_SPEED : n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.dash ? 2.6 : n.speed, step = speed * dt;
             // 늦게 도는 몸 방향이 아니라 가려는 쪽으로 걷고, 막히면 옆으로 틀어 비켜 간다

@@ -4536,7 +4536,7 @@ function boot() {
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
       if (!n) continue;
-      npcs.setCar(kind, hasCar(state, kind)); // 하늘색 자동차를 샀으면(랏코) 먼 길은 차로
+      npcs.setCar(kind, hasCar(state, kind)); // 하늘색 자동차를 샀으면(랏코) 마을 밖 먼 길은 차로
       if (staged.has(kind) || (starShow && starShow.pals && starShow.pals.includes(kind))) continue; // 연출 중(별똥별 · 사이드스토리): 끝나면 일과대로(밤이면 하품하고 집으로)
       if (!n.away) minds[kind] = growNeeds(mindOf(kind), kind, 1.5); // 깨어 있으면 심심함 · 외로움이 조금씩 찬다
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
