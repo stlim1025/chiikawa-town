@@ -48,6 +48,8 @@ ACC.flowercrown = `<ellipse cx="32" cy="36" rx="23" ry="10" fill="none" stroke="
 ACC.halo = `<ellipse cx="32" cy="32" rx="22" ry="8" fill="none" stroke="${L}" stroke-width="9"/><ellipse cx="32" cy="32" rx="22" ry="8" fill="none" stroke="#ffd84a" stroke-width="5"/><path d="M50 14l2-5 2 5 5 2-5 2-2 5-2-5-5-2z" fill="#fff3a0" ${S}/>`;
 // 별 조각 머리핀(재료로 만드는 소품): 노란 별 + 핀
 ACC.starpin = `<path d="M18 50L40 30" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/><path d="M38 8l5.4 11.2 12.4 1.7-9 8.7 2.2 12.3L38 36l-11 5.9 2.2-12.3-9-8.7 12.4-1.7z" fill="#ffd84a" ${S}/><circle cx="38" cy="24" r="4" fill="#fff3a0"/>`;
+// 줄무늬 모자(오데와 함께 감옥 기념): 동그란 하얀 모자에 검은 가로줄
+ACC.jailcap = `<defs><clipPath id="jailcap-clip"><path d="M12 44q0-28 20-28t20 28z"/></clipPath></defs><path d="M12 44q0-28 20-28t20 28z" fill="#fbfaf5"/><g clip-path="url(#jailcap-clip)" fill="#38323a"><rect x="8" y="21" width="48" height="5"/><rect x="8" y="30" width="48" height="5"/><rect x="8" y="39" width="48" height="5"/></g><path d="M12 44q0-28 20-28t20 28z" fill="none" ${S}/>`;
 export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="3.5" fill="#e6d8b8"/>${ACC[id] || ''}</svg>`;
 
 /** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */

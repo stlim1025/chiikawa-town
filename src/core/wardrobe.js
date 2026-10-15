@@ -23,6 +23,7 @@ export const ACCESSORY_ITEMS = {
   flowercrown: { name: '들꽃 화관', price: 1500, note: '알록달록 들꽃을 엮은 화관' },
   halo: { name: '천사 고리', price: 2000, note: '머리 위에 둥실 떠 있는 금빛 고리' },
   pajama: { name: '귀 달린 잠옷', price: 0, gift: true, note: '포셰트 갑옷 씨가 만든 후드 잠옷(선물). 입으면 온몸이 폭신한 연보라' },
+  jailcap: { name: '줄무늬 모자', price: 0, gift: true, note: '고블린 감옥에서 다 같이 쓰던 줄무늬 모자(오데와 함께 감옥 기념)' },
   starpin: { name: '별 조각 머리핀', price: 0, craft: { starshard: 3 }, note: '별똥별맨의 별 조각 셋으로 만든 반짝이는 머리핀' }
 };
 

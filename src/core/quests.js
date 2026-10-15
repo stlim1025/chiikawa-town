@@ -477,6 +477,20 @@ export const QUESTS = {
     ],
     reward: { bond: 3, money: 300, friends: { usagi: 3, chiikawa: 2, hachiware: 2, labor: 2 }, story: 'beetleSwitch' }
   },
+  // 오데와 함께 감옥(원작 애니 189화): 숲에서 커다란 버섯을 먹던 오데와 만났다가 다 같이 고블린들에게 붙잡혀 감옥으로 → 줄무늬 옷을 입고 감옥살이 →
+  // 탈출하려고 땅을 파는 등 고군분투 → 작은 우리는 땅굴로, 오데는 정문 쇠창살을 휘어 빠져나와 고블린들과 싸운다 → 그 뒤 모몽가도 붙잡혀 간다.
+  // 말로 부탁하지 않고, 열흘째부터 낮에 숲 호숫가 길 옆 빈터에서 오데를 찾아 말을 걸면 바로 장면(odeDue · stories/ode.js · world/odejail.js).
+  // 게임에서 정한 부분: 내가 같이 있던 것, 버섯을 나눠 먹은 것, 땅 파기 놀이(간수가 고개를 들면 멈추기), 오데를 응원하는 연타와 싸움 타이밍 놀이,
+  // 모몽가가 붙잡혀 간 때(그날 저녁)와 다음 날 아침까지 마을에 없는 것, 대사 전부, 보상(줄무늬 모자)
+  odePrison: {
+    title: '오데와 함께 감옥', giver: 'hachiware', side: true, noOffer: true, minDay: 10, needHearts: 0, ask: '',
+    offer: ['(숲속 빈터에서 커다란 버섯을 먹고 있는 오데를 만났다)'],
+    steps: [{
+      type: 'scene', scene: 'odePrison', speaker: 'hachiware', goal: '숲속 빈터에서 만난 오데와 고블린 감옥을 빠져나가자!',
+      say: ['헤헤… 오데, 진짜 힘 세더라~ 또 만날 수 있을까?', { who: 'chiikawa', text: '…감옥은… 이제 싫어…' }, '줄무늬 모자는 기념으로 가져가, {name}! 잘 어울려~']
+    }],
+    reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, accessory: 'jailcap' }
+  },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
     title: '치이카와랑 라멘', giver: 'chiikawa', daily: true, again: 3, wish: { hours: [11, 20], need: 'hungry', chance: 0.4 }, needHearts: 0, ask: '무슨 일 있어?',
@@ -607,6 +621,13 @@ export function pitDue(state) {
   if (isActive(state, 'hachiPit') || isDone(state, 'hachiPit') || !isDone(state, 'song')) return false;
   const h = hourOf(state.clock), grade = (state.license || {}).grade ?? 5;
   return h >= 10 && h < 17 && grade <= WEED_KINDS.vine.grade && !sideBusy(state) && hearts(friendOf(state, 'hachiware')) >= 2;
+}
+/** '오데와 함께 감옥'이 일어날 수 있는지: 열흘째부터 낮(9 ~ 17시), 첫날 안내를 끝냈고 다른 이야기가 없을 때 한 번(숲에서 오데를 찾아 말을 걸면 시작 — stories/ode.js). */
+export function odeDue(state) {
+  if (!state.clock || (state.tutorial && state.tutorial !== 'done') || state.clock.day < 10) return false;
+  if (isActive(state, 'odePrison') || isDone(state, 'odePrison')) return false;
+  const h = hourOf(state.clock);
+  return h >= 9 && h < 17 && !sideBusy(state);
 }
 /** 사이드스토리를 지금 새로 열 수 없는지: 하나를 하는 중이거나, 마지막으로 끝낸 지 SIDE_GAP 일이 안 됐다. */
 export function sideBusy(state) {

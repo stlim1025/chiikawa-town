@@ -1313,7 +1313,9 @@ export function createPanels(ui, handlers) {
           go('광장', () => D.hachiCamera('plaza')), go('뽑은 사진', () => D.hachiCamera('prints')), go('장면만', () => D.hachiCamera('show'))),
         row('스위치', '오전 10시 바위산 동굴 앞, 셋째 날 우사기 옆(이빨), 갑옷 씨와 상담한 뒤 동굴 앞, 또는 장면만(보상 없음)',
           go('동굴 앞', () => D.beetleSwitch('open')), go('이빨', () => D.beetleSwitch('teeth')), go('마지막', () => D.beetleSwitch('finale')),
-          go('처음 장면', () => D.beetleSwitch('show')), go('마지막 장면', () => D.beetleSwitch('showEnd')))];
+          go('처음 장면', () => D.beetleSwitch('show')), go('마지막 장면', () => D.beetleSwitch('showEnd'))),
+        row('오데와 함께 감옥', '열흘째 오전 11시 숲속 빈터 근처(가까이 가면 오데, 말을 걸면 시작하고 보상까지), 또는 장면만(보상 없음): 처음부터, 땅 파기부터, 오데와 고블린들의 싸움부터, 모몽가',
+          go('빈터', () => D.odePrison('spot')), go('처음 장면', () => D.odePrison('show')), go('땅 파기', () => D.odePrison('dig')), go('싸움', () => D.odePrison('fight')), go('모몽가', () => D.odePrison('momonga')))];
     },
     // 마을폰 '낚시 도감' 앱(게임 오리지널): 맨 위에 가짓수 보상(받기), 물고기마다 그림 · 잡히는 곳 · 때 · 잡은 수 · 가장 큰 것.
     // 못 잡아 본 물고기는 그림자와 '???'(잡히는 곳 · 때는 힌트로 보인다)

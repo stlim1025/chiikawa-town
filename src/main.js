@@ -130,6 +130,8 @@ import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
 import { createBonbonStory } from './stories/bonbon.js';
 import { createSwitchFront, createBeetleBuddy, createSwitchStage, buildSwitchGadget, holdSwitch, BEETLE_SCALE } from './world/switchcave.js';
 import { createSwitchStory } from './stories/switch.js';
+import { createOdeSpot, createOdeStage } from './world/odejail.js';
+import { createOdeStory } from './stories/ode.js';
 import { createCameraStory } from './stories/camera.js';
 import { createPhotoUi } from './ui/photos.js';
 import { refreshPhotoFrame } from './world/photoframe.js';
@@ -1295,6 +1297,8 @@ function boot() {
        * 'finale' 갑옷 씨와 상담한 뒤 동굴 앞(걸어 들어가면 마지막 장면 · 보상까지), 'show' · 'showEnd' 처음 · 마지막 장면만(보상 없음).
        */
       beetleSwitch: (at) => devBeetleSwitch(at),
+      /** 오데와 함께 감옥: 'spot' 열흘째 오전 11시 숲속 빈터 근처(말을 걸면 시작 · 보상까지), 'show' · 'dig' · 'fight' · 'momonga' 그 장면부터(보상 없음). */
+      odePrison: (at) => devOde(at),
       /**
        * 하치와레의 카메라: 'plaza' 부탁을 받은 채 오전 11시 광장 남쪽(걸어 들어가면 시작 · 보상까지),
        * 'prints' 사진을 찍은 다음 날 오전 10시 하치와레 옆(말을 걸면 뽑은 사진 · 보상), 'show' 광장 장면만(보상 없음).
@@ -1653,6 +1657,7 @@ function boot() {
       blackStar.reset();
       bonbonStory.reset();
       switchStory.reset();
+      odeStory.reset();
       cameraStory.reset();
       loopRewinding = false;
       weather.setRain(false);
@@ -2686,6 +2691,7 @@ function boot() {
     if (mode === 'island') { if (down && islandTrip.roaming && !guide.open) islandTrip.press(); return; } // 수상한 섬: 직접 걸을 때만 행동 버튼(놀이 화면은 자기 버튼 · 스페이스로)
     if (mode === 'bonbon') { if (down && bonbonStory && !guide.open) bonbonStory.press(); return; } // 위스키 봉봉 숲속 빈터: 배 두드리기(박자 · 펀치 화면도 스스로 받는다)
     if (mode === 'beetle') return; // 스위치 바위산 기슭: 대사 · 고르기 창만
+    if (mode === 'odejail') return; // 오데와 함께 감옥: 땅 파기 · 응원 연타 · 싸움 타이밍은 놀이 화면이 스스로 받는다
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
@@ -2735,6 +2741,7 @@ function boot() {
     else if (target.type === 'wake') wakeAlly(target.npc);
     else if (target.type === 'wish') startWish();
     else if (target.type === 'pit') hachiPit.press();
+    else if (target.type === 'ode') odeStory.press();
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -2761,10 +2768,11 @@ function boot() {
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
   let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
   let switchStory = null; // 사이드스토리 '스위치'(stories/switch.js — 아래에서 만든다)
+  let odeStory = null; // 사이드스토리 '오데와 함께 감옥'(stories/ode.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -3099,6 +3107,7 @@ function boot() {
       else if (step.scene === 'starDiner') starDiner.play(done);
       else if (step.scene === 'whiskeyBonbon') bonbonStory.play(done);
       else if (step.scene === 'switchOpen' || step.scene === 'switchFinale') switchStory.play(step.scene, done);
+      else if (step.scene === 'odePrison') odeStory.play(done);
       else if (step.scene === 'hachiCamera') cameraStory.play(done);
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
@@ -3343,6 +3352,7 @@ function boot() {
     if (free && !talking) studyReport();
     if (free && !talking) usagiClub.trySight(); // 사이드스토리: 밤에 우사기가 숲 쪽으로 쌩(목격)
     if (free && !talking) hachiPit.tryDiscover(); // 사이드스토리: 숲 구덩이에서 "살려줘~"
+    if (free && !talking) odeStory.tryDiscover(); // 사이드스토리: 숲속 빈터에서 버섯을 먹는 오데
     if (free && !talking) checkWorks();
     if (!talking) worksChatter();
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
@@ -4207,6 +4217,26 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
+  // 사이드스토리 '오데와 함께 감옥'(stories/ode.js): 숲 호숫가 길 옆 빈터에서 버섯을 먹는 오데(이야기가 열린 동안) · 숲속 빈터와 고블린 감옥 장면(처음 들어갈 때 만든다)
+  const odeSpot = createOdeSpot(scene, village);
+  let odeStage = null;
+  odeStory = createOdeStory({
+    getState: () => state, hud, guide, sound, input, minigame, get stage() { return odeStage || (odeStage = createOdeStage()); }, spot: odeSpot, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName), regionAt,
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(),
+    // 숲에서 오데에게 말을 걸었다: 이야기를 받고 바로 장면(다 보면 마무리 대사 · 보상)
+    startStory: () => { commit(startQuest(state, 'odePrison')); sound.play('job'); questSceneStep('odePrison'); },
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); },
+    // 이야기 끝에 모몽가도 고블린 감옥에: 마을에서는 다음 날 아침까지 보이지 않는다(이야기를 진짜로 할 때만 — 테스트 앱의 장면만 보기는 빼고)
+    jailMomonga: () => {
+      const n = npcs.byKind('momonga');
+      if (!n || !state || !isActive(state, 'odePrison') || staged.has('momonga')) return;
+      npcs.goIn(n);
+      awayInfo.momonga = { why: 'jail', until: 0, day: state.clock.day };
+      setDoing('momonga', 'pot', '고블린 감옥에 갇힌 중');
+    }
+  });
   /**
    * 스위치 풍뎅이(창살을 연 뒤 마지막 장면 전까지): 지금 있는 곳(마을 · 내 집 · 친구 방)의 장면 where 로 옮겨 가 내 자리 me 를 따라온다.
    * hidden: 그 장면을 그리지 않는 동안(마을 화면이 아닐 때) 숨는다. canStand(x, z): 집 안에서 설 수 있는지(가구를 돌아서 온다).
@@ -4237,6 +4267,21 @@ function boot() {
     const p = at === 'teeth' && usagi && !usagi.away ? { x: usagi.x + 1.5, z: usagi.z + 1 } : { x: switchFront.spot.x, z: switchFront.spot.z + 3.5 };
     player.setPosition(p.x, p.z);
     cam.snap(player.position);
+  }
+  /**
+   * 테스트 앱 '오데와 함께 감옥'(디버그 ode 도 같다): 'spot' 열흘째 오전 11시 숲속 빈터 근처(다른 사이드스토리 중이어도 오데가 보인다 · 말을 걸면 시작 · 보상까지),
+   * 'show' · 'dig' · 'fight' · 'momonga' 처음 · 땅 파기 · 오데와 고블린들의 싸움 · 모몽가 장면부터(보상 없음).
+   */
+  function devOde(at) {
+    if (odeStory.active) return;
+    if (at !== 'spot') { odeStory.play(() => hud.toast('테스트: 오데와 함께 감옥 끝', 2400), at === 'show' ? null : at); return; }
+    const qs = { ...(state.quests || {}) };
+    delete qs.odePrison;
+    commit({ ...state, quests: qs, clock: { day: Math.max(10, state.clock.day), t: (11 - 6) / 24 } });
+    const f = odeSpot.front;
+    player.setPosition(f.x + 3, f.z + 3);
+    cam.snap(player.position);
+    odeStory.find();
   }
   // 사이드스토리 '하치와레의 카메라'(stories/camera.js): 광장에서 사진 찍기(뷰파인더 · 찍은 사진은 이 브라우저에) · 다음 날 뽑은 사진
   const photoUi = createPhotoUi(ui);
@@ -4524,6 +4569,7 @@ function boot() {
   const SLEEPY = { chiikawa: '…졸려… 이제 잘래…', hachiware: '하암~ 오늘도 수고했어~ 잘 자!', usagi: '하아… (하품)', kurimanju: '하아~ 한 잔 하고 자야지~', rakko: '…오늘 수련은 여기까지다', momonga: '졸려! 말 걸지 마!' };
   const TIRED_SAY = { chiikawa: '…힘들어… 조금 쉴래…', hachiware: '휴~ 잠깐 낮잠 좀 자고 올게~', usagi: '하아…', kurimanju: '하아~ 피곤해~ 좀 누워야지~', rakko: '…잠시 숨을 고르지.', momonga: '피곤해! 귀찮게 하지 마!' };
   const MORNING = { chiikawa: '…잘 잤다…♪', hachiware: '좋은 아침~!', usagi: '우라!', kurimanju: '하아~ 좋은 아침~', rakko: '…아침 수련 시간이다', momonga: '…뭘 봐? 아침부터' };
+  const JAIL_MORNING = '…감옥 얘기는 꺼내지 마. 흥!'; // 오데와 함께 감옥: 고블린 감옥에서 하룻밤을 보내고 돌아온 모몽가
   const tireNpc = (kind, amount) => { if (state) state = villagerEnergy(state, kind, -amount, state.clock.day); }; // 메인으로 나간 뒤(state 없음)에는 세지 않는다
   /** 집(동굴)으로 걸어가서 들어간다. */
   function npcGoHome(n, why, quiet = false) {
@@ -4621,14 +4667,15 @@ function boot() {
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
       if (n.away) {
         const a = awayInfo[kind] || { why: 'sleep', until: 0 };
-        const wake = !isSleepHour(hour) && (a.why === 'sleep' ? hour >= wakeHourOf(kind) && !(a.day != null && day <= a.day) : lifeClock >= a.until); // 저녁에 든 잠은 날이 바뀐 뒤에
+        // 저녁에 든 잠 · 고블린 감옥(오데와 함께 감옥의 모몽가)은 날이 바뀐 뒤 아침에
+        const wake = !isSleepHour(hour) && (a.why === 'sleep' || a.why === 'jail' ? hour >= wakeHourOf(kind) && !(a.day != null && day <= a.day) : lifeClock >= a.until);
         if (wake && !(visit && visit.kind === kind)) {
           const d = homeDoor(kind);
           npcs.comeOut(n, d.x, d.z + 0.6);
           const e = villagerOf(state, kind, day).energy;
-          state = villagerEnergy(state, kind, (a.why === 'sleep' ? 100 : NAP_ENERGY) - e, day);
+          state = villagerEnergy(state, kind, (a.why === 'sleep' || a.why === 'jail' ? 100 : NAP_ENERGY) - e, day);
           delete awayInfo[kind];
-          if (a.why !== 'visit') npcs.say(n, a.why === 'sleep' ? MORNING[kind] : lineOf(kind, 'napWake')); // 놀러 왔던 내가 나가면 말없이 따라 나온다
+          if (a.why !== 'visit') npcs.say(n, a.why === 'jail' ? JAIL_MORNING : a.why === 'sleep' ? MORNING[kind] : lineOf(kind, 'napWake')); // 놀러 왔던 내가 나가면 말없이 따라 나온다
         }
         continue;
       }
@@ -5636,7 +5683,7 @@ function boot() {
     const doing = {};
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind), d = minds[kind] && minds[kind].doing;
-      const text = n && n.party ? '나랑 같이 토벌' : n && n.away ? (awayInfo[kind] && awayInfo[kind].why === 'nap' ? '집에서 낮잠' : awayInfo[kind] && awayInfo[kind].why === 'visit' ? '집에서 나랑 노는 중' : '집에서 자는 중') : d ? d.text : '쉬는 중';
+      const text = n && n.party ? '나랑 같이 토벌' : n && n.away ? (awayInfo[kind] && awayInfo[kind].why === 'nap' ? '집에서 낮잠' : awayInfo[kind] && awayInfo[kind].why === 'visit' ? '집에서 나랑 노는 중' : awayInfo[kind] && awayInfo[kind].why === 'jail' ? '고블린 감옥에 갇힌 중' : '집에서 자는 중') : d ? d.text : '쉬는 중';
       const icon = n && n.party ? 'sword' : n && n.away ? 'moon' : d && d.icon;
       doing[kind] = { text, svg: icon ? DOING_ICONS[icon] : null };
     }
@@ -5966,6 +6013,8 @@ function boot() {
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
+    const odeT = odeStory.target(p); // 숲속 빈터의 오데(오데와 함께 감옥)
+    if (odeT) options.push({ d: 0.2, t: odeT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
     if (!resting) fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저, 벤치에 앉아 있을 때는 일어나서)
     workTargets(p, options); // 마을 가꾸기 시설: 꽃 따기 · 앉아서 쉬기 · 종 치기
@@ -6469,7 +6518,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage) && !(odeStory && odeStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -6564,6 +6613,8 @@ function boot() {
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
       beetleSwitch: (at) => devBeetleSwitch(at), // 스위치: 'open' · 'teeth' · 'finale' · 'show' · 'showEnd'(테스트 앱과 같다)
+      ode: (at) => devOde(at), // 오데와 함께 감옥: 'spot' · 'show' · 'dig' · 'fight' · 'momonga'(테스트 앱과 같다)
+      odeInfo: () => ({ phase: odeStory.phase, mode, mood: odeStage ? odeStage.mood : null, spot: odeSpot.spot, shown: odeSpot.visible }),
       beetle: () => ({ phase: switchStory.phase, mode, step: beetleStep(), buddy: beetleBuddy.on, mood: switchStage ? switchStage.mood : null }),
       bonbon: () => ({ phase: bonbonStory.phase, mode, swallowed: bonbonGlade ? bonbonGlade.swallowed : null, drunk: bonbonGlade ? bonbonGlade.drunkLevel : null }),
       camera: () => ({ phase: cameraStory.phase, shooting: photoUi.shooting, mode }), // 하치와레의 카메라 진행(뷰파인더가 셔터를 기다리는지)
@@ -6745,6 +6796,16 @@ function boot() {
       hud.placeLabels([], switchStage.camera);
       return;
     }
+    // 오데와 함께 감옥(사이드스토리): 숲속 빈터 · 고블린 감옥. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'odejail' && state) {
+      odeStage.resize(aspect);
+      odeStory.tick(dt, t);
+      setCelLight(odeStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(odeStage.scene, odeStage.camera);
+      hud.placeLabels(odeStage.labels(), odeStage.camera);
+      return;
+    }
     if (mode === 'diner' && state) {
       dinerStage.resize(aspect);
       starDiner.tick(dt, t);
@@ -6818,6 +6879,7 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
+    odeSpot.update(dt, t); // 오데와 함께 감옥: 숲속 빈터에서 버섯을 먹는 오데(이야기가 열린 동안)
     // 스위치 동굴: 바위산 북쪽 끝 절벽에 늘 있다. 창살은 이야기 속에서 연 뒤로(이야기를 끝낸 뒤에도) 열린 채. 그사이 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep();
     switchFront.setOpen(!visiting && !!state && (bstep >= 1 || isDone(state, 'beetleSwitch')));
@@ -6872,6 +6934,7 @@ function boot() {
       starDiner.update(dt, t);
       bonbonStory.update(dt);
       switchStory.update(dt);
+      odeStory.update(dt);
       islandTrip.update(dt);
       updateCryFx(dt);
       if (pulling) updatePull(dt);

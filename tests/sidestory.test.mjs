@@ -345,6 +345,26 @@ test('수상한 섬 합숙 대본: 원작 순서대로 장면이 이어지고, �
   for (const ch of [CHORUS, BATTLE]) { assert.ok(ch[0] >= 4, '처음 4박은 준비'); for (let i = 1; i < ch.length; i++) assert.ok(ch[i] > ch[i - 1]); }
 });
 
+test('오데와 함께 감옥: 열흘째부터 낮에 숲에서 오데를 찾아 시작(말로는 안 함) · 장면 하나로 끝 · 줄무늬 모자', async () => {
+  const W = await import(G + 'wardrobe.js');
+  let s = fresh(10, 12);
+  assert.ok(Q.odeDue(s), '열흘째 낮');
+  assert.ok(!Q.odeDue(fresh(9, 12)), '열흘째부터');
+  assert.ok(!Q.odeDue(fresh(10, 18)), '낮에만');
+  assert.ok(!Q.odeDue({ ...s, tutorial: 'board' }), '첫날 안내 중에는 아니다');
+  assert.ok(!Q.canOffer(s, 'odePrison'), '말로는 시작하지 않는다');
+  assert.ok(!Q.odeDue(Q.startQuest(fresh(11, 12), 'beetleSwitch')), '다른 사이드스토리 중이면 안 나온다');
+  s = Q.startQuest(s, 'odePrison');
+  assert.ok(!Q.odeDue(s), '한 번만');
+  assert.deepEqual(Q.staleScenes(s), ['odePrison'], '장면 도중 새로고침하면 없던 일로(숲에서 다시 찾는다)');
+  const r = Q.completeStep(s, 'odePrison', 10);
+  assert.ok(r.finished);
+  assert.ok(W.wardrobeOf(r.state).owned.includes('jailcap'), '줄무늬 모자(옷장)');
+  assert.ok(W.ACCESSORY_ITEMS.jailcap.gift, '줄무늬 모자는 선물로만');
+  for (const k of ['chiikawa', 'hachiware', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > 0, k + '와도 친해진다');
+  assert.ok(!Q.odeDue({ ...r.state, clock: at(20, 12) }), '끝낸 뒤에는 다시 안 나온다');
+});
+
 test('파자마 파티즈: 잠옷 밤나들이를 끝낸 뒤 여덟째 날부터 낮에 포셰트 갑옷 씨 → 밤 7시 넘어 광장 무대 → 공연', () => {
   let s = fresh(8, 11);
   assert.ok(!Q.canOffer(s, 'pajamaParty'), '잠옷 밤나들이를 끝낸 뒤에');

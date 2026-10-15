@@ -9,6 +9,8 @@ const NAVY = '#6f94bb', USAGI = '#f6e8b6', EAR_PINK = '#f4b6c2'; // 하치와레
 const MOMO_BLUE = '#bfe0f5', KURI_TOP = '#b8743d', KURI_BOT = '#f4dcab', RAKKO = '#fbe7c2', RAKKO_PAW = '#4a3a34', STAR_SCAR = '#bfae8c', INK = '#3a2a28';
 const SHISA = '#f7cf5e', SHISA_MANE = '#e8833a', KANI = '#fbd1d8', KANI_DARK = '#f297a6', CLAW = '#ef6f7f';
 const BEETLE = '#9b6b4b', BEETLE_FACE = '#f3f0eb', BEETLE_WING = '#6b4430'; // 스위치의 풍뎅이: 갈색 몸 · 하얀 얼굴 · 괴물 날개
+const ODE = '#f6ee9a', ODE_LIP = '#f3b88f', ODE_LINE = '#5a3a2e', ROPE = '#d9b98a'; // 오데와 함께 감옥: 연노랑 오데 · 살구색 입술 · 근육 선 · 밧줄
+const GOBLIN = '#bfe2a1', GOBLIN_SKIRT = '#b48a5a', GOBLIN_HEM = '#8e6a43', STRIPE_INK = '#38323a'; // 고블린: 연두 몸 · 풀 치마, 줄무늬 죄수복의 검은 줄
 
 /** 내 캐릭터 선택지. */
 export const EAR_TYPES = [
@@ -26,7 +28,7 @@ export const HAIR_TYPES = [{ id: 'none', label: '없음' }, { id: 'tuft', label:
 export const HAIR_COLORS = ['#7a5236', '#3a3236', '#f3d27a', '#f6a9c4', '#9fd0f2', '#9fdcc0', '#c4b4e8', '#fbfaf5'];
 export const ACCESSORIES = [{ id: 'none', label: '없음' }, { id: 'ribbon', label: '리본' }, { id: 'sprout', label: '새싹' }, { id: 'glasses', label: '안경' }, { id: 'flower', label: '꽃' }, { id: 'cap', label: '모자' }, { id: 'crown', label: '왕관' },
   { id: 'bandage', label: '반창고' }, { id: 'berrypin', label: '딸기 핀' }, { id: 'beret', label: '베레모' }, { id: 'strawhat', label: '밀짚모자' }, { id: 'sunglasses', label: '선글라스' },
-  { id: 'headphones', label: '헤드폰' }, { id: 'flowercrown', label: '화관' }, { id: 'halo', label: '천사 고리' }];
+  { id: 'headphones', label: '헤드폰' }, { id: 'flowercrown', label: '화관' }, { id: 'halo', label: '천사 고리' }, { id: 'jailcap', label: '줄무늬 모자' }];
 /** 캐릭터 만들기에서 고를 수 있는 장식: 싼 기본 장식만(왕관 같은 비싼 것은 포셰트 가게에서 사야 한다). */
 export const STARTER_ACCESSORIES = ACCESSORIES.filter((o) => ['none', 'ribbon', 'sprout', 'glasses', 'flower', 'cap'].includes(o.id));
 
@@ -149,6 +151,13 @@ function bugGeometry(key, win, back = false) {
     return BEETLE;
   });
 }
+// ---------- 줄무늬 죄수복(사이드스토리 '오데와 함께 감옥'): 하양 바탕에 가로 검은 줄, 줄 경계는 삼각형을 잘라 매끈하게 ----------
+const STRIPE_BAND = 0.26; // 줄 하나의 높이(반지름 1 인 구에서)
+function stripeGeometry() {
+  const edges = [];
+  for (let y = -1 + STRIPE_BAND / 2; y < 1; y += STRIPE_BAND) edges.push(y);
+  return cutSphere('stripe', edges.map((b) => (x, y) => y - b), (x, y) => (Math.floor((y + 1) / STRIPE_BAND + 0.5) % 2 ? STRIPE_INK : WHITE));
+}
 // 정수리를 모자처럼 덮는 무늬. 이마 가운데에 작은 홈이 파인다(하치와레).
 function partPattern(dark, light) {
   return (x, y, z) => {
@@ -258,6 +267,7 @@ function geometryFor(m) {
     case 'bugHead': return bugGeometry('bugHead', BUG_FACE);
     case 'bugBody': return bugGeometry('bugBody', BUG_BELLY, true);
     case 'bugMask': return bugGeometry('bugMask', BUG_MASK);
+    case 'stripe': return stripeGeometry();
     default:
       if (m.startsWith('pat:')) { const [, kind, tone, base, accent] = m.split(':'), [field, paint] = lookPattern(kind, tone, accent); return paintedSphere(m, field, paint, base); }
       return lookGeometry(m); // 내 캐릭터 꾸미기 도형(호 · 반달 · 머리카락 · 수염 껍질), 모르면 오류
@@ -535,6 +545,69 @@ const DEFS = {
       parts.push({ m: 'sphere', c: '#efe6d8', p: [sd * 0.95, 1.2, -0.48], r: [-0.2, sd * 0.25, sd * 0.3], s: [0.75, 0.025, 0.4], n: 'body', tag: 'wings' });
     });
     return { label: '괴물 풍뎅이', parts, neck: [0, 1.36, 0], height: 2.6, radius: 1.0, pivots: { armL: [-0.55, 1.22, 0], armR: [0.55, 1.22, 0] } };
+  },
+  ode() {
+    // 사이드스토리 '오데와 함께 감옥'(원작 애니 189화)의 오데: 머리와 몸이 목 없이 하나로 이어진 커다란 연노랑 몸(정수리는 둥글고 어깨가 떡 벌어졌다),
+    // 얼굴 가운데 동그란 외눈(하얀 흰자에 작은 까만 눈동자) 아래 두툼한 살구색 입술(가운데 가로 선), 알통이 불룩한 굵은 팔, 가슴 · 배의 가는 근육 선.
+    // 다리는 서서 걷는 다리(관절 legL · legR)와 책상다리(tag 'sitLegs' — 숲에서 버섯을 먹을 때)를 따로 둔다. 몸에 감긴 밧줄(tag 'rope')은 처음엔 숨김.
+    // 어깨는 팔 관절에 붙여 줄무늬 소매(wearStripes)가 같이 덮는다. 키는 친구들의 두 배쯤
+    const parts = [], hc = [0, 1.66, 0.02], hr = [0.5, 0.56, 0.46], tc = [0, 1.0, 0], tr = [0.6, 0.6, 0.46];
+    parts.push({ m: 'sphere', c: ODE, p: tc, s: tr, n: 'body' }); // 몸통
+    parts.push({ m: 'sphere', c: ODE, p: [0, 0.5, 0.02], s: [0.5, 0.26, 0.38], n: 'body' }); // 엉덩이
+    parts.push({ m: 'sphere', c: ODE, p: hc, s: hr, n: 'head' }); // 목 없이 이어진 둥근 정수리
+    const onBody = (x, y, w, h, rz = 0) => { const q = onHead(tc, tr, x, y - tc[1], 0.004); parts.push({ m: 'dot', c: ODE_LINE, p: q.p, r: [q.r[0], q.r[1], rz], s: [w, h, 0.01], n: 'body', o: false }); };
+    [-1, 1].forEach((sd) => onBody(sd * 0.2, 1.12, 0.16, 0.009, -sd * 0.18)); // 가슴 아랫선
+    onBody(0, 0.86, 0.008, 0.16); // 배 가운데
+    [0.92, 0.78].forEach((y) => [-1, 1].forEach((sd) => onBody(sd * 0.09, y, 0.06, 0.008))); // 복근
+    // 얼굴: 동그란 외눈 · 두툼한 입술
+    const put = (m, c, x, y, s, push = 0.004, o = false) => { const q = onHead(hc, hr, x, y, push); parts.push({ m, c, p: q.p, r: q.r, s, n: 'head', o }); };
+    put('dot', WHITE, 0, 0.08, [0.15, 0.15, 0.02]);
+    put('ring:0.12', EYE, 0, 0.08, [0.15, 0.15, 0.15], 0.006);
+    put('dot', EYE, 0, 0.08, [0.036, 0.036, 0.012], 0.034); // 흰자 한가운데 눈동자(흰자 앞면보다 앞으로 — 안쪽에 두면 흰자에 묻힌다)
+    put('sphere', ODE_LIP, 0, -0.17, [0.27, 0.09, 0.08], 0.035, true);
+    put('dot', ODE_LINE, 0, -0.17, [0.2, 0.009, 0.006], 0.118);
+    // 버럭(tag 'roar' — 창살을 휠 때 · 고블린들과 싸울 때): 입술이 네모나게 쩍 벌어져 위아래 이가 보인다(닫힌 입술 앞을 덮는다)
+    const roar = (m, c, x, y, s, push, o = false) => { const q = onHead(hc, hr, x, y, push); parts.push({ m, c, p: q.p, r: q.r, s, n: 'head', o, tag: 'roar' }); };
+    roar('box', ODE_LIP, 0, -0.17, [0.28, 0.2, 0.05], 0.1, true);
+    roar('box', '#5a2b33', 0, -0.17, [0.21, 0.13, 0.01], 0.128);
+    [-0.066, -0.022, 0.022, 0.066].forEach((x) => [-0.128, -0.212].forEach((y) => roar('box', '#ffffff', x, y, [0.038, 0.04, 0.008], 0.134)));
+    [-1, 1].forEach((sd) => {
+      const arm = sd < 0 ? 'armL' : 'armR', leg = sd < 0 ? 'legL' : 'legR';
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.56, 1.24, 0], s: [0.27, 0.25, 0.26], n: arm }); // 떡 벌어진 어깨
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.74, 0.98, 0.02], r: [0, 0, sd * 0.22], s: [0.21, 0.32, 0.21], n: arm }); // 위팔(알통)
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.83, 0.62, 0.05], r: [0, 0, sd * 0.08], s: [0.17, 0.27, 0.17], n: arm, bare: true }); // 아래팔(줄무늬 소매는 위팔까지)
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.85, 0.36, 0.08], s: [0.15, 0.14, 0.15], n: arm, bare: true }); // 주먹
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.25, 0.3, 0.02], s: [0.21, 0.3, 0.21], n: leg }); // 굵은 다리
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.27, 0.06, 0.1], s: [0.18, 0.08, 0.24], n: leg, bare: true }); // 발
+      // 책상다리: 허벅지는 양옆 앞으로, 정강이는 앞에서 엇갈린다
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.45, 0.26, 0.24], r: [0, -sd * 0.6, 0], s: [0.3, 0.17, 0.2], n: 'body', tag: 'sitLegs' });
+      parts.push({ m: 'sphere', c: ODE, p: [sd * 0.24, sd > 0 ? 0.2 : 0.13, 0.52], r: [0, sd * 0.26, 0], s: [0.42, 0.14, 0.15], n: 'body', tag: 'sitLegs' });
+      parts.push({ m: 'sphere', c: ODE, p: [-sd * 0.22, sd > 0 ? 0.17 : 0.11, 0.66], r: [0, -sd * 0.3, 0], s: [0.11, 0.1, 0.16], n: 'body', tag: 'sitLegs' });
+    });
+    // 포박: 두 팔째 몸을 빙빙 감은 밧줄(손은 앞에 모은다 — 'pray' 몸짓)
+    [0.74, 0.92, 1.1].forEach((y) => parts.push({ m: 'ring:0.07', c: ROPE, p: [0, y, 0.04], r: [Math.PI / 2, 0, 0], s: [0.98, 0.72, 0.98], n: 'body', tag: 'rope' }));
+    // 줄무늬 죄수복(wearStripes): 몸통은 입술 아래 가슴께부터 엉덩이까지 한 벌로 감싸고(얼굴 · 외눈 · 입술은 그대로 보이게), 모자는 정수리에 작게
+    // 몸통보다 넉넉히(앞으로 0.08 남짓): 딱 맞게 감싸면 가슴 · 배 근육 선이 줄무늬를 뚫고 비쳤다. 위는 입술 바로 아래까지
+    const stripeFit = { body: { c: [0, 0.88, 0.02], r: [0.7, 0.66, 0.54] }, cap: { c: [0, 2.13, 0], r: [0.3, 0.16, 0.28] } }; // 아래는 엉덩이 밑까지
+    return { label: '오데', parts, neck: [0, 1.32, 0], height: 2.25, radius: 0.85, stripeFit, pivots: { armL: [-0.56, 1.24, 0], armR: [0.56, 1.24, 0], legL: [-0.25, 0.5, 0], legR: [0.25, 0.5, 0] } };
+  },
+  goblin() {
+    // 사이드스토리 '오데와 함께 감옥'(원작 애니 189화)의 고블린: 동글동글한 연두 몸에 정수리가 뾰족 솟고 양옆으로 뾰족한 귀,
+    // 까만 점 눈 · 분홍 볼(빗금) · ω 입, 허리에 갈색 풀 치마(아랫단이 들쭉날쭉). 키는 치이카와만 하다
+    const parts = [], hc = [0, 0.7, 0], hr = [0.44, 0.4, 0.4];
+    parts.push({ m: 'sphere', c: GOBLIN, p: [0, 0.34, 0], s: [0.34, 0.31, 0.31], n: 'body' });
+    parts.push({ m: 'cylinder', c: GOBLIN_SKIRT, p: [0, 0.07, 0], s: [0.37, 0.24, 0.34], n: 'body' }); // 풀 치마
+    for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; parts.push({ m: 'cone', c: GOBLIN_HEM, p: [Math.sin(a) * 0.36, 0.09, Math.cos(a) * 0.33], r: [Math.PI, 0, 0], s: [0.05, 0.08, 0.05], n: 'body', o: false }); } // 들쭉날쭉한 아랫단
+    limbs(parts, GOBLIN, 0.36, 0.31);
+    parts.push({ m: 'sphere', c: GOBLIN, p: hc, s: hr, n: 'head' });
+    parts.push({ m: 'cone', c: GOBLIN, p: [0, 1.02, -0.03], s: [0.13, 0.2, 0.12], n: 'head' }); // 뾰족 솟은 정수리
+    [-1, 1].forEach((sd) => parts.push({ m: 'cone', c: GOBLIN, p: [sd * 0.39, 0.74, -0.03], r: [0, 0, -sd * 1.25], s: [0.1, 0.2, 0.08], n: 'head' })); // 뾰족한 귀
+    face(parts, hc, hr, { eyeX: 0.12, eyeY: 0.0, eye: [0.035, 0.045, 0.016], cheekX: 0.23, cheekY: -0.07, mouthY: -0.09, cat: true });
+    [-1, 1].forEach((sd) => [-0.02, 0, 0.02].forEach((dx) => { // 볼의 빗금 셋
+      const q = onHead(hc, hr, sd * 0.23 + dx, -0.07, 0.004);
+      parts.push({ m: 'dot', c: '#d0707f', p: q.p, r: [q.r[0], q.r[1], -0.5], s: [0.005, 0.016, 0.004], n: 'head', o: false });
+    }));
+    return { label: '고블린', parts, neck: [0, 0.5, 0], height: 1.14, radius: 0.45 };
   },
   pochette: () => knight('포셰트 갑옷 씨', '#cdd2d8', '#9aa1aa', [
     { m: 'box', c: '#f7a8c4', p: [0.3, 0.7, 0.24], r: [0, -0.4, 0], s: [0.2, 0.16, 0.08], n: 'body' },
@@ -934,7 +1007,7 @@ function hairParts(parts, hc, look) {
 function liftAccessory(list, look, hc) {
   if (['none', 'tuft'].includes(look.hair)) return list;
   const curly = look.hair === 'curly';
-  if (['cap', 'crown', 'sprout', 'beret', 'strawhat', 'headphones', 'flowercrown', 'halo'].includes(look.accessory)) { const up = curly ? 0.1 : 0.025; return list.map((pt) => ({ ...pt, p: [pt.p[0], pt.p[1] + up, pt.p[2]] })); }
+  if (['cap', 'crown', 'sprout', 'beret', 'strawhat', 'headphones', 'flowercrown', 'halo', 'jailcap'].includes(look.accessory)) { const up = curly ? 0.1 : 0.025; return list.map((pt) => ({ ...pt, p: [pt.p[0], pt.p[1] + up, pt.p[2]] })); }
   if (['ribbon', 'flower', 'starpin', 'berrypin'].includes(look.accessory)) { const k = curly ? 1.14 : 1.05; return list.map((pt) => ({ ...pt, p: [pt.p[0] * k, hc[1] + (pt.p[1] - hc[1]) * k, pt.p[2] * k] })); }
   return list;
 }
@@ -1027,6 +1100,9 @@ function accessoryParts(parts, hc, hr, look) {
       break;
     case 'halo': // 머리 위에 둥실 뜬 금빛 고리
       parts.push({ m: 'ring:0.12', c: '#ffd84a', p: [0, 1.34, 0], r: [Math.PI / 2 - 0.15, 0, 0], s: [0.2, 0.2, 0.2], n: 'head' });
+      break;
+    case 'jailcap': // 줄무늬 모자(사이드스토리 '오데와 함께 감옥' 선물): 정수리를 덮는 동그란 모자에 가로 검은 줄
+      parts.push({ m: 'stripe', c: '#ffffff', p: [0, 0.98, -0.01], s: [0.34, 0.22, 0.33], n: 'head' });
       break;
     case 'crown':
       parts.push({ m: 'cylinder', c: '#f3c84b', p: [0, 1.06, 0], s: [0.17, 0.07, 0.17], n: 'head' });
@@ -1141,7 +1217,7 @@ function playerDef(rawLook) {
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
   for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
-  const tall = look.ears === 'bunny' ? 0.45 : ['mouse', 'fox'].includes(look.ears) || ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo'].includes(look.accessory) ? 0.15 : 0;
+  const tall = look.ears === 'bunny' ? 0.45 : ['mouse', 'fox'].includes(look.ears) || ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo', 'jailcap'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
 
@@ -1157,7 +1233,7 @@ function pivotOf(def, name, p) {
 }
 
 /** 꼭짓점 색으로 무늬를 칠한 구 부품(하얀 재질에 꼭짓점 색, 외곽선은 보통 구로). */
-const PAINTED_PARTS = new Set(['hachi', 'kuri', 'kani', 'bugHead', 'bugBody', 'bugMask']);
+const PAINTED_PARTS = new Set(['hachi', 'kuri', 'kani', 'bugHead', 'bugBody', 'bugMask', 'stripe']);
 /** 부품 정의로 Three.js 모델을 만든다. */
 function buildFromDef(def) {
   const root = new THREE.Group();
@@ -1199,6 +1275,7 @@ function buildFromDef(def) {
     }
     holder.add(mesh);
     if (pt.tag) { mesh.visible = false; (props[pt.tag] = props[pt.tag] || []).push(mesh); }
+    if (pt.bare) mesh.userData.bare = true; // 줄무늬 죄수복을 덮지 않는 맨살(오데의 아래팔 · 주먹 · 발)
     if (pt.role) { // 얼굴 표정용(눈 · 눈빛 · 눈물): 원래 자리 · 크기를 기억해 둔다
       mesh.userData.base = { y: mesh.position.y, sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z };
       if (pt.role === 'tear' || pt.role === 'drop') mesh.visible = false;
@@ -1206,7 +1283,7 @@ function buildFromDef(def) {
     }
   });
   mergeDetails(pivots, props, roles);
-  return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label, fit: def.fit || null };
+  return { root, inner, pivots, props, roles, height: def.height, radius: def.radius, label: def.label, fit: def.fit || null, stripeFit: def.stripeFit || null };
 }
 
 const partVolume = (m) => m.scale.x * m.scale.y * m.scale.z;
@@ -1324,6 +1401,42 @@ export function wearPajama(chibi, on, color = PAJAMA_COLORS.me, { ownEars = fals
 }
 
 /**
+ * 줄무늬 죄수복(사이드스토리 '오데와 함께 감옥', 원작 애니 189화 — 고블린 감옥에서 다 같이 입는다): 몸통 · 팔다리를 하양 바탕에 검은 가로줄 껍질로 감싸고,
+ * 정수리에 같은 줄무늬의 동그란 모자를 씌운다. 얼굴 · 귀는 그대로(토끼 귀는 모자 위로 쏙). on = false 면 벗긴다. 어떤 모델에나(가장 큰 부품을 기준으로).
+ * 모델이 자리를 정해 두었으면(stripeFit: { body, cap } — 모델 좌표의 가운데 c · 반지름 r) 그대로: 머리와 몸이 하나로 이어진 오데는 가장 큰 부품을 덮으면 얼굴까지 덮였다.
+ * 맨살로 정한 부품(bare — 오데의 아래팔 · 주먹 · 발)은 덮지 않는다.
+ */
+export function wearStripes(chibi, on, { cap = true } = {}) {
+  const P = chibi.pivots || {};
+  if (chibi.stripes) { chibi.stripes.forEach((m) => m.parent && m.parent.remove(m)); chibi.stripes = null; }
+  if (!on) return;
+  const added = [], mat = celMaterial('#ffffff', { vertexColors: true }), geo = stripeGeometry();
+  const vol = (m) => m.scale.x * m.scale.y * m.scale.z;
+  const biggest = (g) => { let b = null; (g ? g.children : []).forEach((m) => { if (m.isMesh && !m.userData.merged && (!b || vol(m) > vol(b))) b = m; }); return b; };
+  const put = (parent, pos, rot, scale) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(pos);
+    if (rot) m.rotation.copy(rot);
+    m.scale.copy(scale);
+    addOutline(m, 0.022, true, GEO.sphere);
+    parent.add(m);
+    added.push(m);
+  };
+  const F = chibi.stripeFit || {}, V = (a) => new THREE.Vector3(...a);
+  const body = biggest(P.body);
+  if (F.body && P.body) put(P.body, V(F.body.c).sub(P.body.position), null, V(F.body.r));
+  else if (body) put(P.body, body.position, body.rotation, body.scale.clone().multiplyScalar(1.06));
+  // 팔다리: 부품마다 조금 크게(손에 든 소품 · 무기는 빼고)
+  const held = new Set(Object.values(chibi.props || {}).flat());
+  ['armL', 'armR', 'legL', 'legR'].forEach((k) => (P[k] ? P[k].children : []).filter((m) => m.isMesh && !held.has(m) && !m.userData.bare).forEach((m) => put(P[k], m.position, m.rotation, m.scale.clone().multiplyScalar(1.14))));
+  const head = biggest(P.head);
+  if (cap && F.cap && P.head) put(P.head, V(F.cap.c).sub(P.head.position), null, V(F.cap.r));
+  else if (cap && head) put(P.head, new THREE.Vector3(head.position.x, head.position.y + head.scale.y * 0.62, head.position.z - head.scale.z * 0.05), null,
+    new THREE.Vector3(head.scale.x * 0.78, head.scale.y * 0.5, head.scale.z * 0.78));
+  chibi.stripes = added;
+}
+
+/**
  * 다 만든 모델에 멘 포셰트(core/pochette.js 의 id)를 덧붙인다: 마을 친구가 돈을 모아 산 포셰트(core/goals.js 의 friendLook). id 가 없으면 벗긴다.
  * 내 캐릭터의 pochetteParts 와 같은 모양(왼쪽 어깨에서 오른쪽 옆구리로 끈, 오른쪽 배에 가방)을 몸통(가장 큰 부품) 크기에 맞춰 붙인다.
  */
@@ -1389,6 +1502,7 @@ export const SEAT_LIFT = 0.42;
  *   · 'drive' 자동차 운전(핸들 잡기 — 몸을 올리는 높이는 actors/car.js 의 DRIVE_LIFT)
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
+ *   · 오데와 함께 감옥: 'dig' 쪼그려 앉아 바닥 파기 · 'pry' 창살을 쥐고 양옆으로 벌리기(opts.power 0 ~ 1)
  *   · 파자마 파티즈 무대: 'idol' 아이돌 춤(8박 안무) · 'idolSing' 노래하며 춤 · 'glow' 응원봉 흔들기 — 셋 다 opts.beat(곡 박 번호)에 맞춘다
  * opts: { phase (걷기 위상 — 몸짓 박자도 친구마다 어긋나게), power (뽑기 힘 0..1), look (고개 돌림), hop (걷기 통통 높이),
  *   swing (휘두르기 · 찌르기 진행 0..1), moving (걸으면서 휘두르면 다리는 계속 걷는다), eat (한 번 먹기 진행 0..1 — 없으면 계속 먹는다) }
@@ -1634,6 +1748,18 @@ function basePose(mode, t, opts) {
     bob = Math.abs(Math.sin(t * 14 + phase)) * 0.22;
     waddle = Math.sin(t * 16 + phase) * 0.25;
     lean = Math.sin(t * 10 + phase) * 0.18;
+  } else if (mode === 'dig') {
+    // 땅 파기(감옥 바닥을 숟가락으로): 몸을 숙이고 두 팔을 아래 앞으로 모아 번갈아 박박 긁는다
+    const k = Math.sin(t * 11 + phase);
+    a.armL = [-0.55 + k * 0.45, 0, 0.3]; a.armR = [-0.55 - k * 0.45, 0, -0.3];
+    a.head = [0.35, 0, k * 0.05];
+    lean = 0.35; bob = -0.06 + Math.abs(k) * 0.02;
+  } else if (mode === 'pry') {
+    // 창살 벌리기(오데): 두 팔을 앞으로 뻗어 창살을 쥐고 힘껏 양옆으로(opts.power 만큼 벌어진다), 부들부들
+    const pw = opts.power || 0, sh = Math.sin(t * 40) * 0.03;
+    a.armL = [-1.45, 0, 0.35 - pw * 0.75 + sh]; a.armR = [-1.45, 0, -0.35 + pw * 0.75 - sh];
+    a.head = [0.05 + sh, 0, 0];
+    lean = 0.08; bob = sh * 0.3;
   } else if (EAT_ANIMS.includes(mode)) {
     const e = eatPose(mode, t, opts);
     Object.assign(a, e.a);

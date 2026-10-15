@@ -1,13 +1,14 @@
 /**
  * 섬 편 놀이 화면: 연타(mash) · 타이밍(timing). 박자 화면(ui/rhythm.js)처럼 자기 버튼과 스페이스 · 엔터로 누른다
  * (시네마틱 화면에서는 평소 행동 버튼 · 게이지가 숨겨지므로 따로 그린다). 실패해서 끝나는 일은 없다.
- * mash({ label, button, gain, decay, onTick(p), onDone() }): 누를 때마다 gain 만큼 차고, 가만히 있으면 초당 decay 만큼 준다. 다 차면 끝.
+ * mash({ label, button, gain, decay, loss, onPress(), onCaught(), onTick(p), onDone() }): 누를 때마다 gain 만큼 차고, 가만히 있으면 초당 decay 만큼 준다. 다 차면 끝.
+ *   onPress() 가 false 를 돌려주면 그 누름은 들킨 것: loss 만큼 줄고 '들켰다!'(오데와 함께 감옥 — 간수가 고개를 들었을 때 땅 파기).
  * timing({ label, button, need, zone: [from, to], speed, grow, wobble, onTick(p), onHit(n), onMiss(), onDone(misses) }):
  *   바늘이 왔다 갔다 하는 동안 초록 칸에서 누른다. need 번 맞히면 끝. 빗나가면 칸이 grow 만큼 넓어진다.
  *   wobble(0 ~ 1, 없으면 0): 바늘이 취한 듯 빨라졌다 느려졌다 한다(위스키 봉봉의 취권 펀치).
- * update(dt) · stop() · active
+ * update(dt) · stop() · active · setLabel(text, tone): 위 안내 글을 바꾼다(tone 'warn' 노랑 · 'alert' 빨강)
  */
-const WORDS = { good: '좋아!', miss: '빗나감…' };
+const WORDS = { good: '좋아!', miss: '빗나감…', caught: '들켰다!' };
 
 export function createMinigame(ui) {
   const root = document.createElement('div');
@@ -51,8 +52,8 @@ export function createMinigame(ui) {
   }
   const api = {
     get active() { return !!run; },
-    mash({ label, button = '연타!', gain = 0.08, decay = 0.12, ...cb }) {
-      run = { kind: 'mash', p: 0.05, gain, decay, cb };
+    mash({ label, button = '연타!', gain = 0.08, decay = 0.12, loss = 0.15, ...cb }) {
+      run = { kind: 'mash', p: 0.05, gain, decay, loss, cb };
       show(label, button, 'mash');
       pips.replaceChildren();
       draw();
@@ -65,6 +66,7 @@ export function createMinigame(ui) {
     press() {
       if (!run) return;
       if (run.kind === 'mash') {
+        if (run.cb.onPress && run.cb.onPress() === false) { run.p = Math.max(0.02, run.p - run.loss); flash('caught'); run.cb.onCaught?.(); draw(); return; }
         run.p = Math.min(1, run.p + run.gain);
         btn.classList.remove('hit'); void btn.offsetWidth; btn.classList.add('hit');
         draw();
@@ -100,7 +102,8 @@ export function createMinigame(ui) {
       run.cb.onTick?.(run.p);
       draw();
     },
-    stop() { run = null; root.hidden = true; }
+    stop() { run = null; root.hidden = true; },
+    setLabel(text, tone = '') { lab.textContent = text; root.classList.toggle('warn', tone === 'warn'); root.classList.toggle('alert', tone === 'alert'); }
   };
   btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); api.press(); });
   window.addEventListener('keydown', (e) => {
