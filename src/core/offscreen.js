@@ -1,11 +1,12 @@
 import { chooseActivity, satisfy, growNeeds, freshMind, wantsMeal } from './brain.js';
 import {
   VILLAGERS, BED_HOUR, WAKE_HOUR, MAX_JOBS_PER_DAY, MEAL_PRICE, MEAL_ENERGY, NAP_ENERGY, isSleepHour,
-  boardOf, villagerOf, villagerEnergy, villagerTakesJob, payVillager, villagerSpend, villagerPay
+  boardOf, villagerOf, villagerEnergy, villagerTakesJob, payVillager, villagerSpend
 } from './villagers.js';
 import { JOB_TYPES } from './jobs.js';
 import { DAY_SECONDS, hourOf } from './clock.js';
 import { goalOf, canBuy, buyGoal, canDoJob, goalNews } from './goals.js';
+import { friendPay, friendWorkXp, friendLeaves, pickJob } from './friendweed.js';
 
 /** 게임 속 한 시간의 실제 길이(초). 욕구가 차는 빠르기(brain.js 의 NEED_RATE)는 실제 초 기준이다. */
 const HOUR_SECONDS = DAY_SECONDS / 24;
@@ -47,7 +48,7 @@ export function mateEats(s, kind, day) {
  * 마을 가꾸기에 보태거나(donate) 집을 넓히는 것(homeUp)도 목표라 같은 차례로 한다. 토벌 · 시험 · 공연처럼 화면에서 봐야 하는 일은 하지 않는다.
  * 밤잠 시간에 잠들면 친구들도 이미 자는 중이라 그대로 돌려준다. 넘겨받은 state · minds 는 바꾸지 않는다.
  * opts: { day, fromHour, toHour = 밤 9시, random, skip: 끼지 않는 친구 kind 들(첫날 안내 중인 하치와레) }
- * → { state, minds, events: [{ type: 'job' | 'meal' | 'chat' | 'buy' | 'donate' | 'homeUp', who, with?, title?, item?, cost?, hour }] }
+ * → { state, minds, events: [{ type: 'job' | 'meal' | 'chat' | 'buy' | 'donate' | 'homeUp', who, with?, title?, pay?, item?, cost?, hour }] }
  */
 export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, random = Math.random, skip = [] }) {
   if (isSleepHour(fromHour)) return { state, minds, events: [] };
@@ -70,7 +71,8 @@ export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, 
       }
       const v = villagerOf(s, kind, day), spec = VILLAGERS[kind], m = growNeeds(next[kind], kind, HOUR_SECONDS), goal = goalOf(s, kind);
       const left = boardOf(s, day).left;
-      const jobs = v.jobs < MAX_JOBS_PER_DAY ? spec.jobs.filter((id) => left[id] > 0 && canDoJob(s, kind, id)) : []; // 낚시 일감은 낚싯대를 산 뒤에만
+      // 낚시 일감은 낚싯대를 산 뒤에만, 풀 일감은 그 친구 제초 급수가 되어야(4급부터의 풀 일감은 하나는 내 몫으로 남긴다)
+      const jobs = v.jobs < MAX_JOBS_PER_DAY ? spec.jobs.filter((id) => left[id] > 0 && !friendLeaves(id, left) && canDoJob(s, kind, id)) : [];
       const friends = kinds.filter((k) => !done.has(k)).map((k) => ({ kind: k, dist: 10 }));
       const c = chooseActivity({
         kind, hour, energy: v.energy, money: v.money, fun: m.fun, social: m.social, diligence: spec.diligence, appetite: spec.eat,
@@ -79,11 +81,12 @@ export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, 
       next[kind] = satisfy(m, c.act);
       s = villagerEnergy(s, kind, -HOURLY_TIRE, day);
       if (c.act === 'work') {
-        const id = jobs[Math.floor(random() * jobs.length) % jobs.length];
+        const id = pickJob(s, kind, jobs, random); // 보수가 많은 일감일수록 자주
         const r = villagerTakesJob(s, kind, id, day);
         if (!r.ok) continue;
-        s = villagerEnergy(payVillager(r.state, kind, villagerPay(id), day), kind, -WORK_TIRE, day);
-        events.push({ type: 'job', who: kind, title: JOB_TYPES[id].title, hour });
+        const pay = friendPay(r.state, kind, id); // 그 친구 제초 급수 배율까지
+        s = friendWorkXp(villagerEnergy(payVillager(r.state, kind, pay, day), kind, -WORK_TIRE, day), kind, id, day); // 풀 일감이면 경험치도 쌓인다
+        events.push({ type: 'job', who: kind, title: JOB_TYPES[id].title, pay, hour });
       } else if (c.act === 'eat') {
         s = eat(s, kind, day);
         events.push({ type: 'meal', who: kind, hour });

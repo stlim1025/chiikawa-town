@@ -78,6 +78,7 @@ import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen, asleepSpans, mateEats } from './core/offscreen.js';
 import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob, canTryLiquor, tryLiquor, goalNews, goalPlace, friendLook } from './core/goals.js';
+import { friendPay, friendWorkXp, friendLeaves, pickJob, canTryWeedExam, tryWeedExam, weedOf } from './core/friendweed.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
@@ -4716,8 +4717,8 @@ function boot() {
       do: 'call',
       fn: () => {
         if (job.done >= T.target) {
-          const pay = villagerPay(typeId);
-          commit(payVillager(state, n.kind, pay, state.clock.day), false);
+          const pay = friendPay(state, n.kind, typeId); // 그 친구 제초 급수 배율까지(core/friendweed.js)
+          commit(friendWorkXp(payVillager(state, n.kind, pay, state.clock.day), n.kind, typeId, state.clock.day), false); // 풀 일감이면 경험치도 쌓인다
           npcs.say(n, lineOf(n.kind, 'jobDone', { pay: `+${won(pay)}` }));
           happen({ type: 'job', who: n.kind, title: T.title });
           setTimeout(() => staffSay('labor', 'paid', 8, n), 1600);
@@ -4759,6 +4760,28 @@ function boot() {
           if (near) hud.toast(`${josa(nameOf(n.kind), '이/가')} 토벌 자격증 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
         }
         happen({ type: r.passed ? 'examPass' : 'examFail', who: n.kind });
+        restHere(n.kind, 15 + Math.random() * 15);
+        setTimeout(() => { if (state && !npcs.busy(n)) reactToFriend(n, r.passed); }, 2600); // 단짝이 달려와 축하하거나 달래 준다
+      } }
+    ]);
+  }
+  /** 친구의 제초 승급 시험(core/friendweed.js): 경험치가 차면 검정소에서 응시료를 내고 본다. 붙으면 한 급 오르고, 붙든 떨어지든 마을 소식에 남는다. */
+  function npcWeedExam(n) {
+    const ex = village.spots.exam, next = gradeName(weedOf(state, n.kind).grade - 1);
+    const seats = [[0.7, 0.7], [1.5, 1.0], [0.1, 1.3]].map(([dx, dz]) => ({ x: ex.x + dx, z: ex.z + dz }));
+    setDoing(n.kind, 'pen', `제초 ${next} 시험`);
+    npcs.plan(n, [
+      { do: 'walk', slots: seats, near: 0.45 },
+      { do: 'act', anim: 'read', face: { x: ex.x, z: ex.z - 2 }, time: 6, say: lineOf(n.kind, 'examGo') },
+      { do: 'call', fn: () => {
+        const day = state.clock.day;
+        if (!canTryWeedExam(state, n.kind, day)) { n.plan = null; return; }
+        const r = tryWeedExam(state, n.kind, day), item = `제초 ${next}`;
+        commit(r.state, false);
+        const ev = happen({ type: r.passed ? 'weedPass' : 'weedFail', who: n.kind, item });
+        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, myName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
+        if (r.passed) hud.toast(`${josa(nameOf(n.kind), '이/가')} ${josa(item, '이/가')} 됐어요!`, 3600, { icon: faceIcon(n.kind) });
+        else if (Math.hypot(n.x - player.position.x, n.z - player.position.z) < 14) hud.toast(`${josa(nameOf(n.kind), '이/가')} ${item} 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
         restHere(n.kind, 15 + Math.random() * 15);
         setTimeout(() => { if (state && !npcs.busy(n)) reactToFriend(n, r.passed); }, 2600); // 단짝이 달려와 축하하거나 달래 준다
       } }
@@ -5162,13 +5185,16 @@ function boot() {
   function lifeDecide(n, kind, day, hour) {
     const v = villagerOf(state, kind, day), spec = VILLAGERS[kind], m = mindOf(kind), H = HUNTER_PROFILES[kind];
     const left = boardOf(state, day).left, roomForJob = v.jobs < MAX_JOBS_PER_DAY;
-    const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && canDoJob(state, kind, id)) : []; // 낚시 일감은 낚싯대를 산 뒤에만
+    // 낚시 일감은 낚싯대를 산 뒤에만, 풀 일감은 그 친구 제초 급수가 되어야(4급부터의 풀 일감은 하나는 내 몫으로 남긴다 — core/friendweed.js)
+    const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && !friendLeaves(id, left) && canDoJob(state, kind, id)) : [];
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
     // 술 자격이 목표고 응시료가 모였으면 검정소가 여는 동안 시험을 보러 간다(하루 한 번)
     if (hour >= 8 && hour < 17 && !tutorialActive(state.tutorial) && canTryLiquor(state, kind, day)) { npcLiquorExam(n); return 'exam'; }
+    // 제초 경험치가 다 찼고 응시료가 있으면 검정소가 여는 동안 승급 시험을 보러 간다(하루 한 번, core/friendweed.js)
+    if (hour >= 8 && hour < 17 && !tutorialActive(state.tutorial) && canTryWeedExam(state, kind, day)) { npcWeedExam(n); return 'exam'; }
     // 배가 고프면 가방(선물 · 나눠 받은 것)의 먹을 것을 꺼내 먹는다(라멘값을 아낀다)
     const snack = v.energy < SNACK_ENERGY && hour >= 7 && hour < 21 ? snackOf(state, kind) : null;
     if (snack && (v.energy < TIRED || Math.random() < 0.75)) { npcSnack(n, snack); return 'snack'; } // 지쳤으면 낮잠보다 간식 먼저
@@ -5191,7 +5217,7 @@ function boot() {
       case 'eat': npcEat(n); break;
       // 같이 라멘: 불린 친구도 사 먹을 만할 때만(배부르거나 목표 값을 모으는 중이면 혼자 먹으러 간다 — 화면 밖 하루와 같은 기준)
       case 'mealWith': if (isFree(mate) && mateEats(state, mate.kind, state.clock.day)) npcMealWith(n, mate); else npcEat(n); break;
-      case 'work': npcWork(n, jobs[Math.floor(Math.random() * jobs.length)]); break;
+      case 'work': npcWork(n, pickJob(state, kind, jobs)); break; // 보수가 많은 일감일수록 자주
       case 'hunt': npcHunt(n, hunts[Math.floor(Math.random() * hunts.length)]); break;
       case 'exam': npcExam(n); break;
       case 'hobby': npcHobby(n, hour); break;
@@ -6483,6 +6509,8 @@ function boot() {
       npcEat: (kind) => npcEat(npcs.byKind(kind)),
       npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),
       npcExam: (kind) => npcExam(npcs.byKind(kind)),
+      npcWeedExam: (kind) => npcWeedExam(npcs.byKind(kind)), // 친구 제초 승급 시험(경험치 · 응시료가 모자라면 그냥 돌아온다)
+      weedOf: (kind) => weedOf(state, kind),
       npcs: () => npcs.list.map((n) => ({ kind: n.kind, x: n.x, z: n.z, r: n.chibi.radius, state: n.state, task: n.task && (n.task.anim || n.task.type),
         prop: n.prop, plan: n.plan ? n.plan.map((s) => s.do) : null, stuck: n.stuck || 0, path: n.path ? n.path.length : null, party: !!n.party, bubble: n.bubble && n.bubble.text })),
       npc: (kind) => npcs.byKind(kind), // 친구 하나를 직접 들여다보기

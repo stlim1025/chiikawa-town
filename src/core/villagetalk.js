@@ -108,6 +108,8 @@ const OWN = {
   homeUp: { chiikawa: '…집을 넓혔어…! 놀러 와…', hachiware: '집 넓혔어~! 놀러 와!', usagi: '(팔을 활짝 벌린다) 우라!!', kurimanju: '하아~ 집 좀 넓혔지', rakko: '…집을 넓혔다 훗' },
   liquorPass: { chiikawa: '…나 술 자격 땄어…!!', hachiware: '나 술 자격 땄어~! 하이볼 마셔 볼래!', usagi: '(잔을 번쩍 든다) 우라!!', rakko: '…술 자격도 손에 넣었다' },
   liquorFail: { chiikawa: '…술 자격 시험 떨어졌어… 히잉…', hachiware: '술 자격 시험 떨어졌어~ 다음엔 붙을 거야!', usagi: '하아…', rakko: '…다시 간다' },
+  weedPass: { chiikawa: '…나 {item} 됐어…!! 우와아앙…', hachiware: '나 {item} 됐어~! 더 어려운 풀도 뽑을 수 있어!', usagi: '(풀을 번쩍 들어 보인다) 우라!!', kurimanju: '하아~ {item} 됐지 뭐야', rakko: '…{item}이다 훗' },
+  weedFail: { chiikawa: '…제초 시험 떨어졌어… 히잉…', hachiware: '제초 시험 떨어졌어~ 다음엔 깔끔하게 뽑을 거야!', usagi: '하아…', kurimanju: '하아~ 허리가 말을 안 듣더라고', rakko: '…다시 간다' },
   partyHunt: { chiikawa: '…같이 토벌해서… 든든했어…!', hachiware: '같이 토벌해서 재밌었다~!', usagi: '(같이 휘두르는 흉내) 우라!', kurimanju: '하아~ 같이 토벌하니 좋더라', rakko: '…같이 싸우니 나쁘지 않더군' }
 };
 /** 소문: '{who}가 ~했' 까지(끝맺음은 친구 말투로). */
@@ -126,6 +128,8 @@ const STEM = {
   homeUp: (e, N) => `${josa(N(e.who), '이/가')} 집을 넓혔`,
   liquorPass: (e, N) => `${josa(N(e.who), '이/가')} 술 자격 땄`,
   liquorFail: (e, N) => `${josa(N(e.who), '이/가')} 술 자격 시험에 떨어졌`,
+  weedPass: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '제초 급수'} 땄`,
+  weedFail: (e, N) => `${josa(N(e.who), '이/가')} 제초 시험에 떨어졌`,
   partyHunt: (e, N) => `${josa(N(e.who), '이/가')} ${josa(N('me'), '이랑/랑')} 같이 토벌했`,
   playerBoss: (e, N) => `${josa(N('me'), '이/가')} ${josa(e.boss || '왕버섯', '을/를')} 쓰러뜨렸`, // boss: 쓰러뜨린 보스 짧은 이름(없으면 이야기 속 왕버섯)
   playerRanker: (e, N) => `${josa(N('me'), '이/가')} 토벌 랭커가 됐`,
@@ -157,7 +161,7 @@ const REACT = {
   good: { chiikawa: ['…와아…!', '…대단해…!', '…헤에…'], hachiware: ['우와~ 대단하다!', '진짜? 멋지다~', '헤에~ 그랬구나!'], usagi: ['야하!', '우라?', '하아~?'], kurimanju: ['하아~ 그렇구나', '하아~ 대단하네'], rakko: ['…그런가', '…훗', '…나쁘지 않군'], momonga: ['흥! 별거 아니네', '…흥 나도 할 수 있어', '그래서 뭐?'] },
   sad: { chiikawa: '…괜찮아…', hachiware: '다음엔 될 거야~!', usagi: '(토닥토닥)', kurimanju: '하아~ 그럴 때도 있지', rakko: '…다시 하면 된다', momonga: '흥 바보네' }
 };
-const SAD = new Set(['examFail', 'liquorFail', 'theft']);
+const SAD = new Set(['examFail', 'liquorFail', 'weedFail', 'theft']);
 
 /** 그 친구가 이 사건을 이야기하는 말(본인 일이면 1인칭, 아니면 소문). 할 말이 없으면 null. */
 export function storyLine(kind, ev, me = '나', random = Math.random) {
@@ -330,6 +334,8 @@ export function newsLine(ev, me = '나') {
     homeUp: () => `${josa(A, '이/가')} 돈을 모아 집을 ${josa(ev.item || '넓은 방', '으로/로')} 넓혔어요`,
     liquorPass: () => `${josa(A, '이/가')} 술 자격을 땄어요`,
     liquorFail: () => `${josa(A, '이/가')} 술 자격 시험에 떨어졌어요`,
+    weedPass: () => `${josa(A, '이/가')} ${josa(ev.item || '제초 급수', '을/를')} 땄어요`,
+    weedFail: () => `${josa(A, '이/가')} ${ev.item || '제초'} 시험에 떨어졌어요`,
     snack: () => `${josa(A, '이/가')} 가방에서 ${josa(ev.item || '간식', '을/를')} 꺼내 먹었어요`,
     share: () => `${josa(A, '이/가')} ${B}에게 ${josa(ev.item || '선물', '을/를')} 나눠 줬어요`,
     partyHunt: () => `${josa(A, '이/가')} ${josa(N('me'), '과/와')} 같이 토벌했어요`,

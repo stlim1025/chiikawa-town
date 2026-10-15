@@ -8,6 +8,7 @@ import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, 
 import { POCHETTES, THEFT_GUARD, pochetteOf, worn } from '../core/pochette.js';
 import { LICENSES, hasLicense, licensesOf, canWorkRamen } from '../core/licenses.js';
 import { boardOf, DAILY_JOBS } from '../core/villagers.js';
+import { weedOf, WEED_START } from '../core/friendweed.js';
 import { SHIFT_BASE, BOWL_PAY } from '../core/ramen.js';
 import { COIN } from './hud.js';
 import { recipeCards } from './ramenshop.js';
@@ -753,16 +754,17 @@ export function createPanels(ui, handlers) {
       // 하트 많은 친구부터(같으면 원래 순서)
       kinds.map((k, i) => ({ k, i, f: friendOf(s, k) })).sort((a, b) => b.f.pts - a.f.pts || a.i - b.i).forEach(({ k, f }) => {
         const F = FRIENDS[k], hc = hearts(f);
-        // 하트 몇 개면 무슨 선물 · 다음 하트까지 몇 · 오늘 한 일 같은 건 앱에서 알려 주지 않는다(빌린 돈 · 친구 가방에 든 것만)
+        // 하트 몇 개면 무슨 선물 · 다음 하트까지 몇 · 오늘 한 일 같은 건 앱에서 알려 주지 않는다(일하는 친구의 제초 급수 · 빌린 돈 · 친구 가방에 든 것만)
         const bag = Object.entries(pantryOf(s, k)).filter(([id, n]) => n > 0 && itemInfo(id));
-        const chips = [f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null,
+        const grade = WEED_START[k] !== undefined ? chip(null, '', `제초 ${gradeName(weedOf(s, k).grade)}`) : null;
+        const chips = [grade, f.debt ? chip('coin', 'debt', `빌린 돈 ${won(f.debt)}`) : null,
           ...bag.slice(0, 6).map(([id, n]) => h('span', { class: 'chip', title: itemInfo(id).name }, svgSpan('ico', itemSvg(id)), n > 1 ? `×${n}` : ''))];
         out.push(h('div', { class: `row f-card${f.pts ? '' : ' new'}` }, face(k),
           h('div', {},
             h('div', { class: 't' }, F.name,
               h('span', { class: 'f-hearts', role: 'img', 'aria-label': `하트 ${hc} / ${MAX_HEARTS}` }, Array.from({ length: MAX_HEARTS }, (_, i) => svgSpan(`f-heart${i < hc ? ' on' : ''}`, HEART)))),
             live.doing[k] ? h('div', { class: 'f-now' }, live.doing[k].svg ? svgSpan('f-now-ico', live.doing[k].svg) : null, live.doing[k].text) : null,
-            f.debt || bag.length ? h('div', { class: 'mon-chips', 'aria-label': '친구 가방' }, chips) : null)));
+            grade || f.debt || bag.length ? h('div', { class: 'mon-chips', 'aria-label': '친구 가방' }, chips) : null)));
       });
       return out;
     },

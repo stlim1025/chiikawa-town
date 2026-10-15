@@ -5,6 +5,7 @@ import { HUNTER_PROFILES, licensed } from './hunters.js';
 import { villagerOf, villagerSpend, updateVillager } from './villagers.js';
 import { TOOLS } from './tools.js';
 import { JOB_TYPES } from './jobs.js';
+import { gradeAllows } from './friendweed.js';
 import { POCHETTES } from './pochette.js';
 import { WORKS, WORK_IDS, WORK_STEP, workOf, workStatus, leftOf, fundWork } from './works.js';
 
@@ -73,8 +74,8 @@ export const hasRod = (state, kind) => owns(state, kind, 'rod');
 export const hasCar = (state, kind) => owns(state, kind, 'car');
 /** 그 친구에게 술 자격이 있는지(쿠리만쥬는 처음부터, 다른 친구는 검정소 시험에 붙으면). */
 export const hasLiquor = (state, kind) => owns(state, kind, 'liquor');
-/** 그 친구가 그 일감을 할 수 있는지: 도구가 드는 일감(낚시)은 그 도구를 샀을 때만. */
-export const canDoJob = (state, kind, id) => !JOB_TYPES[id] || JOB_TYPES[id].needTool !== 'rod' || hasRod(state, kind);
+/** 그 친구가 그 일감을 할 수 있는지: 도구가 드는 일감(낚시)은 그 도구를 샀을 때만, 풀 · 열매 · 스티커 일감은 그 친구 제초 급수로 받을 수 있을 때만(core/friendweed.js). */
+export const canDoJob = (state, kind, id) => !JOB_TYPES[id] || ((JOB_TYPES[id].needTool !== 'rod' || hasRod(state, kind)) && gradeAllows(state, kind, id));
 
 /** 마을 가꾸기에 보탤 곳: 모으는 중인 시설 가운데 가장 많이 모인 것(내가 모으던 것을 거든다), 없으면 아직 시작 안 한 것 가운데 가장 싼 것. */
 function donateTarget(state) {

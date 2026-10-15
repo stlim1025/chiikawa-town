@@ -52,7 +52,8 @@ test('번 돈 · 쓴 돈이 지갑과 맞고, 일감은 하루 셋까지, 모몽
       const before = villagerOf(s, k, 1), after = villagerOf(r.state, k, 1);
       const jobs = r.events.filter((e) => e.type === 'job' && e.who === k);
       const meals = r.events.filter((e) => e.type === 'meal' && (e.who === k || e.with === k)).length;
-      const earned = jobs.reduce((a, e) => a + payOf(e.title), 0);
+      const earned = jobs.reduce((a, e) => a + e.pay, 0); // 그 친구 제초 급수 배율까지 붙은 보수
+      for (const e of jobs) assert.ok(e.pay >= payOf(e.title), `${k} 보수는 기본 보수보다 적지 않다`);
       const spent = r.events.filter((e) => e.type === 'buy' && e.who === k).reduce((a, e) => a + e.cost, 0); // 목표를 산 값
       assert.ok(jobs.length <= MAX_JOBS_PER_DAY, `${k} 일감 ${jobs.length}개`);
       assert.equal(after.jobs, before.jobs + jobs.length);

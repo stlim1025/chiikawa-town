@@ -5,27 +5,31 @@ import { JOB_TYPES } from './jobs.js';
  * 친구들은 저마다 지갑이 있어서 돈이 모자라면 일감을 받아 일하고, 넉넉하면 쉬거나 라멘을 사 먹는다. 밤에는 쉰다.
  * 모몽가는 일하지 않고 하루에 한 번쯤 내 지갑을 노린다(잡으면 돌려받는다).
  * state.board = { day, left: { 일감 id: 남은 건수 } }
- * state.villagers = { kind: { money, jobs: 그날 받은 일감 수, day, energy?: 기운 0..100(예전 저장에는 없다 → 100) } }
+ * state.villagers = { kind: { money, jobs: 그날 받은 일감 수, day, energy?: 기운 0..100(예전 저장에는 없다 → 100), weed?: 제초 급수 { grade, xp, tries, tryDay }(core/friendweed.js) } }
  * 기운(3단계): 일하고 돌아다니면 줄고, 라멘을 먹으면 차고, 모자라면 집에 들어가 낮잠, 밤(21시~6시)에는 집에서 잔다.
  * state.theftDay = 모몽가가 마지막으로 소매치기를 노린 날
  */
 export const DAILY_JOBS = {
   weed8: 5, clover6: 4, sticker10: 4, berry6: 4, // 5급(친구들도 목표를 위해 부지런히 받아 가니 넉넉히)
-  foxtail6: 2, vine4: 2, glow5: 2, // 4급(반짝 털뭉치는 밤 노동)
-  thorny3: 2, reed5: 2, // 3급
-  rockmoss4: 2, moon3: 1, // 2급
-  giant2: 1, poison3: 1, // 1급
+  // 4급부터의 풀 일감은 급수가 오른 친구들도 받아 가니 하나씩 더(친구들은 하나는 내 몫으로 남긴다 — core/friendweed.js 의 friendLeaves)
+  foxtail6: 3, vine4: 3, glow5: 2, // 4급(반짝 털뭉치는 밤 노동)
+  thorny3: 3, reed5: 3, // 3급
+  rockmoss4: 3, moon3: 1, // 2급
+  giant2: 2, poison3: 2, // 1급
   huntFluff: 2, huntSlime: 2, huntBeetle: 2, huntTurtle: 1, huntMoth: 1, // 토벌(토벌 자격증, 자격증을 딴 친구들도 받아 간다 · 전리품도 따로 팔리니 건수는 적게)
   fishMinnow: 2, fishCrucian: 2, fishMackerel: 1 // 낚시(낚싯대가 있어야, 낚싯대를 산 친구들도 받아 간다)
 };
 
-/** 일하는 친구들: 처음 지갑, 부지런함(일감을 받을 확률), 할 줄 아는 일감, 밥 먹으러 갈 확률. */
+/**
+ * 일하는 친구들: 처음 지갑, 부지런함(일감을 받을 확률), 할 줄 아는 일감, 밥 먹으러 갈 확률.
+ * 풀 · 열매 · 스티커 일감은 그 친구 제초 급수가 되어야 받는다(core/friendweed.js — 급수가 오르면 위쪽 풀 일감도 받는다), 낚시 일감(fish…)은 낚싯대를 산 뒤에만(goals.js hasRod).
+ */
 export const VILLAGERS = {
-  chiikawa: { start: 60, diligence: 0.55, jobs: ['weed8', 'berry6', 'sticker10', 'clover6'], eat: 0.25 },
-  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6', 'clover6', 'fishMinnow', 'fishCrucian'], eat: 0.25 },
-  usagi: { start: 200, diligence: 0.7, jobs: ['weed8', 'thorny3', 'berry6'], eat: 0.35 },
-  kurimanju: { start: 300, diligence: 0.3, jobs: ['sticker10', 'berry6', 'fishCrucian', 'fishMackerel'], eat: 0.5 },
-  rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8', 'fishMackerel', 'fishCrucian'], eat: 0.2 }, // 낚시 일감(fish…)은 낚싯대를 산 뒤에만(goals.js hasRod)
+  chiikawa: { start: 60, diligence: 0.55, jobs: ['weed8', 'berry6', 'sticker10', 'clover6', 'foxtail6', 'reed5'], eat: 0.25 },
+  hachiware: { start: 120, diligence: 0.6, jobs: ['weed8', 'sticker10', 'berry6', 'clover6', 'vine4', 'reed5', 'rockmoss4', 'fishMinnow', 'fishCrucian'], eat: 0.25 },
+  usagi: { start: 200, diligence: 0.7, jobs: ['weed8', 'thorny3', 'berry6', 'foxtail6', 'vine4', 'rockmoss4', 'giant2'], eat: 0.35 },
+  kurimanju: { start: 300, diligence: 0.3, jobs: ['sticker10', 'berry6', 'weed8', 'clover6', 'foxtail6', 'fishCrucian', 'fishMackerel'], eat: 0.5 },
+  rakko: { start: 400, diligence: 0.45, jobs: ['thorny3', 'weed8', 'vine4', 'rockmoss4', 'poison3', 'fishMackerel', 'fishCrucian'], eat: 0.2 },
   momonga: { start: 30, diligence: 0, jobs: [], eat: 0.3, thief: true }
 };
 export const MAX_JOBS_PER_DAY = 3;
@@ -153,5 +157,6 @@ export function isValidVillagers(vs) {
   if (!vs || typeof vs !== 'object' || Array.isArray(vs)) return false;
   return Object.entries(vs).every(([kind, v]) => VILLAGERS[kind] && v && num(v.money) && v.money >= 0 && num(v.jobs) && num(v.day)
     && (v.bought === undefined || (Array.isArray(v.bought) && v.bought.every((id) => typeof id === 'string')))
-    && (v.weapon === undefined || v.weapon === null || typeof v.weapon === 'string'));
+    && (v.weapon === undefined || v.weapon === null || typeof v.weapon === 'string')
+    && (v.weed === undefined || (!!v.weed && Number.isInteger(v.weed.grade) && v.weed.grade >= 1 && v.weed.grade <= 6 && num(v.weed.xp) && v.weed.xp >= 0)));
 }
