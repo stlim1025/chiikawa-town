@@ -454,6 +454,10 @@ function boot() {
     if (Array.isArray(w.c) && Number.isFinite(w.c[0]) && Number.isFinite(w.c[1])) visiting.clock = { day: Math.max(1, Math.floor(w.c[0])), t: Math.min(0.99999, Math.max(0, w.c[1])) };
     if (typeof w.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.d)) visiting.startDate = w.d;
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
+    // 몸이 바뀌었다(주인의 사이드스토리): 주인 마을 친구들도 바뀐 몸 · 이름표로(sw 가 없으면 원래대로)
+    const sw = w.sw && typeof w.sw === 'object' && w.sw.me && typeof w.sw.me === 'object' ? { me: w.sw.me, name: String(w.sw.name || multi.hostName || '친구').slice(0, 8) } : null;
+    visiting.swap = sw;
+    visiting.swapKey = sw ? JSON.stringify(sw) : '';
     if (Array.isArray(w.w)) { visiting.weeds = w.w.slice(0, 400); if (!visiting.arriving) weeds.showGuest(visiting.weeds, multi.you); }
     if (Array.isArray(w.b)) { visiting.berries = w.b.slice(0, 40); if (!visiting.arriving) berries.showGuest(visiting.berries); }
     if (Array.isArray(w.k)) {
@@ -1001,6 +1005,7 @@ function boot() {
     const afield = guestsAfield();
     worldT = afield.length ? 0.1 : 0.2;
     const w = { c: [state.clock.day, +state.clock.t.toFixed(5)], d: state.startDate, n: npcs.snapshot(), m: afield.length ? monsters.snapshot(afield) : [] };
+    if (swapOn) w.sw = { me: realLook(), name: myName() }; // 몸이 바뀌었다: 손님 화면에서도 친구들이 바뀐 몸으로(내 원래 모습은 우사기가 든 내 몸)
     if (afield.length) { const fx = monsters.fxSnapshot(afield); w.s = fx.shots; w.r = fx.rain; }
     const now = performance.now();
     while (hostNews.length && hostNews[0].until < now) hostNews.shift();
@@ -1810,21 +1815,29 @@ function boot() {
   // 몸이 바뀐 동안(사이드스토리 '몸이 바뀌었다' — core/swap.js)은 하치와레 몸: 마을 · 집 · 친구 방 · 이야기 장면의 나도 그 몸으로
   // swapForce: 게임센터 장면이 몸을 잠깐 정해 둔다(바뀌는 · 돌아오는 순간부터 마을로 나와 마무리 대사가 끝날 때까지, null 이면 퀘스트 단계대로)
   let swapOn = false, homeGuest = false, swapForce = null; // homeGuest: 몸이 바뀐 동안 내 집에 손님으로 들어왔다(우사기가 든 내 몸의 집 — 잠 · 상자 · 꾸미기는 못 한다)
-  const myLook = () => (swapOn ? { npc: MY_BODY } : realLook());
+  // label: 같이 놀기 친구 화면의 내 머리 위 이름(몸이 바뀐 동안은 하치와레 — net/remote.js)
+  const myLook = () => (swapOn ? { npc: MY_BODY, label: myBodyTag().name } : realLook());
   const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(myLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
   setLineNames(bodyNames); // 친구들끼리의 짝 수다 · 내 일 이야기 대본에 박힌 이름도 몸이 바뀐 동안은 몸의 이름으로(바뀌지 않았으면 그대로)
   /**
    * 몸이 바뀐 채인지 살펴 바뀌었을 때만 갈아 끼운다(매 프레임): 나는 하치와레 몸, 친구들은 몸대로(core/swap.js 의 SWAP_BODY — 우사기는 내 몸),
    * 이름표도 몸대로. 되돌아오면 원래 몸 · 이름표로.
    */
+  let shownKey = ''; // 마을이 지금 보여 주는 바뀐 몸: '' 원래대로 · 'mine' 내 마을 이야기 · 'host:…' 놀러 간 마을 주인이 보낸 것
   function syncSwap() {
-    if (state && mode !== 'title') { syncSwapWallet(); swapBedtime(); }
-    const on = !!state && mode !== 'title' && (swapForce ?? isSwapped(state));
-    if (on === swapOn) return;
-    swapOn = on;
-    swapNames(on, { name: myName(), tag: '#ffffff', ink: '#5a4a3a' });
-    for (const [kind, body] of Object.entries(SWAP_BODY)) npcs.setBody(kind, on ? (body === 'me' ? buildChibi(realLook()) : buildNpc(body)) : null);
-    refreshLook();
+    if (state && mode !== 'title' && !visiting) { syncSwapWallet(); swapBedtime(); }
+    // 내 몸: 내 마을에 있을 때만 바뀐다(남의 마을에 놀러 가면 그 마을 기준 — 몸이 바뀐 건 내 마을 이야기)
+    const on = !!state && mode !== 'title' && !visiting && (swapForce ?? isSwapped(state));
+    if (on !== swapOn) { swapOn = on; refreshLook(); }
+    // 마을 친구들의 몸 · 이름표: 내 마을이면 내 이야기대로, 놀러 간 마을이면 그 주인이 보낸 대로(주인의 원래 모습이 우사기가 든 주인 몸)
+    const show = visiting ? visiting.swap : on ? { me: realLook(), name: myName() } : null;
+    const key = visiting ? (show ? 'host:' + visiting.swapKey : '') : on ? 'mine' : '';
+    if (key === shownKey) return;
+    shownKey = key;
+    swapNames(false);
+    if (show) swapNames(true, { name: show.name, tag: '#ffffff', ink: '#5a4a3a' });
+    const bodyLook = (look) => { try { return buildChibi(look); } catch { return buildChibi({}); } }; // 손님: 주인이 보낸 모습(모르는 모습이면 기본 모습)
+    for (const [kind, body] of Object.entries(SWAP_BODY)) npcs.setBody(kind, show ? (body === 'me' ? bodyLook(show.me) : buildNpc(body)) : null);
   }
   let swapPayback = null; // 몸이 돌아오며 정산한 것(core/swap.js 의 settleSwapWallet): 마무리 대사가 끝나면 하치와레가 돌려준다고 알린다
   /** 지갑 · 가방도 몸대로(퀘스트 단계대로 — 장면이 잠깐 정하는 swapForce 와 상관없이): 바뀌면 하치와레 몸의 것을 들고, 돌아오면 정산한다. */

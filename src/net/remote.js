@@ -29,6 +29,8 @@ const FOLLOW = 16;
 const heldOf = (m) => (m && typeof m.h === 'string' ? m.h.split(',').filter((t) => /^[a-zA-Z0-9_-]{1,20}$/.test(t)).slice(0, 4).join(',') : '');
 /** 모습 비교용 글자(같은 모습이면 다시 만들지 않는다). */
 const lookKey = (look) => { try { return JSON.stringify(look || {}); } catch { return ''; } };
+/** 모습에 실려 온 머리 위 이름(몸이 바뀌었다 — 바뀐 동안은 하치와레). 없으면 null(들어올 때의 이름). */
+const lookLabel = (look) => (look && typeof look.label === 'string' && look.label ? look.label.slice(0, 8) : null);
 /** 손에 든 등불(빛을 비춘다): 'lantern' | 'flashlight' | null. */
 const lightOfHeld = (held) => (held.includes('flashlight') ? 'flashlight' : held.includes('lantern') ? 'lantern' : null);
 
@@ -45,7 +47,7 @@ export function createRemotePlayers(scene, area = 'village') {
     try { chibi = buildChibi(p.look || {}); } catch { chibi = buildChibi({}); } // 모르는 모습이면 기본 모습
     scene.add(chibi.root);
     const m = p.move || {}, x = m.x || 0, z = m.z || 0, yaw = m.yaw || 0;
-    list.set(p.id, { id: p.id, name: p.name, chibi, lookKey: lookKey(p.look), x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', held: heldOf(m), shownHeld: null, t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
+    list.set(p.id, { id: p.id, name: p.name, label: lookLabel(p.look), chibi, lookKey: lookKey(p.look), x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', held: heldOf(m), shownHeld: null, t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
   }
   /** 모습이 바뀌었다(옷 · 변신 · 포셰트): 캐릭터를 다시 만든다(같은 모습이면 그대로). */
   function setLook(id, look) {
@@ -58,6 +60,7 @@ export function createRemotePlayers(scene, area = 'village') {
     if (p.car) chibi.root.add(p.car.root); // 탄 차는 새 모습으로 옮겨 태운다
     p.chibi = chibi;
     p.lookKey = key;
+    p.label = lookLabel(look);
     p.shownHeld = null; // 새 캐릭터에도 든 것을 다시 쥐여 준다
     scene.add(chibi.root);
   }
@@ -132,7 +135,7 @@ export function createRemotePlayers(scene, area = 'village') {
     for (const p of list.values()) {
       if (!p.chibi.root.visible) continue;
       const top = p.chibi.height;
-      out.push({ id: 'mp-n-' + p.id, x: p.x, y: top + 0.2, z: p.z, text: p.name, kind: 'mp-name' });
+      out.push({ id: 'mp-n-' + p.id, x: p.x, y: top + 0.2, z: p.z, text: p.label || p.name, kind: 'mp-name' });
       if (p.sayT > 0) out.push({ id: 'mp-s-' + p.id, x: p.x, y: top + 0.75, z: p.z, text: p.say, kind: 'bubble' });
     }
     return out;
