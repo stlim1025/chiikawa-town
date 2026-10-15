@@ -1595,6 +1595,14 @@ button.slot { padding: 0; border: none; font: inherit; color: inherit; cursor: p
 .update-bar .ub-go:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
 .update-bar .ub-later { background: transparent; border-color: transparent; color: var(--ink-soft); padding: 3px 8px 5px; }
 .cinematic .update-bar, .cutscene .update-bar { display: none !important; }
+/* 새 버전 띠가 떠 있으면 위 가운데에 뜨는 것(검정소 시험 쪽지 · 놀이 타이머 · 알림)은 띠 아래로 내려 겹치지 않게(연출 중에는 띠가 숨으니 그대로) */
+body:not(.cinematic):not(.cutscene) #ui:has(.update-bar:not([hidden])) .hud-timer,
+body:not(.cinematic):not(.cutscene) #ui:has(.update-bar:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 50px); }
+body:not(.cinematic):not(.cutscene) #ui:has(.update-bar:not([hidden])):has(.hud-timer:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 106px); }
+@media not all and (orientation: portrait) and (max-width: 640px) {
+  body:not(.cinematic):not(.cutscene) #ui:has(.update-bar:not([hidden])) .guide-goal.top { top: calc(max(12px, env(safe-area-inset-top)) + 50px); }
+  body:not(.cinematic):not(.cutscene) #ui:has(.update-bar:not([hidden])):has(.guide-goal.top:not([hidden])) .hud-toasts { top: calc(max(12px, env(safe-area-inset-top)) + 102px); }
+}
 /* 좁은 화면: 꼬리표(부탁 · 이야기)를 제목 위로 올려 글이 넓게 들어가게 */
 @media (max-width: 560px) {
   .hud-quest { grid-template-columns: 1fr; padding: 4px 12px 6px 10px; }
