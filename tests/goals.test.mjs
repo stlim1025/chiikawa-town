@@ -23,12 +23,14 @@ test('친구마다 차례로 이루고 싶은 목표가 있고, 값은 가게 �
     if (kind === 'momonga') { assert.deepEqual(list, []); continue; }
     assert.ok(list.length >= 1, `${kind} 목표`);
     for (const g of list) {
-      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : g.kind === 'camera' ? CAMERA_PRICE : g.kind === 'rod' ? TOOLS.rod.price : FURNITURE[g.item].price;
+      const want = g.kind === 'license' ? LICENSES.hunter.fee : g.kind === 'weapon' ? WEAPONS[g.item].price : g.kind === 'camera' ? CAMERA_PRICE : g.kind === 'rod' ? TOOLS.rod.price : g.kind === 'car' ? TOOLS.car.price : FURNITURE[g.item].price;
       assert.equal(g.cost, want, `${kind} ${g.label}`);
       assert.ok(g.label && g.id, `${kind} 목표 이름`);
     }
   }
   assert.equal(GOALS.rakko.at(-1).item, 'star', '랏코는 가장 센 반짝 검을 노린다');
+  // 하늘색 자동차는 원작처럼 랏코만 모은다(도구점 값 그대로)
+  assert.deepEqual(Object.keys(GOALS).filter((k) => GOALS[k].some((g) => g.kind === 'car')), ['rakko']);
 });
 
 test('자격증을 따거나 물건을 사면 다음 목표로 넘어간다', () => {

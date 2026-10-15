@@ -2,6 +2,7 @@ import { buildNpc, animateChibi, propFor } from './models.js';
 import { EAT_ANIMS } from './eatmotion.js';
 import { VILLAGE_R, groundY, lotById } from '../core/layout.js';
 import { gotWeed } from '../core/weeding.js';
+import { buildCar, rollCar, DRIVE_LIFT, CAR_SPEED } from './car.js';
 
 /** 말 걸면 하는 대사. */
 const TALK = {
@@ -60,6 +61,8 @@ const MIN_WEEDS_FOR_FRIENDS = 8; // 내 몫을 남기려고 풀이 이보다 적
 const POST_ROAM = 2.5; // 자리가 정해진 친구가 쉬다가 자리 둘레를 거니는 거리(따로 정하지 않았으면)
 const EATING = new Set([...EAT_ANIMS, 'drink']); // 먹고 마시는 몸짓: 등을 보이지 않게 화면 쪽으로 돌아서 한다
 const VIEW_Z = 7; // 카메라는 늘 내 캐릭터 뒤(+z)에서 본다(render/camera.js)
+/** 하늘색 자동차(랏코가 돈을 모아 산다, core/goals.js): 이만큼 넘는 길은 차로 가고 이만큼 남으면 내린다, 달리는 빠르기(내 차보다 조금 느긋하게). */
+const DRIVE_FROM = 8, DRIVE_STOP = 1.2, NPC_CAR_SPEED = CAR_SPEED * 0.85;
 
 /** 마을 친구 12명. 자리가 정해진 친구는 그 주변에서만 움직인다. 각자 할 일(WORK)을 하다가 돌아다닌다. */
 export function createNpcs(scene, village, weeds, berries) {
@@ -187,9 +190,17 @@ export function createNpcs(scene, village, weeds, berries) {
       if (village.isFree(x, z, 0.4) && !crowded(n, x, z)) { n.path = [{ x, z }, ...(n.path || [])]; return; }
     }
   }
+  /** 하늘색 자동차에 타거나 내린다(차 모형은 처음 탈 때 만들어 캐릭터 뿌리에 붙이고, 내리면 숨긴다). */
+  function setDriving(n, on) {
+    if (!!n.driving === on) return;
+    n.driving = on;
+    if (on && !n.car) { n.car = buildCar(); n.chibi.root.add(n.car.root); }
+    if (n.car) n.car.root.visible = on;
+  }
   /** 목적지에 닿았다: 풀이면 뽑기 시작, 아니면 잠깐 쉰다(일정이 남았으면 꺾이는 곳마다 쉬지 않고 곧바로 다음 단계로). */
   function arrive(n) {
     clearRoute(n);
+    n.carBlocked = false; // 차로 막혔던 길은 다음 길에서 다시 차로 가 본다
     if (n.task && n.task.type === 'weed') { n.state = 'work'; n.workT = 0; }
     else { n.state = 'idle'; n.timer = n.plan && n.plan.length ? 0.2 : 1.5 + Math.random() * 3; }
   }
@@ -480,6 +491,8 @@ export function createNpcs(scene, village, weeds, berries) {
      * 산책 · 앞 일정 걸음이 이어지면 이야기가 부른 친구가 원래 가던 데로 계속 걸어갔다).
      */
     plan(n, steps) { if (n.task) endTask(n); if (n.state === 'walk') { clearRoute(n); n.state = 'idle'; } n.plan = steps; n.timer = 0.2; n.dash = false; },
+    /** 하늘색 자동차를 가졌는지(랏코가 돈을 모아 사면, core/goals.js 의 hasCar): 먼 길은 차로 다닌다. */
+    setCar(kind, on) { const n = list.find((m) => m.kind === kind); if (n) n.hasCar = !!on; },
     /** 일정이 있거나 따라다니기 · 앞장서기 · 도망 · 대화 중이라 다른 걸 시킬 수 없는지. */
     busy(n) { return !!((n.plan && n.plan.length) || n.follow || n.lead || n.flee || n.talk > 0 || n.emote); },
     /** 말풍선 한 줄. */
@@ -663,13 +676,15 @@ export function createNpcs(scene, village, weeds, berries) {
             while (path && path.length && Math.hypot(path[0].x - n.x, path[0].z - n.z) < 0.35) path.shift(); // 지나온 꺾이는 점
             const goal = path && path.length ? path[0] : { x: n.tx, z: n.tz };
             const want = Math.atan2(goal.x - n.x, goal.z - n.z);
+            // 하늘색 자동차가 있으면(랏코) 먼 길은 차로, 다 와 가면 내린다. 따라다니기 · 앞장서기 · 도망 · 풀 뽑으러 가기와 차로 막힌 길은 걸어서
+            setDriving(n, !!n.hasCar && !n.flee && !n.follow && !n.lead && !n.carBlocked && !(n.task && n.task.weed) && (n.driving ? d > DRIVE_STOP : d > DRIVE_FROM));
             // 따라올 때는 내 걸음에 맞춰 빠르게, 앞장설 때는 내가 따라오기 좋게, 도망갈 때는 달린다
-            const speed = n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.dash ? 2.6 : n.speed, step = speed * dt;
+            const speed = n.driving ? NPC_CAR_SPEED : n.flee ? n.runSpeed : n.lead ? 2.4 : n.follow ? 3.0 : n.dash ? 2.6 : n.speed, step = speed * dt;
             // 늦게 도는 몸 방향이 아니라 가려는 쪽으로 걷고, 막히면 옆으로 틀어 비켜 간다
             let heading = want, moved = false;
             for (const off of STEER) {
               const nx = n.x + Math.sin(want + off) * step, nz = n.z + Math.cos(want + off) * step;
-              if (village.isFree(nx, nz, 0.34) && !crowded(n, nx, nz) && !intoPlayer(n, nx, nz) && (!n.flee || Math.hypot(nx, nz) < Math.max(VILLAGE_R + 12, Math.hypot(n.x, n.z)))) { n.x = nx; n.z = nz; heading = want + off; moved = true; break; }
+              if (village.isFree(nx, nz, n.driving ? 0.45 : 0.34) && !crowded(n, nx, nz) && !intoPlayer(n, nx, nz) && (!n.flee || Math.hypot(nx, nz) < Math.max(VILLAGE_R + 12, Math.hypot(n.x, n.z)))) { n.x = nx; n.z = nz; heading = want + off; moved = true; break; }
             }
             let diff = heading - n.yaw;
             while (diff > Math.PI) diff -= Math.PI * 2;
@@ -677,7 +692,9 @@ export function createNpcs(scene, village, weeds, berries) {
             const turn = n.flee ? 16 : 7; // 도망갈 때는 휙 돌아선다
             n.yaw += Math.max(-dt * turn, Math.min(dt * turn, diff));
             if (moved) { n.phase += dt * speed * 9; mode = 'walk'; } // 정말 움직였을 때만 걷는 몸짓(막히면 제자리 달리기 없이 서 있는다)
+            if (n.driving && moved) rollCar(n.car, step, t);
             checkStuck(n, dt);
+            if (n.driving && (n.stuck || 0) >= 2) { n.carBlocked = true; setDriving(n, false); } // 차로는 못 빠져나가는 길: 이번엔 내려서 걸어간다
           }
         }
         // 한가하게 서 있는 친구는 내가 가까이 지나가면 고개를 돌려 바라본다
@@ -702,7 +719,10 @@ export function createNpcs(scene, village, weeds, berries) {
           while (dy < -Math.PI) dy += Math.PI * 2;
           if (pd0 >= 2.8) n.yaw += dy * Math.min(1, dt * 3);
         }
-        n.chibi.root.position.set(n.x, groundY(n.x, n.z) - (n.sink || 0), n.z); // sink: 구덩이에 빠져 머리만(하치와레가 구덩이에!)
+        // 하늘색 자동차: 걷는 중이 아니면(서기 · 일 · 말 · 몸짓 · 쓰러짐) 내린다. 탄 동안은 운전하는 몸짓으로 의자 높이에 앉는다
+        if (n.state !== 'walk' || n.talk > 0 || n.emote || n.down) setDriving(n, false);
+        if (n.driving) mode = 'drive';
+        n.chibi.root.position.set(n.x, groundY(n.x, n.z) - (n.sink || 0) + (n.driving ? DRIVE_LIFT : 0), n.z); // sink: 구덩이에 빠져 머리만(하치와레가 구덩이에!)
         if (n.faceYaw != null) n.yaw = n.faceYaw; // 연출: 정해진 쪽(카메라)을 본다(우는 얼굴 클로즈업)
         n.chibi.root.rotation.y = n.yaw;
         showProp(n, propFor(n.kind, mode)); // 맥주 · 책 · 빗자루 · 라멘 그릇처럼 그 몸짓에 드는 물건
@@ -722,7 +742,7 @@ export function createNpcs(scene, village, weeds, berries) {
       if (!states) {
         if (!puppeting) return;
         puppeting = false;
-        for (const n of list) { n.pup = null; n.chibi.root.visible = !n.away; } // 자리 · 소품은 다음 update 에서 내 친구들 것으로
+        for (const n of list) { n.pup = null; n.chibi.root.visible = !n.away; if (n.car) n.car.root.visible = !!n.driving; } // 자리 · 소품 · 차는 다음 update 에서 내 친구들 것으로
         return;
       }
       puppeting = true;
@@ -744,7 +764,11 @@ export function createNpcs(scene, village, weeds, berries) {
         P.phase += Math.hypot(P.x - ox, P.z - oz) * 9; // 걸음은 실제로 움직인 만큼(update 와 같은 비율)
         P.bubble = typeof s[5] === 'string' ? s[5].slice(0, 40) : '';
         const mode = typeof s[4] === 'string' && /^[a-zA-Z]{1,16}$/.test(s[4]) ? s[4] : 'idle'; // 몸짓 이름 모양만('idolSing' 처럼, 모르는 몸짓이면 서 있기)
-        n.chibi.root.position.set(P.x, groundY(P.x, P.z), P.z);
+        // 주인 마을 랏코가 하늘색 자동차를 타고 있으면 차도 같이 그린다
+        const drive = mode === 'drive';
+        if (drive && !n.car) { n.car = buildCar(); n.chibi.root.add(n.car.root); }
+        if (n.car) { n.car.root.visible = drive; if (drive) rollCar(n.car, Math.hypot(P.x - ox, P.z - oz), t); }
+        n.chibi.root.position.set(P.x, groundY(P.x, P.z) + (drive ? DRIVE_LIFT : 0), P.z);
         n.chibi.root.rotation.y = P.yaw;
         showProp(n, propFor(n.kind, mode));
         animateChibi(n.chibi, mode, t, { phase: P.phase, power: mode === 'pull' ? 0.6 : 0 });
@@ -753,7 +777,7 @@ export function createNpcs(scene, village, weeds, berries) {
     /** 말풍선 라벨(놀러 간 동안은 주인 마을 친구들의 말풍선). */
     labels() {
       if (puppeting) return list.filter((n) => n.pup && n.pup.bubble && n.chibi.root.visible).map((n) => ({ id: 'npc-' + n.kind, x: n.pup.x, y: n.chibi.height + 0.35, z: n.pup.z, text: n.pup.bubble, kind: 'bubble' }));
-      return list.filter((n) => n.bubble && !n.away).map((n) => ({ id: 'npc-' + n.kind, x: n.x, y: n.chibi.height + 0.35, z: n.z, text: n.bubble.text, kind: 'bubble' }));
+      return list.filter((n) => n.bubble && !n.away).map((n) => ({ id: 'npc-' + n.kind, x: n.x, y: n.chibi.height + 0.35 + (n.driving ? 0.75 : 0), z: n.z, text: n.bubble.text, kind: 'bubble' })); // 차를 타고 있으면 지붕 위로
     }
   };
 }

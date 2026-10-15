@@ -48,6 +48,16 @@ test('안내 중이면 일하지 않고, 밤 8시 넘으면 일 · 밥은 안 �
   assert.ok(!e.work && !e.eat, JSON.stringify(e));
 });
 
+test('라멘: 배부르면(기운 80 이상) 사 먹지 않고, 목표 값을 모으는 중이면 배고플 때만 사 먹는다', () => {
+  const t = tally(base({ hour: 12, energy: 90, money: 300, appetite: 0.5, jobs: false, social: 0.9, friends: [{ kind: 'hachiware', dist: 5 }] }));
+  assert.ok(!t.eat && !t.mealWith, JSON.stringify(t));
+  assert.equal(B.wantsMeal(90, 300, false), false, '배부르면 안 먹는다');
+  assert.equal(B.wantsMeal(70, 300, false), true);
+  assert.equal(B.wantsMeal(70, 300, true), false, '모으는 중이면 배고프지 않을 때는 아낀다');
+  assert.equal(B.wantsMeal(40, 300, true), true, '모으는 중이어도 배고프면 먹는다');
+  assert.equal(B.wantsMeal(40, 50, false), false, '돈이 모자라면 못 먹는다');
+});
+
 test('욕구는 시간이 지나면 차고, 할 일을 하면 풀린다', () => {
   let m = { fun: 0, social: 0 };
   m = B.growNeeds(m, 'usagi', 60);

@@ -76,8 +76,8 @@ import {
 import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, killPoints, PARTY_HEARTS } from './core/hunters.js';
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
-import { liveOffscreen, asleepSpans } from './core/offscreen.js';
-import { goalOf, canBuy, buyGoal, npcPower, hasRod, canDoJob } from './core/goals.js';
+import { liveOffscreen, asleepSpans, mateEats } from './core/offscreen.js';
+import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob } from './core/goals.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
@@ -3342,8 +3342,9 @@ function boot() {
     for (const m of npcs.list) {
       if (m.away || m.bubble || Math.hypot(m.x - focus.x, m.z - focus.z) > 26) continue;
       const mk = markOf(state, m.kind);
-      if (mk === 'story') out.push({ id: 's-' + m.kind, x: m.x, y: m.chibi.height + 0.6, z: m.z, html: STORY_MARK, kind: 'qmark story' }); // 사이드스토리: ! 대신 펼친 책
-      else if (mk) out.push({ id: 'q-' + m.kind, x: m.x, y: m.chibi.height + 0.55, z: m.z, text: mk, kind: mk === '?' ? 'qmark report' : 'qmark' });
+      const up = m.driving ? 0.75 : 0; // 하늘색 자동차를 타고 있으면 지붕 위로
+      if (mk === 'story') out.push({ id: 's-' + m.kind, x: m.x, y: m.chibi.height + 0.6 + up, z: m.z, html: STORY_MARK, kind: 'qmark story' }); // 사이드스토리: ! 대신 펼친 책
+      else if (mk) out.push({ id: 'q-' + m.kind, x: m.x, y: m.chibi.height + 0.55 + up, z: m.z, text: mk, kind: mk === '?' ? 'qmark report' : 'qmark' });
     }
     // 게시판에 붙은 이야기 전단지(수상한 섬 합숙): 게시판 왼쪽 일감 걸이 벽(world/village.js 의 tagWall, 높이 2) 위에 펼친 책.
     // 간판(높이 3) 위는 게시판 앞에 서면 화면 위로 벗어난다
@@ -4535,6 +4536,7 @@ function boot() {
     for (const kind of Object.keys(VILLAGERS)) {
       const n = npcs.byKind(kind);
       if (!n) continue;
+      npcs.setCar(kind, hasCar(state, kind)); // 하늘색 자동차를 샀으면(랏코) 먼 길은 차로
       if (staged.has(kind) || (starShow && starShow.pals && starShow.pals.includes(kind))) continue; // 연출 중(별똥별 · 사이드스토리): 끝나면 일과대로(밤이면 하품하고 집으로)
       if (!n.away) minds[kind] = growNeeds(mindOf(kind), kind, 1.5); // 깨어 있으면 심심함 · 외로움이 조금씩 찬다
       // 집 안: 밤잠은 아침에 저마다 일어나는 때(core/brain.js 의 WAKE)가 되면, 낮잠은 시간이 되면 나온다(내가 놀러 가 있으면 기다린다)
@@ -5081,7 +5083,8 @@ function boot() {
     switch (c.act) {
       case 'sleep': case 'nap': npcGoHome(n, c.act); break;
       case 'eat': npcEat(n); break;
-      case 'mealWith': if (isFree(mate)) npcMealWith(n, mate); else npcEat(n); break;
+      // 같이 라멘: 불린 친구도 사 먹을 만할 때만(배부르거나 목표 값을 모으는 중이면 혼자 먹으러 간다 — 화면 밖 하루와 같은 기준)
+      case 'mealWith': if (isFree(mate) && mateEats(state, mate.kind, state.clock.day)) npcMealWith(n, mate); else npcEat(n); break;
       case 'work': npcWork(n, jobs[Math.floor(Math.random() * jobs.length)]); break;
       case 'hunt': npcHunt(n, hunts[Math.floor(Math.random() * hunts.length)]); break;
       case 'exam': npcExam(n); break;
@@ -5102,7 +5105,7 @@ function boot() {
   /** 모은 돈으로 목표(무기 · 카메라는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
   function npcShop(n) {
-    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera' || g.kind === 'rod'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레) · 낚싯대도 도구점에서
+    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera' || g.kind === 'rod' || g.kind === 'car'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레) · 낚싯대 · 자동차(랏코)도 도구점에서
     if (!door) { restHere(n.kind, 5); return; }
     setDoing(n.kind, 'star', `${tools ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
     npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
@@ -5465,7 +5468,7 @@ function boot() {
     for (const kind of [...Object.keys(VILLAGERS), ...STAFF]) {
       const n = npcs.byKind(kind), d = minds[kind] && minds[kind].doing;
       if (!n || n.away || n.bubble || staged.has(kind) || !d || !d.icon || !DOING_ICONS[d.icon] || Math.hypot(n.x - focus.x, n.z - focus.z) > 15) continue;
-      out.push({ id: 'do-' + kind, x: n.x, y: n.chibi.height + 0.3, z: n.z, text: '', kind: 'doing', icon: d.icon, svg: DOING_ICONS[d.icon] });
+      out.push({ id: 'do-' + kind, x: n.x, y: n.chibi.height + 0.3 + (n.driving ? 0.75 : 0), z: n.z, text: '', kind: 'doing', icon: d.icon, svg: DOING_ICONS[d.icon] });
     }
     return out;
   }

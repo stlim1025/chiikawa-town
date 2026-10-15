@@ -7,7 +7,8 @@ import { TOOLS } from './tools.js';
 import { JOB_TYPES } from './jobs.js';
 
 /**
- * 친구들의 돈 모으기 목표: 저마다 차례로 이루고 싶은 것(토벌 자격증 · 무기 · 가구)이 있고, 그 값을 모으려고 꾸준히 일한다.
+ * 친구들의 돈 모으기 목표: 저마다 차례로 이루고 싶은 것(토벌 자격증 · 무기 · 가구 · 랏코의 자동차)이 있고, 그 값을 모으려고 꾸준히 일한다.
+ * 모으는 동안은 라멘값도 아낀다(brain.js 의 wantsMeal: 배고플 때만 사 먹고, 같이 먹자고 불려도 그때만 낸다).
  * 자격증은 돈이 모이면 검정소에서 시험을 보고(붙어야 다음 목표로), 무기 · 가구는 값이 모이면 도구점 · 가구점에 가서 산다.
  * 산 무기는 토벌 힘이 되고(npcPower), 다 이루면 예전처럼 돈이 모자랄 때 위주로 일한다. 모몽가는 일하지 않고 훔친다.
  * state.villagers[kind].bought = [이룬 목표 id], .weapon = 산 무기 id
@@ -20,19 +21,23 @@ export const CAMERA_PRICE = 500;
 const camera = () => ({ id: 'camera', kind: 'camera', label: '카메라', cost: CAMERA_PRICE, story: 'hachiCamera' });
 /** 낚싯대(게임 오리지널): 도구점에서 사면 쉬는 틈에 물가에서 낚시하고, 노동 접수 낚시 일감도 받는다(hasRod). */
 const rod = () => ({ id: 'rod', kind: 'rod', item: 'rod', label: TOOLS.rod.name, cost: TOOLS.rod.price });
+/** 하늘색 자동차(원작에서 랏코만 가진 차): 도구점 값 그대로 모아서 사고, 산 뒤로는 먼 길을 차로 다닌다(actors/npcs.js 의 setCar). */
+const car = () => ({ id: 'car', kind: 'car', item: 'car', label: TOOLS.car.name, cost: TOOLS.car.price });
 
 export const GOALS = {
   chiikawa: [license(), weapon('fork'), furniture('doll'), furniture('lamp'), weapon('sword')],
   hachiware: [furniture('rug'), license(), camera(), rod(), weapon('fork'), furniture('stove'), weapon('sword')],
   usagi: [license(), weapon('sword'), weapon('hammer')],
   kurimanju: [furniture('stove'), rod(), furniture('shelf'), license(), weapon('sword')], // 안주 삼을 생선을 낚으려고
-  rakko: [rod(), weapon('star')], // 해달이라 물고기는 직접 잡는다. 그다음 이미 이름난 랭커답게 가장 센 반짝 검을 노린다
+  rakko: [rod(), car(), weapon('star')], // 해달이라 물고기는 직접 잡는다. 그다음 원작처럼 자기 차, 마지막으로 이름난 랭커답게 가장 센 반짝 검
   momonga: []
 };
 
 const boughtOf = (state, kind) => (state.villagers && state.villagers[kind] && state.villagers[kind].bought) || [];
 /** 그 친구가 낚싯대를 샀는지. */
 export const hasRod = (state, kind) => boughtOf(state, kind).includes('rod');
+/** 그 친구가 하늘색 자동차를 샀는지(랏코). */
+export const hasCar = (state, kind) => boughtOf(state, kind).includes('car');
 /** 그 친구가 그 일감을 할 수 있는지: 도구가 드는 일감(낚시)은 그 도구를 샀을 때만. */
 export const canDoJob = (state, kind, id) => !JOB_TYPES[id] || JOB_TYPES[id].needTool !== 'rod' || hasRod(state, kind);
 

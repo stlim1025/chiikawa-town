@@ -31,7 +31,7 @@ export const VILLAGERS = {
 export const MAX_JOBS_PER_DAY = 3;
 /** 기운: 이보다 적으면 밥(돈이 있으면) 아니면 낮잠. 라멘 한 그릇 · 낮잠 · 밤잠으로 차는 양. */
 export const TIRED = 25;
-export const MEAL_ENERGY = 45;
+export const MEAL_ENERGY = 60; // 내가 먹는 라멘(+60)과 같게(예전 45 는 일할수록 금방 배고파져 하루 서너 그릇을 먹었다)
 export const NAP_ENERGY = 80;
 /** 밤잠 시간(시): BED 시 이후 ~ WAKE 시 전. */
 export const BED_HOUR = 21, WAKE_HOUR = 6.5;

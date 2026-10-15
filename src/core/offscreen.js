@@ -1,4 +1,4 @@
-import { chooseActivity, satisfy, growNeeds, freshMind } from './brain.js';
+import { chooseActivity, satisfy, growNeeds, freshMind, wantsMeal } from './brain.js';
 import {
   VILLAGERS, BED_HOUR, WAKE_HOUR, MAX_JOBS_PER_DAY, MEAL_PRICE, MEAL_ENERGY, NAP_ENERGY, isSleepHour,
   boardOf, villagerOf, villagerEnergy, villagerTakesJob, payVillager, villagerSpend, villagerPay
@@ -34,6 +34,11 @@ export function asleepSpans(from, to) {
 }
 
 const eat = (s, kind, day) => villagerEnergy(villagerSpend(s, kind, MEAL_PRICE, day), kind, MEAL_ENERGY, day);
+/** 같이 먹자고 불린 친구가 라멘을 사 먹을 만한지(brain.js 의 wantsMeal — 배부르거나 목표 값을 모으는 중이면 안 먹는다). */
+export function mateEats(s, kind, day) {
+  const v = villagerOf(s, kind, day), g = goalOf(s, kind);
+  return wantsMeal(v.energy, v.money, !!g && v.money < g.cost);
+}
 
 /**
  * 내가 일찍 잠든 사이(잠든 시각 ~ 밤 9시) 친구들이 보낸 저녁을 한 시간씩 건너뛰며 지낸다.
@@ -87,7 +92,8 @@ export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, 
         done.add(mate);
         next[mate] = satisfy(growNeeds(next[mate], mate, HOUR_SECONDS), c.act);
         s = villagerEnergy(s, mate, -HOURLY_TIRE, day);
-        if (c.act === 'mealWith') s = eat(eat(s, kind, day), mate, day);
+        // 불려 간 친구는 자기도 사 먹을 만할 때만 라멘값을 낸다(배부르거나 목표 값을 모으는 중이면 곁에서 수다만)
+        if (c.act === 'mealWith') { s = eat(s, kind, day); if (mateEats(s, mate, day)) s = eat(s, mate, day); }
         events.push({ type: c.act === 'chat' ? 'chat' : 'meal', who: kind, with: mate, hour });
       } else if (c.act === 'nap') {
         s = villagerEnergy(s, kind, NAP_ENERGY, day);

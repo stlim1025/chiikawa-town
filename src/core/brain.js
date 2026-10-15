@@ -7,6 +7,10 @@ import { TIRED, MEAL_PRICE, WAKE_HOUR, isSleepHour } from './villagers.js';
  * 할 일(act): sleep 밤잠 · nap 낮잠 · eat 라멘 · mealWith 친구와 라멘 · work 게시판 일감 · hunt 토벌 일감 · exam 토벌 자격증 시험
  *   · hobby 취미(친구마다 다르다) · chat 친구에게 가서 수다 · watch 하치와레 공연 구경 · greet 나에게 먼저 다가와 인사 · stroll 산책 · rest 제자리에서 쉬기
  */
+/** 라멘 사 먹기: 기운이 FULL 이상이면 배불러 안 먹고, HUNGRY 아래면 배고파 먹고 싶어진다(돈 모으는 중이면 그때만). */
+export const FULL = 80, HUNGRY = 55;
+/** 라멘(MEAL_PRICE)을 사 먹을 만한지: 돈이 있고 배부르지 않고, 목표 값을 모으는 중이면 배고플 때만. 같이 먹자고 불린 친구도 이걸로 정한다. */
+export const wantsMeal = (energy, money, saving) => money >= MEAL_PRICE && energy < FULL && (!saving || energy < HUNGRY);
 
 /**
  * 성격. fun · social: 심심함 · 외로움이 차는 빠르기(1 이 보통), greet: 나에게 먼저 다가오는 정도,
@@ -107,9 +111,11 @@ export function chooseActivity(ctx, random = Math.random) {
     if (ctx.hunter.hunt) s.hunt = ctx.hunter.want * (energy > 45 ? 1.1 : 0.3) * (drive ? drive * rush * 1.3 : 1);
     if (ctx.hunter.exam) s.exam = ctx.hunter.want * 0.7 * (ctx.goal && ctx.goal.kind === 'license' ? 4 : 1); // 자격증이 목표면 시험 값이 모이자마자
   }
-  if (day && money >= MEAL_PRICE) {
+  // 라멘(80원, 기운 +45): 배부르면(기운 FULL 이상) 사 먹지 않고, 목표 값을 모으는 중이면 배고플 때(HUNGRY 아래)만 조금.
+  // 예전에는 기운이 가득해도 점심 · 저녁때면 먹고 친구랑 같이도 먹어서 하루 서너 그릇(번 돈 300원 남짓을 거의 다)을 썼다
+  if (day && wantsMeal(energy, money, saving)) {
     const meal = (hour >= 11 && hour < 14) || (hour >= 18 && hour < 20);
-    const eat = (energy < 55 ? 0.6 : 0.08) + (ctx.appetite || 0.3) * (meal ? 1.5 : 0.3);
+    const eat = ((energy < HUNGRY ? 0.6 : 0.08) + (ctx.appetite || 0.3) * (meal ? 1.5 : 0.3)) * (saving ? 0.5 : 1);
     if (best && social > 0.35 && best.w > 0.45) s.mealWith = eat * (1 + social * 0.6) * best.w;
     s.eat = eat;
   }
