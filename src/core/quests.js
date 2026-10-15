@@ -35,6 +35,7 @@ import './fishing.js'; // 낚은 물고기(붕어)도 부탁 물건으로 쓴다
  *   needWork: 마을 가꾸기(core/works.js)로 그 시설이 생긴 뒤에만 부탁한다.
  *   talk 단계에 nextDay 가 있으면 그 단계를 받은 다음 날부터 알릴 수 있다(state.quests[id].at = 받은 날).
  *   reward.friends: { 친구: 점수 } 같이 한 친구들 친밀도도.
+ *   reward.accessory: 꾸미기 소품 id 하나 또는 여럿(['jailcap', 'jailsuit']). 이미 가진 소품은 300원으로 준다.
  * 연계 퀘스트(chain): 여러 친구를 거쳐 구역 보스까지 가는 긴 부탁. 사이드스토리와 따로 한 번에 하나만,
  *   하나를 끝내면 CHAIN_GAP 일 동안은 다음 연계가 열리지 않는다(토벌 자격을 따자마자 한꺼번에 몰리지 않게).
  * to 를 적지 않으면 부탁한 친구(giver)에게 알린다. say: 그 단계를 끝냈을 때 to(visit · boss 는 speaker)가 하는 말.
@@ -480,16 +481,16 @@ export const QUESTS = {
   // 오데와 함께 감옥(원작 애니 189화): 숲에서 커다란 버섯을 먹던 오데와 만났다가 다 같이 고블린들에게 붙잡혀 감옥으로 → 줄무늬 옷을 입고 감옥살이 →
   // 탈출하려고 땅을 파는 등 고군분투 → 작은 우리는 땅굴로, 오데는 정문 쇠창살을 휘어 빠져나와 고블린들과 싸운다 → 그 뒤 모몽가도 붙잡혀 간다.
   // 말로 부탁하지 않고, 열흘째부터 낮에 숲 호숫가 길 옆 빈터에서 오데를 찾아 말을 걸면 바로 장면(odeDue · stories/ode.js · world/odejail.js).
-  // 게임에서 정한 부분: 내가 같이 있던 것, 버섯을 나눠 먹은 것, 땅 파기 놀이(간수가 고개를 들면 멈추기), 오데를 응원하는 연타와 싸움 타이밍 놀이,
-  // 모몽가가 붙잡혀 간 때(그날 저녁)와 다음 날 아침까지 마을에 없는 것, 대사 전부, 보상(줄무늬 모자)
+  // 게임에서 정한 부분: 내가 같이 있던 것, 버섯을 나눠 먹은 것, 땅 파기 놀이(간수가 뒤돌아보면 멈추기), 오데를 응원하는 연타와 싸움 타이밍 놀이,
+  // 모몽가가 붙잡혀 간 때(그날 저녁)와 다음 날 아침까지 마을에 없는 것, 대사 전부, 보상(줄무늬 죄수복과 줄무늬 모자)
   odePrison: {
     title: '오데와 함께 감옥', giver: 'hachiware', side: true, noOffer: true, minDay: 10, needHearts: 0, ask: '',
     offer: ['(숲속 빈터에서 커다란 버섯을 먹고 있는 오데를 만났다)'],
     steps: [{
       type: 'scene', scene: 'odePrison', speaker: 'hachiware', goal: '숲속 빈터에서 만난 오데와 고블린 감옥을 빠져나가자!',
-      say: ['헤헤… 오데, 진짜 힘 세더라~ 또 만날 수 있을까?', { who: 'chiikawa', text: '…감옥은… 이제 싫어…' }, '줄무늬 모자는 기념으로 가져가, {name}! 잘 어울려~']
+      say: ['헤헤… 오데, 진짜 힘 세더라~ 또 만날 수 있을까?', { who: 'chiikawa', text: '…감옥은… 이제 싫어…' }, '줄무늬 옷이랑 모자는 기념으로 가져가, {name}! 잘 어울려~']
     }],
-    reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, accessory: 'jailcap' }
+    reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2, usagi: 2 }, accessory: ['jailcap', 'jailsuit'] }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {
@@ -812,9 +813,9 @@ export function giveReward(state, id, day) {
     add({ kind: 'village', n: R.village, text: `마을 친구 모두 +${R.village}`, long: '마을 친구들 모두와 친밀도 +' + R.village });
   }
   if (R.items) for (const [it, n] of Object.entries(R.items)) { s = addItem(s, it, n).state; add({ kind: 'item', id: it, n, text: `${itemInfo(it).name} ×${n}` }); }
-  if (R.accessory) {
+  for (const a of [].concat(R.accessory || [])) { // 소품 하나 또는 여럿
     const w = wardrobeOf(s);
-    if (!w.owned.includes(R.accessory)) { s = { ...s, wardrobe: { owned: [...w.owned, R.accessory], wear: w.wear } }; add({ kind: 'accessory', id: R.accessory, text: ACCESSORY_ITEMS[R.accessory].name, long: `${ACCESSORY_ITEMS[R.accessory].name}(옷장)` }); }
+    if (!w.owned.includes(a)) { s = { ...s, wardrobe: { owned: [...w.owned, a], wear: w.wear } }; add({ kind: 'accessory', id: a, text: ACCESSORY_ITEMS[a].name, long: `${ACCESSORY_ITEMS[a].name}(옷장)` }); }
     else { s = { ...s, money: s.money + 300 }; add({ kind: 'money', n: 300, text: '300원', long: '300원(이미 가진 소품 대신)' }); }
   }
   if (R.weapon) {
@@ -964,7 +965,7 @@ export function checkQuestData() {
       if (!st.goal || !st.say) errs.push(id + ': goal/say');
     }
     const R = Q.reward || {};
-    if (R.accessory && !ACCESSORY_ITEMS[R.accessory]) errs.push(id + ': accessory');
+    if ([].concat(R.accessory || []).some((a) => !ACCESSORY_ITEMS[a])) errs.push(id + ': accessory');
     if (R.weapon && !WEAPONS[R.weapon]) errs.push(id + ': weapon');
     if (R.furniture && !FURNITURE[R.furniture]) errs.push(id + ': furniture');
     if (R.friends) for (const k of Object.keys(R.friends)) if (!FRIENDS[k]) errs.push(id + ': friend ' + k);

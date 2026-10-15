@@ -12,7 +12,7 @@ import { odeDue } from '../core/quests.js';
  *     → 고블린들이 나가떨어진 뒤 우리 넷은 땅굴로 → 땅굴 끝에서 오데와 만나 숲으로 → 오데는 숲 안쪽으로
  *  6) 그날 저녁 감옥: 줄무늬 옷의 모몽가(마을에서는 다음 날 아침까지 안 보인다) → 마을(마지막 대사 · 보상은 퀘스트 done)
  * 게임에서 정한 부분(원작에서 확인하지 못함): 내가 같이 있던 것, 버섯을 나눠 먹은 것, 땅 파기 놀이 규칙(간수가 뒤돌아보면 멈추기),
- *   오데를 응원하는 연타와 싸움 타이밍 놀이, 모몽가가 붙잡혀 간 때(그날 저녁)와 다음 날 아침까지 마을에 없는 것, 대사 전부와 보상(줄무늬 모자).
+ *   오데를 응원하는 연타와 싸움 타이밍 놀이, 모몽가가 붙잡혀 간 때(그날 저녁)와 다음 날 아침까지 마을에 없는 것, 대사 전부와 보상(줄무늬 죄수복과 줄무늬 모자).
  * ctx: { getState, hud, guide, sound, input, minigame, stage(장면 — 처음 들어갈 때 만든다), spot(숲속 빈터의 오데), cam, getPlayer, who(kind), narrator,
  *        fill(lines), regionAt, setMode, setCinematic, myLook, startStory(), arriveBeside(kind, x, z), letGo(kind), jailMomonga() }
  */
@@ -292,7 +292,7 @@ export function createOdeStory(ctx) {
 
   /** 마을로: 숲속 빈터 앞, 하치와레 · 치이카와가 옆에. 모몽가는 다음 날 아침까지 감옥. 마지막 대사 · 보상은 퀘스트 done. */
   function outside() {
-    hud.curtain(true, '(…줄무늬 옷은 갈아입었지만, 줄무늬 모자만은 기념으로 챙겨 왔다)');
+    hud.curtain(true, '(…줄무늬 옷과 모자는 기념으로 챙겨 왔다)');
     setTimeout(() => {
       if (!S) return;
       ctx.setMode('play');

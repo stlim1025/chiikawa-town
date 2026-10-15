@@ -1217,7 +1217,7 @@ function playerDef(rawLook) {
   for (const [id, [z, y, w]] of Object.entries(FACE_AT)) held({ parts }, 'armR', HOLD.train, faceParts(body, z, y, w)).forEach((pt) => parts.push({ ...pt, n: 'weapon', par: 'armR', tag: 'wf-' + id }));
   // 먹을 때 손에 드는 음식(꼬리표 'f-…', player.eat 로 보인다): 라멘 그릇 · 맥주잔 · 하이볼 · 주먹밥 …
   for (const tag of Object.keys(FOOD_SHAPES)) foodParts({ parts }, tag).forEach((pt) => parts.push({ ...pt, tag }));
-  const tall = look.ears === 'bunny' ? 0.45 : ['mouse', 'fox'].includes(look.ears) || ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo', 'jailcap'].includes(look.accessory) ? 0.15 : 0;
+  const tall = look.ears === 'bunny' ? 0.45 : ['mouse', 'fox'].includes(look.ears) || ['bun', 'curly'].includes(look.hair) || ['cap', 'crown', 'sprout', 'pajama', 'beret', 'strawhat', 'flowercrown', 'halo', 'jailcap', 'jailsuit'].includes(look.accessory) ? 0.15 : 0;
   return { label: '나', parts, neck: [0, 0.5, 0], height: 1.12 + tall, radius: 0.45, pivots };
 }
 
@@ -1316,6 +1316,7 @@ function mergeDetails(pivots, props, roles) {
 export function buildChibi(look) {
   const c = buildFromDef(playerDef(look));
   if (look && look.accessory === 'pajama') wearPajama(c, true, PAJAMA_COLORS.me); // 귀 달린 잠옷은 온몸에 입힌다
+  if (look && look.accessory === 'jailsuit') wearStripes(c, true); // 줄무늬 죄수복은 온몸에, 줄무늬 모자까지 한 벌(옷장은 한 번에 하나라)
   return c;
 }
 

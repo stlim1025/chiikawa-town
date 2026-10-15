@@ -50,6 +50,8 @@ ACC.halo = `<ellipse cx="32" cy="32" rx="22" ry="8" fill="none" stroke="${L}" st
 ACC.starpin = `<path d="M18 50L40 30" stroke="#b9a37a" stroke-width="4" stroke-linecap="round"/><path d="M38 8l5.4 11.2 12.4 1.7-9 8.7 2.2 12.3L38 36l-11 5.9 2.2-12.3-9-8.7 12.4-1.7z" fill="#ffd84a" ${S}/><circle cx="38" cy="24" r="4" fill="#fff3a0"/>`;
 // 줄무늬 모자(오데와 함께 감옥 기념): 동그란 하얀 모자에 검은 가로줄
 ACC.jailcap = `<defs><clipPath id="jailcap-clip"><path d="M12 44q0-28 20-28t20 28z"/></clipPath></defs><path d="M12 44q0-28 20-28t20 28z" fill="#fbfaf5"/><g clip-path="url(#jailcap-clip)" fill="#38323a"><rect x="8" y="21" width="48" height="5"/><rect x="8" y="30" width="48" height="5"/><rect x="8" y="39" width="48" height="5"/></g><path d="M12 44q0-28 20-28t20 28z" fill="none" ${S}/>`;
+// 줄무늬 죄수복(오데와 함께 감옥 선물): 하얀 웃옷에 가로 검은 줄
+ACC.jailsuit = `<defs><clipPath id="jailsuit-clip"><path d="M22 12l-12 7 4 10 6-3v26h24V26l6 3 4-10-12-7q-3 6-10 6t-10-6z"/></clipPath></defs><path d="M22 12l-12 7 4 10 6-3v26h24V26l6 3 4-10-12-7q-3 6-10 6t-10-6z" fill="#fbfaf5"/><g clip-path="url(#jailsuit-clip)" fill="#38323a"><rect x="6" y="19" width="52" height="5"/><rect x="6" y="28" width="52" height="5"/><rect x="6" y="37" width="52" height="5"/><rect x="6" y="46" width="52" height="5"/></g><path d="M22 12l-12 7 4 10 6-3v26h24V26l6 3 4-10-12-7q-3 6-10 6t-10-6z" fill="none" ${S}/>`;
 export const accessorySvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="56" rx="16" ry="3.5" fill="#e6d8b8"/>${ACC[id] || ''}</svg>`;
 
 /** 가방 물건 그림(풀 · 열매 · 이후 단계의 물건은 등록된 그림). 퀘스트에서 받는 먹을 것은 여기 바로 둔다. */

@@ -360,7 +360,9 @@ test('오데와 함께 감옥: 열흘째부터 낮에 숲에서 오데를 찾아
   const r = Q.completeStep(s, 'odePrison', 10);
   assert.ok(r.finished);
   assert.ok(W.wardrobeOf(r.state).owned.includes('jailcap'), '줄무늬 모자(옷장)');
-  assert.ok(W.ACCESSORY_ITEMS.jailcap.gift, '줄무늬 모자는 선물로만');
+  assert.ok(W.wardrobeOf(r.state).owned.includes('jailsuit'), '줄무늬 죄수복도(옷장)');
+  assert.ok(W.ACCESSORY_ITEMS.jailcap.gift && W.ACCESSORY_ITEMS.jailsuit.gift, '줄무늬 모자와 죄수복은 선물로만');
+  assert.equal(r.reward.parts.filter((p) => p.kind === 'accessory').length, 2, '보상 꼬리표에 둘 다');
   for (const k of ['chiikawa', 'hachiware', 'usagi']) assert.ok(F.friendOf(r.state, k).pts > 0, k + '와도 친해진다');
   assert.ok(!Q.odeDue({ ...r.state, clock: at(20, 12) }), '끝낸 뒤에는 다시 안 나온다');
 });
