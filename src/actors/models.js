@@ -262,7 +262,7 @@ function geometryFor(m) {
     case 'star4': return hairCaps.star4;
     case 'heart': return hairCaps.heart;
     case 'hachi': return patternGeometry('hachi', partPattern(NAVY, WHITE));
-    case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.12 + Math.sin(x * 5) * 0.04 ? KURI_TOP : KURI_BOT));
+    case 'kuri': return patternGeometry('kuri', (x, y) => (y > 0.47 + Math.sin(x * 5) * 0.03 ? KURI_TOP : KURI_BOT)); // 갈색은 정수리만(원작처럼 옆머리의 귀까지 내려오지 않는다)
     case 'kani': return patternGeometry('kani', (x, y, z) => (y > 0.32 && z > 0.15 ? KANI_DARK : KANI));
     case 'bugHead': return bugGeometry('bugHead', BUG_FACE);
     case 'bugBody': return bugGeometry('bugBody', BUG_BELLY, true);
@@ -404,7 +404,7 @@ const DEFS = {
     parts.push({ m: 'sphere', c: KURI_BOT, p: [0, 0.33, 0], s: [0.34, 0.31, 0.31], n: 'body' });
     limbs(parts, KURI_BOT, 0.35, 0.31);
     parts.push({ m: 'kuri', c: '#ffffff', p: hc, s: hr, n: 'head' });
-    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: KURI_TOP, p: [sd * 0.27, 1.0, -0.03], r: [0, 0, -sd * 0.35], s: [0.09, 0.08, 0.06], n: 'head' }));
+    [-1, 1].forEach((sd) => parts.push({ m: 'sphere', c: KURI_BOT, p: [sd * 0.41, 0.825, -0.04], r: [0, 0, -sd * 0.9], s: [0.075, 0.07, 0.06], n: 'head' })); // 작은 귀: 갈색 바로 아래 옆머리에 몸 색으로
     face(parts, hc, hr, { eyeX: 0.13, eyeY: -0.04, eye: [0.034, 0.045, 0.016], cheekX: 0.24, cheekY: -0.12, mouthY: -0.14, mouth: [0.03, 0.013, 0.01] });
     return { label: '쿠리만쥬', parts, neck: [0, 0.5, 0], height: 1.1, radius: 0.46 };
   },
