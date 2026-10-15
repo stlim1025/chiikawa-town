@@ -118,15 +118,22 @@ function cutSphere(key, cuts, colorAt) {
 }
 // ---------- 스위치의 풍뎅이 칠: 갈색 껍질에 잠옷 후드처럼 동그랗게 트인 하얀 얼굴 · 배(가장자리에 가는 선), 등은 접힌 딱지날개 ----------
 const BUG_LINE = '#2b2224', BUG_LW = 0.07; // 가장자리 선 색 · 굵기(창 반폭에 대한 비율)
-/** 앞(+z)에서 el 만큼 올려다본 방향을 가운데로 한 둥근 창: 가운데 0, 가장자리 1. a 옆 · up 위 · down 아래 반폭(각, 라디안). */
-function bugWindow(x, y, z, [el, a, up, down]) {
+/**
+ * 앞(+z)에서 el 만큼 올려다본 방향을 가운데로 한 둥근 창: 가운데 0, 가장자리 1. a 옆 · up 위 · down 아래 반폭(각, 라디안).
+ * round: 위 절반을 둥글게 펴는 정도(2 면 보통 타원, 클수록 위가 넓고 둥글다 — 2 면 구 위에서 위쪽이 뾰족해 보인다).
+ * dip: 위쪽 가운데(꼭지 밑)로 갈색이 동그랗게 살짝 파고든 깊이(원작 풍뎅이 얼굴).
+ */
+function bugWindow(x, y, z, [el, a, up, down, round = 2, dip = 0]) {
   const s = Math.sin(el), c = Math.cos(el), w = y * s + z * c, v = y * c - z * s;
   if (w < 0.05) return 3;
-  const be = Math.atan2(v, w);
-  return Math.hypot(Math.atan2(x, w) / a, be / (be > 0 ? up : down));
+  const al = Math.atan2(x, w), be = Math.atan2(v, w);
+  if (be <= 0) return Math.hypot(al / a, be / down);
+  const r = ((Math.abs(al) / a) ** round + (be / up) ** round) ** (1 / round);
+  return dip ? r + dip * Math.exp(-((al / 0.24) ** 2)) * (be / up) ** 5 : r;
 }
-// 창: [가운데 높이각, 옆, 위, 아래]. 머리 얼굴은 아래로 턱 밑까지(하얀 배와 이어진다), 몸의 배는 위로 목 밑까지, 괴물 얼굴은 갈색 테가 빙 둘러싼다
-const BUG_FACE = [-0.3, 0.92, 1.15, 1.35], BUG_BELLY = [0.2, 0.85, 1.45, 0.85], BUG_MASK = [0, 0.78, 0.8, 0.85];
+// 창: [가운데 높이각, 옆, 위, 아래, 위쪽 둥글기, 위 가운데 파임]. 머리 얼굴은 위가 둥글고(가운데는 꼭지 밑으로 살짝 파였다) 아래로 턱 밑까지(하얀 배와 이어진다).
+// 몸의 배는 위로 목 밑까지, 괴물 얼굴은 갈색 테가 빙 둘러싼다
+const BUG_FACE = [-0.3, 0.84, 0.95, 1.35, 3.2, 0.1], BUG_BELLY = [0.2, 0.85, 1.45, 0.85], BUG_MASK = [0, 0.78, 0.8, 0.85];
 const ELYTRA = 1.0, ELYTRA_LW = 0.035, SEAM = 0.035; // 딱지날개: 등 한가운데에서 이 각까지 · 아랫단 선 굵기 · 가운데 접힌 선 반폭
 /** 얼굴(배) 창 하나를 칠한 구: 안은 하양, 가장자리는 선, 밖은 갈색. back 이면 등에 접힌 딱지날개(가운데 선 · 아랫단 선)도. */
 function bugGeometry(key, win, back = false) {
@@ -481,7 +488,7 @@ const DEFS = {
   beetleMonster() {
     // 마지막에 괴물로 커진 풍뎅이(원작: 우락부락한 근육질로 책상다리를 하고 앉는다). 머리는 작은 풍뎅이처럼 갈색 테가 빙 두른 하얀 얼굴
     // (눈썹을 찌푸린 동그란 눈 · 송곳니를 드러내고 씩 웃는 입) 위로 꼭지가 길게 솟았고, 목 없이 어깨에 얹혔다.
-    // 몸은 갈색 근육: 가슴 · 복근 · 굵은 팔(팔꿈치를 굽혀 주먹을 가슴 높이로), 다리는 앞에서 엇갈린 책상다리.
+    // 몸은 갈색 근육: 가슴 · 복근 · 굵은 팔(팔꿈치를 굽혀 주먹을 가슴 높이로), 다리는 앞에서 엇갈린 책상다리(tag 'sitLegs'), 날 때는 늘어뜨린 다리(tag 'flyLegs').
     // 날아갈 때 등에 날개(tag 'wings': 갈색 딱지날개 둘 + 연한 속날개 둘) — world/switchcave.js 가 켜고 퍼덕인다.
     // 크기는 다른 친구 키의 두 배쯤으로 만들고 장면에서 더 키운다. 팔은 관절(armL · armR)로 따로 움직인다.
     const parts = [], hc = [0, 1.76, 0.02], hr = [0.52, 0.5, 0.44], tc = [0, 0.9, 0], tr = [0.5, 0.56, 0.36];
@@ -490,9 +497,13 @@ const DEFS = {
     [-1, 1].forEach((sd) => {
       parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.2, 1.16, 0.24], s: [0.24, 0.16, 0.14], n: 'body' }); // 가슴
       parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.5, 1.22, 0], s: [0.22, 0.2, 0.2], n: 'body' }); // 어깨
-      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.41, 0.24, 0.27], r: [0, -sd * 0.6, 0], s: [0.27, 0.16, 0.18], n: 'body' }); // 허벅지(무릎은 양옆 앞으로)
-      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.225, sd > 0 ? 0.2 : 0.13, 0.52], r: [0, sd * 0.26, 0], s: [0.4, 0.13, 0.14], n: 'body' }); // 정강이(앞에서 엇갈린다)
-      parts.push({ m: 'sphere', c: BEETLE, p: [-sd * 0.2, sd > 0 ? 0.17 : 0.11, 0.64], r: [0, -sd * 0.3, 0], s: [0.1, 0.1, 0.15], n: 'body' }); // 발
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.41, 0.24, 0.27], r: [0, -sd * 0.6, 0], s: [0.27, 0.16, 0.18], n: 'body', tag: 'sitLegs' }); // 허벅지(무릎은 양옆 앞으로)
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.225, sd > 0 ? 0.2 : 0.13, 0.52], r: [0, sd * 0.26, 0], s: [0.4, 0.13, 0.14], n: 'body', tag: 'sitLegs' }); // 정강이(앞에서 엇갈린다)
+      parts.push({ m: 'sphere', c: BEETLE, p: [-sd * 0.2, sd > 0 ? 0.17 : 0.11, 0.64], r: [0, -sd * 0.3, 0], s: [0.1, 0.1, 0.15], n: 'body', tag: 'sitLegs' }); // 발
+      // 날 때는 책상다리를 풀고 다리를 아래로 늘어뜨린다(tag 'flyLegs')
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.2, 0.08, 0.06], r: [0.2, 0, sd * 0.1], s: [0.16, 0.26, 0.17], n: 'body', tag: 'flyLegs' });
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.22, -0.32, 0.1], s: [0.12, 0.2, 0.13], n: 'body', tag: 'flyLegs' });
+      parts.push({ m: 'sphere', c: BEETLE, p: [sd * 0.23, -0.52, 0.18], s: [0.11, 0.08, 0.15], n: 'body', tag: 'flyLegs' });
     });
     // 복근: 가운데 세로 선 · 가로 세 줄씩 양쪽, 옆구리 비스듬한 선
     const onBody = (x, y, w, h, rz = 0) => { const q = onHead(tc, tr, x, y - tc[1], 0.004); parts.push({ m: 'dot', c: BUG_LINE, p: q.p, r: [q.r[0], q.r[1], rz], s: [w, h, 0.01], n: 'body', o: false }); };

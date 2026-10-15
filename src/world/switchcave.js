@@ -2,20 +2,20 @@ import * as THREE from 'three';
 import { toonMesh, GEO } from '../render/toon.js';
 import { mergeUnit } from '../render/batch.js';
 import { buildChibi, buildNpc, animateChibi } from '../actors/models.js';
-import { roadDist, groundY } from '../core/layout.js';
+import { groundY } from '../core/layout.js';
 
 /**
  * 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」 — stories/switch.js)의 장소와 장면.
- *  createSwitchFront: 북쪽 바위산 기슭의 바위벽(이야기를 받은 동안만). 가운데 둥근 동굴 입구가 창살로 막혀 있다.
+ *  createSwitchFront: 바위산 북쪽 끝 절벽에 뚫린 동굴 입구(이야기를 받은 동안만). 둥근 입구가 창살로 막혀 있다.
  *  buildSwitchGadget · holdSwitch: 우사기가 주워 들고 다니는 스위치(하얀 상자에 빨간 버튼).
  *  createBeetleBuddy: 마을에서 나를 졸졸 따라다니는 풍뎅이(창살을 연 뒤부터 마지막 장면 전까지).
- *  createSwitchStage: 바위산 기슭 장면(우사기가 스위치를 누르면 창살이 올라가고 풍뎅이가 나온다 · 소풍 · 근육질 괴물로 커져 날아간다).
+ *  createSwitchStage: 바위산 끝자락 절벽 앞 장면(우사기가 스위치를 누르면 창살이 올라가고 풍뎅이가 나온다 · 소풍 · 근육질 괴물로 커져 날아간다).
  */
 /** 풍뎅이 크기: 원작에서는 아주 작다. 캐릭터 절반쯤으로 세운다. */
 export const BEETLE_SCALE = 0.5;
 const MONSTER_S = 2; // 괴물 풍뎅이 크기(모델 앉은키 2.6 → 5.2쯤: 친구들의 네 배 남짓)
 const ROCK = ['#a29a90', '#8f877e', '#b3aba1'];
-const STONE = '#cfc7bb', BAR = '#8d5a48', CRACK = '#8a6656', CAVE = '#2c2628';
+const STONE = '#cfc7bb', BAR = '#8d5a48', CRACK = '#8a6656', CAVE = '#2c2628', CLIFF_ROCK = '#8f8174'; // CLIFF_ROCK: 바위산 북쪽 끝 절벽 색(world/outdoors.js)
 const ARCH_W = 0.72, ARCH_LEG = 1.05, ARCH_TOP = ARCH_LEG + ARCH_W; // 동굴 입구: 반폭 · 곧은 옆벽 높이(그 위는 반원)
 const ease = (u) => u * u * (3 - 2 * u);
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
@@ -31,9 +31,27 @@ function archPath(path, w = ARCH_W, bottom = -0.15) {
   return path;
 }
 
+/** 창살(원작 그림처럼 가로세로 살 + 칸마다 X 빗금): 입구 모양대로(옆 · 위 끝과 바닥은 돌 · 땅 속에 묻힌다), 한 덩어리로 합친다. */
+function buildBars() {
+  const bars = new THREE.Group();
+  const bar = (x, y, w, h, rz = 0, line = true) => bars.add(toonMesh(GEO.box, BAR, { position: [x, y, 0], scale: [w, h, 0.06], rotation: [0, 0, rz], outline: line ? 0.012 : false, shell: true, shadow: false }));
+  const half = (y) => (y <= ARCH_LEG ? ARCH_W : Math.sqrt(Math.max(0, ARCH_W * ARCH_W - (y - ARCH_LEG) ** 2)));
+  const COLS = [-0.6, -0.36, -0.12, 0.12, 0.36, 0.6], ROWS = [0.32, 0.64, 0.96, 1.28, 1.56];
+  COLS.forEach((x) => { const top = ARCH_LEG + Math.sqrt(ARCH_W * ARCH_W - x * x) + 0.06; bar(x, (top - 0.2) / 2, 0.065, top + 0.2); });
+  ROWS.forEach((y) => bar(0, y, half(y) * 2 + 0.12, 0.06));
+  for (let i = 0; i <= COLS.length; i++) for (let j = 0; j <= ROWS.length; j++) { // 칸마다 엇갈려 그은 X(가장자리의 좁은 칸 · 반원 밖은 건너뛴다)
+    const x0 = i ? COLS[i - 1] : -ARCH_W, x1 = i < COLS.length ? COLS[i] : ARCH_W, y0 = j ? ROWS[j - 1] : 0, y1 = j < ROWS.length ? ROWS[j] : ARCH_TOP;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, len = Math.min(x1 - x0, y1 - y0) * 0.75;
+    if (x1 - x0 < 0.2 || Math.abs(cx) + 0.08 > half(cy + 0.08)) continue;
+    [-0.78, 0.78].forEach((rz) => bar(cx, cy, len, 0.012, rz, false));
+  }
+  mergeUnit(bars, bars.children.slice());
+  return bars;
+}
+
 /**
- * 바위벽: 동굴 입구가 뚫린 두툼한 돌판 · 뒤로 둘러선 바위 · 금 간 자국, 입구 안은 깜깜하다. 앞은 +z.
- * 입구는 창살(원작 그림처럼 가로세로 살 + 칸마다 X 빗금)로 막혀 있고, 열면 창살이 돌판 속으로 쑥 올라간다.
+ * 장면 속 바위벽: 동굴 입구가 뚫린 두툼한 돌판 · 뒤로 둘러선 바위 · 금 간 자국, 입구 안은 깜깜하다. 앞은 +z.
+ * 입구는 창살로 막혀 있고, 열면 창살이 돌판 속으로 쑥 올라간다.
  */
 function buildSwitchRock() {
   const group = new THREE.Group();
@@ -50,20 +68,8 @@ function buildSwitchRock() {
   [[-1.55, 2.2, 0.5, 0.5], [-1.2, 2.36, 0.3, -0.3], [1.6, 1.0, 0.45, -0.6], [1.86, 0.84, 0.25, 0.2], [1.25, 2.9, 0.35, 0.3], [-1.9, 0.75, 0.3, 1.2]]
     .forEach(([x, y, len, rz]) => t(GEO.box, CRACK, { position: [x, y, 0.29], scale: [len, 0.025, 0.02], rotation: [0, 0, rz], outline: false })); // 금 간 자국
   t(new THREE.ShapeGeometry(archPath(new THREE.Shape(), ARCH_W + 0.02), 12), CAVE, { position: [0, 0, -0.2], outline: false }); // 입구 안 깜깜한 동굴 속
-  // 창살: 돌판 두께 한가운데(옆 · 위 끝은 돌 속에 묻혔다). 열리면 위로 올라가 돌판 속에 숨는다
-  const bars = new THREE.Group();
-  const bar = (x, y, w, h, rz = 0, line = true) => bars.add(toonMesh(GEO.box, BAR, { position: [x, y, 0], scale: [w, h, 0.06], rotation: [0, 0, rz], outline: line ? 0.012 : false, shell: true, shadow: false }));
-  const half = (y) => (y <= ARCH_LEG ? ARCH_W : Math.sqrt(Math.max(0, ARCH_W * ARCH_W - (y - ARCH_LEG) ** 2)));
-  const COLS = [-0.6, -0.36, -0.12, 0.12, 0.36, 0.6], ROWS = [0.32, 0.64, 0.96, 1.28, 1.56];
-  COLS.forEach((x) => { const top = ARCH_LEG + Math.sqrt(ARCH_W * ARCH_W - x * x) + 0.06; bar(x, (top - 0.2) / 2, 0.065, top + 0.2); });
-  ROWS.forEach((y) => bar(0, y, half(y) * 2 + 0.12, 0.06));
-  for (let i = 0; i <= COLS.length; i++) for (let j = 0; j <= ROWS.length; j++) { // 칸마다 엇갈려 그은 X(가장자리의 좁은 칸 · 반원 밖은 건너뛴다)
-    const x0 = i ? COLS[i - 1] : -ARCH_W, x1 = i < COLS.length ? COLS[i] : ARCH_W, y0 = j ? ROWS[j - 1] : 0, y1 = j < ROWS.length ? ROWS[j] : ARCH_TOP;
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, len = Math.min(x1 - x0, y1 - y0) * 0.75;
-    if (x1 - x0 < 0.2 || Math.abs(cx) + 0.08 > half(cy + 0.08)) continue;
-    [-0.78, 0.78].forEach((rz) => bar(cx, cy, len, 0.012, rz, false));
-  }
-  mergeUnit(bars, bars.children.slice());
+  // 창살: 돌판 두께 한가운데. 열리면 위로 올라가 돌판 속에 숨는다
+  const bars = buildBars();
   group.add(bars);
   return {
     group,
@@ -72,20 +78,52 @@ function buildSwitchRock() {
   };
 }
 
-/** 마을에 둔 바위벽: 바위산 길 옆 빈자리(앞이 마을 쪽). spot 은 그 앞에 서는 자리. */
+/**
+ * 마을의 동굴 입구: 바위산 북쪽 끝 절벽 면에 박는 입구 둘레 돌(절벽과 같은 색, 앞이 +z, 절벽 면보다 1m쯤 앞으로 나오고 뒤는 절벽 속으로) · 깜깜한 속 · 창살.
+ * 깜깜한 속과 창살은 둥근 절벽 면보다 앞에 둔다(뒤에 두면 구멍 안으로 절벽 바위가 비친다).
+ * 마을에서는 여닫는 모습을 보여 주지 않으니(장면 속에서 연다) 열린 뒤로는 창살을 숨긴다.
+ */
+function buildCliffDoor() {
+  const group = new THREE.Group();
+  const t = (geo, c, o) => { const m = toonMesh(geo, c, { shadow: false, ...o }); group.add(m); return m; };
+  const rim = new THREE.Shape();
+  rim.moveTo(-1.55, -0.3);
+  rim.lineTo(1.55, -0.3);
+  rim.splineThru([[1.75, 0.9], [1.5, 2.1], [0.8, 2.85], [-0.15, 3.0], [-1.0, 2.75], [-1.6, 1.95], [-1.78, 0.85], [-1.55, -0.3]].map(([x, y]) => new THREE.Vector2(x, y)));
+  rim.holes.push(archPath(new THREE.Path()));
+  t(new THREE.ExtrudeGeometry(rim, { depth: 1.4, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 2, curveSegments: 16 }).translate(0, 0, -1.5), CLIFF_ROCK, { outline: 0.04 });
+  t(new THREE.ShapeGeometry(archPath(new THREE.Shape(), ARCH_W + 0.02), 12), CAVE, { position: [0, 0, -0.6], outline: false }); // 깜깜한 동굴 속
+  const bars = buildBars();
+  bars.position.z = -0.3;
+  group.add(bars);
+  return { group, open(u) { bars.visible = u < 1; } };
+}
+
+/**
+ * 마을: 바위산 북쪽 끝 절벽(world/outdoors.js 가 큰 바위를 이어 붙인 맵 끝 절벽)에 뚫린 동굴 입구. 이야기를 받은 동안만 보인다.
+ * 남쪽에서 북쪽으로 훑어 처음 막히는 곳을 절벽 면으로 보고 그 앞에 박는다. x 후보는 왕버섯 굴 협곡 · 하치와레 동굴과 떨어진 곳, 앞이 트인 첫 자리.
+ * spot 은 그 앞에 서는 자리(길목을 막지 않게 길 가운데가 아닌 맵 끝 절벽에).
+ */
 export function createSwitchFront(scene, village) {
-  const tries = [[-4, -40], [-3, -44], [-6, -38], [-12, -42]];
-  const [x, z] = tries.find(([tx, tz]) => village.isFree(tx, tz, 1.6, true) && village.isFree(tx, tz + 2.4, 0.8) && roadDist(tx, tz) > 2) || tries[0];
-  const rock = buildSwitchRock();
-  rock.group.position.set(x, groundY(x, z), z);
-  rock.group.visible = false;
-  scene.add(rock.group);
+  const cliffAt = (x) => { for (let z = -56; z >= -76; z -= 0.25) if (!village.isFree(x, z, 0.3)) return z; return null; };
+  let at = { x: 1, z: -69.95 };
+  for (const x of [1, 2, 0, 4, 11, 17, -2]) {
+    const c = cliffAt(x);
+    if (c == null || c > -64) continue; // 절벽보다 앞의 바위에 먼저 걸렸다
+    if (!village.isFree(x, c + 2.5, 1.2) || !village.isFree(x - 1.4, c + 1.2, 0.5) || !village.isFree(x + 1.4, c + 1.2, 0.5)) continue;
+    at = { x, z: c + 0.3 }; // 실제 절벽 면은 막히는 자리(절벽 바위 반지름의 1.1배 + 0.3)보다 0.6 ~ 0.8 안쪽: 입구 앞면은 그보다 1m쯤 앞
+    break;
+  }
+  const door = buildCliffDoor();
+  door.group.position.set(at.x, groundY(at.x, at.z), at.z);
+  door.group.visible = false;
+  scene.add(door.group);
   return {
-    spot: { x, z: z + 2.4 },
-    get visible() { return rock.group.visible; },
-    set visible(v) { rock.group.visible = !!v; },
+    spot: { x: at.x, z: at.z + 2.4 },
+    get visible() { return door.group.visible; },
+    set visible(v) { door.group.visible = !!v; },
     /** 창살을 연 뒤로는 열린 채(이야기 속에서 우사기가 스위치를 눌렀다). */
-    setOpen(on) { rock.open(on ? 1 : 0); }
+    setOpen(on) { door.open(on ? 1 : 0); }
   };
 }
 
@@ -316,7 +354,7 @@ export function createSwitchStage() {
       mon.root.visible = false;
       mon.root.scale.setScalar(MONSTER_S);
       mon.root.rotation.set(0, 0, 0);
-      showTag(mon, 'wings', false);
+      showTag(mon, 'wings', false); showTag(mon, 'sitLegs', false); showTag(mon, 'flyLegs', false);
       wings.forEach((m) => { m.rotation.z = m.userData.rz; });
       cloth.visible = at === 'finale';
       dishes.forEach((d) => { d.visible = false; });
@@ -374,22 +412,28 @@ export function createSwitchStage() {
         beetle.root.visible = false;
         rumble(MONSTER_AT[0], MONSTER_AT[1] + 1.2, 1.4);
         mon.root.visible = true;
+        showTag(mon, 'sitLegs', true); showTag(mon, 'flyLegs', false); // 책상다리하고 앉는다
         mon.root.position.set(MONSTER_AT[0], 0, MONSTER_AT[1]);
         mon.root.rotation.set(0, 0, 0);
         tween(1.4, (u) => mon.root.scale.setScalar(MONSTER_S * (0.12 + 0.88 * ease(u)) * (1 + Math.sin(u * Math.PI) * 0.08)), () => mon.root.scale.setScalar(MONSTER_S));
       });
     },
-    /** 등에서 날개가 펼쳐지고 퍼덕퍼덕 떠오른다. */
+    /** 등에서 날개가 펼쳐지고 퍼덕퍼덕 떠오른다(땅에서 뜨면 책상다리를 풀고 다리를 늘어뜨린다). */
     fly() {
       showTag(mon, 'wings', true);
       flap = true;
       flight = 'up';
-      tween(2.4, (u) => { if (flight !== 'up') return; mon.root.position.y = ease(u) * 3.2; mon.root.rotation.x = 0.15 * ease(u); }, null);
+      tween(2.4, (u) => {
+        if (flight !== 'up') return;
+        mon.root.position.y = ease(u) * 3.2; mon.root.rotation.x = 0.15 * ease(u);
+        const hang = mon.root.position.y > 1.1;
+        showTag(mon, 'sitLegs', !hang); showTag(mon, 'flyLegs', hang);
+      }, null);
     },
     /** (숲가로 숨은 뒤) 하늘 저편으로 날아가 멀어진다(먼 산 너머에서 사라진다). 우리 등 뒤 카메라에는 괴물 등과 날개가 보인다. */
     flyAway() {
       flight = 'away';
-      showTag(mon, 'wings', true);
+      showTag(mon, 'wings', true); showTag(mon, 'sitLegs', false); showTag(mon, 'flyLegs', true);
       flap = true;
       mon.root.visible = true;
       mon.root.scale.setScalar(MONSTER_S);

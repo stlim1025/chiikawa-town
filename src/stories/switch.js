@@ -9,7 +9,7 @@
  * 게임에서 정한 부분(원작에서 확인하지 못함): 내가 쓰다듬어 친해지는 것, 따라다니는 날수, 상담하는 갑옷 씨(노동 갑옷 씨)와 같이 지켜보러 온 것,
  *   스위치를 주운 곳, 창살이 올라가 열리는 것, 소풍 자리와 불러낸 음식 종류, 마을로 돌아온 뒤 대사와 보상.
  * ctx: { hud, guide, sound, input, stage(장면 — 처음 들어갈 때 만든다), cam, getPlayer, who(kind), narrator, fill(lines),
- *        setMode, setCinematic, myLook, front(바위산 기슭 바위벽 — spot), arriveBeside(kind, x, z), letGo(kind) }
+ *        setMode, setCinematic, myLook, front(바위산 끝 절벽 동굴 입구 — spot), arriveBeside(kind, x, z), letGo(kind) }
  */
 const PALS = ['hachiware', 'chiikawa'];
 
@@ -39,7 +39,7 @@ export function createSwitchStory(ctx) {
     S = { kind: 'intro', scene, done, wait: null, t: 0, doneCalled: false };
     input.setEnabled(false);
     hud.setAction(null);
-    hud.curtain(true, finale ? '(바위산 기슭, 창살이 열린 동굴 앞… 노동 갑옷 씨도 같이 와 주었다)' : '(북쪽 바위산 기슭… 커다란 바위벽 앞)');
+    hud.curtain(true, finale ? '(바위산 끝 절벽, 창살이 열린 동굴 앞… 노동 갑옷 씨도 같이 와 주었다)' : '(바위산 북쪽 끝자락… 커다란 절벽 앞)');
     setTimeout(() => {
       if (!S) return;
       ctx.setMode('beetle');
@@ -56,7 +56,7 @@ export function createSwitchStory(ctx) {
   function found() {
     S.kind = 'talk';
     scenes([
-      ['wide', ['(바위벽 가운데 둥근 동굴 입구가 창살로 꽉 막혀 있다)', U('우라! 우라!'), '(우사기가 하얀 상자를 번쩍 들어 보이며 방방 뛴다)']],
+      ['wide', ['(절벽에 뚫린 둥근 동굴 입구가 창살로 꽉 막혀 있다)', U('우라! 우라!'), '(우사기가 하얀 상자를 번쩍 들어 보이며 방방 뛴다)']],
       ['switch', ['(빨간 버튼이 달린 하얀 상자… 우사기가 이 근처에서 주웠다고 한다)', H('이거… 스위치 맞지? 누르면 저 창살이 열릴 것 같은데~'), C('…(고개를 도리도리)'), H('그치? 함부로 누르면 안 되겠지~?')],
         () => ctx.stage.setMood('press')],
       ['switch', [U('…(빤히)'), U('야하!'), H('앗, 우사기 잠깐만~!!')]]
@@ -75,7 +75,7 @@ export function createSwitchStory(ctx) {
   /** 쿠구구궁… 창살이 올라간 어두운 동굴 안에서 조그만 풍뎅이가 걸어 나온다. */
   function opened() {
     scenes([
-      ['door', ['(쿠구구구궁…!! 창살이 바위벽 속으로 천천히 올라갔다)', C('…!! (하치와레 뒤로 쏙)'), H('아, 안이 깜깜해… 뭔가 있어…?')]]
+      ['door', ['(쿠구구구궁…!! 창살이 절벽 속으로 천천히 올라갔다)', C('…!! (하치와레 뒤로 쏙)'), H('아, 안이 깜깜해… 뭔가 있어…?')]]
     ], () => {
       ctx.stage.beetleOut();
       whenStill(() => {
@@ -148,7 +148,7 @@ export function createSwitchStory(ctx) {
     });
   }
 
-  /** 마을로: 바위산 기슭 바위벽 앞, 하치와레 · 치이카와가 옆에. 마지막 대사 · 보상은 퀘스트 done. */
+  /** 마을로: 바위산 끝 절벽 동굴 앞, 하치와레 · 치이카와가 옆에. 마지막 대사 · 보상은 퀘스트 done. */
   function outside(text) {
     hud.curtain(true, text);
     setTimeout(() => {

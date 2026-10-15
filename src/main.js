@@ -4183,7 +4183,7 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
-  // 사이드스토리 '스위치'(stories/switch.js): 바위산 길 옆 창살로 막힌 동굴 바위벽(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 ·
+  // 사이드스토리 '스위치'(stories/switch.js): 바위산 북쪽 끝 절벽의 창살로 막힌 동굴 입구(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 ·
   // 우사기가 들고 다니는 스위치(동굴에 가기 전까지) · 바위산 기슭 장면(처음 들어갈 때 만든다)
   const switchFront = createSwitchFront(scene, village);
   const beetleBuddy = createBeetleBuddy(scene);
@@ -6761,7 +6761,7 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
-    // 스위치 동굴 바위벽: 이야기를 받은 동안만 바위산 길 옆에(창살을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
+    // 스위치 동굴: 이야기를 받은 동안만 바위산 북쪽 끝 절벽에 입구가 있다(창살을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep(), follow = bstep >= 1 && bstep <= 4;
     switchFront.visible = bstep >= 0;
     switchFront.setOpen(bstep >= 1);
