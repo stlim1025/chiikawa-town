@@ -153,6 +153,7 @@ const ui = document.getElementById('ui');
 const canvas = document.getElementById('scene');
 
 function fatal(title, text) {
+  if (window.__splash) window.__splash.done(); // 처음 불러오는 화면을 걷고 안내를 보인다
   ui.innerHTML = '';
   const box = document.createElement('div');
   box.className = 'notice';
@@ -7073,6 +7074,14 @@ function boot() {
   }
   village.warmShaders(gfx.renderer, cam.camera); // 처음 나무 · 집 뒤에 갈 때 멈칫하지 않게 반투명 셰이더를 미리
   requestAnimationFrame(frame);
+  // 첫 화면(타이틀)을 그린 다음 처음 불러오는 화면(index.html 의 #splash)을 걷는다
+  requestAnimationFrame(() => requestAnimationFrame(() => window.__splash && window.__splash.done()));
 }
 
-boot();
+// 마을을 짓는 동안은 화면이 멈추니, 처음 불러오는 화면에 '마을을 짓는 중'을 한 번 그려 둔 다음 짓는다
+// (창이 뒤에 숨어 있어 그리기가 멈춰 있어도 곧 지을 수 있게 setTimeout 도 같이)
+let booted = false;
+const startBoot = () => { if (booted) return; booted = true; boot(); };
+if (window.__splash) window.__splash.step(0.9, '마을을 짓는 중…');
+requestAnimationFrame(() => setTimeout(startBoot, 0));
+setTimeout(startBoot, 250);

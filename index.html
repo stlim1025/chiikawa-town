@@ -2153,6 +2153,110 @@ html.standalone, html.standalone body { height: 100vh; }
 }
 </style>
 
+<!-- 처음 불러오는 화면: 스크립트를 받고 마을을 짓는 동안(그동안 3D 화면은 아무것도 그려지지 않는다) 보인다.
+     main.js 가 첫 화면을 그리면 __splash.done() 으로 걷힌다. 마을을 짓는 동안은 화면이 멈춰서 움직임은 합성(transform)으로만 -->
+<style>
+#splash { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 16px; box-sizing: border-box;
+  background: linear-gradient(#bfe4f6, #e3f3f8 60%, #eef8e4); color: var(--ink); font-family: var(--hand); font-weight: 700; transition: opacity 0.5s ease; }
+#splash.gone { opacity: 0; pointer-events: none; }
+.sp-hill { position: absolute; left: -25%; right: -25%; bottom: -40vh; height: 64vh; border-radius: 50%; background: #c9e9b6; box-shadow: inset 0 12px 0 #b4dd9d; }
+.sp-cloud { position: absolute; left: 0; width: 120px; height: 40px; border-radius: 40px; background: #fff; opacity: 0.92; animation: sp-drift 28s linear infinite; }
+.sp-cloud::before, .sp-cloud::after { content: ''; position: absolute; border-radius: 50%; background: #fff; }
+.sp-cloud::before { width: 54px; height: 54px; left: 16px; top: -26px; }
+.sp-cloud::after { width: 42px; height: 42px; left: 58px; top: -18px; }
+.sp-cloud.c1 { top: 13vh; }
+.sp-cloud.c2 { top: 26vh; scale: 0.7; animation-duration: 36s; animation-delay: -14s; }
+.sp-cloud.c3 { top: 6vh; scale: 0.85; animation-duration: 31s; animation-delay: -24s; }
+@keyframes sp-drift { from { translate: -160px 0; } to { translate: 105vw 0; } }
+.sp-main { position: relative; display: flex; flex-direction: column; align-items: center; width: min(360px, 100%); text-align: center; }
+.sp-friends { display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin-bottom: 6px; }
+.sp-friend { position: relative; width: min(88px, 23vw); }
+.sp-friend.mid { width: min(100px, 26vw); }
+.sp-friend::after { content: ''; position: absolute; left: 20%; right: 20%; bottom: 0; height: 8px; border-radius: 50%; background: rgba(90, 130, 70, 0.22); z-index: -1; }
+.sp-friend svg { display: block; width: 100%; height: auto; overflow: visible; transform-origin: 50% 96%; animation: sp-hop 1.4s ease-in-out infinite; }
+@keyframes sp-hop { 0%, 100% { transform: translateY(0) scale(1.04, 0.96); } 45% { transform: translateY(-9%) scale(0.97, 1.03); } 60% { transform: translateY(-10%); } }
+.sp-kicker { margin: 4px 0 0; font-size: 17px; color: var(--ink-soft); letter-spacing: 1px; }
+.sp-title { margin: 0; font-size: clamp(34px, 9vw, 46px); line-height: 1.1; text-shadow: 0 3px 0 #fff, 0 5px 0 var(--shadow); }
+.sp-bar { position: relative; width: min(260px, 72vw); height: 18px; margin: 16px 0 6px; border-radius: 12px; background: var(--paper); box-shadow: inset 0 0 0 3px #e6d6b2, 0 3px 0 var(--shadow); overflow: hidden; }
+.sp-fill { position: absolute; inset: 3px; border-radius: 9px; overflow: hidden; background: linear-gradient(90deg, var(--mint), var(--mint-deep)); transform: scaleX(0.05); transform-origin: left; transition: transform 0.45s ease-out; }
+.sp-fill::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent); animation: sp-shine 1.2s linear infinite; }
+@keyframes sp-shine { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.sp-state { margin: 0; font-size: 18px; }
+.sp-tip { min-height: 2.6em; box-sizing: border-box; display: flex; align-items: center; justify-content: center; margin: 12px 0 0; padding: 6px 16px 8px; border-radius: var(--r); background: rgba(255, 250, 235, 0.88); box-shadow: 0 3px 0 var(--shadow); font-size: 16px; line-height: 1.3; color: var(--ink-soft); word-break: keep-all; transition: opacity 0.3s; }
+.sp-tip.fade { opacity: 0; }
+.sp-note { margin: 12px 0 0; font-size: 16px; word-break: keep-all; }
+.sp-note button { margin-left: 6px; padding: 2px 14px 4px; border: 0; border-radius: 14px; background: var(--yellow); color: var(--ink); font: inherit; box-shadow: 0 3px 0 var(--yellow-deep); cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { #splash *, #splash *::before, #splash *::after { animation: none !important; transition: none !important; } }
+</style>
+<div id="splash" role="status" aria-live="polite">
+  <div class="sp-cloud c1"></div><div class="sp-cloud c2"></div><div class="sp-cloud c3"></div>
+  <div class="sp-hill"></div>
+  <div class="sp-main">
+    <!-- 친구 셋: 그림은 src/ui/art.js 의 charSvg 를 그대로 옮겨 왔다(타이틀 화면과 같은 모습 — 그림을 고치면 여기도 다시 옮긴다) -->
+    <div class="sp-friends" aria-hidden="true">
+      <span class="sp-friend"><svg viewBox="0 0 64 64" aria-hidden="true" style="animation-delay:0s"><g transform="translate(0 -3) scale(0.32)"><g transform="rotate(4 100 196)"><path d="M44 112A56 54 0 0 1 80 61.56C72 44 70 14 81 8C92 3 95 38 95 58.22A56 54 0 0 1 105 58.22C105 38 108 3 119 8C130 14 128 44 120 61.56A56 54 0 0 1 156 112C156 124.1 154.4 128 152 134C160 131 168 132 170 139C172 146 160 154 149 154C151 164 148 173 142 179C143.5 187 141 194 135.5 194C130 194 127.5 187 129 182C123 191 114 190 100 190C86 190 80 191 74 188C75.5 193 73 200 67.5 200C62 200 59.5 193 61 185C55 179 51 170 53 160C46 163 38 160 37 153C36 145 43 138 50 140C46.400000000000006 134 44 127.4 44 112Z" fill="#fbe9a8" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M83 54C78 38 78 20 82 15C88 12 90 36 90 54Z" fill="#f6b4c3"/><path d="M117 54C122 38 122 20 118 15C112 12 110 36 110 54Z" fill="#f6b4c3"/><path d="M69 106Q78 98 88 104" fill="none" stroke="#3a2a28" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M112 104Q122 98 131 106" fill="none" stroke="#3a2a28" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/><ellipse cx="79" cy="118" rx="6.6" ry="6.6" fill="#3a2a28"/><ellipse cx="79.6" cy="116.6" rx="3.6" ry="1.9" fill="#ffffff"/><ellipse cx="121" cy="118" rx="6.6" ry="6.6" fill="#3a2a28"/><ellipse cx="121.6" cy="116.6" rx="3.6" ry="1.9" fill="#ffffff"/><ellipse cx="59" cy="124" rx="12.5" ry="8.5" fill="#f7a9b9"/><path d="M50.3 127.8L54.3 120.2M54.8 127.8L58.8 120.2M59.3 127.8L63.3 120.2M63.8 127.8L67.8 120.2" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="141" cy="124" rx="12.5" ry="8.5" fill="#f7a9b9"/><path d="M132.3 127.8L136.3 120.2M136.8 127.8L140.8 120.2M141.3 127.8L145.3 120.2M145.8 127.8L149.8 120.2" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><path d="M94 128q3 3.7199999999999998 6 0q3 3.7199999999999998 6 0" fill="none" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M97 137q3 2 6 0" fill="none" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></g></g></svg></span>
+      <span class="sp-friend mid"><svg viewBox="0 0 64 64" aria-hidden="true" style="animation-delay:0.25s"><g transform="translate(0 -3) scale(0.32)"><path d="M24 104A76 68 0 0 1 52 51.28A13.4 13.4 0 0 1 76 39.48A76 68 0 0 1 124 39.48A13.4 13.4 0 0 1 148 51.28A76 68 0 0 1 176 104C176 120.5 173.6 128 170 134C178 131 186 132 188 139C190 146 178 154 167 154C169 164 157 179 151 185C152.5 193 150 200 144.5 200C139 200 136.5 193 138 188C132 191 114 190 100 190C86 190 68 191 62 188C63.5 193 61 200 55.5 200C50 200 47.5 193 49 185C43 179 31 164 33 154C22 154 10 146 12 139C14 132 22 131 30 134C26.400000000000006 128 24 120.5 24 104Z" fill="#ffffff" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M69 97Q77 93 85 97" fill="none" stroke="#3a2a28" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M115 97Q123 93 131 97" fill="none" stroke="#3a2a28" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M69 113Q77 108 85 113" fill="none" stroke="#3a2a28" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M115 113Q123 108 131 113" fill="none" stroke="#3a2a28" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/><ellipse cx="55" cy="117" rx="14" ry="9.5" fill="#f7a9b9"/><path d="M45.4 121.3L49.4 112.7M50.5 121.3L54.5 112.7M55.5 121.3L59.5 112.7M60.6 121.3L64.6 112.7" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="145" cy="117" rx="14" ry="9.5" fill="#f7a9b9"/><path d="M135.4 121.3L139.4 112.7M140.5 121.3L144.5 112.7M145.5 121.3L149.5 112.7M150.6 121.3L154.6 112.7" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><path d="M92 121q4 4.96 8 0q4 4.96 8 0" fill="none" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M94.5 124Q100 137 105.5 124Z" fill="#ffffff" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M96.5 142Q100 144 103.5 142" fill="none" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></g></svg></span>
+      <span class="sp-friend"><svg viewBox="0 0 64 64" aria-hidden="true" style="animation-delay:0.5s"><g transform="translate(0 -3) scale(0.32)"><g transform="rotate(-3 100 196)"><path d="M52 180Q32 190 24 182Q20 176 25 172" fill="none" stroke="#3a2a28" stroke-width="17.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M52 180Q32 190 24 182Q20 176 25 172" fill="none" stroke="#6593bf" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 104A76 68 0 0 1 176 104C176 115 175.6 118 175 124C178 119 183 112 188 111C194 110 196 118 193 125C190 131 181 136 173 144C175 154 157 179 151 185C152.5 193 150 200 144.5 200C139 200 136.5 193 138 188C132 191 114 190 100 190C86 190 68 191 62 188C63.5 193 61 200 55.5 200C50 200 47.5 193 49 185C43 179 31 164 33 154C22 154 10 146 12 139C14 132 22 131 30 134C26.400000000000006 128 24 120.5 24 104Z" fill="#ffffff" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M31.8 74A76 68 0 0 1 168.2 74Q150 84 116 78L100 60L84 78Q50 84 31.8 74Z" fill="#6593bf"/><path d="M24 104A76 68 0 0 1 176 104C176 115 175.6 118 175 124C178 119 183 112 188 111C194 110 196 118 193 125C190 131 181 136 173 144C175 154 157 179 151 185C152.5 193 150 200 144.5 200C139 200 136.5 193 138 188C132 191 114 190 100 190C86 190 68 191 62 188C63.5 193 61 200 55.5 200C50 200 47.5 193 49 185C43 179 31 164 33 154C22 154 10 146 12 139C14 132 22 131 30 134C26.400000000000006 128 24 120.5 24 104Z" fill="none" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M40.2 62Q34 34 48 13Q70 22 86 37.2" fill="#6593bf" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M159.8 62Q166 34 152 13Q130 22 114 37.2" fill="#6593bf" stroke="#3a2a28" stroke-width="4.6" stroke-linejoin="round" stroke-linecap="round"/><ellipse cx="76" cy="110" rx="8" ry="9.5" fill="#3a2a28"/><ellipse cx="78.4" cy="106.39" rx="2.88" ry="2.88" fill="#ffffff"/><ellipse cx="73.44" cy="113.99" rx="1.36" ry="1.36" fill="#ffffff"/><ellipse cx="124" cy="110" rx="8" ry="9.5" fill="#3a2a28"/><ellipse cx="126.4" cy="106.39" rx="2.88" ry="2.88" fill="#ffffff"/><ellipse cx="121.44" cy="113.99" rx="1.36" ry="1.36" fill="#ffffff"/><ellipse cx="54" cy="120" rx="14" ry="9.5" fill="#f7a9b9"/><path d="M44.4 124.3L48.4 115.7M49.5 124.3L53.5 115.7M54.5 124.3L58.5 115.7M59.6 124.3L63.6 115.7" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="146" cy="120" rx="14" ry="9.5" fill="#f7a9b9"/><path d="M136.4 124.3L140.4 115.7M141.5 124.3L145.5 115.7M146.5 124.3L150.5 115.7M151.6 124.3L155.6 115.7" fill="none" stroke="#c45a70" stroke-width="2.2" stroke-linecap="round"/><path d="M91 118q4.5 5.58 9 0q4.5 5.58 9 0" fill="none" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M94 122Q100 133 106 122Z" fill="#ef8ea0" stroke="#3a2a28" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></g></g></svg></span>
+    </div>
+    <p class="sp-kicker">먼작귀 마을 생활</p>
+    <h1 class="sp-title">치이카와 마을</h1>
+    <div class="sp-bar"><span class="sp-fill"></span></div>
+    <p class="sp-state">불러오는 중…</p>
+    <p class="sp-tip"></p>
+    <p class="sp-note" hidden><span></span><button type="button">새로고침</button></p>
+  </div>
+</div>
+<script>
+// 처음 불러오는 화면: 받은 스크립트 수로 어림한 진행 막대(전체 수는 몰라서 갈수록 천천히 85%까지), 돌아가며 보이는 팁,
+// 오래 걸리거나 스크립트를 못 받으면 새로고침 안내. main.js 가 __splash.step(진행, 글) · __splash.done() 을 부른다
+(function () {
+  var root = document.getElementById('splash');
+  if (!root) return;
+  var fill = root.querySelector('.sp-fill'), state = root.querySelector('.sp-state'), tip = root.querySelector('.sp-tip'), note = root.querySelector('.sp-note');
+  var TIPS = [
+    '풀은 깔끔하게 뽑아야 일감에 세요. 끊어진 풀은 사라져요',
+    '하트가 세 개가 되면 친구가 선물 가구를 보내 줘요',
+    '라멘 로우 라멘 한 그릇이면 기운이 60 차요',
+    '밤 9시가 지나면 친구들은 집에 가서 자요',
+    '모몽가는 지갑을 노려요. 포셰트를 메면 피해가 절반이에요',
+    '일감이 마감된 날은 풀을 가방에 모아 두었다가 다음에 내요',
+    '별똥별이 쏟아지는 밤에는 소원을 빌어 봐요',
+    '좋아하는 물건을 선물하면 친구와 더 빨리 친해져요'
+  ];
+  var p = 0, n = 0, done = false, failed = false, k = Math.floor(Math.random() * TIPS.length);
+  function bar(v) { if (v > p) { p = Math.min(1, v); fill.style.transform = 'scaleX(' + p.toFixed(3) + ')'; } }
+  function showTip() { tip.textContent = TIPS[k % TIPS.length]; k++; }
+  bar(0.05);
+  showTip();
+  var tipTimer = setInterval(function () { tip.classList.add('fade'); setTimeout(function () { showTip(); tip.classList.remove('fade'); }, 300); }, 4500);
+  try {
+    new PerformanceObserver(function (list) {
+      list.getEntries().forEach(function (e) { if (/\.js($|\?)/.test(e.name)) n++; });
+      bar(0.05 + 0.8 * (1 - Math.exp(-n / 45)));
+    }).observe({ type: 'resource', buffered: true });
+  } catch (e) { /* 진행 어림이 안 되는 브라우저: 막대는 마을을 지을 때 한 번에 찬다 */ }
+  function warn(text) { if (done) return; note.querySelector('span').textContent = text; note.hidden = false; }
+  note.querySelector('button').addEventListener('click', function () { location.reload(); });
+  var slow = setTimeout(function () { warn('조금 오래 걸리고 있어요. 인터넷이 느리면 더 걸려요'); }, 25000);
+  window.addEventListener('error', function (e) {
+    if (done || failed) return;
+    var t = e.target;
+    if (t && t !== window && t.tagName !== 'SCRIPT') return; // 글꼴 · 그림을 못 받은 것은 괜찮다
+    failed = true;
+    setTimeout(function () { warn('불러오다 문제가 생겼어요. 새로고침해 주세요'); }, 1500);
+  }, true);
+  window.__splash = {
+    step: function (v, text) { bar(v); if (text) state.textContent = text; },
+    done: function () {
+      if (done) return;
+      done = true;
+      clearInterval(tipTimer); clearTimeout(slow);
+      bar(1); state.textContent = '다 됐어요!'; note.hidden = true;
+      setTimeout(function () { root.classList.add('gone'); setTimeout(function () { root.remove(); }, 600); }, 250);
+    }
+  };
+})();
+</script>
 <div id="game">
   <canvas id="scene" aria-label="치이카와 마을. 내 캐릭터를 움직여 풀을 뽑고 일감을 해요."></canvas>
   <div id="ui"></div>
