@@ -4623,12 +4623,17 @@ function boot() {
       // 낚시 일감: 그 물고기가 사는 물가(연못 · 시냇물 · 바다)로 가서 한 마리씩 낚는다(일감 물고기는 일감에 낸다)
       const water = FISH[T.kind].waters.find((w) => w !== 'lake') || 'pond', spot = npcFishSpot(water) || npcFishSpot('pond');
       if (spot) steps.push({ do: 'walk', x: spot.x, z: spot.z, near: 0.4 });
-      // 놓치기도 한다(친구마다 솜씨가 다르다): 다 낚을 때까지 더 던지고, 너무 많이 놓치면 다 못 한 채 돌아간다
+      // 놓치기도 한다(친구마다 솜씨가 다르다): 다 낚을 때까지 더 던지고, 너무 많이 놓치면 다 못 한 채 돌아간다.
+      // 낚시는 몸짓 하나로 쭉(던질 때마다 끊었다 이으면 그 사이에 옆에 선 나를 쳐다봤다), 한 번 던질 때마다 낚음 · 놓침(beats)
+      const beats = [];
+      let at = 0;
       for (let got = 0, cast = 0; got < T.target && cast < T.target * 4; cast++) {
         const miss = Math.random() < fishMiss(n.kind);
-        steps.push({ do: 'act', anim: 'fish', face: spot ? spot.face : null, time: 4 + Math.random() * 4 }, { do: 'call', fn: miss ? () => npcMissFish(n) : () => { job.done++; npcLandFish(n, water, false, T.kind); } });
+        at += 4 + Math.random() * 4;
+        beats.push({ at, fn: miss ? () => npcMissFish(n) : () => { job.done++; npcLandFish(n, water, false, T.kind); } });
         if (!miss) got++;
       }
+      steps.push({ do: 'act', anim: 'fish', face: spot ? spot.face : null, time: at + 0.4, beats, quick: true });
     } else steps.push({ do: 'walk', slots: SLOTS.bench(), near: 0.4 }, { do: 'act', anim: 'read', face: benchMid, time: T.target * 1.5, say: lineOf(n.kind, 'sticker') }, { do: 'call', fn: () => { job.done = T.target; tireNpc(n.kind, 15); } });
     steps.push({ do: 'walk', slots: SLOTS.board(), near: 0.45 }, {
       do: 'call',
@@ -5237,8 +5242,11 @@ function boot() {
     if (!spot) { npcStroll(n); return; }
     setDoing(n.kind, 'fish', '낚시하는 중');
     const steps = [{ do: 'walk', x: spot.x, z: spot.z, near: 0.4 }];
-    const casts = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < casts; i++) steps.push({ do: 'act', anim: 'fish', face: spot.face, time: 5 + Math.random() * 4 }, { do: 'call', fn: () => (Math.random() < fishMiss(n.kind) ? npcMissFish(n) : npcLandFish(n, spot.water, true)) });
+    // 두세 번 던진다: 몸짓 하나로 쭉 낚시만(던질 때마다 끊으면 그 사이에 옆에 선 나를 쳐다봤다), 던질 때마다 낚음 · 놓침(beats)
+    const casts = 2 + Math.floor(Math.random() * 2), beats = [];
+    let at = 0;
+    for (let i = 0; i < casts; i++) { at += 5 + Math.random() * 4; beats.push({ at, fn: () => (Math.random() < fishMiss(n.kind) ? npcMissFish(n) : npcLandFish(n, spot.water, true)) }); }
+    steps.push({ do: 'act', anim: 'fish', face: spot.face, time: at + 0.4, beats, quick: true });
     steps.push({ do: 'call', fn: () => restHere(n.kind, 6 + Math.random() * 10) });
     npcs.plan(n, steps);
   }

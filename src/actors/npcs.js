@@ -246,7 +246,8 @@ export function createNpcs(scene, village, weeds, berries) {
 
   /** 할 일을 끝내고(또는 그만두고) 잠깐 쉰다(토벌 중 휘두르기처럼 quick 이면 쉬지 않고 바로 다음). */
   function endTask(n) {
-    const quick = n.task && n.task.quick;
+    const quick = n.task && n.task.quick, beats = n.task && n.task.beats;
+    if (beats) while (beats.length) beats.shift().fn(n); // 몸짓이 도중에 끊겨도(말을 걸면) 남은 할 일은 해 둔다(일감 낚시 수가 사라지지 않게)
     n.task = null;
     n.state = 'idle';
     n.timer = quick ? 0.05 : 1.5 + Math.random() * 3;
@@ -314,7 +315,7 @@ export function createNpcs(scene, village, weeds, berries) {
 
   /**
    * 일정(plan) 한 단계를 진행한다. 단계: walk { x, z } 또는 { slots: [{ x, z }…], near } (갈 때 빈자리를 고른다)
-   * · weeds { kind, left, onPull } · berries { left, onPick } · act { anim, time, say, face: { x, z } } · say { text }
+   * · weeds { kind, left, onPull } · berries { left, onPick } · act { anim, time, say, face: { x, z }, beats: [{ at, fn(n) }] 도중 할 일 } · say { text }
    * · wait { time } · call { fn } · hunt { find(x, z, skip), hit(m), left, onKill(m) } (마을 밖 몬스터 토벌). 다 하면 다음 단계로.
    * · walk 에 run: true 면 뛰어간다. act 에 quick: true 면 끝나자마자 다음 단계(대화처럼 박자를 맞출 때).
    * · sync { group: { need, here: Set } } 같은 group 의 친구가 다 모일 때까지 기다린다(오래 안 오면 모두 그만둔다).
@@ -433,7 +434,8 @@ export function createNpcs(scene, village, weeds, berries) {
       n.state = 'walk';
     } else if (step.do === 'act') {
       if (step.face) n.yaw = Math.atan2(step.face.x - n.x, step.face.z - n.z);
-      n.task = { type: 'act', anim: step.anim, time: step.time, quick: !!step.quick };
+      // beats: 몸짓 도중 정해진 때(at 초) 할 일(낚시 한 번 던질 때마다 낚음 · 놓침) — 몸짓을 끊지 않고 이어서(사이사이 서 있으면 나를 쳐다봤다)
+      n.task = { type: 'act', anim: step.anim, time: step.time, quick: !!step.quick, beats: step.beats ? [...step.beats].sort((a, b) => a.at - b.at) : null };
       n.state = 'work';
       n.workT = 0;
       if (step.say) say(n, step.say);
@@ -661,6 +663,7 @@ export function createNpcs(scene, village, weeds, berries) {
           } else {
             mode = task.anim;
             if (EATING.has(mode)) turnToward(n, Math.atan2(lastPlayer.x - n.x, lastPlayer.z + VIEW_Z - n.z), dt); // 먹을 때는 등을 보이지 않게
+            while (task.beats && task.beats.length && n.workT >= task.beats[0].at) task.beats.shift().fn(n);
             if (n.workT >= task.time) endTask(n);
           }
         } else {
