@@ -148,6 +148,8 @@ const decorSvg = (kind, c) => (kind === 'wall'
   ? `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 34V17a14 12 0 0 1 28 0v17z" fill="${c}" stroke="#5a4431" stroke-width="2"/><rect x="15" y="15" width="10" height="10" rx="1.5" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><path d="M20 15v10M15 20h10" stroke="#5a4431" stroke-width="1.2"/></svg>`
   : `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="24" rx="15" ry="10" fill="${c}" stroke="#5a4431" stroke-width="2"/><path d="M9 20.5h22M6.5 25h27M9 29.5h22" stroke="#5a4431" stroke-opacity=".25" stroke-width="1.4"/></svg>`);
 /** 집 넓히기 그림: 둥근 집 양옆으로 분홍 화살표. */
+// 빌린 집(마을이 처음부터 세운 하얀 돔 집 — world/homeext.js 의 0단계): 동그란 돔에 네모 창, 옆으로 튀어나온 둥근 현관
+const DOME_ART = '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="49" rx="28" ry="5" fill="#a9dc8c"/><path d="M7 48C7 23 18 12 32 12s25 11 25 36z" fill="#fbfaf5" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><rect x="17" y="24" width="12" height="10" rx="2" fill="#c6e7f5" stroke="#5a4431" stroke-width="2"/><path d="M23 24v10M17 29h12" stroke="#5a4431" stroke-width="1.6"/><path d="M38 48V36a8 8 0 0 1 16 0v12z" fill="#fbfaf5" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M42 48v-10a4 4 0 0 1 8 0v10z" fill="#c49a6c" stroke="#5a4431" stroke-width="1.6"/></svg>';
 const ROOM_ART = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 33V19a11 9.5 0 0 1 22 0v14z" fill="#fff3d6" stroke="#5a4431" stroke-width="2"/><path d="M17 33v-6a3 3 0 0 1 6 0v6" fill="#c49a6c" stroke="#5a4431" stroke-width="1.6"/><path d="M2.5 23 6 19.5v7zM37.5 23 34 19.5v7z" fill="#f08fae"/></svg>';
 /** 스티커 일감 그림: 과일 스티커가 붙은 종이 한 장. */
 const STICKER_ART = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="13" y="10" width="38" height="46" rx="5" fill="#fff" stroke="#5a4431" stroke-width="2.4"/><circle cx="25" cy="25" r="7" fill="#f04a60" stroke="#5a4431" stroke-width="2"/><circle cx="40" cy="27" r="6.5" fill="#fcd95b" stroke="#5a4431" stroke-width="2"/><circle cx="31" cy="41" r="7" fill="#8fd16a" stroke="#5a4431" stroke-width="2"/><path d="M25 18v-3M40 20.5v-3" stroke="#5e9f80" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -914,6 +916,10 @@ export function createPanels(ui, handlers) {
       const out = [head('부동산', s.money)];
       // 돈이 모자라면 얼마 더 모아야 하는지(값 버튼만 흐리게 두면 왜 못 사는지 안 보였다)
       const short = (price) => (s.money < price ? h('div', { class: 'd short' }, `${won(price - s.money)} 더 모아야 해요`) : null);
+      // 집 사기 버튼: 위에 「집 사기」, 아래에 값
+      const buyHouseBtn = () => h('button', { class: 'btn pink price-btn buy-house', type: 'button', disabled: s.money < HOUSE_PRICE, onClick: after(handlers.buyHouse),
+        'aria-label': `집 사기 ${won(HOUSE_PRICE)}${s.money < HOUSE_PRICE ? ' (돈이 부족해요)' : ''}` },
+        h('small', {}, '집 사기'), h('span', { class: 'bh-price' }, svgSpan('coin-ico', COIN), won(HOUSE_PRICE)));
       if (hs.own) {
         out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '내 집이에요!'), h('div', { class: 'd' }, '이제 집세를 내지 않아요'))));
         // 집 넓히기(core/home.js): 한 단계씩, 가구 놓을 칸이 늘어난다
@@ -939,22 +945,27 @@ export function createPanels(ui, handlers) {
               h('button', { class: 'btn', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `${won(hs.unpaid)} 내기`)));
           }
         } else {
-          // 지금 사는 집(빌린 집)과 집세
-          out.push(h('div', { class: 'row' },
-            h('div', {}, h('div', { class: 't' }, '빌린 집'), h('div', { class: 'mon-chips' }, chip('coin', '', `일주일 집세 ${won(RENT)}`), chip('clock', '', `다음 집세 ${rentDay}`))),
+          // 지금 사는 집(빌린 집): 하얀 돔 집 그림, 집세, 사면 어떻게 되는지와 집 사기 버튼을 한 칸에(밀린 집세가 있으면 그것부터)
+          out.push(h('div', { class: 'row pochette house' }, svgSpan('pochette-art', DOME_ART),
+            h('div', {}, h('div', { class: 't' }, '빌린 집'),
+              h('div', { class: 'mon-chips' }, chip('coin', '', `일주일 집세 ${won(RENT)}`), chip('clock', '', `다음 집세 ${rentDay}`)),
+              h('div', { class: 'd' }, hs.unpaid > 0 ? '밀린 집세를 다 내야 집을 살 수 있어요' : '집을 사면 집세가 없어지고 집을 넓힐 수 있어요'),
+              hs.unpaid > 0 ? null : short(HOUSE_PRICE)),
             hs.unpaid > 0
               ? h('button', { class: 'btn primary', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `밀린 집세 ${won(hs.unpaid)} 내기`)
-              : null));
+              : buyHouseBtn()));
           // 밀린 집세 경고: 월요일에는 밀린 집세와 그 주 집세를 함께 낸다
           if (hs.unpaid > 0) {
             const lastChance = (hs.missed || 0) + 1 >= EVICT_AFTER;
             out.push(h('p', { class: 'note warn' }, lastChance ? '다음 월요일에 못 내면 쫓겨나요!' : `${EVICT_AFTER}번 연달아 못 내면 쫓겨나요!`));
           }
         }
-        // 돈 모아 사기
-        out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어지고 집을 넓힐 수 있어요'), hs.unpaid > 0 ? null : short(HOUSE_PRICE)),
-          hs.unpaid > 0 ? h('span', { class: 'lic-badge' }, '밀린 집세부터') : priceBtn(HOUSE_PRICE, s.money, after(handlers.buyHouse), 'btn pink')));
+        // 쫓겨난 뒤에는 빌린 집 칸이 없으니 집 사기를 따로
+        if (hs.evicted) {
+          out.push(h('div', { class: 'row' },
+            h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어지고 집을 넓힐 수 있어요'), hs.unpaid > 0 ? null : short(HOUSE_PRICE)),
+            hs.unpaid > 0 ? h('span', { class: 'lic-badge' }, '밀린 집세부터') : buyHouseBtn()));
+        }
         // 청약
         const lot = hs.lottery;
         let lotRow;
