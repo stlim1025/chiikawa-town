@@ -3214,7 +3214,7 @@ function boot() {
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
-  let questT = 0, bossM = null, questHint = false;
+  let questT = 0, bossM = null, questHint = false, hourHint = null; // hourHint: 시간이 아닐 때 와서 몇 시에 오라고 알린 퀘스트(멀어지면 비운다)
   /**
    * 구역 보스(core/bosses.js): 오늘 쓰러뜨리지 않았으면 제 굴 · 빈터에 한 마리씩 있다(내 눈앞에서 솟아나지 않게 멀리 있을 때 놓는다).
    * 처음 가까이 다가가면 '등장!' 알림과 함께 도감에 드러난다. 이미 쓰러뜨린 날의 저장을 불러왔으면 치운다.
@@ -3328,6 +3328,15 @@ function boot() {
         questSceneStep(id);
         return;
       }
+    }
+    // 퀘스트 자리에 왔는데 그 시간이 아니면(장면이 열리지 않는다) 몇 시에 오면 되는지 한 번 알린다. 멀어졌다 다시 오면 또
+    if (free) for (const id of activeQuests(state)) {
+      const step = stepOf(state, id), place = step && step.type === 'visit' ? questPlaceAt(step.place) : null;
+      if (!place || Math.hypot(p.x - place.x, p.z - place.z) >= (QUEST_PLACES[step.place].r || 3)) { if (hourHint === id) hourHint = null; continue; }
+      const when = (step.goal.match(/\(([^)]*)\)/) || [])[1];
+      if (hourHint === id || !when || arrived(step, place, p.x, p.z, hour)) continue;
+      hourHint = id;
+      hud.toast(`${QUEST_PLACES[step.place].name}에는 ${when}에 와요`, 3600, { chips: [{ icon: ICO.pin, text: QUESTS[id].title }] });
     }
     if (free && !talking && buddyDone.length) { const id = buddyDone.shift(); if (isActive(state, id) && stepReady(state, id)) finishBuddy(id); }
     if (free && !talking) studyReport();
