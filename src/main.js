@@ -92,6 +92,7 @@ import { POCHETTES, buyPochette, wearPochette, worn, guardedTheft } from './core
 import { VILLAGE_R, REGION_NAMES, GATES, POND, RIVER, BRIDGES, riverZ, regionAt, roadDist, RAMEN_SEATS, RAMEN_QUEUE, SOUTH_SHORE, CLIFF } from './core/layout.js';
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
+import { CAR_RADIUS } from './actors/car.js';
 import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish, grillFish, claimDex } from './core/fishing.js';
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
@@ -1498,7 +1499,8 @@ function boot() {
         // 지도는 마을폰 앱으로 본다: 알림으로 어디서 보는지 알려 주고, 지도 앱을 열 때까지 마을폰 버튼과 지도 아이콘이 빛난다
         appNudge = 'map';
         hud.toast('마을 지도를 샀어요! 마을폰의 지도 앱에서 볼 수 있어요', 4200);
-      } else hud.toast(`${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
+      } else if (id === 'car') hud.toast('하늘색 자동차를 샀어요! 오른쪽 위 자동차 버튼(C 키)으로 언제든 타고 내려요', 4600);
+      else hud.toast(`${josa(TOOLS[id].name, '을/를')} 샀어요!`, 2600);
       gotTicket(paid);
     },
     setLight(id) { commit({ ...state, tools: { ...toolsOf(state), light: id } }); },
@@ -1904,6 +1906,29 @@ function boot() {
   };
   hud.onLight(() => toggleLight(false));
   hud.onRecall(() => recallHome());
+  // ---------- 하늘색 자동차(도구점, actors/car.js): 버튼 또는 C 키로 언제든 타고 내린다(걷기의 두 배 빠르기) ----------
+  // 행동 버튼 · 휘두르기를 하면 내려서 그 일을 하고, 이야기 장면 · 다른 장면 · 쓰러짐처럼 걸어야 할 때는 저절로 내린다
+  /** 지금 차에 탄 채로 있어도 되는지(아니면 저절로 내린다). */
+  const carStay = () => mode === 'play' && !!state && !!player && !fainting && !downed && !sleeping && !recalling && !hunterExam && !resting && !pulling && !fishing && !glowTry && !sticker
+    && !funBusy() && !player.walkTo && !(visiting && (visiting.arriving || visiting.leaving));
+  function getOffCar(quiet = false) {
+    if (!player || !player.riding) return;
+    player.setRiding(false);
+    if (!quiet) sound.play('poof');
+  }
+  function toggleCar(fromKey) {
+    if (!state || mode !== 'play' || !player) return;
+    if (!hasTool(state, 'car')) { if (fromKey) hud.toast('자동차가 아직 없어요', 2200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.car.price)}` }] }); return; }
+    if (player.riding) { getOffCar(); return; }
+    if (!carStay() || panels.isOpen() || guide.open || talking) return;
+    // 차가 들어갈 자리: 좁은 곳이면 가까운 빈자리로 살짝 비켜 탄다(너무 멀면 못 탄다)
+    const p = player.position, at = village.nearestFree(p.x, p.z, CAR_RADIUS);
+    if (Math.hypot(at.x - p.x, at.z - p.z) > 1.2) { hud.toast('여기는 자동차를 꺼낼 자리가 없어요', 2200); return; }
+    player.placeAt(at.x, at.z);
+    player.setRiding(true);
+    sound.play('honk');
+  }
+  hud.onCar(() => toggleCar(false));
   // 퀘스트 쪽지 압정: 고정하면 접어도 늘 보이고 맨 위로(다시 누르면 풀기). 저장에 남는다
   hud.onQuestPin((id) => {
     if (!state || !QUESTS[id]) return;
@@ -1911,12 +1936,13 @@ function boot() {
     commit({ ...state, questPins: on ? pins.filter((x) => x !== id) : [...pins.filter((x) => isActive(state, x)), id] }); // 끝난 퀘스트 압정은 이참에 치운다
     sound.play('click');
   });
-  // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불, H 집으로(마을 밖에서)
+  // 키보드: I · B 주머니, E 마을폰(같은 키를 한 번 더 누르면 닫는다), F 등불, C 자동차, H 집으로(마을 밖에서)
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || (e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) return;
     if (e.code === 'KeyI' || e.code === 'KeyB') { if (panels.openKind() === 'bag') panels.close(); else openBag(); }
     else if (e.code === 'KeyE') { if (panels.isPhone()) panels.close(); else openPhone(); }
     else if (e.code === 'KeyF') toggleLight(true);
+    else if (e.code === 'KeyC') toggleCar(true);
     else if (e.code === 'KeyH') recallHome();
   });
   // ---------- 집으로: 마을 밖에서 토벌하다가 커튼 한 번에 집 앞으로(친구 마을이면 친구네 집 앞) ----------
@@ -2665,6 +2691,8 @@ function boot() {
     if (panels.isOpen() || fainting) return;
     if (downed) { giveUpDown(); return; } // 쓰러져 있을 때 행동 버튼: 그만 기다리기
     if (pulling) return;
+    // 자동차에 탄 채 행동 버튼: 내려서 그 일을 한다(할 일이 없으면 내리기만)
+    if (player.riding) { getOffCar(); if (!target && !(weaponNow() && !visiting)) return; }
     // 대상이 없어도 무기를 들고 있으면 허공에 휘두른다
     if (!target) { if (weaponNow() && !visiting) doSwing(); return; } // 친구 마을에서는 무기를 휘두르지 않는다(대상도 풀 · 열매 · 가게만)
     if (target.type === 'attack') doSwing();
@@ -3528,6 +3556,7 @@ function boot() {
   function doSwing(aim) {
     const id = weaponNow();
     if (!id || swingCool > 0 || player.swinging || fainting || downed || fishing) return; // 낚시 중에는 휘두르지 않는다
+    if (player.riding) getOffCar(); // 차에서는 못 휘두른다: 내려서 휘두른다
     const W = WEAPONS[id], p = player.position;
     let near = monsters.nearest(p.x, p.z, W.range + 1.2);
     if (aim) {
@@ -6382,6 +6411,8 @@ function boot() {
       islandPlay: (from) => { if (!islandTrip.active) islandTrip.play({ from, done: () => hud.toast('테스트: 섬 끝', 2400) }); },
       pit: () => ({ spot: pit.spot, front: pit.front, phase: hachiPit.phase, open: pit.open }),
       action: (down) => input.setAction(down),
+      /** 하늘색 자동차 타기 · 내리기(가지고 있어야 탄다) → 지금 탔는지. */
+      drive: (on) => { if (on && !player.riding) toggleCar(false); else if (!on && player.riding) getOffCar(); return player.riding; },
       drawCalls: () => gfx.renderer.info.render.calls,
       /** 렌더 통계(최적화 확인용): 그리기 호출 · 삼각형 · 기하 · 텍스처 · 셰이더 수. */
       renderInfo: () => { const I = gfx.renderer.info; return { calls: I.render.calls, triangles: I.render.triangles, geometries: I.memory.geometries, textures: I.memory.textures, programs: I.programs ? I.programs.length : 0 }; },
@@ -6735,6 +6766,9 @@ function boot() {
     remotes.update(dt, (mode === 'play' || (mode === 'intro' && !!visiting)) && !closeup); // 친구 마을로 걸어 들어갈 때도 와 있는 친구들이 보인다
     updateRemoteLights();
     hud.setRecall(canRecall()); // 마을 밖에 있을 때만 집으로 버튼
+    // 하늘색 자동차: 걸어야 할 때(이야기 · 다른 장면 · 쓰러짐 · 앉아 쉬기 …)는 저절로 내리고, 버튼은 차가 있을 때만(타고 있으면 눌린 모양)
+    if (player && player.riding && !carStay()) getOffCar(true);
+    hud.setCar(mode === 'play' && state && hasTool(state, 'car') ? (player && player.riding ? 'on' : 'off') : null);
     hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)

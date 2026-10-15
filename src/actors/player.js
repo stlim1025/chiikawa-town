@@ -1,4 +1,5 @@
 import { animateChibi } from './models.js';
+import { buildCar, rollCar, DRIVE_LIFT, CAR_SPEED, CAR_RADIUS } from './car.js';
 import { groundY } from '../core/layout.js';
 
 const SPEED = 3.2;
@@ -16,6 +17,7 @@ export function createPlayer(scene, chibi, village) {
   let swingT = 0, hurtT = 0, blinkT = 0, swingStyle = 'swing'; // swingStyle: 'swing'(내리치기) | 'thrust'(찌르기)
   let eatT = 0, eatDur = 1, eatMode = null, food = null; // 먹는 중: 몸짓('slurp' | 'gulp' | 'nibble') · 손에 든 음식 꼬리표('f-…')
   let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
+  let riding = false, car = null; // 하늘색 자동차(actors/car.js)에 탔는지 · 차 모형(캐릭터 뿌리에 붙인다 — 깜빡이거나 숨으면 같이)
   const knock = { x: 0, z: 0 };
   // 먹는 동안은 음식만 든다(무기 · 손전등은 잠깐 넣어 둔다)
   let heldTags = ''; // 지금 보이는 소품 꼬리표(쉼표로) — 같이 놀기에서 다른 사람 화면에도 같게
@@ -56,7 +58,19 @@ export function createPlayer(scene, chibi, village) {
       scene.remove(model.root);
       model = next;
       scene.add(model.root);
+      if (car) model.root.add(car.root); // 탄 차는 새 모형으로 옮겨 태운다
       showHeld();
+    },
+    /** 하늘색 자동차에 탔는지. */
+    get riding() { return riding; },
+    /** 자동차에 타거나(on) 내린다. 차 모형은 처음 탈 때 만든다. 걷기 · 맞기 · 먹기 몸짓은 그만둔다. */
+    setRiding(on) {
+      on = !!on;
+      if (on === riding) return;
+      riding = on;
+      if (on && !car) { car = buildCar(); model.root.add(car.root); }
+      if (car) car.root.visible = on;
+      stopEat(); actT = 0; swingT = 0;
     },
     /** 손에 드는 불 'lantern' | 'flashlight' | null. 모델을 바꿔도 유지한다. */
     setHeld(tag) { if (held === tag) return; held = tag; showHeld(); },
@@ -88,6 +102,8 @@ export function createPlayer(scene, chibi, village) {
     update(dt, input) {
       t += dt;
       let moving = false;
+      // 자동차에 타면 두 배 빠르고, 차 크기만큼 넓게 부딪힌다(집 · 나무에 파묻히지 않게)
+      const speed = riding ? CAR_SPEED : SPEED, rad = riding ? CAR_RADIUS : RADIUS, sx = position.x, sz = position.z;
       if (api.walkTo) {
         // 연출: 목표까지 충돌 검사 없이 걷는다
         const w = api.walkTo, dx = w.x - position.x, dz = w.z - position.z, d = Math.hypot(dx, dz);
@@ -102,7 +118,7 @@ export function createPlayer(scene, chibi, village) {
       }
       // 맞아서 밀려나는 중이면 조작이 잠깐 안 먹는다
       if (Math.abs(knock.x) + Math.abs(knock.z) > 0.05) {
-        const p = village.move(position.x, position.z, position.x + knock.x * dt, position.z + knock.z * dt, RADIUS);
+        const p = village.move(position.x, position.z, position.x + knock.x * dt, position.z + knock.z * dt, rad);
         position.x = p.x; position.z = p.z;
         const damp = Math.exp(-dt * 10);
         knock.x *= damp; knock.z *= damp;
@@ -114,16 +130,17 @@ export function createPlayer(scene, chibi, village) {
       if (len > 0.12) {
         const dx = v.x / Math.hypot(v.x, v.y), dz = -v.y / Math.hypot(v.x, v.y);
         const pace = swingT > 0 ? SWING_SLOW : 1;
-        const step = SPEED * len * pace * dt, ox = position.x, oz = position.z;
+        const step = speed * len * pace * dt, ox = position.x, oz = position.z;
         // 막혀도 장애물을 따라 미끄러지며 간다(가로등 · 건물 모서리에 살짝 걸려도 멈추지 않게)
-        const p = village.move(position.x, position.z, position.x + dx * step, position.z + dz * step, RADIUS);
+        const p = village.move(position.x, position.z, position.x + dx * step, position.z + dz * step, rad);
         position.x = p.x; position.z = p.z;
         moving = Math.hypot(position.x - ox, position.z - oz) > step * 0.25; // 벽에 막혀 제자리면 걷는 몸짓을 하지 않는다
         const want = Math.atan2(dx, dz);
         let d = want - yaw;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
-        yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
+        const turn = riding ? 7 : 10; // 차는 조금 천천히 돈다
+        yaw += Math.max(-dt * turn, Math.min(dt * turn, d));
         if (moving) phase += dt * SPEED * len * pace * 3.2;
       }
       api.cheerTime = Math.max(0, api.cheerTime - dt);
@@ -132,15 +149,16 @@ export function createPlayer(scene, chibi, village) {
       hurtT = Math.max(0, hurtT - dt);
       if (eatT > 0) { eatT = Math.max(0, eatT - dt); if (eatT === 0) stopEat(); }
       actT = Math.max(0, actT - dt);
-      const mode = api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : eatT > 0 ? eatMode : actT > 0 ? actMode : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
-      api.anim = mode; // 지금 몸짓(같이 놀기에서 다른 사람에게 보낸다)
-      // 풀 뽑기 · 춤 · 만세 중에는 무기를 넣어 둔다(손이 풀 · 머리에 박히지 않게)
-      const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer');
+      const mode = riding ? 'drive' : api.mode === 'pull' ? 'pull' : hurtT > 0 ? 'hurt' : swingT > 0 ? swingStyle : eatT > 0 ? eatMode : actT > 0 ? actMode : api.danceTime > 0 ? 'dance' : api.cheerTime > 0 ? 'cheer' : moving ? 'walk' : 'idle';
+      api.anim = mode; // 지금 몸짓(같이 놀기에서 다른 사람에게 보낸다 — 'drive' 면 그 사람 화면에도 차가 보인다)
+      // 풀 뽑기 · 춤 · 만세 · 운전 중에는 무기를 넣어 둔다(손이 풀 · 머리 · 핸들에 박히지 않게)
+      const show = !(mode === 'pull' || mode === 'dance' || mode === 'cheer' || mode === 'drive');
       if (show !== weaponShown) { weaponShown = show; showHeld(); }
       // 맞은 뒤 무적 시간에는 깜빡인다
       if (blinkT > 0) { blinkT = Math.max(0, blinkT - dt); model.root.visible = blinkT === 0 || Math.floor(blinkT * 14) % 2 === 0; }
-      model.root.position.set(position.x, groundY(position.x, position.z) + (api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로
+      model.root.position.set(position.x, groundY(position.x, position.z) + (riding ? DRIVE_LIFT : api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로(차에 타면 의자 높이)
       model.root.rotation.y = yaw;
+      if (riding && car) rollCar(car, Math.hypot(position.x - sx, position.z - sz), t);
       animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0, moving, eat: eatT > 0 ? 1 - eatT / eatDur : undefined });
     }
   };

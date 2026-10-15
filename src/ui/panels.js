@@ -1231,6 +1231,14 @@ export function createPanels(ui, handlers) {
         out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', ROD_ART), h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, T.note)),
           own ? h('span', { class: 'lic-badge done' }, ico('check'), '가지고 있음') : priceBtn(T.price, s.money, after(() => handlers.buyTool('rod')))));
       }
+      // 하늘색 자동차(actors/car.js): 사면 화면 오른쪽 위 자동차 버튼(C)으로 언제든 타고 내린다
+      {
+        const T = TOOLS.car, own = hasTool(s, 'car');
+        const CAR_ART = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 28q-1-7 6-8.5l3.5-6.5q6.5-6.5 13 0l3.5 6.5q7 1.5 6 8.5z" fill="#b8d6f2" stroke="#5a4431" stroke-width="2" stroke-linejoin="round"/><path d="M15 19.5l2.4-4.4q2.6-2.2 5.2 0l2.4 4.4z" fill="#eef7ff" stroke="#5a4431" stroke-width="1.4" stroke-linejoin="round"/><path d="M20 9V6.5" stroke="#5a4431" stroke-width="1.4"/><circle cx="20" cy="5" r="2.4" fill="#f7a3c0" stroke="#5a4431" stroke-width="1.2"/><circle cx="20" cy="5" r=".9" fill="#ffe066"/><circle cx="11.5" cy="29.5" r="4" fill="#5b5e67" stroke="#5a4431" stroke-width="1.8"/><circle cx="28.5" cy="29.5" r="4" fill="#5b5e67" stroke="#5a4431" stroke-width="1.8"/><circle cx="11.5" cy="29.5" r="1.5" fill="#fff"/><circle cx="28.5" cy="29.5" r="1.5" fill="#fff"/><path d="M31 22.5q1.2 1 2.4 0" fill="none" stroke="#5a4431" stroke-width="1.2" stroke-linecap="round"/><circle cx="34" cy="25" r="1.4" fill="#f6a9bd"/></svg>';
+        out.push(h('h3', { class: 'shop-sec' }, '탈것'));
+        out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', CAR_ART), h('div', {}, h('div', { class: 't' }, T.name), h('div', { class: 'd' }, own ? '화면 오른쪽 위 자동차 버튼(C 키)으로 언제든 타고 내려요' : T.note)),
+          own ? h('span', { class: 'lic-badge done' }, ico('check'), '가지고 있음') : priceBtn(T.price, s.money, after(() => handlers.buyTool('car')))));
+      }
       // 산소 표백제(사이드스토리 '검은 별똥별'에서 찾아야 할 때만 판다)
       const bleach = handlers.bleachShop?.();
       if (bleach) {

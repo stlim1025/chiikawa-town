@@ -264,7 +264,9 @@ export function createSound(storage) {
     bell: () => [0, 0.75, 1.5].forEach((st) => { tone({ freq: 392, type: 'sine', start: st, dur: 1.5, vol: 0.13, attack: 0.004 }); tone({ freq: 784, type: 'sine', start: st, dur: 1.1, vol: 0.05 }); tone({ freq: 1180, type: 'triangle', start: st, dur: 0.5, vol: 0.03 }); }),
     can: () => { tone({ freq: 1900, slideTo: 1500, type: 'square', dur: 0.05, vol: 0.05 }); noise({ dur: 0.06, vol: 0.08, freq: 4200, q: 3 }); },
     // 하치와레의 카메라: 셔터가 열리고 닫히는 찰-칵(짧은 딸깍 둘)
-    shutter: () => { noise({ dur: 0.03, vol: 0.14, freq: 3400, q: 1.4 }); tone({ freq: 1700, slideTo: 1100, type: 'square', dur: 0.025, vol: 0.03 }); noise({ start: 0.08, dur: 0.045, vol: 0.12, freq: 2300, q: 1.2 }); }
+    shutter: () => { noise({ dur: 0.03, vol: 0.14, freq: 3400, q: 1.4 }); tone({ freq: 1700, slideTo: 1100, type: 'square', dur: 0.025, vol: 0.03 }); noise({ start: 0.08, dur: 0.045, vol: 0.12, freq: 2300, q: 1.2 }); },
+    // 하늘색 자동차에 탈 때: 빵빵(낮은 두 음을 겹쳐 짧게 두 번)
+    honk: () => [0, 0.17].forEach((st) => { tone({ freq: 392, type: 'square', start: st, dur: 0.12, vol: 0.05 }); tone({ freq: 494, type: 'square', start: st, dur: 0.12, vol: 0.04 }); })
   };
 
   // ---------- 배경음악 ----------

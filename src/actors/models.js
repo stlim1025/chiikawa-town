@@ -1198,6 +1198,7 @@ export const SEAT_LIFT = 0.42;
  * 자세를 잡는다. mode: 'idle' | 'walk' | 'pull' | 'cheer' | 'talk' | 'sweep' | 'train' | 'read' | 'drink' | 'dance'
  *   | 'swing' | 'thrust' | 'hurt'(내 캐릭터) | 쉬기 · 놀기 몸짓: 'wave' 손 흔들기 · 'clap' 박수 · 'stretch' 기지개 · 'look' 두리번
  *   · 'sway' 흥얼흥얼 · 'hop' 깡충 · 'spin' 빙글 · 'sit' 앉기 · 'bench' 벤치 · 의자에 앉기 · 'fish' 낚시(낚싯대 소품) · 'think' 갸웃 · 'shy' 부끄부끄 · 'pose' 귀여운 척 · 'gaze' 하늘 보기 · 'lean' 계산대에 기대기
+ *   · 'drive' 자동차 운전(핸들 잡기 — 몸을 올리는 높이는 actors/car.js 의 DRIVE_LIFT)
  *   · 먹기: 'slurp' 그릇 들고 후루룩 · 'gulp' 잔 들고 꿀꺽 · 'nibble' 두 손으로 냠냠(eatmotion.js)
  *   · 별똥별맨 소동: 'pray' 두 손 모아 소원 빌기 · 'flail' 팔다리를 마구 휘두르며 발광 · 우사기 클럽: 'dj' 도토리를 나뭇잎으로 끽끽
  *   · 파자마 파티즈 무대: 'idol' 아이돌 춤(8박 안무) · 'idolSing' 노래하며 춤 · 'glow' 응원봉 흔들기 — 셋 다 opts.beat(곡 박 번호)에 맞춘다
@@ -1347,6 +1348,12 @@ function basePose(mode, t, opts) {
     a.armL = [-0.6, 0, 0.12]; a.armR = [-0.6, 0, -0.12];
     a.head = [0.04 + Math.sin(t * 1.3 + phase) * 0.03, Math.sin(t * 0.6 + phase) * 0.3, 0];
     lean = -0.04; legs = 1.5;
+  } else if (mode === 'drive') {
+    // 하늘색 자동차 운전(actors/car.js): 의자에 앉아 다리는 앞으로, 두 손은 앞으로 뻗어 핸들을 잡고 살짝 좌우로 돌린다
+    const turn = Math.sin(t * 1.7 + phase) * 0.08;
+    a.legL = [-1.35, 0, 0.08]; a.legR = [-1.35, 0, -0.08];
+    a.armL = [-1.2, 0, 0.32 + turn]; a.armR = [-1.2, 0, -0.32 + turn];
+    a.head = [0.02 + Math.sin(t * 1.3 + phase) * 0.03, Math.sin(t * 0.5 + phase) * 0.12, 0];
   } else if (mode === 'fish') {
     // 낚시(친구들): 오른손에 낚싯대를 앞으로 내밀고 찌를 바라본다. 가끔 입질에 대 끝이 들썩, 왼손은 줄을 잡는다
     const twitch = Math.max(0, Math.sin(t * 0.9 + phase * 3)) ** 8 * 0.14;

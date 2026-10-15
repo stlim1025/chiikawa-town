@@ -1,15 +1,17 @@
 import { trySpend } from './state.js';
 
 /**
- * 도구: 마을 지도(카니 헌책방), 랜턴 · 손전등 · 낚싯대(도구점). 불은 하나만 들고, 화면 버튼으로 끔 → 랜턴 → 손전등을 바꾼다.
- * 낚싯대가 있으면 물가에서 '낚시하기'(core/fishing.js).
+ * 도구: 마을 지도(카니 헌책방), 랜턴 · 손전등 · 낚싯대 · 하늘색 자동차(도구점). 불은 하나만 들고, 화면 버튼으로 끔 → 랜턴 → 손전등을 바꾼다.
+ * 낚싯대가 있으면 물가에서 '낚시하기'(core/fishing.js). 자동차가 있으면 화면 버튼(C)으로 언제든 타고 내린다(탄 채로는 저장하지 않는다).
  * state.tools = { owned: [도구 id], light: 'off' | 'lantern' | 'flashlight' }
  */
 export const TOOLS = {
   map: { name: '마을 지도', price: 300, shop: 'books', note: '다녀온 곳이 다 보여요' }, // 처음부터 부담 없이 사게(예전 500원 → 200원 → 300원)
   lantern: { name: '랜턴', price: 300, shop: 'tools', light: true, note: '내 둘레를 밝혀요' },
   flashlight: { name: '손전등', price: 900, shop: 'tools', light: true, note: '둘레는 넓게, 앞은 멀리 밝혀요' },
-  rod: { name: '낚싯대', price: 600, shop: 'tools', note: '물가에서 낚시해요. 물마다 잡히는 고기가 달라요' }
+  rod: { name: '낚싯대', price: 600, shop: 'tools', note: '물가에서 낚시해요. 물마다 잡히는 고기가 달라요' },
+  // 원작에서 랏코가 타고 다니는 하늘색 자동차(얼굴 · 지붕 꽃). 값 · 빠르기 · 도구점에서 파는 것은 게임에서 정했다(actors/car.js)
+  car: { name: '하늘색 자동차', price: 30000, shop: 'tools', ride: true, note: '랏코가 타는 것과 같은 자동차예요. 걷는 것보다 두 배 빨라요' }
 };
 export const LIGHT_ORDER = ['off', 'lantern', 'flashlight'];
 

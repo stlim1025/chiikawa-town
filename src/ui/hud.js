@@ -27,6 +27,8 @@ const LIGHT_ICON = {
   // 켜면 버튼이 노래지니 빛줄기는 흰색에 노란 테두리(배경에 묻히지 않게)
   flashlight: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M25 13.5l13-6.5v26l-13-6.5z" fill="#fffdf0" stroke="#e8a23a" stroke-width="1.8" stroke-linejoin="round"/><path d="M29 16.5l6-2M29 23.5l6 2" stroke="#ffd45e" stroke-width="1.8" stroke-linecap="round"/><rect x="2.5" y="14.5" width="16" height="11" rx="4" fill="#7fc4e8" stroke="#5a4431" stroke-width="2.4"/><path d="M18 12h5a2.5 2.5 0 0 1 2.5 2.5v11a2.5 2.5 0 0 1-2.5 2.5h-5z" fill="#4f9cc9" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><circle cx="9.5" cy="20" r="2.4" fill="#fff" stroke="#5a4431" stroke-width="1.4"/><path d="M5.5 17.2h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/></svg>'
 };
+/** 자동차 버튼 그림: 하늘색 자동차(actors/car.js) 옆모습 — 둥근 지붕 위 분홍 꽃, 창 하나, 바퀴 둘, 분홍 볼. */
+const CAR_ICON = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 27q-1-7 6-8l3-6q6-6 12 0l3 6q7 1 6 8z" fill="#b8d6f2" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><path d="M15.5 18.5l2-4q2.5-2 5 0l2 4z" fill="#eef7ff" stroke="#5a4431" stroke-width="1.6" stroke-linejoin="round"/><path d="M20 9V7" stroke="#5a4431" stroke-width="1.6"/><circle cx="20" cy="5.5" r="2.4" fill="#f7a3c0" stroke="#5a4431" stroke-width="1.4"/><circle cx="12" cy="28.5" r="4.2" fill="#5b5e67" stroke="#5a4431" stroke-width="2"/><circle cx="28" cy="28.5" r="4.2" fill="#5b5e67" stroke="#5a4431" stroke-width="2"/><circle cx="12" cy="28.5" r="1.6" fill="#fff"/><circle cx="28" cy="28.5" r="1.6" fill="#fff"/><circle cx="31.5" cy="23" r="1.6" fill="#f6a9bd"/></svg>';
 /** 집으로 버튼 그림: 마을의 하얀 동그란 내 집(분홍 문 · 둥근 창). 납작한 돔이라 그림 칸(viewBox)을 돔 쪽으로 옮겨 버튼 가운데에 오게. */
 const HOME_ICON = '<svg viewBox="2 8 36 36" aria-hidden="true"><path d="M5 33a15 15 0 0 1 30 0z" fill="#fff8ea" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 26q3-5 9-6.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.9"/><path d="M17 33v-5.5a3.5 3.5 0 0 1 7 0v5.5" fill="#f2a7bb" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><circle cx="27.5" cy="25.5" r="2.8" fill="#bfe3f2" stroke="#5a4431" stroke-width="1.8"/><path d="M3 33h34" stroke="#5a4431" stroke-width="2.4" stroke-linecap="round"/><path d="M33.5 33c0-2.5 1-4.2 3-5" fill="none" stroke="#6fb15a" stroke-width="2.2" stroke-linecap="round"/></svg>';
 
@@ -192,7 +194,12 @@ export function createHud(ui, input) {
   recallBtn.hidden = true;
   recallBtn.title = '집으로 (H)';
   recallBtn.setAttribute('aria-label', '집으로 돌아가기');
-  zoom.append(lightBtn, recallBtn);
+  // 하늘색 자동차: 가지고 있을 때만(타고 있으면 눌린 모양)
+  const carBtn = el('button', 'icon-btn hud-car', CAR_ICON);
+  carBtn.type = 'button';
+  carBtn.hidden = true;
+  carBtn.title = '자동차 (C)';
+  zoom.append(lightBtn, carBtn, recallBtn);
   const action = el('button', 'hud-action');
   action.type = 'button';
   action.hidden = true;
@@ -323,6 +330,16 @@ export function createHud(ui, input) {
     onLight(fn) { lightBtn.addEventListener('click', fn); },
     /** 집으로 버튼을 누르면. */
     onRecall(fn) { recallBtn.addEventListener('click', fn); },
+    /** 자동차 버튼을 누르면(타기 · 내리기). */
+    onCar(fn) { carBtn.addEventListener('click', fn); },
+    /** 자동차 버튼 모양: null 숨김(차가 없거나 못 탈 때) · 'off' 내려 있음 · 'on' 타고 있음. */
+    setCar(mode) {
+      carBtn.hidden = mode == null;
+      if (mode == null || shown.car === mode) return;
+      shown.car = mode;
+      carBtn.setAttribute('aria-pressed', String(mode === 'on'));
+      carBtn.setAttribute('aria-label', mode === 'on' ? '자동차에서 내리기' : '자동차 타기');
+    },
     /** 퀘스트 쪽지의 압정(고정)을 누르면 fn(퀘스트 id). */
     onQuestPin(fn) { questPinFns.push(fn); },
     /** 「외 N개」(시계 위까지 다 못 들어간 퀘스트 쪽지)를 눌렀을 때. */

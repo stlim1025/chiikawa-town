@@ -1,4 +1,5 @@
 import { buildChibi, animateChibi, SEAT_LIFT } from '../actors/models.js';
+import { buildCar, rollCar, DRIVE_LIFT } from '../actors/car.js';
 import { groundY } from '../core/layout.js';
 
 /**
@@ -6,8 +7,10 @@ import { groundY } from '../core/layout.js';
  * 머리 위에 이름표와 한마디 말풍선을 띄운다. 마을에 있을 때만 보인다(집 안 · 다른 장면이면 숨긴다).
  */
 
-/** 그대로 따라 할 몸짓(그 밖은 서 있기로). swing · thrust: 같이 토벌할 때 휘두르기, faint: 쓰러져 깨워 주길 기다린다. */
-const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'bench', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze', 'swing', 'thrust', 'faint']);
+/** 그대로 따라 할 몸짓(그 밖은 서 있기로). swing · thrust: 같이 토벌할 때 휘두르기, faint: 쓰러져 깨워 주길 기다린다, drive: 하늘색 자동차를 탄다(차도 같이 그린다). */
+const ANIMS = new Set(['idle', 'walk', 'pull', 'cheer', 'dance', 'hurt', 'slurp', 'gulp', 'nibble', 'pray', 'wave', 'clap', 'hop', 'sit', 'bench', 'stretch', 'look', 'sway', 'spin', 'think', 'shy', 'pose', 'gaze', 'swing', 'thrust', 'faint', 'drive']);
+/** 받은 자리 사이를 앞질러 그리는 몸짓(움직이는 중): 걷기 · 자동차. */
+const MOVING = new Set(['walk', 'drive']);
 /** 한마디 말풍선이 떠 있는 시간(초). */
 const SAY_SEC = 3.5;
 /** 받은 위치와 이만큼 넘게 떨어져 있으면 따라가지 않고 바로 옮긴다(순간 이동 · 다시 접속). */
@@ -52,6 +55,7 @@ export function createRemotePlayers(scene, area = 'village') {
     try { chibi = buildChibi(look || {}); } catch { return; } // 모르는 모습이면 지금 모습 그대로
     scene.remove(p.chibi.root);
     chibi.root.visible = p.chibi.root.visible;
+    if (p.car) chibi.root.add(p.car.root); // 탄 차는 새 모습으로 옮겨 태운다
     p.chibi = chibi;
     p.lookKey = key;
     p.shownHeld = null; // 새 캐릭터에도 든 것을 다시 쥐여 준다
@@ -69,8 +73,8 @@ export function createRemotePlayers(scene, area = 'village') {
     if (!p) return;
     const now = performance.now(), gap = p.at ? (now - p.at) / 1000 : 0;
     if (Math.hypot(m.x - p.x, m.z - p.z) > SNAP) { p.x = m.x; p.z = m.z; }
-    // 걷는 중이면 지난 자리에서 온 빠르기를 재 둔다(멈췄거나 소식 사이가 너무 길면 0)
-    if (m.anim === 'walk' && gap > 0.02 && gap < 0.4 && Math.hypot(m.x - p.tx, m.z - p.tz) < SNAP) {
+    // 걷는 중(차를 타고 달리는 중)이면 지난 자리에서 온 빠르기를 재 둔다(멈췄거나 소식 사이가 너무 길면 0)
+    if (MOVING.has(m.anim) && gap > 0.02 && gap < 0.4 && Math.hypot(m.x - p.tx, m.z - p.tz) < SNAP) {
       p.vx = (m.x - p.tx) / gap;
       p.vz = (m.z - p.tz) / gap;
       const v = Math.hypot(p.vx, p.vz);
@@ -110,8 +114,11 @@ export function createRemotePlayers(scene, area = 'village') {
       p.t += dt;
       p.animT = (p.animT || 0) + dt;
       p.phase += Math.hypot(p.x - ox, p.z - oz) * 3.2; // 걸음은 실제로 움직인 만큼(내 캐릭터와 같은 비율)
-      const anim = p.emoteT > 0 ? p.emote : ANIMS.has(p.anim) ? p.anim : 'idle';
-      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로
+      const drive = p.anim === 'drive', anim = drive ? 'drive' : p.emoteT > 0 ? p.emote : ANIMS.has(p.anim) ? p.anim : 'idle'; // 차에 탄 동안은 몸짓을 바꾸지 않는다
+      // 하늘색 자동차: 처음 탈 때 차를 만들어 캐릭터 뿌리에 붙이고, 내리면 숨긴다
+      if (drive && !p.car) { p.car = buildCar(); p.chibi.root.add(p.car.root); }
+      if (p.car) { p.car.root.visible = drive; if (drive) rollCar(p.car, Math.hypot(p.x - ox, p.z - oz), p.t); }
+      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : drive ? DRIVE_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로, 차에 탔으면 의자 높이로
       p.chibi.root.rotation.y = p.yaw;
       const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
       showHeld(p);
