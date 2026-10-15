@@ -14,7 +14,7 @@ import { WORKS, WORK_IDS, WORK_STEP, workOf, workStatus, leftOf, fundWork } from
  * 모으는 동안은 라멘값도 아낀다(brain.js 의 wantsMeal: 배고플 때만 사 먹고, 같이 먹자고 불려도 그때만 낸다).
  * 토벌 자격증 · 술 자격은 돈이 모이면 검정소에서 시험을 보고(붙어야 다음 목표로), 나머지는 값이 모이면 그곳(goalPlace)에 가서 산다.
  * 산 무기는 토벌 힘이 되고(npcPower), 마을 가꾸기에 보탠 돈은 내가 내는 모금함과 같은 곳에 모인다(core/works.js). 모몽가는 일하지 않고 훔친다.
- * 랏코는 원작처럼 처음부터 하늘색 자동차가 있다(START_OWN).
+ * 처음부터 가진 것(START_OWN): 랏코는 원작처럼 하늘색 자동차, 쿠리만쥬는 술 자격(위스키 강의를 하는 술꾼).
  * state.villagers[kind].bought = [이룬 목표 id], .weapon = 산 무기 id, .liquorDay · .liquorTries = 술 자격 시험을 마지막으로 본 날 · 본 횟수
  */
 const license = () => ({ id: 'license', kind: 'license', label: LICENSES.hunter.name, cost: LICENSES.hunter.fee });
@@ -25,8 +25,11 @@ export const CAMERA_PRICE = 500;
 const camera = () => ({ id: 'camera', kind: 'camera', label: '카메라', cost: CAMERA_PRICE, story: 'hachiCamera' });
 /** 낚싯대(게임 오리지널): 도구점에서 사면 쉬는 틈에 물가에서 낚시하고, 노동 접수 낚시 일감도 받는다(hasRod). */
 const rod = () => ({ id: 'rod', kind: 'rod', item: 'rod', label: TOOLS.rod.name, cost: TOOLS.rod.price });
-/** 처음부터 가진 것: 랏코의 하늘색 자동차(원작에서 랏코만 가진 차). 마을 밖 먼 길을 차로 다닌다(마을 안은 걸어서, actors/npcs.js 의 setCar). */
-const START_OWN = { rakko: ['car'] };
+/**
+ * 처음부터 가진 것(모으는 목표가 아니다): 랏코의 하늘색 자동차(원작에서 랏코만 가진 차, 마을 밖 먼 길을 차로 다닌다 — actors/npcs.js 의 setCar),
+ * 쿠리만쥬의 술 자격(나에게 위스키 강의를 해 주는 술꾼이라 이미 있다).
+ */
+const START_OWN = { rakko: ['car'], kurimanju: ['liquor'] };
 
 export const GOALS = {
   chiikawa: [license(), weapon('fork'), furniture('doll'), furniture('lamp'), weapon('sword')],
@@ -41,7 +44,7 @@ export const GOALS = {
  * 차례 목표를 다 이룬 뒤 바라는 것(게임 오리지널). pochette · furniture · wall · floor: 사고 싶은 것들(차례는 없다).
  * like: 종류마다 좋아하는 정도. 다음 목표는 '값 ÷ 좋아하는 정도'가 가장 작은 것이라 싼 것부터 사고, 좋아하는 것은 조금 비싸도 먼저 산다.
  * 종류: pochette 포셰트 · furniture 가구 · decor 벽지와 바닥 · home 집 넓히기(넓은 방 → 큰 방) · donate 마을 가꾸기 보태기 · liquor 술 자격 · weapon 더 센 무기.
- * like 에 없는 종류는 바라지 않는다(쿠리만쥬는 위스키 강의를 하는 쪽이라 술 자격을 바라지 않는다).
+ * like 에 없는 종류와 처음부터 가진 것(START_OWN: 쿠리만쥬의 술 자격)은 바라지 않는다.
  */
 export const WISHES = {
   chiikawa: { pochette: ['strawberry', 'lemon'], furniture: ['cushion', 'plant', 'rug'], wall: ['pink'], floor: ['pink'],
@@ -67,6 +70,8 @@ const owns = (state, kind, id) => (START_OWN[kind] || []).includes(id) || bought
 export const hasRod = (state, kind) => owns(state, kind, 'rod');
 /** 그 친구에게 하늘색 자동차가 있는지(랏코는 처음부터). */
 export const hasCar = (state, kind) => owns(state, kind, 'car');
+/** 그 친구에게 술 자격이 있는지(쿠리만쥬는 처음부터, 다른 친구는 검정소 시험에 붙으면). */
+export const hasLiquor = (state, kind) => owns(state, kind, 'liquor');
 /** 그 친구가 그 일감을 할 수 있는지: 도구가 드는 일감(낚시)은 그 도구를 샀을 때만. */
 export const canDoJob = (state, kind, id) => !JOB_TYPES[id] || JOB_TYPES[id].needTool !== 'rod' || hasRod(state, kind);
 
@@ -80,7 +85,7 @@ function wishes(state, kind) {
   const W = WISHES[kind];
   if (!W) return [];
   const bought = boughtOf(state, kind), out = [];
-  const add = (type, g, base = g.cost) => { if (W.like[type] && !bought.includes(g.id)) out.push({ goal: g, rank: base / W.like[type] }); };
+  const add = (type, g, base = g.cost) => { if (W.like[type] && !owns(state, kind, g.id)) out.push({ goal: g, rank: base / W.like[type] }); };
   for (const item of W.pochette || []) add('pochette', { id: `p-${item}`, kind: 'pochette', item, label: POCHETTES[item].name, cost: POCHETTES[item].price });
   for (const item of W.furniture || []) add('furniture', furniture(item));
   for (const item of W.wall || []) add('decor', { id: `wall-${item}`, kind: 'decor', part: 'wall', item, label: WALLPAPERS[item].name, cost: WALLPAPERS[item].price });

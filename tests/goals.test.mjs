@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GOALS, WISHES, DONATE_STEP, goalOf, canBuy, buyGoal, npcPower, hasCar, canTryLiquor, tryLiquor, goalNews, goalPlace, CAMERA_PRICE } from '../src/core/goals.js';
+import { GOALS, WISHES, DONATE_STEP, goalOf, canBuy, buyGoal, npcPower, hasCar, hasLiquor, canTryLiquor, tryLiquor, goalNews, goalPlace, CAMERA_PRICE } from '../src/core/goals.js';
 import { POCHETTES } from '../src/core/pochette.js';
 import { HOME_SIZES, WALLPAPERS, FLOORS } from '../src/core/home.js';
 import { WORKS, workOf, workStatus } from '../src/core/works.js';
@@ -42,6 +42,15 @@ test('랏코는 원작처럼 처음부터 하늘색 자동차가 있다(모으�
   assert.ok(Object.values(GOALS).every((list) => list.every((g) => g.kind !== 'car')), '차는 목표에 없다');
 });
 
+test('쿠리만쥬는 처음부터 술 자격이 있다(위스키 강의를 하는 술꾼). 다른 친구는 시험에 붙어야 생긴다', () => {
+  const s = fresh();
+  assert.ok(hasLiquor(s, 'kurimanju'), '새로 시작해도');
+  assert.ok(hasLiquor(withMoney(s, 'kurimanju', 10, { bought: ['f-stove'] }), 'kurimanju'), '예전 저장도');
+  for (const kind of Object.keys(VILLAGERS).filter((k) => k !== 'kurimanju')) assert.ok(!hasLiquor(s, kind), kind);
+  const passed = tryLiquor(withMoney(s, 'rakko', 1000), 'rakko', 1, () => 0);
+  assert.ok(passed.passed && hasLiquor(passed.state, 'rakko'), '붙으면 생긴다');
+});
+
 /** 돈을 넉넉히 주며 목표를 차례로 이뤄 본다(자격증 · 술 자격은 붙었다 치고). → 이룬 목표들 */
 function reach(kind, count, s0 = fresh()) {
   let s = s0;
@@ -78,7 +87,7 @@ test('차례 목표를 다 이뤄도 바라는 것(포셰트 · 가구 · 벽지
     const homes = got.filter((g) => g.kind === 'home').map((g) => g.item);
     assert.deepEqual(homes, [1, 2].slice(0, homes.length), `${kind} 집 넓히기 차례`);
   }
-  assert.ok(!WISHES.kurimanju.like.liquor, '쿠리만쥬는 위스키 강의를 하는 쪽이라 술 자격을 바라지 않는다');
+  assert.ok(!reach('kurimanju', 40).got.some((g) => g.kind === 'liquor'), '쿠리만쥬는 처음부터 술 자격이 있어 시험을 보지 않는다');
   assert.equal(goalOf(fresh(), 'momonga'), null, '모몽가는 여전히 훔친다');
 });
 
