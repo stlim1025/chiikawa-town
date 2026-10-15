@@ -912,13 +912,16 @@ export function createPanels(ui, handlers) {
     realty(s) {
       const hs = housingOf(s), day = s.clock.day;
       const out = [head('부동산', s.money)];
+      // 돈이 모자라면 얼마 더 모아야 하는지(값 버튼만 흐리게 두면 왜 못 사는지 안 보였다)
+      const short = (price) => (s.money < price ? h('div', { class: 'd short' }, `${won(price - s.money)} 더 모아야 해요`) : null);
       if (hs.own) {
         out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '내 집이에요!'), h('div', { class: 'd' }, '이제 집세를 내지 않아요'))));
         // 집 넓히기(core/home.js): 한 단계씩, 가구 놓을 칸이 늘어난다
         const home = homeOf(s), cur = gridOf(home), next = nextSize(home);
         out.push(h('div', { class: 'row pochette' }, svgSpan('pochette-art', ROOM_ART),
           h('div', {}, h('div', { class: 't' }, next ? `${josa(next.name, '으로/로')} 넓히기` : cur.name),
-            h('div', { class: 'd' }, next ? `가구 놓을 칸이 ${cur.cols * cur.rows}칸에서 ${next.cols * next.rows}칸으로 늘어요` : `가장 넓은 방이에요. 가구를 ${cur.cols * cur.rows}칸까지 놓아요`)),
+            h('div', { class: 'd' }, next ? `가구 놓을 칸이 ${cur.cols * cur.rows}칸에서 ${next.cols * next.rows}칸으로 늘어요` : `가장 넓은 방이에요. 가구를 ${cur.cols * cur.rows}칸까지 놓아요`),
+            next ? short(next.price) : null),
           next ? priceBtn(next.price, s.money, after(handlers.expandHome), 'btn pink') : h('span', { class: 'lic-badge done' }, ico('check'), '다 넓혔어요')));
       } else {
         const rentDay = handlers.dayLabel(handlers.nextDay(RENT_DAY));
@@ -938,7 +941,7 @@ export function createPanels(ui, handlers) {
         } else {
           // 지금 사는 집(빌린 집)과 집세
           out.push(h('div', { class: 'row' },
-            h('div', {}, h('div', { class: 't' }, '빌린 집'), h('div', { class: 'mon-chips' }, chip('coin', '', `집세 ${won(RENT)} / 주`), chip(null, '', `다음 ${rentDay}`))),
+            h('div', {}, h('div', { class: 't' }, '빌린 집'), h('div', { class: 'mon-chips' }, chip('coin', '', `일주일 집세 ${won(RENT)}`), chip('clock', '', `다음 집세 ${rentDay}`))),
             hs.unpaid > 0
               ? h('button', { class: 'btn primary', type: 'button', disabled: s.money < hs.unpaid, onClick: after(handlers.payRent) }, `밀린 집세 ${won(hs.unpaid)} 내기`)
               : null));
@@ -950,7 +953,7 @@ export function createPanels(ui, handlers) {
         }
         // 돈 모아 사기
         out.push(h('div', { class: 'row' },
-          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어지고 집을 넓힐 수 있어요')),
+          h('div', {}, h('div', { class: 't' }, '집 사기'), h('div', { class: 'd' }, '집세가 없어지고 집을 넓힐 수 있어요'), hs.unpaid > 0 ? null : short(HOUSE_PRICE)),
           hs.unpaid > 0 ? h('span', { class: 'lic-badge' }, '밀린 집세부터') : priceBtn(HOUSE_PRICE, s.money, after(handlers.buyHouse), 'btn pink')));
         // 청약
         const lot = hs.lottery;
@@ -964,8 +967,9 @@ export function createPanels(ui, handlers) {
         }
         const lotDesc = lot && lot.won
           ? h('div', { class: 'd' }, `당첨! ${handlers.dayLabel(lot.until)}까지`)
-          : chipLine(chip('clock', '', '수요일 발표'), chip('coin', '', `당첨되면 ${won(LOTTERY_PRICE)}`));
-        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '주택 청약'), lotDesc), lotRow));
+          : chipLine(chip('clock', '', '매주 수요일 발표'), chip('coin', '', `당첨되면 ${won(LOTTERY_PRICE)}`));
+        out.push(h('div', { class: 'row' }, h('div', {}, h('div', { class: 't' }, '주택 청약'),
+          lot && lot.won ? null : h('div', { class: 'd' }, '당첨되면 집을 싸게 살 수 있어요'), lotDesc), lotRow));
       }
       out.push(h('p', { class: 'note' }, `오늘은 ${handlers.dayLabel(day)}`));
       out.push(h('div', { class: 'actions' }, closeBtn()));
