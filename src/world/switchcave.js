@@ -147,7 +147,10 @@ export function holdSwitch(chibi, gadget, on) {
 /** 풍뎅이의 쩍 벌린 입(이빨) · 괴물의 날개를 켠다. */
 const showTag = (c, tag, on) => (c.props[tag] || []).forEach((m) => { m.visible = !!on; });
 
-/** 마을에서 나를 따라다니는 풍뎅이: 떨어지면 아장아장 쫓아오고, 가까우면 나를 바라본다. 너무 멀어지면(순간 이동) 옆에 나타난다. */
+/**
+ * 나를 따라다니는 풍뎅이: 떨어지면 아장아장 쫓아오고, 가까우면 나를 바라본다. 너무 멀어지면(순간 이동) 옆에 나타난다.
+ * 마을뿐 아니라 집 안(내 집 · 친구 방)에도 따라 들어온다: setScene 으로 지금 장면에 옮겨 붙는다.
+ */
 export function createBeetleBuddy(scene) {
   const c = buildNpc('beetle');
   c.root.scale.setScalar(BEETLE_SCALE);
@@ -165,15 +168,21 @@ export function createBeetleBuddy(scene) {
       c.root.visible = on;
       if (on && near) { pos.set(near.x + 0.7, 0, near.z + 0.5); yaw = 0; }
     },
+    /** 따라다니는 장면을 바꾼다(마을 · 내 집 · 친구 방): 다른 장면이면 그리로 옮겨 near(내 자리) 옆에 세운다. */
+    setScene(target, near) {
+      if (c.root.parent === target) return;
+      target.add(c.root);
+      if (near) { pos.set(near.x + 0.6, 0, near.z - 0.3); yaw = 0; }
+    },
     /** 하품: ω 입이 쩍 벌어져 뾰족한 이빨이 보인다. faceYaw 가 있으면 그동안 제자리에서 그쪽(카메라)을 본다. */
     yawn(v, faceYaw = null) { mouth = v ? 1 : 0; holdYaw = v ? faceYaw : null; showTag(c, 'teeth', v); },
     /** 기뻐서 폴짝. */
     jump() { hop = 0.6; },
-    /** hidden: 마을 화면이 아니면(다른 장면 · 집 안) 숨는다. */
-    update(dt, t, player, hidden) {
+    /** me: 내 자리 { x, z }, hidden: 숨을 때(이야기 장면 같은 다른 화면), indoor: 집 안(바닥 높이 0). */
+    update(dt, t, me, hidden, indoor = false) {
       c.root.visible = on && !hidden;
-      if (!on || hidden || !player) return;
-      const p = player.position, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
+      if (!on || hidden || !me) return;
+      const p = me, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
       if (holdYaw != null) { yaw = holdYaw; moving = false; } // 하품하는 동안은 제자리에서 카메라 쪽을
       else if (d > 14) { pos.set(p.x + 0.7, 0, p.z + 0.5); moving = false; } // 멀리 순간 이동했으면 옆에
       else if (d > 1.1) { // 떨어지면 쫓아온다(멀수록 빨리)
@@ -184,7 +193,7 @@ export function createBeetleBuddy(scene) {
       } else { moving = false; yaw += (Math.atan2(dx, dz) - yaw) * Math.min(1, dt * 3); } // 가까우면 나를 본다
       phase += dt * (moving ? 12 : 0);
       hop = Math.max(0, hop - dt);
-      c.root.position.set(pos.x, groundY(pos.x, pos.z) + Math.sin((hop / 0.6) * Math.PI) * 0.25, pos.z);
+      c.root.position.set(pos.x, (indoor ? 0 : groundY(pos.x, pos.z)) + Math.sin((hop / 0.6) * Math.PI) * 0.25, pos.z);
       c.root.rotation.y = yaw;
       animateChibi(c, moving ? 'walk' : mouth ? 'talk' : 'idle', t, { phase, hop: 0.1 });
     }

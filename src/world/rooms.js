@@ -253,6 +253,8 @@ export function createRooms() {
     },
     /** 내 캐릭터가 (x, z) 를 바라본다. */
     face(x, z) { yaw = Math.atan2(x - pos.x, z - pos.z); },
+    /** 방 안의 내 캐릭터 자리(따라다니는 풍뎅이가 쫓아온다). */
+    get playerPos() { return pos; },
     /** 집주인 머리 위(하트 · 말풍선 자리). */
     hostAnchor() { return { x: hostAt.x, y: host ? host.height + 0.5 : 1.5, z: hostAt.z }; },
     resize(aspect) {
