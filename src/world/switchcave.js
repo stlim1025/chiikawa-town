@@ -6,7 +6,7 @@ import { groundY } from '../core/layout.js';
 
 /**
  * 사이드스토리 '스위치'(원작 애니 시즌1 「스위치」 — stories/switch.js)의 장소와 장면.
- *  createSwitchFront: 바위산 북쪽 끝 절벽에 뚫린 동굴 입구(이야기를 받은 동안만). 둥근 입구가 창살로 막혀 있다.
+ *  createSwitchFront: 바위산 북쪽 끝 절벽에 늘 뚫려 있는 동굴 입구. 둥근 입구가 창살로 막혀 있다(이야기 속에서 연 뒤로는 열린 채).
  *  buildSwitchGadget · holdSwitch: 우사기가 주워 들고 다니는 스위치(하얀 상자에 빨간 버튼).
  *  createBeetleBuddy: 마을에서 나를 졸졸 따라다니는 풍뎅이(창살을 연 뒤부터 마지막 장면 전까지).
  *  createSwitchStage: 바위산 끝자락 절벽 앞 장면(우사기가 스위치를 누르면 창살이 올라가고 풍뎅이가 나온다 · 소풍 · 근육질 괴물로 커져 날아간다).
@@ -100,7 +100,7 @@ function buildCliffDoor() {
 }
 
 /**
- * 마을: 바위산 북쪽 끝 절벽(world/outdoors.js 가 큰 바위를 이어 붙인 맵 끝 절벽)에 뚫린 동굴 입구. 이야기를 받은 동안만 보인다.
+ * 마을: 바위산 북쪽 끝 절벽(world/outdoors.js 가 큰 바위를 이어 붙인 맵 끝 절벽)에 늘 뚫려 있는 동굴 입구(이야기와 상관없이 마을 지형).
  * 남쪽에서 북쪽으로 훑어 처음 막히는 곳을 절벽 면으로 보고 그 앞에 박는다. x 후보는 왕버섯 굴 협곡 · 하치와레 동굴과 떨어진 곳, 앞이 트인 첫 자리.
  * spot 은 그 앞에 서는 자리(길목을 막지 않게 길 가운데가 아닌 맵 끝 절벽에).
  */
@@ -116,8 +116,8 @@ export function createSwitchFront(scene, village) {
   }
   const door = buildCliffDoor();
   door.group.position.set(at.x, groundY(at.x, at.z), at.z);
-  door.group.visible = false;
   scene.add(door.group);
+  village.obstacles.push({ x: at.x, z: at.z - 0.5, r: 1.5 }); // 절벽 앞으로 나온 입구 둘레 돌에 부딪힌다
   return {
     spot: { x: at.x, z: at.z + 2.4 },
     get visible() { return door.group.visible; },
@@ -147,9 +147,54 @@ export function holdSwitch(chibi, gadget, on) {
 /** 풍뎅이의 쩍 벌린 입(이빨) · 괴물의 날개를 켠다. */
 const showTag = (c, tag, on) => (c.props[tag] || []).forEach((m) => { m.visible = !!on; });
 
+const PATH_CELL = 0.25; // 집 안 길 찾기 칸 크기
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+/** a 에서 b 까지 곧장 가도 설 수 있는 자리만 지나는지(0.1 마다 본다). */
+function clearLine(canStand, a, b) {
+  const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.1);
+  for (let s = 1; s <= n; s++) if (!canStand(a.x + ((b.x - a.x) * s) / n, a.z + ((b.z - a.z) * s) / n)) return false;
+  return true;
+}
+/**
+ * from 에서 to 둘레 near 안까지 설 수 있는 칸만 지나는 길(집 안 가구 · 벽을 돌아간다): 두 점을 둘러싼 칸 그물에서 너비 우선으로 찾는다.
+ * 대각선은 양옆 칸이 다 트였을 때만(모서리를 깎아 지나가지 않게). → [{ x, z }, …](출발 칸은 빼고) | null(갈 수 없다 · 너무 멀다)
+ */
+function findRoute(canStand, from, to, near) {
+  const pad = 2.5, x0 = Math.min(from.x, to.x) - pad, z0 = Math.min(from.z, to.z) - pad;
+  const W = Math.ceil((Math.max(from.x, to.x) + pad - x0) / PATH_CELL) + 1, H = Math.ceil((Math.max(from.z, to.z) + pad - z0) / PATH_CELL) + 1;
+  if (W * H > 24000) return null;
+  const at = (k) => ({ x: x0 + (k % W) * PATH_CELL, z: z0 + Math.floor(k / W) * PATH_CELL });
+  const known = new Int8Array(W * H), prev = new Int32Array(W * H).fill(-1), seen = new Uint8Array(W * H);
+  const ok = (i, j) => {
+    if (i < 0 || j < 0 || i >= W || j >= H) return false;
+    const k = j * W + i;
+    if (!known[k]) { const p = at(k); known[k] = canStand(p.x, p.z) ? 1 : 2; }
+    return known[k] === 1;
+  };
+  const start = Math.round((from.z - z0) / PATH_CELL) * W + Math.round((from.x - x0) / PATH_CELL), queue = [start];
+  seen[start] = 1;
+  for (let q = 0; q < queue.length; q++) {
+    const k = queue[q], i = k % W, j = Math.floor(k / W), p = at(k);
+    if (Math.hypot(p.x - to.x, p.z - to.z) < near) {
+      const out = [];
+      for (let m = k; m !== start; m = prev[m]) out.push(at(m));
+      return out.reverse();
+    }
+    for (const [di, dj] of DIRS) {
+      const ni = i + di, nj = j + dj, nk = nj * W + ni;
+      if (!ok(ni, nj) || seen[nk] || (di && dj && (!ok(i + di, j) || !ok(i, j + dj)))) continue;
+      seen[nk] = 1;
+      prev[nk] = k;
+      queue.push(nk);
+    }
+  }
+  return null;
+}
+
 /**
  * 나를 따라다니는 풍뎅이: 떨어지면 아장아장 쫓아오고, 가까우면 나를 바라본다. 너무 멀어지면(순간 이동) 옆에 나타난다.
  * 마을뿐 아니라 집 안(내 집 · 친구 방)에도 따라 들어온다: setScene 으로 지금 장면에 옮겨 붙는다.
+ * 집 안에서는 canStand(x, z)(가구 · 벽 · 집주인을 피해 설 수 있는지)를 받아 가구를 돌아서 온다.
  */
 export function createBeetleBuddy(scene) {
   const c = buildNpc('beetle');
@@ -157,7 +202,17 @@ export function createBeetleBuddy(scene) {
   c.root.visible = false;
   scene.add(c.root);
   const pos = new THREE.Vector3();
-  let on = false, moving = false, phase = 0, yaw = 0, hop = 0, mouth = 0, holdYaw = null;
+  let on = false, moving = false, phase = 0, yaw = 0, hop = 0, mouth = 0, holdYaw = null, route = null, routeT = 0;
+  /** near 옆 설 수 있는 빈자리에 세운다(canStand 가 없으면 바로 옆). */
+  const placeNear = (near, canStand) => {
+    route = null;
+    yaw = 0;
+    for (const r of [0.65, 0.9, 1.2, 1.6]) for (let k = 0; k < 8; k++) {
+      const a = 2.2 + (k * Math.PI) / 4, x = near.x + Math.sin(a) * r, z = near.z + Math.cos(a) * r;
+      if (!canStand || canStand(x, z)) { pos.set(x, 0, z); return; }
+    }
+    pos.set(near.x + 0.6, 0, near.z - 0.3);
+  };
   return {
     chibi: c,
     get on() { return on; },
@@ -166,31 +221,48 @@ export function createBeetleBuddy(scene) {
     show(v, near) {
       on = !!v;
       c.root.visible = on;
-      if (on && near) { pos.set(near.x + 0.7, 0, near.z + 0.5); yaw = 0; }
+      if (on && near) { pos.set(near.x + 0.7, 0, near.z + 0.5); yaw = 0; route = null; }
     },
-    /** 따라다니는 장면을 바꾼다(마을 · 내 집 · 친구 방): 다른 장면이면 그리로 옮겨 near(내 자리) 옆에 세운다. */
-    setScene(target, near) {
+    /** 따라다니는 장면을 바꾼다(마을 · 내 집 · 친구 방): 다른 장면이면 그리로 옮겨 near(내 자리) 옆 빈자리에 세운다. */
+    setScene(target, near, canStand = null) {
       if (c.root.parent === target) return;
       target.add(c.root);
-      if (near) { pos.set(near.x + 0.6, 0, near.z - 0.3); yaw = 0; }
+      if (near) placeNear(near, canStand);
     },
     /** 하품: ω 입이 쩍 벌어져 뾰족한 이빨이 보인다. faceYaw 가 있으면 그동안 제자리에서 그쪽(카메라)을 본다. */
     yawn(v, faceYaw = null) { mouth = v ? 1 : 0; holdYaw = v ? faceYaw : null; showTag(c, 'teeth', v); },
     /** 기뻐서 폴짝. */
     jump() { hop = 0.6; },
-    /** me: 내 자리 { x, z }, hidden: 숨을 때(이야기 장면 같은 다른 화면), indoor: 집 안(바닥 높이 0). */
-    update(dt, t, me, hidden, indoor = false) {
+    /**
+     * me: 내 자리 { x, z }, hidden: 숨을 때(이야기 장면 같은 다른 화면), indoor: 집 안(바닥 높이 0),
+     * canStand(x, z): 집 안에서 설 수 있는지 — 있으면 가구를 돌아가는 길을 찾아(0.4초마다 다시) 곧장 보이는 가장 먼 길목으로 간다.
+     */
+    update(dt, t, me, hidden, indoor = false, canStand = null) {
       c.root.visible = on && !hidden;
       if (!on || hidden || !me) return;
       const p = me, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
       if (holdYaw != null) { yaw = holdYaw; moving = false; } // 하품하는 동안은 제자리에서 카메라 쪽을
-      else if (d > 14) { pos.set(p.x + 0.7, 0, p.z + 0.5); moving = false; } // 멀리 순간 이동했으면 옆에
+      else if (d > 14) { pos.set(p.x + 0.7, 0, p.z + 0.5); moving = false; route = null; } // 멀리 순간 이동했으면 옆에
       else if (d > 1.1) { // 떨어지면 쫓아온다(멀수록 빨리)
         const v = Math.min(7, 1.5 + (d - 1.1) * 2.4) * dt;
-        pos.x += (dx / d) * v; pos.z += (dz / d) * v;
-        yaw = Math.atan2(dx, dz);
-        moving = true;
-      } else { moving = false; yaw += (Math.atan2(dx, dz) - yaw) * Math.min(1, dt * 3); } // 가까우면 나를 본다
+        let tx = p.x, tz = p.z;
+        if (canStand) {
+          routeT -= dt;
+          if (routeT <= 0 || !route) { route = clearLine(canStand, pos, p) ? [] : findRoute(canStand, pos, p, 0.9); routeT = 0.4; }
+          if (route) {
+            while (route.length > 1 && clearLine(canStand, pos, route[1])) route.shift(); // 곧장 보이는 가장 먼 길목까지 건너뛴다
+            if (route.length) { tx = route[0].x; tz = route[0].z; }
+          }
+        }
+        const mx = tx - pos.x, mz = tz - pos.z, md = Math.hypot(mx, mz);
+        if (md > 1e-4) {
+          const s = Math.min(v, md), nx = pos.x + (mx / md) * s, nz = pos.z + (mz / md) * s;
+          if (!canStand || canStand(nx, nz) || !canStand(pos.x, pos.z)) { pos.x = nx; pos.z = nz; } // 가구 속으로는 들어가지 않는다(이미 끼었으면 빠져나온다)
+          if (route && route.length && Math.hypot(route[0].x - pos.x, route[0].z - pos.z) < 0.06) route.shift();
+          yaw = Math.atan2(mx, mz);
+          moving = true;
+        } else moving = false;
+      } else { moving = false; route = null; yaw += (Math.atan2(dx, dz) - yaw) * Math.min(1, dt * 3); } // 가까우면 나를 본다
       phase += dt * (moving ? 12 : 0);
       hop = Math.max(0, hop - dt);
       c.root.position.set(pos.x, (indoor ? 0 : groundY(pos.x, pos.z)) + Math.sin((hop / 0.6) * Math.PI) * 0.25, pos.z);

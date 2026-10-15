@@ -4183,7 +4183,7 @@ function boot() {
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
-  // 사이드스토리 '스위치'(stories/switch.js): 바위산 북쪽 끝 절벽의 창살로 막힌 동굴 입구(이야기를 받은 동안만) · 마을에서 따라다니는 풍뎅이 ·
+  // 사이드스토리 '스위치'(stories/switch.js): 바위산 북쪽 끝 절벽에 늘 있는 창살로 막힌 동굴 입구 · 마을에서 따라다니는 풍뎅이 ·
   // 우사기가 들고 다니는 스위치(동굴에 가기 전까지) · 바위산 기슭 장면(처음 들어갈 때 만든다)
   const switchFront = createSwitchFront(scene, village);
   const beetleBuddy = createBeetleBuddy(scene);
@@ -4198,13 +4198,13 @@ function boot() {
   });
   /**
    * 스위치 풍뎅이(창살을 연 뒤 마지막 장면 전까지): 지금 있는 곳(마을 · 내 집 · 친구 방)의 장면 where 로 옮겨 가 내 자리 me 를 따라온다.
-   * hidden: 그 장면을 그리지 않는 동안(마을 화면이 아닐 때) 숨는다.
+   * hidden: 그 장면을 그리지 않는 동안(마을 화면이 아닐 때) 숨는다. canStand(x, z): 집 안에서 설 수 있는지(가구를 돌아서 온다).
    */
-  function beetleFollow(dt, t, where, me, hidden = false) {
+  function beetleFollow(dt, t, where, me, hidden = false, canStand = null) {
     const bstep = visiting ? -1 : beetleStep(), follow = bstep >= 1 && bstep <= 4;
     if (follow !== beetleBuddy.on) beetleBuddy.show(follow, me);
-    if (follow) beetleBuddy.setScene(where, me);
-    beetleBuddy.update(dt, t, me, hidden, where !== scene);
+    if (follow) beetleBuddy.setScene(where, me, canStand);
+    beetleBuddy.update(dt, t, me, hidden, where !== scene, canStand);
   }
   /** 스위치 이야기에서 지금 단계(받지 않았거나 끝났으면 -1): 0 은 동굴에 가기 전(우사기가 스위치를 들고 다닌다), 1 ~ 4 는 창살을 연 뒤 마지막 장면 전(풍뎅이가 따라다닌다). */
   const beetleStep = () => (state && isActive(state, 'beetleSwitch') ? (state.quests.beetleSwitch || {}).step ?? -1 : -1);
@@ -6609,7 +6609,7 @@ function boot() {
         hud.setAction('치기!');
       } else hud.setAction(homeTarget ? homeTarget.label : null);
       rooms.update(dt, t, !!talking);
-      beetleFollow(dt, t, rooms.scene, rooms.playerPos); // 스위치 풍뎅이도 친구 방까지 따라 들어온다
+      beetleFollow(dt, t, rooms.scene, rooms.playerPos, false, (x, z) => rooms.free(x, z)); // 스위치 풍뎅이도 친구 방까지 따라 들어와 가구를 돌아서 온다
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
       if (!skipRender && drawNow) gfx.renderer.render(rooms.scene, rooms.camera);
@@ -6726,7 +6726,7 @@ function boot() {
       interior.setCue(homeTarget, t);
       hud.setAction(homeTarget ? homeTarget.label : null);
       interior.update(dt, t);
-      beetleFollow(dt, t, interior.scene, interior.playerPos); // 스위치 풍뎅이도 집 안까지 따라 들어온다
+      beetleFollow(dt, t, interior.scene, interior.playerPos, false, (x, z) => interior.free(homeOf(state), x, z)); // 스위치 풍뎅이도 집 안까지 따라 들어와 가구를 돌아서 온다
       homeRemotes.update(dt, true); // 같이 놀기: 내 집에 구경 온 친구
       setCelLight(INDOOR_LIGHT);
       lights.update('off', player.position, player.yaw, 0);
@@ -6773,10 +6773,9 @@ function boot() {
     // 위스키 봉봉 초콜릿 덩굴: 이야기를 받은 동안만 서쪽 숲길 옆에 있다
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
-    // 스위치 동굴: 이야기를 받은 동안만 바위산 북쪽 끝 절벽에 입구가 있다(창살을 연 뒤로는 열린 채). 그동안 풍뎅이가 나를 따라다닌다
+    // 스위치 동굴: 바위산 북쪽 끝 절벽에 늘 있다. 창살은 이야기 속에서 연 뒤로(이야기를 끝낸 뒤에도) 열린 채. 그사이 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep();
-    switchFront.visible = bstep >= 0;
-    switchFront.setOpen(bstep >= 1);
+    switchFront.setOpen(!visiting && !!state && (bstep >= 1 || isDone(state, 'beetleSwitch')));
     beetleFollow(dt, t, scene, player ? player.position : null, mode !== 'play');
     const usagiNpc = npcs.byKind('usagi');
     if (usagiNpc) holdSwitch(usagiNpc.chibi, villageSwitch, bstep === 0); // 동굴에 가기 전: 우사기가 주운 스위치를 손에 들고 다닌다

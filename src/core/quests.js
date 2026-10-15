@@ -81,7 +81,7 @@ export const PLACES = {
   crabGate: { name: '강가 진흙밭 입구', r: 4 },
   dojo: { name: '수련장', r: 3.4 },
   bonbonVine: { name: '초콜릿 덩굴', r: 2.8 }, // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
-  switchRock: { name: '바위산 끝 절벽 동굴', r: 3 }, // 바위산 북쪽 끝 절벽(이야기를 받은 동안만 창살로 막힌 동굴 입구가 있다 — world/switchcave.js)
+  switchRock: { name: '바위산 끝 절벽 동굴', r: 3 }, // 바위산 북쪽 끝 절벽(창살로 막힌 동굴 입구가 늘 있다 — world/switchcave.js)
   // 마을 가꾸기(core/works.js)로 생긴 곳
   bench: { name: '연못 쉼터', r: 2.6 },
   pavilion: { name: '강가 정자', r: 2.8 },

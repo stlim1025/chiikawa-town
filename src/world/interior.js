@@ -422,6 +422,8 @@ export function createInterior() {
       yaw += Math.max(-dt * 10, Math.min(dt * 10, d));
       if (moving) phase += dt * 2.6 * len * 3.2;
     },
+    /** (x, z) 에 반지름 r 인 몸이 설 수 있는지(벽 · 가구 · 옷장을 피해서 — 따라다니는 풍뎅이가 길을 찾는다). */
+    free(home, x, z, r = 0.2) { return !blocked(home, x, z, r); },
     /** 그 자리에 바로 선다(확인용). */
     standAt(x, z) { pos.x = x; pos.z = z; },
     /** 같이 놀기: 문간에 먼저 와 있는 사람(others [{ x, z }])과 겹치지 않게 옆 빈자리로 비켜 선다(가구 · 벽은 피한다). */
