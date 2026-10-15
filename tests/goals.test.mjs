@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GOALS, goalOf, canBuy, buyGoal, npcPower, CAMERA_PRICE } from '../src/core/goals.js';
+import { GOALS, WISHES, DONATE_STEP, goalOf, canBuy, buyGoal, npcPower, hasCar, canTryLiquor, tryLiquor, goalNews, goalPlace, CAMERA_PRICE } from '../src/core/goals.js';
+import { POCHETTES } from '../src/core/pochette.js';
+import { HOME_SIZES, WALLPAPERS, FLOORS } from '../src/core/home.js';
+import { WORKS, workOf, workStatus } from '../src/core/works.js';
 import { TOOLS } from '../src/core/tools.js';
 import { chooseActivity } from '../src/core/brain.js';
 import { liveOffscreen } from '../src/core/offscreen.js';
@@ -29,8 +32,118 @@ test('친구마다 차례로 이루고 싶은 목표가 있고, 값은 가게 �
     }
   }
   assert.equal(GOALS.rakko.at(-1).item, 'star', '랏코는 가장 센 반짝 검을 노린다');
-  // 하늘색 자동차는 원작처럼 랏코만 모은다(도구점 값 그대로)
-  assert.deepEqual(Object.keys(GOALS).filter((k) => GOALS[k].some((g) => g.kind === 'car')), ['rakko']);
+});
+
+test('랏코는 원작처럼 처음부터 하늘색 자동차가 있다(모으는 목표가 아니고, 다른 친구에게는 없다)', () => {
+  const s = fresh();
+  assert.ok(hasCar(s, 'rakko'), '새로 시작해도 랏코는 차가 있다');
+  assert.ok(hasCar(withMoney(s, 'rakko', 10, { bought: ['rod'] }), 'rakko'), '예전 저장(차를 모으던 중)도');
+  for (const kind of Object.keys(VILLAGERS).filter((k) => k !== 'rakko')) assert.ok(!hasCar(s, kind), kind);
+  assert.ok(Object.values(GOALS).every((list) => list.every((g) => g.kind !== 'car')), '차는 목표에 없다');
+});
+
+/** 돈을 넉넉히 주며 목표를 차례로 이뤄 본다(자격증 · 술 자격은 붙었다 치고). → 이룬 목표들 */
+function reach(kind, count, s0 = fresh()) {
+  let s = s0;
+  const got = [];
+  for (let i = 0; i < count; i++) {
+    const g = goalOf(s, kind);
+    if (!g) break;
+    s = withMoney(s, kind, g.cost + 5, { liquorDay: -1 });
+    if (g.kind === 'license') s = licensedAs(s, kind);
+    else if (g.kind === 'liquor') s = tryLiquor(s, kind, 1, () => 0).state;
+    else { const r = buyGoal(s, kind, 1); assert.ok(r.ok, `${kind} ${g.id}`); s = r.state; }
+    got.push(g);
+  }
+  return { got, state: s };
+}
+
+test('차례 목표를 다 이뤄도 바라는 것(포셰트 · 가구 · 벽지와 바닥 · 술 자격 · 무기 · 집 넓히기 · 마을 가꾸기)이 이어서 생긴다', () => {
+  for (const kind of Object.keys(WISHES)) {
+    const { got } = reach(kind, 40);
+    assert.equal(got.length, 40, `${kind}: 목표가 끊기지 않는다`);
+    const fixed = GOALS[kind].length;
+    assert.deepEqual(got.slice(0, fixed).map((g) => g.id), GOALS[kind].map((g) => g.id), `${kind}: 차례 목표가 먼저`);
+    const kinds = new Set(got.map((g) => g.kind));
+    for (const k of ['pochette', 'furniture', 'decor', 'home', 'donate', ...(WISHES[kind].like.liquor ? ['liquor'] : [])]) assert.ok(kinds.has(k), `${kind}: ${k}`);
+    // 같은 것을 두 번 이루지 않는다(마을 가꾸기 보태기만 여러 번)
+    const once = got.filter((g) => g.kind !== 'donate').map((g) => g.id);
+    assert.equal(new Set(once).size, once.length, `${kind}: ${once}`);
+    // 값은 그 가게 값 그대로
+    for (const g of got) {
+      const want = { pochette: () => POCHETTES[g.item].price, decor: () => (g.part === 'wall' ? WALLPAPERS : FLOORS)[g.item].price, home: () => HOME_SIZES[g.item].price, liquor: () => LICENSES.liquor.fee, donate: () => DONATE_STEP }[g.kind];
+      if (want) assert.equal(g.cost, want(), `${kind} ${g.label}`);
+    }
+    // 집은 넓은 방 다음에 큰 방
+    const homes = got.filter((g) => g.kind === 'home').map((g) => g.item);
+    assert.deepEqual(homes, [1, 2].slice(0, homes.length), `${kind} 집 넓히기 차례`);
+  }
+  assert.ok(!WISHES.kurimanju.like.liquor, '쿠리만쥬는 위스키 강의를 하는 쪽이라 술 자격을 바라지 않는다');
+  assert.equal(goalOf(fresh(), 'momonga'), null, '모몽가는 여전히 훔친다');
+});
+
+test('바라는 것은 싼 것부터, 좋아하는 것은 조금 비싸도 먼저: 처음 몇 개는 가구 · 포셰트처럼 작은 것', () => {
+  const { got } = reach('chiikawa', GOALS.chiikawa.length + 5);
+  const first = got.slice(GOALS.chiikawa.length);
+  assert.ok(first.every((g) => g.cost <= 400), first.map((g) => `${g.label} ${g.cost}`).join(', '));
+  // 무기를 좋아하는 우사기는 가구보다 무기를 먼저 노린다
+  const u = reach('usagi', GOALS.usagi.length + 20).got.slice(GOALS.usagi.length);
+  assert.ok(u.findIndex((g) => g.kind === 'weapon') < u.findIndex((g) => g.kind === 'home'), u.map((g) => g.label).join(' → '));
+});
+
+test('마을 가꾸기에 보태면 내 모금함과 같은 곳에 모이고, 다 모이면 다음 날 생긴다. 보탤수록 다음 보태기는 뒤로 미룬다', () => {
+  const kind = 'hachiware', done = GOALS[kind].map((g) => g.id).filter((id) => id !== 'license');
+  // 바라는 것도 마을 가꾸기 말고는 다 이뤘다고 치고, 꽃밭은 내가 2,500원 모아 두었다
+  const other = ['p-sky', 'p-night', 'f-cushion', 'f-lamp', 'f-plant', 'wall-sky', 'floor-grass', 'liquor', 'w-hammer', 'w-star', 'h-1', 'h-2'];
+  let s = licensedAs(withMoney(fresh(), kind, 0, { bought: [...done, ...other] }), kind);
+  s = { ...s, works: { flowers: { paid: 2500 } } };
+  const g = goalOf(s, kind);
+  assert.equal(g.kind, 'donate');
+  assert.equal(g.item, 'flowers', '내가 모으던 시설을 거든다');
+  assert.equal(g.cost, 500, '남은 만큼만');
+  assert.equal(goalPlace(g), 'donation');
+  assert.equal(goalNews(g), 'donate');
+  s = withMoney(s, kind, 600);
+  const r = buyGoal(s, kind, 1);
+  assert.ok(r.ok && r.full, '다 모였다');
+  assert.equal(workOf(r.state, 'flowers').paid, WORKS.flowers.price);
+  assert.equal(workStatus(r.state, 'flowers'), 'building', '내일 아침에 생긴다');
+  assert.equal(villagerOf(r.state, kind, 1).money, 100);
+  const next = goalOf(r.state, kind);
+  assert.equal(next.kind, 'donate', '살 것이 다 떨어지면 남은 시설에도 보탠다');
+  assert.equal(next.item, 'benches', '다음은 아직 시작 안 한 시설 가운데 가장 싼 곳');
+  assert.equal(next.id, 'd-2');
+});
+
+test('술 자격은 검정소 시험: 응시료가 모이면 하루 한 번 보고, 떨어질수록 붙기 쉬워진다', () => {
+  const kind = 'rakko', s0 = withMoney(fresh(), kind, 0, { bought: ['rod', 'w-star', 'f-plant', 'f-lamp'], weapon: 'star' });
+  assert.equal(goalOf(s0, kind).kind, 'liquor');
+  assert.equal(goalPlace(goalOf(s0, kind)), 'exam');
+  assert.ok(!canTryLiquor(s0, kind, 1), '돈이 모자라면 못 본다');
+  let s = withMoney(s0, kind, 1000);
+  assert.ok(!canBuy(s, kind, 1), '가게에서 사지 않는다');
+  assert.ok(canTryLiquor(s, kind, 1));
+  const fail = tryLiquor(s, kind, 1, () => 0.99);
+  assert.ok(!fail.passed);
+  assert.equal(villagerOf(fail.state, kind, 1).money, 1000 - LICENSES.liquor.fee, '떨어져도 응시료는 낸다');
+  assert.ok(!canTryLiquor(withMoney(fail.state, kind, 1000), kind, 1), '하루 한 번');
+  assert.equal(goalOf(fail.state, kind).kind, 'liquor', '붙을 때까지 목표 그대로');
+  s = withMoney(fail.state, kind, 1000);
+  assert.ok(canTryLiquor(s, kind, 2), '다음 날 다시');
+  const pass = tryLiquor(s, kind, 2, () => 0.8); // 처음엔 0.7 이라 떨어질 값이지만, 한 번 떨어졌으니 붙는다
+  assert.ok(pass.passed);
+  assert.notEqual(goalOf(pass.state, kind).kind, 'liquor', '붙으면 다음 목표로');
+});
+
+test('목표마다 가는 곳: 무기 · 낚싯대는 도구점, 가구 · 벽지는 가구점, 포셰트는 포셰트 가게, 집은 부동산', () => {
+  assert.equal(goalPlace({ kind: 'weapon' }), 'tools');
+  assert.equal(goalPlace({ kind: 'rod' }), 'tools');
+  assert.equal(goalPlace({ kind: 'furniture' }), 'furniture');
+  assert.equal(goalPlace({ kind: 'decor' }), 'furniture');
+  assert.equal(goalPlace({ kind: 'pochette' }), 'pochette');
+  assert.equal(goalPlace({ kind: 'home' }), 'realty');
+  assert.equal(goalNews({ kind: 'home' }), 'homeUp');
+  assert.equal(goalNews({ kind: 'pochette' }), 'buy');
 });
 
 test('자격증을 따거나 물건을 사면 다음 목표로 넘어간다', () => {
@@ -115,6 +228,18 @@ test('친구의 목표는 앱이 아니라 대화로 알게 된다: 친구 말�
         assert.ok(typeof line === 'string' && line.length > 0 && line.length <= 30, `${kind} ${g.label}: ${line}`);
         assert.ok(!/[^.…]\.(\s|$)/.test(line), `마침표: ${line}`);
         if (kind !== 'usagi') assert.ok(line.includes(g.kind === 'license' ? '자격증' : g.label) || line.includes('시험'), `무엇을 모으는지 말한다: ${line}`);
+      }
+    }
+  }
+  // 차례 목표 다음에 바라는 것도: 집 넓히기는 '집', 마을 가꾸기는 그 시설 이름, 술 자격은 '술'을 말한다
+  for (const kind of Object.keys(WISHES)) {
+    for (const g of reach(kind, 30).got.slice(GOALS[kind].length)) {
+      for (const have of [0, Math.floor(g.cost / 2), g.cost - 1]) {
+        const line = savingLine(kind, g, have);
+        assert.ok(typeof line === 'string' && line.length > 0 && line.length <= 30, `${kind} ${g.label}: ${line}`);
+        assert.ok(!/[^.…]\.(\s|$)/.test(line) && !line.includes('·'), `문장부호: ${line}`);
+        const word = g.kind === 'home' ? '집' : g.kind === 'liquor' ? '술' : g.label;
+        if (kind !== 'usagi') assert.ok(line.includes(word), `무엇을 모으는지 말한다: ${line}`);
       }
     }
   }

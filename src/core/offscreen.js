@@ -5,7 +5,7 @@ import {
 } from './villagers.js';
 import { JOB_TYPES } from './jobs.js';
 import { DAY_SECONDS, hourOf } from './clock.js';
-import { goalOf, canBuy, buyGoal, canDoJob } from './goals.js';
+import { goalOf, canBuy, buyGoal, canDoJob, goalNews } from './goals.js';
 
 /** 게임 속 한 시간의 실제 길이(초). 욕구가 차는 빠르기(brain.js 의 NEED_RATE)는 실제 초 기준이다. */
 const HOUR_SECONDS = DAY_SECONDS / 24;
@@ -44,10 +44,10 @@ export function mateEats(s, kind, day) {
  * 내가 일찍 잠든 사이(잠든 시각 ~ 밤 9시) 친구들이 보낸 저녁을 한 시간씩 건너뛰며 지낸다.
  * 화면에서처럼 두뇌(chooseActivity)가 할 일을 고르고 결과만 남긴다: 일하면 보수(게시판 일감이 줄고 하루 세 개까지),
  * 라멘을 먹으면 돈과 기운, 수다 · 같이 라멘은 짝도 마음이 풀린다. 돈 모으는 목표(core/goals.js)를 보고 일하고, 값이 모이면 가게에서 산다.
- * 토벌 · 시험 · 공연처럼 화면에서 봐야 하는 일은 하지 않는다.
+ * 마을 가꾸기에 보태거나(donate) 집을 넓히는 것(homeUp)도 목표라 같은 차례로 한다. 토벌 · 시험 · 공연처럼 화면에서 봐야 하는 일은 하지 않는다.
  * 밤잠 시간에 잠들면 친구들도 이미 자는 중이라 그대로 돌려준다. 넘겨받은 state · minds 는 바꾸지 않는다.
  * opts: { day, fromHour, toHour = 밤 9시, random, skip: 끼지 않는 친구 kind 들(첫날 안내 중인 하치와레) }
- * → { state, minds, events: [{ type: 'job' | 'meal' | 'chat' | 'buy', who, with?, title?, item?, cost?, hour }] }
+ * → { state, minds, events: [{ type: 'job' | 'meal' | 'chat' | 'buy' | 'donate' | 'homeUp', who, with?, title?, item?, cost?, hour }] }
  */
 export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, random = Math.random, skip = [] }) {
   if (isSleepHour(fromHour)) return { state, minds, events: [] };
@@ -65,7 +65,7 @@ export function liveOffscreen(state, minds, { day, fromHour, toHour = BED_HOUR, 
       if (hour < SHOP_CLOSE && !guiding && canBuy(s, kind, day)) { // 목표 값이 모였으면 이번 시간에는 가게에 다녀온다(첫날 안내 중엔 화면에서처럼 안 간다)
         const b = buyGoal(s, kind, day);
         s = b.state;
-        events.push({ type: 'buy', who: kind, item: b.goal.label, cost: b.goal.cost, hour });
+        events.push({ type: goalNews(b.goal), who: kind, item: b.goal.label, cost: b.goal.cost, hour });
         continue;
       }
       const v = villagerOf(s, kind, day), spec = VILLAGERS[kind], m = growNeeds(next[kind], kind, HOUR_SECONDS), goal = goalOf(s, kind);

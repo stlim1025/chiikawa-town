@@ -104,6 +104,10 @@ const OWN = {
   watch: { chiikawa: '…하치와레 노래 들었어…♪ 좋았어…', usagi: '(노래 흉내) 야하~', kurimanju: '하아~ 하치와레 노래 좋더라', rakko: '…하치와레의 노래 나쁘지 않았다', momonga: '하치와레 노래? 내가 더 잘해!' },
   train: { rakko: '…{w}와 수련했다', usagi: '(칼 휘두르는 흉내) 우라!' },
   buy: { chiikawa: '…나 {item} 샀어…! 헤헤…', hachiware: '나 {item} 샀다~! 모은 보람이 있어!', usagi: '(새 물건을 번쩍 들어 보인다) 야하!!', kurimanju: '하아~ {item} 하나 들였지', rakko: '…드디어 {item}이다 훗', momonga: '{item} 샀어! 부럽지? 흥!' },
+  donate: { chiikawa: '…{item}에 조금 보탰어…♪', hachiware: '{item}에 돈 보탰어~! 빨리 생기면 좋겠다!', usagi: '(모금함에 동전 넣는 흉내) 야하!', kurimanju: '하아~ {item}에 조금 보탰지', rakko: '…{item}에 보탰다' },
+  homeUp: { chiikawa: '…집을 넓혔어…! 놀러 와…', hachiware: '집 넓혔어~! 놀러 와!', usagi: '(팔을 활짝 벌린다) 우라!!', kurimanju: '하아~ 집 좀 넓혔지', rakko: '…집을 넓혔다 훗' },
+  liquorPass: { chiikawa: '…나 술 자격 땄어…!!', hachiware: '나 술 자격 땄어~! 하이볼 마셔 볼래!', usagi: '(잔을 번쩍 든다) 우라!!', rakko: '…술 자격도 손에 넣었다' },
+  liquorFail: { chiikawa: '…술 자격 시험 떨어졌어… 히잉…', hachiware: '술 자격 시험 떨어졌어~ 다음엔 붙을 거야!', usagi: '하아…', rakko: '…다시 간다' },
   partyHunt: { chiikawa: '…같이 토벌해서… 든든했어…!', hachiware: '같이 토벌해서 재밌었다~!', usagi: '(같이 휘두르는 흉내) 우라!', kurimanju: '하아~ 같이 토벌하니 좋더라', rakko: '…같이 싸우니 나쁘지 않더군' }
 };
 /** 소문: '{who}가 ~했' 까지(끝맺음은 친구 말투로). */
@@ -118,6 +122,10 @@ const STEM = {
   train: (e, N) => (e.with ? `${josa(N(e.who), '이/가')} ${josa(N(e.with), '이랑/랑')} 수련했` : `${josa(N(e.who), '이/가')} 수련했`),
   theft: () => '모몽가가 또 소매치기했',
   buy: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '새 물건'} 샀`,
+  donate: (e, N) => `${josa(N(e.who), '이/가')} ${e.item || '마을 가꾸기'}에 돈을 보탰`,
+  homeUp: (e, N) => `${josa(N(e.who), '이/가')} 집을 넓혔`,
+  liquorPass: (e, N) => `${josa(N(e.who), '이/가')} 술 자격 땄`,
+  liquorFail: (e, N) => `${josa(N(e.who), '이/가')} 술 자격 시험에 떨어졌`,
   partyHunt: (e, N) => `${josa(N(e.who), '이/가')} ${josa(N('me'), '이랑/랑')} 같이 토벌했`,
   playerBoss: (e, N) => `${josa(N('me'), '이/가')} ${josa(e.boss || '왕버섯', '을/를')} 쓰러뜨렸`, // boss: 쓰러뜨린 보스 짧은 이름(없으면 이야기 속 왕버섯)
   playerRanker: (e, N) => `${josa(N('me'), '이/가')} 토벌 랭커가 됐`,
@@ -149,7 +157,7 @@ const REACT = {
   good: { chiikawa: ['…와아…!', '…대단해…!', '…헤에…'], hachiware: ['우와~ 대단하다!', '진짜? 멋지다~', '헤에~ 그랬구나!'], usagi: ['야하!', '우라?', '하아~?'], kurimanju: ['하아~ 그렇구나', '하아~ 대단하네'], rakko: ['…그런가', '…훗', '…나쁘지 않군'], momonga: ['흥! 별거 아니네', '…흥 나도 할 수 있어', '그래서 뭐?'] },
   sad: { chiikawa: '…괜찮아…', hachiware: '다음엔 될 거야~!', usagi: '(토닥토닥)', kurimanju: '하아~ 그럴 때도 있지', rakko: '…다시 하면 된다', momonga: '흥 바보네' }
 };
-const SAD = new Set(['examFail', 'theft']);
+const SAD = new Set(['examFail', 'liquorFail', 'theft']);
 
 /** 그 친구가 이 사건을 이야기하는 말(본인 일이면 1인칭, 아니면 소문). 할 말이 없으면 null. */
 export function storyLine(kind, ev, me = '나', random = Math.random) {
@@ -262,10 +270,34 @@ const SAVING_LICENSE = {
   usagi: { start: '(자격증 흉내를 낸다) 우라!', half: '(자격증 흉내를 내며 반만 웃는다) 야하', almost: '(검정소 쪽을 가리킨다) 야하!!' },
   kurimanju: { start: '하아~ 자격증 시험 볼 돈 모으는 중이야', half: '하아~ 시험 볼 돈이 반은 모였지', almost: '하아~ 곧 자격증 시험 보러 가야지' }
 };
+/** 술 자격 시험 볼 돈(쿠리만쥬는 술 자격을 바라지 않는다). */
+const SAVING_LIQUOR = {
+  chiikawa: { start: '…술 자격 시험 볼 돈… 모으는 중…!', half: '…술 자격 시험 돈… 반쯤 모았어…!', almost: '…곧 술 자격 시험 보러 갈 거야…!' },
+  hachiware: { start: '술 자격 시험 볼 돈 모으는 중이야~', half: '술 자격 시험 돈이 반쯤 모였어~!', almost: '곧 술 자격 시험 보러 갈 거야~!' },
+  usagi: { start: '(잔을 드는 흉내) 야하!', half: '(잔을 반만 채우는 흉내) 우라!', almost: '(검정소 쪽을 가리킨다) 야하!!' },
+  rakko: { start: '…술 자격 시험 볼 돈을 모은다', half: '…술 자격까지 아직 절반이다', almost: '…곧 술 자격 시험을 보러 간다' }
+};
+/** 집 넓히기(부동산). */
+const SAVING_HOME = {
+  chiikawa: { start: '…집 넓히려고… 돈 모으는 중…!', half: '…집 넓힐 돈… 반쯤 모았어…!', almost: '…집 넓힐 돈… 거의 다 모았어…!!' },
+  hachiware: { start: '집 넓히려고 열심히 모으는 중이야~', half: '집 넓힐 돈이 반쯤 모였어~!', almost: '집 넓히기까지 조금만 더~!' },
+  usagi: { start: '(팔을 활짝 벌린다) 야하!', half: '(팔을 반만 벌린다) 우라!', almost: '(부동산 쪽을 가리킨다) 야하!!' },
+  kurimanju: { start: '하아~ 집 좀 넓히려고 모으는 중이야', half: '하아~ 집 넓힐 돈이 반은 모였지', almost: '하아~ 곧 집을 넓히겠어' },
+  rakko: { start: '…집을 넓힐 때까지 모은다', half: '…집 넓히기까지 아직 절반이다', almost: '…집을 넓힐 날도 머지않았다' }
+};
+/** 마을 가꾸기에 보탤 돈({item}: 보탤 시설 이름). */
+const SAVING_DONATE = {
+  chiikawa: { start: '…{item}에 보태려고… 모으는 중…!', half: '…{item}에 보탤 돈… 반쯤 모았어…!', almost: '…곧 {item}에 보탤 수 있어…!' },
+  hachiware: { start: '{item}에 보태려고 모으는 중이야~', half: '{item}에 보탤 돈이 반쯤 모였어~!', almost: '곧 {item}에 보탤 수 있어~!' },
+  usagi: { start: '(모금함에 동전 넣는 흉내) 야하!', half: '(동전을 반만 세어 본다) 우라!', almost: '(모금함 쪽을 가리킨다) 야하!!' },
+  kurimanju: { start: '하아~ {item}에 조금 보태려고', half: '하아~ {item}에 보탤 돈이 반은 모였지', almost: '하아~ 곧 {item}에 보태야지' },
+  rakko: { start: '…{item}에 보탤 돈을 모은다', half: '…{item}까지 아직 절반이다', almost: '…곧 {item}에 보탠다' }
+};
+const SAVING_OF = { license: SAVING_LICENSE, liquor: SAVING_LIQUOR, home: SAVING_HOME, donate: SAVING_DONATE };
 /** 그 친구가 지금 모으는 목표 이야기 한 줄(목표가 없으면 null). have: 지금 가진 돈. */
 export function savingLine(kind, goal, have) {
   if (!goal) return null;
-  const T = (goal.kind === 'license' ? SAVING_LICENSE : SAVING)[kind];
+  const T = (SAVING_OF[goal.kind] || SAVING)[kind];
   if (!T) return null;
   const p = have / goal.cost;
   return fill(p < 0.34 ? T.start : p < 0.8 ? T.half : T.almost, { item: goal.label });
@@ -294,6 +326,10 @@ export function newsLine(ev, me = '나') {
     congrats: () => `${josa(A, '이/가')} ${josa(B, '을/를')} 축하해 줬어요`,
     theft: () => '모몽가가 또 소매치기를 했어요',
     buy: () => `${josa(A, '이/가')} 돈을 모아 ${josa(ev.item || '새 물건', '을/를')} 샀어요`,
+    donate: () => `${josa(A, '이/가')} 마을 가꾸기${ev.item ? ` ${ev.item}` : ''}에 돈을 보탰어요`,
+    homeUp: () => `${josa(A, '이/가')} 돈을 모아 집을 ${josa(ev.item || '넓은 방', '으로/로')} 넓혔어요`,
+    liquorPass: () => `${josa(A, '이/가')} 술 자격을 땄어요`,
+    liquorFail: () => `${josa(A, '이/가')} 술 자격 시험에 떨어졌어요`,
     snack: () => `${josa(A, '이/가')} 가방에서 ${josa(ev.item || '간식', '을/를')} 꺼내 먹었어요`,
     share: () => `${josa(A, '이/가')} ${B}에게 ${josa(ev.item || '선물', '을/를')} 나눠 줬어요`,
     partyHunt: () => `${josa(A, '이/가')} ${josa(N('me'), '과/와')} 같이 토벌했어요`,

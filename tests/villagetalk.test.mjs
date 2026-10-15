@@ -10,8 +10,9 @@ const clean = (line, where) => {
   assert.ok(!/[^.…]\.(\s|$)/.test(line), `마침표: ${where}: ${line}`);
   assert.ok(line.length <= 30, `너무 길다(${line.length}): ${where}: ${line}`);
 };
-const TYPES = ['meal', 'chat', 'job', 'hunt', 'examPass', 'examFail', 'sing', 'watch', 'train', 'theft', 'partyHunt', 'buy'];
-const evs = (who, other) => TYPES.map((type) => ({ type, who: type === 'sing' ? 'hachiware' : type === 'theft' ? 'momonga' : who, with: type === 'buy' ? null : other, title: '잡초 8개 뽑기', mon: '물방울 슬라임', n: 3, item: '먼작귀 인형' }));
+const SOLO = ['buy', 'donate', 'homeUp', 'liquorPass', 'liquorFail']; // 혼자 한 일(돈 모으기 목표 core/goals.js)
+const TYPES = ['meal', 'chat', 'job', 'hunt', 'examPass', 'examFail', 'sing', 'watch', 'train', 'theft', 'partyHunt', ...SOLO];
+const evs = (who, other) => TYPES.map((type) => ({ type, who: type === 'sing' ? 'hachiware' : type === 'theft' ? 'momonga' : who, with: SOLO.includes(type) ? null : other, title: '잡초 8개 뽑기', mon: '물방울 슬라임', n: 3, item: type === 'donate' ? '바깥 길 가로등' : '먼작귀 인형' }));
 
 test('짝 수다 · 잡담은 짧고 말하는 친구가 그 짝이다', () => {
   for (const [key, scripts] of Object.entries(V.PAIR_TALK)) {
@@ -68,6 +69,12 @@ test('마을 소식 문장', () => {
   assert.equal(V.newsLine({ type: 'job', who: 'usagi', title: '잡초 8개 뽑기' }).text, '우사기가 잡초 8개 뽑기를 끝냈어요');
   assert.equal(V.newsLine({ type: 'playerBoss', who: 'me' }, '승택').text, '승택이 왕버섯을 쓰러뜨렸어요');
   assert.deepEqual(V.newsLine({ type: 'comfort', who: 'hachiware', with: 'chiikawa' }).kinds, ['hachiware', 'chiikawa']);
+  // 돈 모으기 목표를 이뤘을 때(core/goals.js 의 goalNews)
+  assert.equal(V.newsLine({ type: 'donate', who: 'chiikawa', item: '광장 꽃밭' }).text, '치이카와가 마을 가꾸기 광장 꽃밭에 돈을 보탰어요');
+  assert.equal(V.newsLine({ type: 'homeUp', who: 'hachiware', item: '넓은 방' }).text, '하치와레가 돈을 모아 집을 넓은 방으로 넓혔어요');
+  assert.equal(V.newsLine({ type: 'liquorPass', who: 'usagi' }).text, '우사기가 술 자격을 땄어요');
+  assert.equal(V.newsLine({ type: 'liquorFail', who: 'rakko' }).text, '랏코가 술 자격 시험에 떨어졌어요');
+  assert.equal(V.storyLine('chiikawa', { type: 'liquorPass', who: 'hachiware' }), '…있잖아 하치와레가 술 자격 땄대…!');
   for (const k of Object.keys(V.HOBBY)) for (const t of V.HOBBY[k].lines) clean(t, k);
   for (const k of KINDS) { V.GREET_RUN[k].forEach((t) => clean(t, k)); clean(V.GIFT[k].line, k); clean(V.CONGRATS[k], k); clean(V.COMFORT[k], k); clean(V.FAINT_RUSH[k], k); }
 });

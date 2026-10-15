@@ -77,7 +77,7 @@ import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engra
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen, asleepSpans, mateEats } from './core/offscreen.js';
-import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob } from './core/goals.js';
+import { goalOf, canBuy, buyGoal, npcPower, hasRod, hasCar, canDoJob, canTryLiquor, tryLiquor, goalNews, goalPlace } from './core/goals.js';
 import {
   conversation, storyLine, praiseLine, newsLine, HOBBY, SHOW, TRAIN_TALK, GREET_RUN, GIFT, CONGRATS, THANKS, COMFORT, COMFORTED,
   FAINT_RUSH, THEFT_SEEN, MEAL_INVITE, SMALLTALK, pickLine, fillLine, STAFF_TALK, STAFF_SCRIPTS, PRAISED, savingLine
@@ -4687,6 +4687,28 @@ function boot() {
       } }
     ]);
   }
+  /** 친구의 술 자격 시험(차례 목표 다음에 바라는 것, core/goals.js): 검정소에서 응시료를 내고 보고, 붙든 떨어지든 마을 소식에 남는다. */
+  function npcLiquorExam(n) {
+    const ex = village.spots.exam;
+    const seats = [[0.7, 0.7], [1.5, 1.0], [0.1, 1.3]].map(([dx, dz]) => ({ x: ex.x + dx, z: ex.z + dz }));
+    setDoing(n.kind, 'pen', '술 자격 시험');
+    npcs.plan(n, [
+      { do: 'walk', slots: seats, near: 0.45 },
+      { do: 'act', anim: 'read', face: { x: ex.x, z: ex.z - 2 }, time: 6, say: lineOf(n.kind, 'examGo') },
+      { do: 'call', fn: () => {
+        const day = state.clock.day;
+        if (!canTryLiquor(state, n.kind, day)) { n.plan = null; return; }
+        const r = tryLiquor(state, n.kind, day);
+        commit(r.state, false);
+        const ev = happen({ type: r.passed ? 'liquorPass' : 'liquorFail', who: n.kind });
+        npcs.say(n, (r.passed && ev && storyLine(n.kind, ev, myName())) || lineOf(n.kind, r.passed ? 'examPass' : 'examFail'));
+        if (r.passed) hud.toast(`${josa(nameOf(n.kind), '이/가')} 술 자격을 땄어요!`, 3600, { icon: faceIcon(n.kind) });
+        else if (Math.hypot(n.x - player.position.x, n.z - player.position.z) < 14) hud.toast(`${josa(nameOf(n.kind), '이/가')} 술 자격 시험에 떨어졌어요`, 2800, { icon: faceIcon(n.kind) });
+        restHere(n.kind, 15 + Math.random() * 15);
+        setTimeout(() => { if (state && !npcs.busy(n)) reactToFriend(n, r.passed); }, 2600); // 단짝이 달려와 축하하거나 달래 준다
+      } }
+    ]);
+  }
   /**
    * 친구의 토벌 일감: 게시판에서 받고 → 마을 밖 그 몬스터에게 걸어가 쓰러뜨리고(점수가 쌓인다) → 게시판에서 보수를 받는다.
    * 몬스터는 친구를 쫓지 않는다(나만 노린다). 다 못 잡고 오래 헤매면 그만두고 일감을 돌려놓는다.
@@ -5068,6 +5090,8 @@ function boot() {
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
+    // 술 자격이 목표고 응시료가 모였으면 검정소가 여는 동안 시험을 보러 간다(하루 한 번)
+    if (hour >= 8 && hour < 17 && !tutorialActive(state.tutorial) && canTryLiquor(state, kind, day)) { npcLiquorExam(n); return 'exam'; }
     // 배가 고프면 가방(선물 · 나눠 받은 것)의 먹을 것을 꺼내 먹는다(라멘값을 아낀다)
     const snack = v.energy < SNACK_ENERGY && hour >= 7 && hour < 21 ? snackOf(state, kind) : null;
     if (snack && (v.energy < TIRED || Math.random() < 0.75)) { npcSnack(n, snack); return 'snack'; } // 지쳤으면 낮잠보다 간식 먼저
@@ -5107,17 +5131,32 @@ function boot() {
   const JOY = { chiikawa: ['cheer', 'hop', 'shy', 'clap'], hachiware: ['wave', 'clap', 'sway', 'cheer'], usagi: ['hop', 'spin', 'cheer'], kurimanju: ['clap', 'sway', 'wave'], rakko: ['think', 'clap', 'wave'], momonga: ['pose', 'spin', 'hop'] };
   const STAFF_JOY = ['clap', 'wave', 'cheer'];
   const joyAnim = (kind) => pickLine(JOY[kind] || STAFF_JOY);
-  /** 모은 돈으로 목표(무기 · 카메라는 도구점, 가구는 가구점)를 사러 간다: 가게 앞에서 기뻐하고 사면 마을 소식에 남는다. */
+  /**
+   * 모은 돈으로 목표를 이루러 간다(core/goals.js 의 goalPlace: 무기 · 카메라 · 낚싯대는 도구점, 가구 · 벽지는 가구점, 포셰트는 포셰트 가게,
+   * 집 넓히기는 부동산, 마을 가꾸기는 모금함). 그 앞에서 기뻐하고 이루면 마을 소식에 남는다.
+   */
   const BUY_SAY = { chiikawa: '…드디어…! 이거 주세요…!', hachiware: '드디어 산다~! 이거 주세요!', usagi: '야하! 야하!', kurimanju: '하아~ 이걸로 할게', rakko: '…이것으로 하지' };
+  const HOME_SAY = { chiikawa: '…집을… 넓히고 싶어요…!', hachiware: '집을 넓히고 싶어요~!', usagi: '(팔을 활짝 벌린다) 우라!', kurimanju: '하아~ 집 좀 넓혀 볼까', rakko: '…집을 넓히겠다' };
+  const DONATE_SAY = { chiikawa: '…마을이 예뻐지면 좋겠어…', hachiware: '마을 가꾸기에 보태야지~!', usagi: '(동전을 넣는다) 야하!', kurimanju: '하아~ 조금 보태 볼까', rakko: '…마을을 위해서다' };
+  const PLACE_NAME = { tools: '도구점', furniture: '가구점', pochette: '포셰트 가게', realty: '부동산', donation: '마을 가꾸기 모금함' };
   function npcShop(n) {
-    const g = goalOf(state, n.kind), tools = !!g && (g.kind === 'weapon' || g.kind === 'camera' || g.kind === 'rod' || g.kind === 'car'), door = g && (tools ? village.spots.tools : village.spots.furniture); // 카메라(하치와레) · 낚싯대 · 자동차(랏코)도 도구점에서
-    if (!door) { restHere(n.kind, 5); return; }
-    setDoing(n.kind, 'star', `${tools ? '도구점' : '가구점'}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
-    npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say: BUY_SAY[n.kind] || '이거 주세요!' }, {
+    const g = goalOf(state, n.kind), place = goalPlace(g), door = place && village.spots[place];
+    if (!door || !PLACE_NAME[place]) { restHere(n.kind, 5); return; }
+    setDoing(n.kind, 'star', `${PLACE_NAME[place]}에 가는 중`); // 무엇을 사는지는 이야기로 알게 된다
+    const say = (g.kind === 'home' ? HOME_SAY : g.kind === 'donate' ? DONATE_SAY : BUY_SAY)[n.kind] || '이거 주세요!';
+    npcs.plan(n, [{ do: 'walk', x: door.x, z: door.z, near: 0.7 }, { do: 'act', anim: joyAnim(n.kind), time: 1.6, say }, {
       do: 'call',
       fn: () => {
-        const r = buyGoal(state, n.kind, state.clock.day); // 오는 사이 돈을 써 버렸으면 못 산다
-        if (r.ok) { commit(r.state, false); happen({ type: 'buy', who: n.kind, item: r.goal.label, cost: r.goal.cost }); }
+        const r = buyGoal(state, n.kind, state.clock.day); // 오는 사이 돈을 써 버렸거나 그 시설이 다 모였으면 못 이룬다
+        if (r.ok) {
+          commit(r.state, false);
+          happen({ type: goalNews(r.goal), who: n.kind, item: r.goal.label, cost: r.goal.cost });
+          if (r.goal.kind === 'donate') {
+            panels.refresh('works');
+            // 친구가 보태서 다 모였으면 내가 낸 것처럼 알린다(다음 날 아침에 생긴다)
+            if (r.full) hud.toast(`${josa(nameOf(n.kind), '이/가')} 보태서 ${josa(r.goal.label, '이/가')} 다 모였어요! 내일 아침에 생겨요`, 3600, { icon: faceIcon(n.kind) });
+          }
+        }
         restHere(n.kind, 10 + Math.random() * 12);
       }
     }]);
