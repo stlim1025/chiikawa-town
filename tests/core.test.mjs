@@ -87,6 +87,14 @@ test('multi-stage advance', () => {
   const v1 = W.advanceWeed(null, 'vine', 'clean'), v2 = W.advanceWeed(v1, 'vine', 'clean');
   assert.equal(v2.final, 'clean');
 });
+test('끊어진 풀은 얻지 못한다: 깔끔하게 뽑아야 일감 · 가방 · 도감에 들어간다(나눠 뽑다 한 번이라도 끊긴 풀도)', () => {
+  assert.equal(W.gotWeed('clean'), true);
+  assert.equal(W.gotWeed('snapped'), false);
+  assert.equal(W.gotWeed('none'), false);
+  const g = ['clean', 'snapped', 'clean'].reduce((pr, r) => W.advanceWeed(pr, 'giantweed', r), null);
+  assert.equal(g.done, true);
+  assert.equal(W.gotWeed(g.final), false);
+});
 test('poison stamina', () => {
   assert.equal(W.pullStamina('poisonweed', 'snapped'), W.STAMINA_PER_PULL + W.POISON_STAMINA);
   assert.equal(W.pullStamina('poisonweed', 'clean'), W.STAMINA_PER_PULL);

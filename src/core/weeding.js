@@ -107,6 +107,12 @@ export function advanceWeed(progress, kind, result) {
   return { stage, flawed, done, final: done ? (flawed ? 'snapped' : 'clean') : null };
 }
 
+/**
+ * 다 뽑은 풀을 얻는지: 깔끔하게 뽑아야 얻는다. 끊어진 풀(여러 번에 나눠 뽑다 한 번이라도 끊긴 풀도)은 그 자리에서 사라지고
+ * 일감 개수 · 가방 · 도감 · 퀘스트 어디에도 들어가지 않는다(내 캐릭터도 친구도 같다).
+ */
+export const gotWeed = (result) => result === 'clean';
+
 /** 한 번 뗄 때 드는 기운(독풀이 끊기면 더). */
 export function pullStamina(kind, result) {
   if (result === 'none') return 0;

@@ -34,7 +34,7 @@ import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
 import { createState, addMoney, trySpend, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
 import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
-import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
+import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, gotWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob, isFishJob } from './core/jobs.js';
 import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, EXAM_STREAK, payExamFee, NOVICE, gradeName } from './core/license.js';
 import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
@@ -2400,15 +2400,16 @@ function boot() {
       save();
       return;
     }
-    const result = prog.final;
-    const log = state.weedLog || {}, first = !log[weed.kind];
+    // 끊어진 풀은 못 얻는다(core/weeding.js 의 gotWeed): 일감 개수 · 가방 · 도감(퀘스트도 도감 수로 센다) · 같이 풀 뽑기에 넣지 않는다. 경험치는 조금
+    const result = prog.final, got = gotWeed(result);
+    const log = state.weedLog || {}, first = got && !log[weed.kind];
     next = {
-      ...next, license: gainXp(next.license, result, weed.kind), weedLog: { ...log, [weed.kind]: (log[weed.kind] || 0) + 1 },
+      ...next, license: gainXp(next.license, result, weed.kind), ...(got ? { weedLog: { ...log, [weed.kind]: (log[weed.kind] || 0) + 1 } } : {}),
       stats: { pulled: next.stats.pulled + 1, clean: next.stats.clean + (result === 'clean' ? 1 : 0) }
     };
-    const counted = next.job && JOB_TYPES[next.job.typeId].kind === weed.kind && !isComplete(next.job);
+    const counted = got && next.job && JOB_TYPES[next.job.typeId].kind === weed.kind && !isComplete(next.job);
     if (counted) next = { ...next, job: recordPull(next.job, weed.kind, result) };
-    else {
+    else if (got) {
       // 일감에 안 세는 풀은 가방에 모아 둔다(일감을 받으면 바로 낼 수 있다)
       const a = addItem(next, weed.kind, 1, result === 'clean' ? 1 : 0);
       next = a.state;
@@ -2442,7 +2443,7 @@ function boot() {
     }
     celebrateIfDone(state.job, next.job);
     state = next;
-    if (!counted && !state.exam && !seen('bag-herb')) {
+    if (got && !counted && !state.exam && !seen('bag-herb')) {
       markSeen('bag-herb');
       hud.toast('뽑은 풀은 주머니로', 2600);
     }
@@ -2450,7 +2451,7 @@ function boot() {
       markSeen('exam-' + state.license.grade);
       announceExam();
     }
-    didAct('weed'); // 일상 부탁: 같이 풀 뽑기
+    if (got) didAct('weed'); // 일상 부탁: 같이 풀 뽑기
     save();
   }
 

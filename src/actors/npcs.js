@@ -1,6 +1,7 @@
 import { buildNpc, animateChibi, propFor } from './models.js';
 import { EAT_ANIMS } from './eatmotion.js';
 import { VILLAGE_R, groundY, lotById } from '../core/layout.js';
+import { gotWeed } from '../core/weeding.js';
 
 /** 말 걸면 하는 대사. */
 const TALK = {
@@ -334,7 +335,7 @@ export function createNpcs(scene, village, weeds, berries) {
       const spot = weedSpot(n, best);
       if (!spot) { (step.skip = step.skip || new Set()).add(best); n.timer = 0.2; return; } // 설 자리가 없는 풀은 건너뛴다
       n.task = {
-        type: 'weed', weed: best, onDone: () => { step.left--; step.onPull?.(); },
+        type: 'weed', weed: best, onDone: (result) => { if (!gotWeed(result)) return; step.left--; step.onPull?.(); }, // 끊어진 풀은 일감에 안 센다(다른 풀을 더 뽑는다)
         onFail: () => (step.skip = step.skip || new Set()).add(best) // 다음엔 다른 풀을 고른다
       };
       clearRoute(n);
