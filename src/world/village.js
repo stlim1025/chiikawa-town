@@ -728,7 +728,9 @@ export function buildVillage(scene) {
   const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0xffc56b, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const poolGeo = new THREE.CircleGeometry(1.9, 28).rotateX(-Math.PI / 2);
   const lampGlows = []; // 후광 · 빛 웅덩이: 낮엔 감춘다(투명도 0 이어도 보이게 두면 매 장면 40번쯤 헛그렸다)
+  const lampList = []; // 세운 가로등 자리(막대 과자 데이 깃발 줄을 건다 — world/festival.js)
   function lamp(x, z) {
+    lampList.push({ x, z });
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     place(g, toonMesh(GEO.cylinder, '#4a3f48', { scale: [0.17, 0.12, 0.17] }));
@@ -884,6 +886,8 @@ export function buildVillage(scene) {
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
     /** 가로등을 하나 더 세운다(마을 가꾸기 '바깥 길 가로등'): { group, obstacle }. 숨길 때는 group.visible 과 obstacle.off. */
     lamp: (x, z) => lamp(x, z),
+    /** 세운 가로등 자리 [{ x, z }](읽기만). */
+    lamps: lampList,
     /** 글씨 간판 재질(다른 간판처럼 밤에는 어두워진다). opts: signTexture 와 같다. */
     signMaterial(text, opts) { const m = new THREE.MeshBasicMaterial({ map: signTexture(text, opts) }); signs.push(m); return m; },
     /** 나무 울타리 묶음(마을 가꾸기 '든든한 돌담'이 생기면 숨긴다). */

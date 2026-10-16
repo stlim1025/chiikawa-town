@@ -1,7 +1,7 @@
 import { JOB_TYPES, availableJobs, isComplete, payout, gradedJob } from '../core/jobs.js';
 import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName } from '../core/fishing.js';
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
-import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
+import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS, isOnSale } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
 import { FURNITURE, FURNITURE_CATS, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, sizeOf, decorOf, hasDecor } from '../core/home.js';
 import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, EVICT_AFTER, LODGING_PRICE, ROUGH_REST, housingOf } from '../core/housing.js';
@@ -807,13 +807,16 @@ export function createPanels(ui, handlers) {
         pizzabun: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M15 8q1-2 0-4M20 8q1-2 0-4M25 8q1-2 0-4" fill="none" stroke="#c9b9a6" stroke-width="1.6" stroke-linecap="round"/><path d="M6 24q0-13 14-13t14 13q0 8-14 8T6 24z" fill="#fbd3a0" stroke="#a8743a" stroke-width="2"/><path d="M9 25q11 5 22 0" fill="none" stroke="#e8573f" stroke-width="2.4" stroke-linecap="round"/><circle cx="15" cy="28" r="1.6" fill="#f2c43d"/><circle cx="25" cy="28" r="1.4" fill="#8fbf5a"/></svg>',
         highball: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 6h16l-2 28H14z" fill="#eaf6fb" stroke="#9cc4d6" stroke-width="2"/><path d="M13 14h14l-1.4 19H14.4z" fill="#f2c25e" opacity=".85"/><rect x="16" y="16" width="6" height="5" rx="1.2" fill="#fff" opacity=".8"/><rect x="19" y="22" width="5" height="4.5" rx="1.2" fill="#fff" opacity=".7"/><circle cx="27" cy="9" r="4.5" fill="#f8e36a" stroke="#d8b733" stroke-width="1.5"/><path d="M27 4.5v9M22.5 9h9" stroke="#d8b733" stroke-width="1"/></svg>'
       };
+      // 막대 과자(축제 메뉴): 초콜릿을 입힌 가는 과자 막대 셋
+      ART.sticksnack = '<svg viewBox="0 0 40 40" aria-hidden="true"><g stroke-linecap="round"><path d="M11 34L19 6" stroke="#e9c48a" stroke-width="3.4"/><path d="M14.2 22.8L19 6" stroke="#6b3f26" stroke-width="4"/><path d="M20 35V6" stroke="#e9c48a" stroke-width="3.4"/><path d="M20 23V6" stroke="#ff9fc0" stroke-width="4"/><path d="M29 34L21 6" stroke="#e9c48a" stroke-width="3.4"/><path d="M25.8 22.8L21 6" stroke="#6b3f26" stroke-width="4"/></g><circle cx="17.6" cy="12" r="0.9" fill="#fff"/><circle cx="20" cy="15" r="0.9" fill="#fff"/></svg>';
       ART.shisaramen = ART.ramen; // 시사 특제 라멘(같은 그릇)
       const out = [head(shop.name, s.money), h('p', { class: 'sub' }, `지금 기운 ${s.stamina} / ${MAX_STAMINA}`)];
       shop.items.forEach((item) => {
         if (item.after && !(s.story || {})[item.after]) return; // 새 메뉴는 소식이 나온 뒤부터
+        if (!isOnSale(s, item)) return; // 축제 메뉴(막대 과자)는 축제 동안만
         const lock = item.needs && !hasLicense(s, item.needs), full = !item.item && s.stamina >= MAX_STAMINA; // 포장은 배불러도 산다
         out.push(h('div', { class: 'row pub-row' }, ART[item.id] ? svgSpan('lic-ico', ART[item.id]) : null,
-          h('div', {}, h('div', { class: 't' }, item.name, item.after ? h('span', { class: 'weed-count' }, '새 메뉴') : null), h('div', { class: 'd' }, item.item ? '포장해서 가방에 넣어 가요' : `기운 +${item.stamina}`)),
+          h('div', {}, h('div', { class: 't' }, item.name, item.fest ? h('span', { class: 'weed-count' }, '축제') : item.after ? h('span', { class: 'weed-count' }, '새 메뉴') : null), h('div', { class: 'd' }, item.item ? '포장해서 가방에 넣어 가요' : `기운 +${item.stamina}`)),
           lock ? h('span', { class: 'lic-badge' }, '자격증 필요') : full ? h('span', { class: 'lic-badge' }, '배불러요')
             : priceBtn(item.price, s.money, after(() => handlers.buy(item.id)))));
       });
@@ -1362,6 +1365,8 @@ export function createPanels(ui, handlers) {
         row('시사의 슈퍼 알바이터', '저녁 공부 또는 시험 날 검정소 앞', go('공부', () => D.shisaStudy()), go('시험', () => D.shisaExam())),
         row('하치와레가 구덩이에!', '숲 구덩이 앞에 덩굴풀 3개 들고', go('가기', () => D.hachiPit())),
         row('잠옷 밤나들이', '밤 9시 내 집 앞, 귀 달린 잠옷 입고', go('가기', () => D.pajama())),
+        row('집들이', '집을 산 다음 날 저녁 6시 반, 내 집 근처', go('가기', () => D.housewarm())),
+        row('막대 과자 데이', '11월 10일 아침(장식, 가게, 친구 선물) 또는 11일 저녁 광장 앞', go('축제', () => D.stickDay()), go('파티', () => D.stickDay(true))),
         row('수상한 섬 합숙', '다음 날 아침 선착장 앞, 또는 동굴과 결전 장면부터(보상 없음)', go('선착장', () => D.island()), go('동굴', () => D.island('cave2')), go('결전', () => D.island('battle'))),
         row('파자마 파티즈', '밤 8시 광장 앞, 또는 무대만 바로(보상 없음)', go('광장', () => D.pajamaParty()), go('무대', () => D.pajamaParty('show'))),
         row('별 세 개', '저녁 7시 가게 앞, 또는 가게 안 장면만(보상 없음)', go('가게 앞', () => D.starDiner()), go('장면만', () => D.starDiner('show'))),

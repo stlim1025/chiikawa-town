@@ -1,6 +1,7 @@
 import { MAX_STAMINA, trySpend, restoreStamina } from './state.js';
 import { hasLicense } from './licenses.js';
 import { addItem } from './inventory.js';
+import { STICK_SNACK, isStickFest } from './stickday.js';
 
 /** 가게와 상품. */
 export const SHOPS = {
@@ -11,7 +12,8 @@ export const SHOPS = {
       { id: 'onigiri', name: '주먹밥', price: 30, stamina: 25 },
       { id: 'highball', name: '하이볼', price: 90, stamina: 45, needs: 'liquor' }, // 술 자격이 있어야 판다
       { id: 'pizzabun', name: '피자호빵', price: 60, item: 'pizzabun', after: 'pizzaNews' }, // 새 메뉴(소식이 나온 뒤부터): 포장해서 가방에
-      { id: 'shisaramen', name: '시사 특제 라멘', price: 120, stamina: 80, after: 'shisaPass' } // 시사가 슈퍼 알바이터에 붙은 뒤부터
+      { id: 'shisaramen', name: '시사 특제 라멘', price: 120, stamina: 80, after: 'shisaPass' }, // 시사가 슈퍼 알바이터에 붙은 뒤부터
+      { id: STICK_SNACK, name: '막대 과자', price: 30, item: STICK_SNACK, fest: 'stick' } // 막대 과자 데이 축제(11월 10 ~ 12일)에만: 포장해서 가방에
     ]
   },
   // 맥주집(마을 동쪽 노점): 저녁이면 쿠리만쥬가 와서 한 잔 한다. 같이 건배하면 친해진다
@@ -28,10 +30,14 @@ export const CHEERS_PRICE = 200, CHEERS_STAMINA = 30;
 export const PUB_HOURS = [17, 21];
 export const isPubHour = (hour) => hour >= PUB_HOURS[0] && hour < PUB_HOURS[1];
 
-/** 상품을 산다. item 이 있는 상품은 그 자리에서 먹지 않고 포장해서 가방에(→ { ok, state, item }). after: 그 소식(state.story)이 난 뒤부터 판다. */
+/** 축제 상품(fest)을 지금 파는지(그 밖의 상품은 늘). */
+export const isOnSale = (state, item) => !item.fest || (item.fest === 'stick' && isStickFest(state));
+
+/** 상품을 산다. item 이 있는 상품은 그 자리에서 먹지 않고 포장해서 가방에(→ { ok, state, item }). after: 그 소식(state.story)이 난 뒤부터 판다. fest: 그 축제 동안만 판다. */
 export function buy(state, shopId, itemId) {
   const item = SHOPS[shopId].items.find(i => i.id === itemId);
   if (item.after && !(state.story || {})[item.after]) return { ok: false, reason: 'soon', state };
+  if (item.fest && !isOnSale(state, item)) return { ok: false, reason: 'soon', state };
   if (item.needs && !hasLicense(state, item.needs)) return { ok: false, reason: 'license', state };
   if (item.item) {
     const paid = trySpend(state, item.price);

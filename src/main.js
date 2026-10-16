@@ -122,6 +122,13 @@ import { createMinigame } from './ui/minigame.js';
 import { createShisaStory } from './stories/shisa.js';
 import { createHachiPit } from './stories/hachipit.js';
 import { createPajamaStory } from './stories/pajama.js';
+import { createHousewarm } from './stories/housewarm.js';
+import { createStickParty } from './stories/stickday.js';
+import { createFestival } from './world/festival.js';
+import { createConfetti } from './world/confetti.js';
+import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
+import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
+import { PLAZA } from './core/layout.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
@@ -1239,6 +1246,28 @@ function boot() {
         player.setPosition(h.x + 4, h.z + 3);
         cam.snap(player.position);
       },
+      /** 집들이: 내 집을 산 것으로(산 날은 어제) 저녁 6시 반, 집 앞 조금 떨어진 곳(걸어가면 시작 · 보상까지). */
+      housewarm() {
+        if (housewarm.active) return;
+        const day = Math.max(2, state.clock.day), st = { ...(state.story || {}), houseDay: day - 1 };
+        delete st.housewarm;
+        commit({ ...state, housing: { ...housingOf(state), own: true, unpaid: 0 }, story: st, clock: { day, t: (18.5 - 6) / 24 } });
+        const h = village.spots.home;
+        player.setPosition(h.x + 3, h.z + 4);
+        cam.snap(player.position);
+      },
+      /** 막대 과자 데이: party 면 11월 11일 저녁 6시 반 광장 앞(걸어 들어가면 파티 · 보상까지), 아니면 11월 10일 아침(소식 · 장식 · 가게 · 친구 선물). */
+      stickDay(party) {
+        if (stickParty.active) return;
+        const want = party ? 11 : 10;
+        let day = state.clock.day;
+        for (let k = 0; k < 400; k++, day++) { const d = dateOf(state.startDate, day); if (d.m === 11 && d.d === want) break; }
+        const st = { ...(state.story || {}) };
+        delete st.stick;
+        commit({ ...state, story: st, clock: { day, t: ((party ? 18.5 : 9) - 6) / 24 } });
+        player.setPosition(PLAZA.x + 1, PLAZA.z + PLAZA.r + 3);
+        cam.snap(player.position);
+      },
       /** 파자마 파티즈: show 면 무대만 바로(보상 없음), 아니면 잠옷 밤나들이를 끝낸 것으로 하고 부탁을 받은 채 밤 8시 광장 앞(걸어 들어가면 시작 · 보상까지). */
       pajamaParty(show) {
         if (idolStory.active) return;
@@ -1670,6 +1699,9 @@ function boot() {
       shisaStory.reset();
       hachiPit.reset();
       pajama.reset();
+      housewarm.reset();
+      stickParty.reset();
+      confetti.clear();
       islandTrip.reset();
       idolStory.reset();
       starDiner.reset();
@@ -1894,7 +1926,62 @@ function boot() {
   }
 
   /** 내 집 마련! */
+  // ---------- 마을 이벤트(게임 오리지널): 집들이 · 막대 과자 데이(core/events.js · core/stickday.js) ----------
+  let hwNote = 0, partyNote = 0; // 그날 저녁 알림을 띄운 날
+  const eventWhen = (text) => ({ chips: [{ icon: ICO.pin, text }, { icon: ICO.clock, text: '밤 9시까지' }] });
+  /** 0.3초마다(움직일 수 있을 때): 이벤트 소식 · 알림, 그 자리에 오면 장면 시작. */
+  function checkEvents(p, hour) {
+    const st = state.story || {}, day = state.clock.day;
+    // 예전 저장에서 이미 내 집이면 처음 본 날을 산 날로 삼는다(그다음 날 저녁 집들이)
+    if (housingOf(state).own && st.houseDay == null && !st.housewarm) {
+      commit(noteHouseBought(state, day));
+      hud.toast('내일 저녁 집들이를 열어요!', 4600, { chips: [{ icon: ICO.clock, text: '저녁 6시 ~ 9시' }, { icon: ICO.pin, text: '내 집 앞' }] });
+      return;
+    }
+    if (housewarmDue(state, hour)) {
+      if (nearHome()) { startHousewarm(); return; }
+      if (hwNote !== day) { hwNote = day; hud.toast('오늘 저녁은 집들이! 친구들이 내 집 앞으로 와요', 4600, eventWhen('내 집 앞')); }
+    }
+    if (stickNewsDue(state)) {
+      commit(markStickNews(state));
+      hud.banner('막대 과자 데이!', '11월 10일부터 12일까지 마을 축제예요', 3800);
+      sound.play('done');
+      setTimeout(() => hud.toast('라멘 로우에서 막대 과자를 팔아요', 4400, { chips: [{ icon: itemSvg(STICK_SNACK), text: '막대 과자' }, { icon: ICO.pin, text: '11일 저녁 광장 파티' }] }), 3900);
+      return;
+    }
+    if (stickPartyDue(state, hour)) {
+      if (Math.hypot(p.x - PLAZA.x, p.z - PLAZA.z) < PLAZA.r + 0.6) { startStickParty(); return; }
+      if (partyNote !== day) { partyNote = day; hud.toast('광장에서 막대 과자 파티가 열렸어요!', 4600, eventWhen('광장')); }
+    }
+  }
+  function startHousewarm() {
+    cancelPull();
+    housewarm.play(housewarmGuests(state).filter((k) => npcs.byKind(k)), (came) => {
+      const r = finishHousewarm(state, came);
+      commit(r.state);
+      eventDone('집들이 끝!', '처음 내 집', r);
+    });
+  }
+  function startStickParty() {
+    cancelPull();
+    stickParty.play(STICK_FRIENDS.filter((k) => npcs.byKind(k)), (came) => {
+      const r = finishStickParty(state, came);
+      commit(r.state);
+      eventDone('막대 과자 데이!', '광장 막대 과자 파티', r);
+    });
+  }
+  /** 이벤트 보상 카드(부탁 완료 카드와 같은 모양): 하트 · 물건 그림 꼬리표, 하트 3개 선물 가구는 따로 알림. */
+  function eventDone(title, sub, r) {
+    const chips = r.parts.map((pt) => ({ icon: pt.kind === 'bond' ? 'heart' : pt.kind === 'item' ? itemSvg(pt.id) : null, text: pt.text }));
+    hud.questDone({ title, sub, chips, ms: 5600 });
+    sound.play('quest');
+    player.cheerTime = 2.4;
+    if (r.gifts.length) setTimeout(() => hud.toast('선물을 받았어요!', 3000, { chips: r.gifts.map((g) => ({ text: FURNITURE[g].name })) }), 5000);
+  }
   function celebrateHouse() {
+    commit(noteHouseBought(state, state.clock.day)); // 집들이는 다음 날 저녁(core/events.js)
+    happen({ type: 'playerHouse', who: 'me' }); // 마을 친구들이 듣고 이야기한다
+    setTimeout(() => hud.toast('내일 저녁 집들이를 열어요!', 4600, { chips: [{ icon: ICO.clock, text: '저녁 6시 ~ 9시' }, { icon: ICO.pin, text: '내 집 앞' }] }), 3300);
     hud.banner('내 집 마련!', '', 3200);
     sound.play('done');
     player.cheerTime = 1.8;
@@ -2865,6 +2952,7 @@ function boot() {
   let usagiClub = null; // 사이드스토리 '우사기의 집' 연출(stories/usagiclub.js — 아래에서 만든다)
   let islandTrip = null; // 사이드스토리 '수상한 섬 합숙'(stories/island.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
+  let housewarm = null, stickParty = null, confetti = null, festival = null; // 마을 이벤트(집들이 · 막대 과자 데이 — 아래에서 만든다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
@@ -2875,7 +2963,7 @@ function boot() {
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (housewarm && housewarm.active) || (stickParty && stickParty.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -2935,6 +3023,15 @@ function boot() {
   }
 
   /** 말을 걸면: 첫마디와 함께 동물의 숲처럼 고를 거리를 띄운다. */
+  /** 막대 과자 데이에 친구가 막대 과자를 건네며 하는 말(게임 오리지널). */
+  const STICK_GIVE = {
+    chiikawa: '…마, 막대 과자 데이라서… 이거…! (막대 과자를 내민다)',
+    hachiware: '오늘은 막대 과자 데이~! 이거 {name} 거야, 같이 먹자~',
+    usagi: '야하! (막대 과자를 쓱 내민다)',
+    kurimanju: '하아~ 막대 과자 데이네. 하나 줄게, 안주로도 좋아.',
+    rakko: '…막대 과자 데이라던데. 받아 둬라.',
+    momonga: '흥! 남는 거 하나 준다! 고마워해!'
+  };
   function talkTo(n) {
     const f = FRIENDS[n.kind];
     if (!f) return;
@@ -3047,6 +3144,17 @@ function boot() {
         sayAs(n, LODGE[n.kind], () => { endTalk(); doSleep('lodge'); });
       } else endTalk();
     };
+    // 막대 과자 데이: 축제 동안 처음 말을 걸면 막대 과자를 하나 건넨다(core/stickday.js, 가방이 꽉 찼으면 다음에)
+    if (!visiting && stickGiftDue(state, n.kind)) {
+      const r = takeStickGift(state, n.kind);
+      if (r.ok) {
+        commit(r.state);
+        npcs.emote(n, 'hop', 1.6);
+        sound.play('job');
+        sayAs(n, [STICK_GIVE[n.kind]], () => { hud.toast(`${FRIENDS[n.kind].name}에게 막대 과자를 받았어요`, 2800, { icon: itemSvg(STICK_SNACK) }); showTop(); });
+        return;
+      }
+    }
     showTop();
   }
 
@@ -3447,6 +3555,7 @@ function boot() {
     questT -= dt;
     if (questT > 0 || !state) return;
     questT = 0.3;
+    festival.setOn(isStickFest(state)); // 막대 과자 데이 사흘 동안 광장 장식
     checkReady();
     const p = player.position, hour = hourOf(state.clock);
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
@@ -3478,6 +3587,7 @@ function boot() {
     if (free && !talking) checkWorks();
     if (free && !talking && swapPayback && !swapStory.active) paybackSwap(); // 몸이 돌아온 뒤 하치와레가 하치와레 몸으로 번 것을 돌려준다
     if (!talking) worksChatter();
+    if (free && !talking && !swapOn) checkEvents(p, hour); // 마을 이벤트: 집들이 · 막대 과자 데이
     if (free && !talking && pizzaNewsDue(state)) { // 사이드스토리 '우사기의 피자호빵': 아침에 라멘 로우 새 메뉴 소식
       commit({ ...state, story: { ...(state.story || {}), pizzaNews: state.clock.day } });
       hud.toast('라멘 로우에 새 메뉴가 나왔대요!', 4200, { chips: [{ icon: itemSvg('pizzabun'), text: '피자호빵' }] });
@@ -4276,6 +4386,22 @@ function boot() {
     sleepHere: (after, dark) => doSleep('home', after, dark), // dark: 화면이 깜깜한 동안(아침 자리로 옮겨 두기)
     wakeBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); delete awayInfo[kind]; setDoing(kind, null, null); }
   });
+  // 마을 이벤트(게임 오리지널): 집들이(stories/housewarm.js) · 막대 과자 데이 광장 파티(stories/stickday.js) · 축제 장식 · 색종이
+  confetti = createConfetti(scene);
+  festival = createFestival(scene, village);
+  const eventCtx = {
+    npcs, village, guide, input, hud, staged, sound, cam, confetti, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    // 그 친구를 하던 일에서 빼서 (x, z) 에 데려온다(고블린 감옥에 갇혔거나 다른 이야기에 나온 중이면 null)
+    summon: (kind, x, z) => {
+      const n = npcs.byKind(kind);
+      if (!n || staged.has(kind) || (awayInfo[kind] && awayInfo[kind].why === 'jail')) return null;
+      dropJob(n); delete awayInfo[kind]; setDoing(kind, null, null); staged.add(kind); npcs.comeOut(n, x, z);
+      return n;
+    }
+  };
+  housewarm = createHousewarm(eventCtx);
+  stickParty = createStickParty(eventCtx);
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
@@ -7155,6 +7281,7 @@ function boot() {
       intro.update(dt);
     } else if (state && player && mode === 'play' && visiting) {
       guestTick(dt); // 친구 마을에 놀러 간 중
+      if (festival.on) festival.setOn(false); // 축제 장식은 내 마을에만
     } else if (state && player && mode === 'play') {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 창(노동 접수 · 가게 · 마을폰 …)을 보는 동안에도 시간은 흐른다
       loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
@@ -7167,6 +7294,9 @@ function boot() {
       shisaStory.update(dt);
       hachiPit.update(dt);
       pajama.update(dt);
+      housewarm.update(dt);
+      stickParty.update(dt);
+      confetti.update(dt);
       cameraStory.update(dt);
       idolStory.update(dt);
       starDiner.update(dt, t);
@@ -7258,7 +7388,7 @@ function boot() {
     hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
-    const cut = mode === 'play' && (pajama.active || !!starShow || !!closeup || blackStar.cutscene || cameraStory.cutscene);
+    const cut = mode === 'play' && (pajama.active || housewarm.cutscene || stickParty.cutscene || !!starShow || !!closeup || blackStar.cutscene || cameraStory.cutscene);
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
@@ -7266,7 +7396,7 @@ function boot() {
       if (starShow) starCamera(dt);
       else if (closeup) closeupCamera(dt);
       else {
-        const pp = pajama.camPose(dt) || cameraStory.camPose(); // 이야기 카메라(별 보기 · 뷰파인더)
+        const pp = pajama.camPose(dt) || housewarm.camPose(dt) || stickParty.camPose(dt) || cameraStory.camPose(); // 이야기 카메라(별 보기 · 뷰파인더)
         if (pp) { cam.set(pp.pos, pp.look); storyCam = true; }
         else {
           // 이야기 카메라가 끝나면 따라가기 카메라를 바로 내 자리에 붙인다(연출 전 자리 — 마을 — 에서 날아오지 않게)

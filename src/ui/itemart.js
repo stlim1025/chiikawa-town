@@ -135,6 +135,12 @@ Object.assign(EXTRA, {
     <path d="M32 36v20" stroke="${L}" stroke-width="5.6" stroke-linecap="round"/><path d="M32 36v20" stroke="#fffaf0" stroke-width="3" stroke-linecap="round"/>
     <circle cx="32" cy="24" r="15" fill="#ffb7cf" ${S}/><path d="M32 24m-2 0a2 2 0 1 1 4 0a5 5 0 1 1-9 0a8 8 0 1 1 15 0a11 11 0 1 1-21 0" fill="none" stroke="#e0527a" stroke-width="2.6" stroke-linecap="round"/>
     <circle cx="25" cy="17" r="2.4" fill="#fff" opacity=".8"/></svg>`,
+  // 막대 과자(막대 과자 데이): 아래는 맨 과자, 위는 초콜릿 · 딸기 초콜릿을 입힌 막대 셋
+  sticksnack: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="16" ry="3.5" fill="#e6d8b8"/>
+    <g stroke-linecap="round"><path d="M19 54L29 10" stroke="${L}" stroke-width="7"/><path d="M19 54L29 10" stroke="#e9c48a" stroke-width="4"/><path d="M23.6 34L29 10" stroke="${L}" stroke-width="8.4"/><path d="M23.6 34L29 10" stroke="#6b3f26" stroke-width="5.4"/>
+    <path d="M32 55V9" stroke="${L}" stroke-width="7"/><path d="M32 55V9" stroke="#e9c48a" stroke-width="4"/><path d="M32 33V9" stroke="${L}" stroke-width="8.4"/><path d="M32 33V9" stroke="#ff9fc0" stroke-width="5.4"/>
+    <path d="M45 54L35 10" stroke="${L}" stroke-width="7"/><path d="M45 54L35 10" stroke="#e9c48a" stroke-width="4"/><path d="M40.4 34L35 10" stroke="${L}" stroke-width="8.4"/><path d="M40.4 34L35 10" stroke="#6b3f26" stroke-width="5.4"/></g>
+    <circle cx="31" cy="15" r="1.3" fill="#fff"/><circle cx="33" cy="22" r="1.1" fill="#fff"/><circle cx="27.4" cy="18" r="1.1" fill="#fff" opacity=".7"/></svg>`,
   // 휴지(참가상): 꽃무늬 하늘색 상자에서 휴지가 퐁
   tissue: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="22" ry="4" fill="#e6d8b8"/>
     <path d="M10 30h44v22H10z" fill="#cfe7ff" ${S}/><path d="M24 30q8-4 16 0" fill="none" ${S}/>

@@ -2,6 +2,7 @@ import { itemInfo, countOf, takeItem } from './inventory.js';
 import { FRIENDS, giftBond, friendOf, hearts } from './friends.js';
 import { sellPrice } from './market.js';
 import { addToPantry } from './pantry.js';
+import { STICK_SNACK, isStickFest } from './stickday.js';
 
 /**
  * 친구에게 선물(말 걸기 → '선물 줄게' → 주머니에서 고르기): 가방 물건 하나를 친구 가방(pantry.js)에 넣고 친밀도가 오른다.
@@ -45,14 +46,18 @@ export const loves = (kind, id) => (LIKES[kind] || []).includes(id);
 /** 싫어하는 선물을 그 자리에서 바로 버리는 친구(성격이 솔직하다). 나머지는 받아 두었다가 몰래 버린다. */
 export const TOSS_NOW = ['momonga', 'usagi'];
 export const tossesNow = (kind) => TOSS_NOW.includes(kind);
-/** 그 친구의 취향: 'love' 좋아함 · 'hate' 싫어함 · 'ok' 보통. */
-export const tasteOf = (kind, id) => (loves(kind, id) ? 'love' : (DISLIKES[kind] || []).includes(id) ? 'hate' : 'ok');
+/**
+ * 그 친구의 취향: 'love' 좋아함 · 'hate' 싫어함 · 'ok' 보통.
+ * state 를 주면 그날 일도 본다: 막대 과자 데이 축제 동안 막대 과자는 누구에게나 좋아하는 선물(core/stickday.js).
+ */
+export const tasteOf = (kind, id, state = null) => (loves(kind, id) ? 'love' : (DISLIKES[kind] || []).includes(id) ? 'hate'
+  : id === STICK_SNACK && state && isStickFest(state) ? 'love' : 'ok');
 
 /** 물건 값(노동 접수 매입가)으로 정한 선물 점수: [이 값 이상, 좋아함 점수, 보통 점수] — 값이 큰 것부터 본다. */
 export const GIFT_PTS = [[1000, 6, 2], [300, 4, 2], [100, 3, 1], [30, 2, 1], [0, 2, 0]];
-/** 선물 하나로 오르는 친밀도(싫어하면 0). */
-export function giftPoints(kind, id) {
-  const taste = tasteOf(kind, id);
+/** 선물 하나로 오르는 친밀도(싫어하면 0). state 를 주면 그날 취향(축제 막대 과자)까지. */
+export function giftPoints(kind, id, state = null) {
+  const taste = tasteOf(kind, id, state);
   if (taste === 'hate') return 0;
   const [, love, ok] = GIFT_PTS.find(([min]) => sellPrice(id) >= min);
   return taste === 'love' ? love : ok;
@@ -69,13 +74,13 @@ export function canGift(id) {
  * → { ok, reason?: 'none' | 'today', state, taste, love, tossNow, gained, hearts, up, gift(선물 가구) }
  */
 export function giveGift(state, kind, id, day) {
-  const taste = FRIENDS[kind] ? tasteOf(kind, id) : 'ok';
+  const taste = FRIENDS[kind] ? tasteOf(kind, id, state) : 'ok';
   if (!FRIENDS[kind] || !canGift(id) || countOf(state, id) <= 0) return { ok: false, reason: 'none', state, taste, love: false };
   if (friendOf(state, kind).gotDay === day) return { ok: false, reason: 'today', state, taste, love: taste === 'love' };
   let s = takeItem(state, id, 1, false).state;
   const tossNow = taste === 'hate' && tossesNow(kind);
   if (!tossNow) s = addToPantry(s, kind, id, 1).state; // 착한 친구는 싫어도 일단 받아 둔다(나중에 몰래 버린다)
-  const b = giftBond(s, kind, giftPoints(kind, id), day);
+  const b = giftBond(s, kind, giftPoints(kind, id, state), day);
   return { ok: true, state: b.state, taste, love: taste === 'love', tossNow, gained: b.gained, hearts: b.hearts ?? hearts(friendOf(b.state, kind)), up: b.up, gift: b.gift };
 }
 
