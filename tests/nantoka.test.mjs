@@ -8,9 +8,9 @@ const H = await import(G + 'home.js');
 const { SIGNAL } = await import('../src/stories/nantoka.js');
 
 const at = (day, hour) => ({ day, t: (hour - 6) / 24 });
-const fresh = (day = 12, hour = 11) => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', clock: at(day, hour) });
+const fresh = (day = 20, hour = 11) => ({ ...St.createState({ name: 't', look: {} }), tutorial: 'done', clock: at(day, hour) });
 const withHearts = (s, kind, h) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: F.ptsForHearts(h), talk: 0, play: 0, gift: true } } });
-const friendly = (s, h = 2) => ['hachiware', 'chiikawa', 'usagi'].reduce((acc, k) => withHearts(acc, k, h), s);
+const friendly = (s, h = 3) => ['hachiware', 'chiikawa', 'usagi'].reduce((acc, k) => withHearts(acc, k, h), s);
 
 test('난토카바니아: 하치와레가 권하는 사이드스토리, 서쪽 숲 오솔길 장면 하나, 보상은 300원 · 친밀도 · 인형 세트', () => {
   assert.deepEqual(Q.checkQuestData(), []);
@@ -25,22 +25,22 @@ test('난토카바니아: 하치와레가 권하는 사이드스토리, 서쪽 �
   assert.ok(H.FURNITURE.dollset && H.FURNITURE.dollset.gift, '가게에서는 안 파는 선물 가구');
 });
 
-test('난토카바니아: 12일째부터 오전 10시 ~ 오후 5시, 하치와레 · 치이카와 · 우사기 모두 하트 2개부터', () => {
-  const s = friendly(fresh(12, 11));
+test('난토카바니아: 스무째 날부터 오전 10시 ~ 오후 5시, 하치와레 · 치이카와 · 우사기 모두 하트 3개부터', () => {
+  const s = friendly(fresh(20, 11));
   assert.ok(Q.canOffer(s, 'nantoka'));
-  assert.ok(!Q.canOffer(friendly(fresh(11, 11)), 'nantoka'), '11일째는 아직');
-  assert.ok(!Q.canOffer({ ...s, clock: at(12, 18) }, 'nantoka'), '저녁에는 없다(숲이라 낮에)');
-  assert.ok(!Q.canOffer(withHearts(s, 'usagi', 1), 'nantoka'), '우사기와도 하트 2개부터');
-  assert.ok(!Q.canOffer(withHearts(s, 'chiikawa', 1), 'nantoka'), '치이카와와도 하트 2개부터');
-  assert.ok(!Q.canOffer(withHearts(s, 'hachiware', 1), 'nantoka'), '하치와레와 하트 2개부터');
+  assert.ok(!Q.canOffer(friendly(fresh(19, 11)), 'nantoka'), '열아홉째 날은 아직');
+  assert.ok(!Q.canOffer({ ...s, clock: at(20, 18) }, 'nantoka'), '저녁에는 없다(숲이라 낮에)');
+  assert.ok(!Q.canOffer(withHearts(s, 'usagi', 2), 'nantoka'), '우사기와도 하트 3개부터');
+  assert.ok(!Q.canOffer(withHearts(s, 'chiikawa', 2), 'nantoka'), '치이카와와도 하트 3개부터');
+  assert.ok(!Q.canOffer(withHearts(s, 'hachiware', 2), 'nantoka'), '하치와레와 하트 3개부터');
   assert.ok(!Q.canOffer({ ...s, tutorial: 'board' }, 'nantoka'), '첫날 안내 중에는 없다');
 });
 
 test('난토카바니아: 받으면 서쪽 숲 오솔길에 가는 일이 생기고, 다 보면 보상(인형 세트가 집에)', () => {
-  let s = Q.startQuest(friendly(fresh(12, 11)), 'nantoka');
+  let s = Q.startQuest(friendly(fresh(20, 11)), 'nantoka');
   assert.equal(Q.stepOf(s, 'nantoka').type, 'visit');
   const money = s.money;
-  s = Q.giveReward(s, 'nantoka', 12).state;
+  s = Q.giveReward(s, 'nantoka', 20).state;
   assert.equal(s.money, money + 300);
   assert.equal(H.homeOf(s).owned.dollset, 1);
 });

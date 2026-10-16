@@ -1342,7 +1342,7 @@ function boot() {
         if (show) { nantokaStory.play(() => hud.toast('테스트: 난토카바니아 끝', 2400)); return; }
         const qs = { ...(state.quests || {}) };
         delete qs.nantoka;
-        commit({ ...startQuest({ ...state, quests: qs }, 'nantoka'), clock: { day: Math.max(12, state.clock.day), t: (11 - 6) / 24 } });
+        commit({ ...startQuest({ ...state, quests: qs }, 'nantoka'), clock: { day: Math.max(20, state.clock.day), t: (11 - 6) / 24 } });
         player.setPosition(DOLL_PATH.x + 4, DOLL_PATH.z);
         cam.snap(player.position);
       },

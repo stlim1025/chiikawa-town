@@ -527,7 +527,7 @@ export const QUESTS = {
   // 다들 원래 몸으로 돌아와 보따리에서 빠져나온다 → 강가에서 얼굴을 비춰 보며 안도한다. 장면은 stories/nantoka.js · world/nantoka.js.
   // 게임에서 정한 부분: 나도 같이 인형이 된 것(내 인형은 연두 멜빵바지), 뚜껑을 굴릴 때의 「지금!」 신호 놀이, 장소(서쪽 숲 오솔길), 여는 조건, 대사 전부와 보상(인형 세트 가구)
   nantoka: {
-    title: '난토카바니아', giver: 'hachiware', side: true, minDay: 12, hours: [10, 17], needHearts: 2, needFriends: { chiikawa: 2, usagi: 2 }, ask: '그 상자 뭐야?',
+    title: '난토카바니아', giver: 'hachiware', side: true, minDay: 20, hours: [10, 17], needHearts: 3, needFriends: { chiikawa: 3, usagi: 3 }, ask: '그 상자 뭐야?',
     offer: ['(하치와레가 작은 상자를 소중히 안고 싱글벙글하고 있다)', '헤헤, 이거? 아직 비밀이야~!', '서쪽 숲 오솔길에서 다 같이 열어 볼래? 치이카와랑 우사기도 부를게!', '{name}도 꼭 와야 해~!'],
     steps: [
       { type: 'visit', place: 'dollPath', hours: [10, 17], scene: 'nantoka', speaker: 'hachiware', goal: '서쪽 숲 오솔길에서 하치와레가 가져온 상자를 같이 열어 보자! (오전 10시 ~ 오후 5시)',
