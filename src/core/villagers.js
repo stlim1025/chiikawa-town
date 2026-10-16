@@ -119,8 +119,8 @@ export function villagerSpend(state, kind, amount, day) {
   const v = villagerOf(state, kind, day);
   return setVillager(state, kind, { ...v, money: Math.max(0, v.money - amount) });
 }
-/** 친구가 받을 일감의 보수(급수 배율 없이 기본 보수). */
-export const villagerPay = (id) => JOB_TYPES[id].base;
+/** 친구가 받을 일감의 보수(급수 배율 없이 기본 보수, 친구 보수가 따로 정해진 일감은 그 값 — 낚시 일감 friendBase). */
+export const villagerPay = (id) => JOB_TYPES[id].friendBase ?? JOB_TYPES[id].base;
 
 /** 오늘 모몽가가 아직 노리지 않았고, 내 지갑에 가져갈 만한 돈이 있는지. */
 export function canSteal(state, day) {

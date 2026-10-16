@@ -5,6 +5,24 @@ import { WEAPONS, MONSTERS, BOSS_EAT_COOL, bossEatWait } from '../src/core/comba
 import { createState } from '../src/core/state.js';
 import { GAME_START_DATE, dateLabel } from '../src/core/calendar.js';
 import { FURNITURE, FURNITURE_CATS } from '../src/core/home.js';
+import { JOB_TYPES } from '../src/core/jobs.js';
+import { villagerPay } from '../src/core/villagers.js';
+import { FISH } from '../src/core/fishing.js';
+import { SHIFT_BASE, BOWL_PAY } from '../src/core/ramen.js';
+
+test('낚시 일감: 나는 올린 보수, 친구는 예전 보수(friendBase) — 친구 살림 속도를 그대로 둔다', () => {
+  for (const id of ['fishMinnow', 'fishCrucian', 'fishMackerel']) {
+    const T = JOB_TYPES[id];
+    assert.ok(T.friendBase > 0 && T.friendBase < T.base, `${id}: 친구 보수가 내 보수보다 적다`);
+    assert.equal(villagerPay(id), T.friendBase);
+    assert.ok(T.base / T.target > FISH[T.kind].sell, `${id}: 일감으로 내는 쪽이 파는 것보다 이득`);
+  }
+  assert.equal(villagerPay('weed8'), JOB_TYPES.weed8.base, '다른 일감은 친구도 기본 보수 그대로');
+});
+
+test('알바 한 번(보통 실력 여섯 그릇, 팁 빼고)은 450원 이상: 100초 근무로 1초 4.5원, 평균 벌이만큼', () => {
+  assert.ok(SHIFT_BASE + 6 * BOWL_PAY >= 450);
+});
 
 test('보스전 먹기 쿨타임: 처음엔 바로, 먹은 뒤로는 BOSS_EAT_COOL 초를 기다린다', () => {
   assert.equal(bossEatWait(null, 100), 0);

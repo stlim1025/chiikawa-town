@@ -57,8 +57,9 @@ export function potState(pot, now) {
 }
 
 /** 근무 기본급과 그릇 하나의 보수(남은 인내심 0..1 에 따라 팁이 붙는다). */
-export const SHIFT_BASE = 100;
-export const BOWL_PAY = 30;
+// 2026-10-16 에 100 · 30 에서 올렸다: 예전 값으로는 보통 사람 한 번에 350원 남짓(1초에 3.5원)으로 평균 벌이보다 적었다
+export const SHIFT_BASE = 150;
+export const BOWL_PAY = 50;
 export const TIP_MAX = 20;
 export function servePay(patience) {
   return BOWL_PAY + Math.round(TIP_MAX * Math.max(0, Math.min(1, patience)));

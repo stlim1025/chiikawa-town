@@ -30,10 +30,10 @@ export const JOB_TYPES = {
   huntTurtle: { id: 'huntTurtle', title: '이끼 거북 2마리 토벌', kind: 'turtle', target: 2, base: 300, cleanBonus: 20, needGrade: 5, needLicense: 'hunter', hunt: true, where: '북쪽 바위산' },
   huntMoth: { id: 'huntMoth', title: '그림자 나방 3마리 토벌', kind: 'moth', target: 3, base: 255, cleanBonus: 15, needGrade: 5, needLicense: 'hunter', hunt: true, where: '마을 밖 (밤에만)' },
   // 낚시 일감(게임 오리지널): 낚싯대가 있어야 받는다(needTool). 제초 급수와 상관없이 그대로, 깔끔 보너스 없음.
-  // 낚은 물고기는 따로 팔 수 있으니 보수는 한 마리 매입가보다 넉넉히(일감으로 내는 쪽이 이득)
-  fishMinnow: { id: 'fishMinnow', title: '송사리 4마리 낚기', kind: 'minnow', target: 4, base: 110, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '마을 연못, 시냇물' },
-  fishCrucian: { id: 'fishCrucian', title: '붕어 3마리 낚기', kind: 'crucian', target: 3, base: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '시냇물, 호수' },
-  fishMackerel: { id: 'fishMackerel', title: '고등어 2마리 낚기', kind: 'mackerel', target: 2, base: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '남쪽 바다' }
+  // 낚은 물고기는 따로 팔 수 있으니 보수는 한 마리 매입가보다 넉넉히(일감으로 내는 쪽이 이득). 2026-10-16 물고기 값 1.5배와 함께 110 · 150 · 150 에서 올렸다(friendBase: 친구가 받는 보수는 예전 값 그대로 — 친구들은 물고기를 거의 팔지 않고 낚시 일감으로 벌어서, 올리면 친구 목표가 3주쯤 당겨졌다)
+  fishMinnow: { id: 'fishMinnow', title: '송사리 4마리 낚기', kind: 'minnow', target: 4, base: 180, friendBase: 110, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '마을 연못, 시냇물' },
+  fishCrucian: { id: 'fishCrucian', title: '붕어 3마리 낚기', kind: 'crucian', target: 3, base: 250, friendBase: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '시냇물, 호수' },
+  fishMackerel: { id: 'fishMackerel', title: '고등어 2마리 낚기', kind: 'mackerel', target: 2, base: 250, friendBase: 150, cleanBonus: 0, needGrade: 6, needTool: 'rod', fishing: true, where: '남쪽 바다' }
 };
 
 /** 풀을 뽑는 일감인지. */

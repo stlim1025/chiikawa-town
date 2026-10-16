@@ -9,20 +9,21 @@ import { POND, LAKE, RIVER, SOUTH_SHORE, BRIDGES, riverZ } from './layout.js';
  * size: 0 작은 고기 · 1 중간 · 2 큰 고기(칸이 좁고 물고기가 빠르다). day · night: 그때만 잡힌다. weight: 잘 잡히는 정도.
  * cm: 잡힐 때 크기 범위(낚시 기록 state.fishLog 에 가장 큰 것을 남긴다). junk: 쓰레기(놀이 없이 바로 올라온다).
  */
+// sell: 2026-10-16 에 1.5배로(빈 깡통은 그대로). 예전 값으로는 낚시가 1초에 2.4 ~ 3.2원으로 어떤 벌이보다 적어 낚싯대를 사도 낚시를 안 했다
 export const FISH = {
-  minnow: { name: '송사리', sell: 12, waters: ['pond', 'river'], weight: 5, size: 0, cm: [3, 6], color: '#c9d6de', note: '작은 물고기. 연못과 시냇물에 많다.' },
-  goldfish: { name: '금붕어', sell: 70, waters: ['pond'], weight: 1, size: 0, cm: [6, 14], color: '#f2884a', note: '마을 연못에 숨어 사는 주황빛 물고기.' },
-  chub: { name: '피라미', sell: 18, waters: ['river'], weight: 5, size: 0, cm: [8, 15], color: '#a9c3cf', note: '시냇물을 재빠르게 오르내리는 물고기.' },
-  crucian: { name: '붕어', sell: 30, waters: ['river', 'lake'], weight: 4, size: 1, cm: [14, 28], color: '#b8a47a', note: '둥글넓적한 민물고기.' },
-  sweetfish: { name: '은어', sell: 60, waters: ['river'], weight: 1.5, size: 1, day: true, cm: [15, 25], color: '#cfe0e8', note: '맑은 낮의 시냇물에서만 잡힌다. 수박 냄새가 난다나?' },
-  catfish: { name: '메기', sell: 90, waters: ['river', 'lake'], weight: 2, size: 2, night: true, cm: [35, 70], color: '#6f6a63', note: '밤에만 어슬렁거리는 수염 난 물고기.' },
-  carp: { name: '잉어', sell: 45, waters: ['lake'], weight: 4, size: 1, cm: [30, 65], color: '#d8a868', note: '호수의 터줏대감.' },
-  trout: { name: '송어', sell: 60, waters: ['lake'], weight: 2.5, size: 1, cm: [25, 45], color: '#9fb7a8', note: '차가운 호숫물을 좋아한다.' },
-  rainbow: { name: '무지개송어', sell: 130, waters: ['lake'], weight: 0.8, size: 2, cm: [35, 60], color: '#e7a0b8', note: '옆구리에 무지개빛 줄이 있는 귀한 송어.' },
-  mackerel: { name: '고등어', sell: 40, waters: ['sea'], weight: 5, size: 1, cm: [25, 40], color: '#6f94bb', note: '바다에서 떼 지어 다닌다.' },
-  puffer: { name: '복어', sell: 80, waters: ['sea'], weight: 2, size: 1, cm: [12, 28], color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
-  seabream: { name: '도미', sell: 120, waters: ['sea'], weight: 1.5, size: 2, cm: [30, 55], color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
-  octopus: { name: '문어', sell: 180, waters: ['sea'], weight: 0.6, size: 2, night: true, cm: [40, 90], color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
+  minnow: { name: '송사리', sell: 18, waters: ['pond', 'river'], weight: 5, size: 0, cm: [3, 6], color: '#c9d6de', note: '작은 물고기. 연못과 시냇물에 많다.' },
+  goldfish: { name: '금붕어', sell: 105, waters: ['pond'], weight: 1, size: 0, cm: [6, 14], color: '#f2884a', note: '마을 연못에 숨어 사는 주황빛 물고기.' },
+  chub: { name: '피라미', sell: 27, waters: ['river'], weight: 5, size: 0, cm: [8, 15], color: '#a9c3cf', note: '시냇물을 재빠르게 오르내리는 물고기.' },
+  crucian: { name: '붕어', sell: 45, waters: ['river', 'lake'], weight: 4, size: 1, cm: [14, 28], color: '#b8a47a', note: '둥글넓적한 민물고기.' },
+  sweetfish: { name: '은어', sell: 90, waters: ['river'], weight: 1.5, size: 1, day: true, cm: [15, 25], color: '#cfe0e8', note: '맑은 낮의 시냇물에서만 잡힌다. 수박 냄새가 난다나?' },
+  catfish: { name: '메기', sell: 135, waters: ['river', 'lake'], weight: 2, size: 2, night: true, cm: [35, 70], color: '#6f6a63', note: '밤에만 어슬렁거리는 수염 난 물고기.' },
+  carp: { name: '잉어', sell: 70, waters: ['lake'], weight: 4, size: 1, cm: [30, 65], color: '#d8a868', note: '호수의 터줏대감.' },
+  trout: { name: '송어', sell: 90, waters: ['lake'], weight: 2.5, size: 1, cm: [25, 45], color: '#9fb7a8', note: '차가운 호숫물을 좋아한다.' },
+  rainbow: { name: '무지개송어', sell: 195, waters: ['lake'], weight: 0.8, size: 2, cm: [35, 60], color: '#e7a0b8', note: '옆구리에 무지개빛 줄이 있는 귀한 송어.' },
+  mackerel: { name: '고등어', sell: 60, waters: ['sea'], weight: 5, size: 1, cm: [25, 40], color: '#6f94bb', note: '바다에서 떼 지어 다닌다.' },
+  puffer: { name: '복어', sell: 120, waters: ['sea'], weight: 2, size: 1, cm: [12, 28], color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
+  seabream: { name: '도미', sell: 180, waters: ['sea'], weight: 1.5, size: 2, cm: [30, 55], color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
+  octopus: { name: '문어', sell: 270, waters: ['sea'], weight: 0.6, size: 2, night: true, cm: [40, 90], color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
   can: { name: '빈 깡통', sell: 3, waters: ['pond', 'river', 'lake', 'sea'], weight: 0.8, size: 0, junk: true, color: '#b9bec6', note: '누가 버렸담. 물이 깨끗해졌다.' }
 };
 registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { name: f.name, kind: 'fish', sell: f.sell, note: f.note }])));
