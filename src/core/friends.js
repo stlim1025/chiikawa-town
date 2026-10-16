@@ -81,11 +81,14 @@ export const CHATS = {
 };
 
 /**
- * 하트 n 개가 되는 누적 점수: 처음엔 금방 친해지고 갈수록 오래 걸린다(하트마다 2 · 4 · 6 · 8 · 10점).
- * 하루 상한(DAY_CAP 2점)으로 매일 이야기 + 놀기를 하면 첫 하트는 첫날, 다섯 개는 보름.
+ * 하트 n 개가 되는 누적 점수: 처음엔 금방 친해지고 갈수록 오래 걸린다(하트마다 3 · 6 · 9 · 12 · 15점).
+ * 하루 상한(DAY_CAP 2점)으로 매일 이야기 + 놀기만 하면 첫 하트는 이튿날, 다섯 개는 3주 남짓(퀘스트 · 선물 친밀도는 따로 더 오른다).
+ * 2026-10-16 에 1.5배로 늘렸다: 예전 곡선(CURVE_V3)으로는 퀘스트 · 선물까지 더해 친한 셋과 열흘 남짓이면 하트가 다 찼다.
  * 예전 저장은 하트 하나에 같은 점수였다(버전 1: 3점, 버전 2: 6점) → upgradeFriends · curveFriends 가 가진 하트를 그대로 두고 바꾼다.
+ * 버전 3 ~ 5 저장은 예전 곡선(CURVE_V3)이었다 → stretchFriends 가 가진 하트를 그대로 두고 바꾼다.
  */
-export const HEART_AT = [2, 6, 12, 20, 30];
+export const HEART_AT = [3, 9, 18, 30, 45];
+export const CURVE_V3 = [2, 6, 12, 20, 30];
 export const OLD_HEART_PTS = 3, FLAT_HEART_PTS = 6;
 export const MAX_HEARTS = 5;
 /** 하트 n 개(0..MAX_HEARTS)가 되는 점수. */
@@ -123,6 +126,20 @@ export function curveFriends(friends) {
     const h = Math.min(MAX_HEARTS, Math.floor(pts / FLAT_HEART_PTS)), rest = pts - h * FLAT_HEART_PTS;
     if (h >= MAX_HEARTS) return ptsForHearts(MAX_HEARTS) + rest;
     return Math.floor(ptsForHearts(h) + (rest / FLAT_HEART_PTS) * (ptsForHearts(h + 1) - ptsForHearts(h)));
+  };
+  return Object.fromEntries(Object.entries(friends).map(([kind, f]) => [kind, { ...f, pts: conv(f.pts) }]));
+}
+/**
+ * 버전 3 ~ 5 저장(CURVE_V3 곡선)의 점수를 지금 곡선(HEART_AT)으로 — curveFriends 처럼 가진 하트 개수와 다음 하트까지 채운 비율(내림)은 그대로,
+ * 하트를 다 채우고 남은 점수는 그대로 얹는다. 그날 쌓은 일상 친밀도(capPts)는 하루 상한을 세는 값이라 그대로 둔다.
+ */
+export function stretchFriends(friends) {
+  const at = (n) => (n <= 0 ? 0 : CURVE_V3[Math.min(n, MAX_HEARTS) - 1]);
+  const conv = (pts) => {
+    let h = 0;
+    while (h < MAX_HEARTS && pts >= CURVE_V3[h]) h++;
+    if (h >= MAX_HEARTS) return ptsForHearts(MAX_HEARTS) + (pts - at(MAX_HEARTS));
+    return Math.floor(ptsForHearts(h) + ((pts - at(h)) / (at(h + 1) - at(h))) * (ptsForHearts(h + 1) - ptsForHearts(h)));
   };
   return Object.fromEntries(Object.entries(friends).map(([kind, f]) => [kind, { ...f, pts: conv(f.pts) }]));
 }
