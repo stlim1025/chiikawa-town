@@ -326,6 +326,8 @@ export function createHud(ui, input) {
     onBag(fn) { bagBtn.addEventListener('click', fn); },
     /** 가방에 무언가 들어갔을 때 가방 버튼이 톡 튄다. */
     bagBump() { bagBtn.classList.remove('bump'); void bagBtn.offsetWidth; bagBtn.classList.add('bump'); },
+    /** 하치와레가 기운 이야기를 하는 동안 왼쪽 위 기운 알약을 반짝여 가리킨다. */
+    pointStamina(on) { q(status, '.hud-energy').classList.toggle('pointed', !!on); },
     /** 등불 버튼을 누르면(끔 → 랜턴 → 손전등). */
     onLight(fn) { lightBtn.addEventListener('click', fn); },
     /** 집으로 버튼을 누르면. */

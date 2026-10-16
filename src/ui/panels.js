@@ -1365,6 +1365,7 @@ export function createPanels(ui, handlers) {
         row('시사의 슈퍼 알바이터', '저녁 공부 또는 시험 날 검정소 앞', go('공부', () => D.shisaStudy()), go('시험', () => D.shisaExam())),
         row('하치와레가 구덩이에!', '숲 구덩이 앞에 덩굴풀 3개 들고', go('가기', () => D.hachiPit())),
         row('잠옷 밤나들이', '밤 9시 내 집 앞, 귀 달린 잠옷 입고', go('가기', () => D.pajama())),
+        row('기운 안내', '기운 25로 광장 앞, 하치와레가 달려와 라멘 로우로', go('가기', () => D.tiredGuide())),
         row('집들이', '집을 산 다음 날 저녁 6시 반, 내 집 근처', go('가기', () => D.housewarm())),
         row('막대 과자 데이', '11월 10일 아침(장식, 가게, 친구 선물) 또는 11일 저녁 광장 앞', go('축제', () => D.stickDay()), go('파티', () => D.stickDay(true))),
         row('수상한 섬 합숙', '다음 날 아침 선착장 앞, 또는 동굴과 결전 장면부터(보상 없음)', go('선착장', () => D.island()), go('동굴', () => D.island('cave2')), go('결전', () => D.island('battle'))),

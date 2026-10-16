@@ -37,7 +37,7 @@ import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './co
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, gotWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob, isFishJob } from './core/jobs.js';
 import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, EXAM_STREAK, payExamFee, NOVICE, gradeName } from './core/license.js';
-import { buy, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
+import { buy, SHOPS, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop.js';
 import { createStore } from './core/save.js';
 import { encodeSave, decodeSave } from './core/savecode.js';
 import { createSound } from './audio/sound.js';
@@ -1246,6 +1246,17 @@ function boot() {
         player.setPosition(h.x + 4, h.z + 3);
         cam.snap(player.position);
       },
+      /** 기운 안내: 기운 25로 광장 앞, 낮이 아니면 오전 10시로(하치와레가 달려와 라멘 로우로 데려가 첫 그릇을 사 준다). */
+      tiredGuide() {
+        const seenTips = state.seenTips.filter((t) => t !== 'guide-tired' && t !== 'guide-tired-done');
+        const h = hourOf(state.clock);
+        commit({ ...state, seenTips, stamina: 25, ...(h < 9 || h >= 19 ? { clock: { ...state.clock, t: (10 - 6) / 24 } } : {}) });
+        tiredCall = null; tiredShown = false;
+        guide.setGoal(null);
+        npcs.lead('hachiware', null);
+        player.setPosition(PLAZA.x, PLAZA.z + PLAZA.r + 2);
+        cam.snap(player.position);
+      },
       /** 집들이: 내 집을 산 것으로(산 날은 어제) 저녁 6시 반, 집 앞 조금 떨어진 곳(걸어가면 시작 · 보상까지). */
       housewarm() {
         if (housewarm.active) return;
@@ -1720,6 +1731,8 @@ function boot() {
       save();
       guide.setGoal(null);
       examGoal = null; // 다음에 들어오면 승급 시험 쪽지를 다시 띄운다
+      tiredCall = null; tiredShown = false; // 기운 안내도(데려가던 중이면 다시 들어올 때 쪽지를 다시 띄운다)
+      hud.pointStamina(false);
       npcs.setFollow('hachiware', false);
       // 마을 친구들이 하던 일감 · 일정을 멈춘다(타이틀에서도 친구들은 움직이는데, 일정 끝에 진행(state)을 고치다 오류가 났다)
       for (const n of npcs.list) npcs.plan(n, []);
@@ -2707,7 +2720,7 @@ function boot() {
     npcs.lead('hachiware', step === 'house' || step === 'houseTour' ? homeLead : step === 'board' || step === 'report' ? boardLead : null);
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
-    else if (step === 'tips') sayGuide(TUTORIAL_LINES.tips, () => enterTutorial('phone', 'tips'));
+    else if (step === 'tips') { hud.pointStamina(true); sayGuide(TUTORIAL_LINES.tips, () => { hud.pointStamina(false); enterTutorial('phone', 'tips'); }); } // 기운 이야기 동안 기운 알약을 가리킨다
     else if (step === 'phone') { tutPhoneOpened = false; sayGuide(TUTORIAL_LINES.phone, () => announceGoal(step)); }
     else if (step === 'phoneTour') sayGuide(TUTORIAL_LINES.phoneTour, () => { enterTutorial('done', 'phoneTour'); hud.toast('안내 끝!', 2400); });
     else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board, () => announceGoal(step));
@@ -2774,6 +2787,107 @@ function boot() {
       hud.announce({ kicker: '할 일!', title: '제초 5급을 따자!', sub: '검정소에 가서 시험 보자!', target: guide.goalEl, look: 'goal' });
     });
   }
+  // ---------- 기운 안내(게임 오리지널): 처음으로 기운이 TIRED_AT 아래로 떨어지면 하치와레가 달려와 기운 이야기를 하고 라멘 로우로 앞장선다.
+  // 가게 앞에 오면 첫 그릇은 하치와레가 사 준다(초반에 돈이 모자라도 막히지 않게). 한 번만: seen 'guide-tired'(불렀다) → 'guide-tired-done'(끝) ----------
+  const TIRED_AT = 30, TIRED_GOAL = '하치와레랑 라멘 먹으러 가자!';
+  const ramenSign = village.labels.find((l) => l.text === '라멘 로우');
+  const ramenLead = { get x() { return village.spots.ramen.x + 2.4; }, get z() { return village.spots.ramen.z + 1.8; } }; // 하치와레가 서서 기다리는 가게 앞 오른쪽(손님 의자 · 줄 옆)
+  let tiredCall = null; // 하치와레가 달려오는 중 { t }
+  let tiredShown = false; // 할 일 쪽지 · 라멘 로우 위 '여기!' 를 띄우는 중
+  let tiredWait = 0; // 라멘 로우 앞에서 하치와레를 기다린 초
+  const tiredReady = () => mode === 'play' && !guide.open && !panels.isOpen() && !sleeping && !funBusy() && !fainting && !pulling && !questScene;
+  /** 끝(첫 그릇을 먹었다 · 그새 자거나 먹어서 기운이 찼다): 쪽지를 걷고, 하던 안내(제초 5급 · 승급 시험)가 있으면 그 쪽지로 돌려놓는다. */
+  function endTiredGuide() {
+    tiredCall = null;
+    tiredShown = false;
+    if (!seen('guide-tired-done')) markSeen('guide-tired-done');
+    npcs.setFollow('hachiware', false);
+    npcs.lead('hachiware', grade5Shown ? examLead : null);
+    guide.setGoal(grade5Shown ? GRADE5_GOAL : examGoal, { top: true });
+  }
+  function updateTiredGuide(dt) {
+    if (!state || tutorialActive(state.tutorial) || seen('guide-tired-done')) return;
+    const n = npcs.byKind('hachiware');
+    if (seen('guide-tired')) {
+      // 데려가는 중(저장을 불러와도): 그새 기운이 찼으면 그만, 라멘 로우 앞에 오면 첫 그릇
+      if (state.stamina >= 80) { endTiredGuide(); return; }
+      if (!tiredShown) {
+        tiredShown = true;
+        guide.setGoal(TIRED_GOAL, { top: true });
+        if (n && !n.away && !n.party && !buddies.has('hachiware')) npcs.lead('hachiware', ramenLead);
+      }
+      const r = village.spots.ramen;
+      if (!player || Math.hypot(player.position.x - r.x, player.position.z - r.z) >= 4.5) { // 가게 앞 손님 줄 · 기다리는 하치와레 곁까지
+        if (tiredWait > 0 && n && n.follow) { npcs.setFollow('hachiware', false); npcs.lead('hachiware', ramenLead); } // 가게를 떠났으면 다시 앞장서서 기다린다
+        tiredWait = 0;
+        return;
+      }
+      // 내가 먼저 왔으면 하치와레가 달려온다(앞장서기는 내가 멀면 서서 기다려서). 곁에 오면(또는 오래 걸리면) 첫 그릇
+      if (!n || n.away) { tiredWait = 0; return; } // 하치와레가 집 안(밤잠 · 낮잠)이면 나올 때까지 기다린다(그새 자거나 사 먹어 기운이 차면 그만)
+      const here = Math.hypot(n.x - player.position.x, n.z - player.position.z) < 3.2;
+      if (!here && !n.follow && !n.party) { npcs.lead('hachiware', null); npcs.setFollow('hachiware', true); } // 앞장서기는 내가 멀면 서서 기다리니 그만두고 달려온다(아주 멀면 곁에 나타난다)
+      tiredWait += dt;
+      if ((here || tiredWait > 9) && tiredReady()) { npcs.setFollow('hachiware', false); treatRamen(n); }
+      return;
+    }
+    if (state.stamina >= TIRED_AT) { if (tiredCall) { tiredCall = null; npcs.setFollow('hachiware', false); if (grade5Shown) npcs.lead('hachiware', examLead); } return; }
+    if (tiredCall) {
+      // 달려오는 중: 가까이 오면(또는 오래 걸리면) 말을 건다
+      tiredCall.t += dt;
+      const near = n && player && Math.hypot(n.x - player.position.x, n.z - player.position.z) < 2.4;
+      if ((near || tiredCall.t > 9) && tiredReady()) callTired(n);
+      return;
+    }
+    // 마을 안에서만(몬스터 곁으로 부르지 않는다). 하치와레가 집 안 · 잠 · 같이 토벌 · 다른 안내로 달려오는 중이면 기다린다(검정소 앞에서 기다리던 중이면 데려온다)
+    if (!tiredReady() || visiting || grade5Call || !player || regionAt(player.position.x, player.position.z) !== 'village') return;
+    if (!n || n.away || n.party || n.follow || buddies.has('hachiware') || isSleepHour(hourOf(state.clock))) return;
+    tiredCall = { t: 0 };
+    npcs.lead('hachiware', null); // 앞장서기가 따라오기보다 먼저라(검정소 앞에서 기다리던 중이어도) 풀고 달려온다. 끝나면 endTiredGuide 가 돌려놓는다
+    npcs.setFollow('hachiware', true); // 내 쪽으로 달려온다
+  }
+  function callTired(n) {
+    tiredCall = null;
+    npcs.setFollow('hachiware', false);
+    if (n) beginTalk(n);
+    hud.pointStamina(true);
+    sayGuide([
+      '{name}~! 잠깐잠깐!',
+      '왼쪽 위에 하트랑 분홍 막대 보여? 그게 기운이야~',
+      '거의 바닥났네! 풀 뽑고 일하면 줄어들거든~',
+      '기운이 없으면 손이 떨려서 풀도 잘 안 뽑혀…',
+      '라멘 먹으러 가자! 첫 그릇은 내가 살게~ 따라와!'
+    ].map(fillName), () => {
+      hud.pointStamina(false);
+      markSeen('guide-tired'); // 말을 다 듣고 나서(말하는 동안 데려가기 쪽지가 먼저 뜨지 않게)
+      if (n) { endTalk(); npcs.lead('hachiware', ramenLead); } // 라멘 로우 앞까지 앞장서서 기다린다
+      tiredShown = true;
+      guide.setGoal(TIRED_GOAL, { hold: true, top: true });
+      sound.play('job');
+      hud.announce({ kicker: '할 일!', title: '라멘 먹으러 가자!', sub: '하치와레가 라멘 로우에서 기다려!', target: guide.goalEl, look: 'goal' });
+    });
+  }
+  /** 라멘 로우 앞: 첫 그릇은 하치와레가 사 준다. 같이 후루룩 먹고, 다음부터 사 먹는 법과 자면 차는 것까지 알려 준다. */
+  function treatRamen(n) {
+    markSeen('guide-tired-done');
+    const bowl = SHOPS.ramen.items.find((i) => i.id === 'ramen');
+    if (n && n.away) n = null;
+    if (n) beginTalk(n);
+    sayGuide(['여기가 라멘 로우야~', '자, 첫 그릇은 내가 살게! 같이 먹자~'], () => {
+      commit(restoreStamina(state, bowl.stamina));
+      sound.play('eat');
+      eatMotion('ramen');
+      didAct('ramen');
+      hud.toast(`후루룩! 기운이 ${bowl.stamina} 찼어요`, 2400);
+      if (n) npcs.act(n, 'slurp', { face: ramenFace(), time: 4 });
+      sayGuide([
+        '헤헤, 맛있지~? 기운이 다시 찼어!',
+        '다음부턴 가게 앞에서 버튼 눌러서 주문해~',
+        `라멘 한 그릇에 ${won(bowl.price)}이야!`,
+        '집에 가서 푹 자도 기운이 다시 차~',
+        '기운이 바닥나기 전에 꼭 챙겨 먹어!'
+      ], () => { if (n) endTalk(); endTiredGuide(); });
+    });
+  }
   // ---------- 승급 시험 알림(5급 → 4급부터): 위에 뜨는 작은 알림 한 줄은 못 보고 지나치기 쉬웠다. 가운데에 큼직한 카드가 떴다가
   // 할 일 쪽지로 꽂히고, 시험을 볼 때까지 할 일 쪽지와 검정소 위 '여기!' 가 남는다 ----------
   let examGoal = null; // 할 일 쪽지에 띄운 승급 시험 글(없으면 null)
@@ -2819,6 +2933,7 @@ function boot() {
     const jobDone = state && state.job && isComplete(state.job);
     // 집 안내(첫날, 또는 하치와레에게 집을 물었을 때): 내 집 간판 위에
     if (step === 'house' || escort) return { id: 'guide', x: homeLabel.x, y: homeLabel.y + 0.9, z: homeLabel.z, text: '여기!', kind: 'mark' };
+    if (tiredShown) return { id: 'guide', x: ramenSign.x, y: ramenSign.y + 0.9, z: ramenSign.z, text: '여기!', kind: 'mark' }; // 하치와레랑 라멘 먹으러
     if (step === 'board' || step === 'report' || jobDone) return { id: 'guide', x: boardSign.x, y: boardSign.y + 0.9, z: boardSign.z, text: '여기!', kind: 'mark' };
     if (grade5Shown || examGoal) return { id: 'guide', x: examSign.x, y: examSign.y + 0.9, z: examSign.z, text: '여기!', kind: 'mark' }; // 제초 승급 시험 보러
     // 다른 작업 일감 중이면 어디서 하는지 표시: 스티커는 작업대, 열매는 가장 가까운 열린 덤불
@@ -7368,6 +7483,7 @@ function boot() {
         else if (guide.goalEl.classList.contains('incoming') && performance.now() - goalCardAt > 4000) announceGoal(state.tutorial);
       }
       updateGrade5Guide(dt);
+      updateTiredGuide(dt);
       updateExamGoal();
       updateRakkoAdvice(dt);
       updateDown(dt); // 같이 놀기: 쓰러져 깨워 주길 기다리는 중(행동 버튼 · 위 알약을 덮어쓴다)
