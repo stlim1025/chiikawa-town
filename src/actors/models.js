@@ -401,6 +401,14 @@ const DEFS = {
     face(parts, hc, hr, { eyeX: 0.15, eyeY, eye: [0.054, 0.058, 0.01], shine: 1.3, shineX: 0, cheekX, cheekY, cheekSize: [0.072, 0.054, 0.012], mouthY: -0.1, mouth: null });
     const put = (m, c, x, y, s, rz = 0, push = 0.004) => { const q = onHead(hc, hr, x, y, push); parts.push({ m, c, p: q.p, r: [q.r[0], q.r[1], rz], s, n: 'head', o: false }); };
     [-1, 1].forEach((sd) => [-1, 0, 1].forEach((k) => put('dot', EYE, sd * cheekX + k * 0.026, cheekY, [0.009, 0.032, 0.006], 0, 0.012))); // 볼 빗살(분홍 볼보다 앞으로, 또렷하게)
+    // 눈동자 아래쪽 하얀 초승달(◡): 큰 반짝 아래로 가로로 살짝 휜 빛. 반짝과 같은 역할이라 우는 얼굴(setCrying)에서는 같이 숨는다
+    [-1, 1].forEach((sd) => {
+      const q = onHead(hc, hr, sd * 0.15, eyeY - 0.036, 0.013);
+      parts.push({ m: 'arc:1.7:0.2', c: SHINE, p: q.p, r: [q.r[0], q.r[1], Math.PI], s: [0.03, 0.03, 0.006], n: 'head', o: false, role: 'shine' });
+    });
+    // 눈썹(두 번째로 보낸 그림을 따라): 눈 위로 멀찍이, 눈보다 긴 가는 아치. 두 끝이 아래로 내려오고 바깥쪽 끝이 더 내려온다(k: 안쪽 -1 ~ 바깥 1)
+    [-1, 1].forEach((sd) => faceStroke(parts, hc, hr, sd < 0 ? 'usagiBrowL' : 'usagiBrowR',
+      [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1].map((k) => [sd * (0.15 + k * 0.075), eyeY + 0.14 - 0.042 * k * k - 0.012 * k]), 0.0042, EYE));
     // 입: 끊김 없는 붓선 셋 — ω(오른쪽 끝은 방울), 가운데에서 위로 솟은 굵은 줄기, 왼쪽 혹 밑에서 내려와 오른쪽으로 휘는 꼬리
     // 모양은 사진 그대로 잡고 MK 배로 줄인다(입 가운데 (-0.015, -0.1) 기준. 1 이면 사진 비율 그대로인데 게임에서는 커 보였다)
     const MK = 0.7, mk = (pts) => pts.map(([x, y]) => [-0.015 + (x + 0.015) * MK, -0.1 + (y + 0.1) * MK]);
