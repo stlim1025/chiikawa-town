@@ -282,12 +282,25 @@ function onHead(hc, hr, x, y, push = 0) {
   return { p: [hc[0] + x + n.x * push, hc[1] + y + n.y * push, hc[2] + z + n.z * push], r: [-Math.asin(n.y), Math.atan2(n.x, n.z), 0] };
 }
 
+/**
+ * 얼굴 위 이어진 선(우사기 입처럼 휘고 꺾이는 붓선): 얼굴 면 (x, y) 점들을 머리 겉면에 붙여 굵기 r 의 관 하나로 잇고, 두 끝은 동그랗게.
+ * 관 도형은 이름으로 한 번만 만든다(lookGeometry 'stroke:이름'). 부품 크기는 작게(STROKE_UNIT) 두고 도형을 그만큼 키워,
+ * 관절에서 가장 큰 부품(머리 본체: 잠옷이 크기를 잰다)으로 잡히지 않게 한다. ends: 두 끝 방울 굵기 배수.
+ */
+const STROKES = new Map(), STROKE_UNIT = 0.01;
+function faceStroke(parts, hc, hr, name, pts, r, c, { push = 0.004, ends = [1, 1] } = {}) {
+  const abs = pts.map(([x, y]) => onHead(hc, hr, x, y, push).p), o = abs[0], U = STROKE_UNIT;
+  if (!STROKES.has(name)) STROKES.set(name, { pts: abs.map((p) => new THREE.Vector3((p[0] - o[0]) / U, (p[1] - o[1]) / U, (p[2] - o[2]) / U)), r: r / U });
+  parts.push({ m: 'stroke:' + name, c, p: o, s: [U, U, U], n: 'head', o: false });
+  [abs[0], abs[abs.length - 1]].forEach((p, i) => parts.push({ m: 'dot', c, p, s: [r * ends[i], r * ends[i], r * ends[i]], n: 'head', o: false }));
+}
+
 function face(parts, hc, hr, o) {
   [-1, 1].forEach((sd) => {
     const e = onHead(hc, hr, sd * o.eyeX, o.eyeY);
     parts.push({ m: 'dot', c: EYE, p: e.p, r: e.r, s: o.eye, n: 'head', o: false, role: 'eye' });
     const sh = o.shine || 1;
-    const h = onHead(hc, hr, sd * o.eyeX + 0.012, o.eyeY + o.eye[1] * 0.35, 0.012);
+    const h = onHead(hc, hr, sd * o.eyeX + (o.shineX ?? 0.012), o.eyeY + o.eye[1] * 0.35, 0.012);
     parts.push({ m: 'dot', c: SHINE, p: h.p, r: h.r, s: [o.eye[0] * 0.36 * sh, o.eye[1] * 0.3 * sh, 0.008], n: 'head', o: false, role: 'shine' });
     // 우는 얼굴(setCrying)일 때만: 감은 눈 밑에 고인 눈물, 볼을 타고 흐르는 줄기, 턱 밑으로 떨어지는 방울
     const pool = onHead(hc, hr, sd * o.eyeX, o.eyeY - o.eye[1] * 0.75, 0.012);
@@ -297,7 +310,7 @@ function face(parts, hc, hr, o) {
     const drop = onHead(hc, hr, sd * (o.eyeX + 0.014), o.eyeY - o.eye[1] - 0.15, 0.03);
     parts.push({ m: 'sphere', c: TEAR, p: drop.p, s: [0.024, 0.032, 0.024], n: 'head', o: false, role: 'drop' });
     const b = onHead(hc, hr, sd * o.cheekX, o.cheekY, -0.004);
-    parts.push({ m: 'dot', c: o.cheek || CHEEK, p: b.p, r: b.r, s: [0.075, 0.034, 0.012], n: 'head', o: false });
+    parts.push({ m: 'dot', c: o.cheek || CHEEK, p: b.p, r: b.r, s: o.cheekSize || [0.075, 0.034, 0.012], n: 'head', o: false });
     if (o.brows) [0.1, 0.125].forEach((dy) => {
       const bw = onHead(hc, hr, sd * o.eyeX, o.eyeY + dy, 0.002);
       parts.push({ m: 'dot', c: EYE, p: bw.p, r: bw.r, s: [0.035, 0.007, 0.006], n: 'head', o: false });
@@ -308,7 +321,7 @@ function face(parts, hc, hr, o) {
     const q = onHead(hc, hr, x, o.mouthY + 0.004, 0.002);
     parts.push({ m: 'dot', c: MOUTH, p: q.p, r: [q.r[0], q.r[1], i % 2 ? 0.6 : -0.6], s: [0.012, 0.006, 0.006], n: 'head', o: false });
   });
-  else parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: o.mouth, n: 'head', o: false });
+  else if (o.mouth) parts.push({ m: 'dot', c: MOUTH, p: mo.p, r: mo.r, s: o.mouth, n: 'head', o: false }); // mouth: null 이면 입은 캐릭터 쪽에서 따로 그린다(우사기)
   if (o.nose) {
     const no = onHead(hc, hr, 0, o.mouthY + 0.045, 0.004);
     parts.push({ m: 'dot', c: o.nose, p: no.p, r: no.r, s: [0.035, 0.022, 0.014], n: 'head', o: false });
@@ -382,7 +395,18 @@ const DEFS = {
       parts.push({ m: 'sphere', c: USAGI, p: [sd * 0.12, 1.32, -0.02], r: [0, 0, -sd * 0.12], s: [0.085, 0.3, 0.065], n: nm, par: 'head' });
       parts.push({ m: 'dot', c: EAR_PINK, p: [sd * 0.12, 1.32, 0.035], r: [0, 0, -sd * 0.12], s: [0.045, 0.22, 0.02], n: nm, par: 'head', o: false });
     });
-    face(parts, hc, hr, { eyeX: 0.12, eyeY: 0.02, eye: [0.03, 0.04, 0.016], cheekX: 0.22, cheekY: -0.05, mouthY: -0.1, mouth: [0.06, 0.045, 0.014] });
+    // 얼굴(사용자가 보낸 사진을 따라): 멀찍이 떨어진 큰 까만 눈에 위쪽 가운데 큰 반짝, 눈 아래 바깥쪽 둥근 분홍 볼에 세로줄 셋,
+    // 가운데 위로 짧은 줄기가 솟은 ω 입(오른쪽 끝은 방울), 왼쪽 혹 밑에서 내려와 오른쪽으로 휘는 꼬리. 입은 모두 이어진 붓선(faceStroke)
+    const eyeY = 0.04, cheekX = 0.25, cheekY = -0.085;
+    face(parts, hc, hr, { eyeX: 0.15, eyeY, eye: [0.054, 0.058, 0.01], shine: 1.3, shineX: 0, cheekX, cheekY, cheekSize: [0.072, 0.054, 0.012], mouthY: -0.1, mouth: null });
+    const put = (m, c, x, y, s, rz = 0, push = 0.004) => { const q = onHead(hc, hr, x, y, push); parts.push({ m, c, p: q.p, r: [q.r[0], q.r[1], rz], s, n: 'head', o: false }); };
+    [-1, 1].forEach((sd) => [-1, 0, 1].forEach((k) => put('dot', EYE, sd * cheekX + k * 0.026, cheekY, [0.009, 0.032, 0.006], 0, 0.012))); // 볼 빗살(분홍 볼보다 앞으로, 또렷하게)
+    // 입: 끊김 없는 붓선 셋 — ω(오른쪽 끝은 방울), 가운데에서 위로 솟은 굵은 줄기, 왼쪽 혹 밑에서 내려와 오른쪽으로 휘는 꼬리
+    // 모양은 사진 그대로 잡고 MK 배로 줄인다(입 가운데 (-0.015, -0.1) 기준. 1 이면 사진 비율 그대로인데 게임에서는 커 보였다)
+    const MK = 0.7, mk = (pts) => pts.map(([x, y]) => [-0.015 + (x + 0.015) * MK, -0.1 + (y + 0.1) * MK]);
+    faceStroke(parts, hc, hr, 'usagiMouth', mk([[-0.084, -0.068], [-0.077, -0.087], [-0.058, -0.106], [-0.036, -0.099], [-0.022, -0.082], [-0.005, -0.099], [0.017, -0.111], [0.041, -0.102], [0.055, -0.08]]), 0.007, EYE, { ends: [1, 1.5] });
+    faceStroke(parts, hc, hr, 'usagiStem', mk([[-0.022, -0.082], [-0.019, -0.064], [-0.017, -0.048]]), 0.0078, EYE, { ends: [1, 1.4] });
+    faceStroke(parts, hc, hr, 'usagiTail', mk([[-0.058, -0.106], [-0.06, -0.123], [-0.053, -0.142], [-0.034, -0.156], [-0.008, -0.157]]), 0.007, EYE, { ends: [1, 1.35] });
     return { label: '우사기', parts, neck: [0, 0.52, 0], height: 1.6, radius: 0.42, pivots: { earL: [-0.12, 1.04, -0.02], earR: [0.12, 1.04, -0.02] } };
   },
   momonga() {
@@ -957,6 +981,7 @@ function lookGeometry(m) {
     // 호(선): 가운데가 원점에 오는 ∩ 모양 굵은 선(span 라디안, tube 굵기). rz = π 면 ∪
     if (kind === 'arc') return new THREE.TorusGeometry(1, +b, 6, Math.max(8, Math.round(+a * 8)), +a).rotateZ(Math.PI / 2 - +a / 2).translate(0, -1, 0);
     if (kind === 'ring') return new THREE.TorusGeometry(1, +a, 8, 28);
+    if (kind === 'stroke') { const s = STROKES.get(a); return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(s.pts), s.pts.length * 8, s.r, 7, false); } // 얼굴 위 이어진 선(faceStroke)
     if (kind === 'half') return new THREE.CircleGeometry(1, 20, Math.PI, Math.PI); // 아래 반달(위가 곧은 벌린 입)
     if (kind === 'hair') return shellGeometry({ edge: (x) => hairline(x, HAIR_LINES[a]), bump: HAIR_BUMP[a] });
     if (kind === 'beard') {
