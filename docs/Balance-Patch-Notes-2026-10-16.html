@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>밸런스 패치 내역</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --text: #1f2328; --text-soft: #5b636c; --text-faint: #9aa1a9;
+    --line: #cfd4da; --line-soft: #e6e9ec; --code-bg: #f0f1f3; --code-text: #24292f;
+    --mark: #b4530a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191d; --text: #e2e5e9; --text-soft: #9aa3ad; --text-faint: #6b7480;
+      --line: #40464e; --line-soft: #2b3037; --code-bg: #262b32; --code-text: #d5d9de;
+      --mark: #e69a55;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 52px 32px 110px; }
+
+  /* 머리 */
+  .masthead { border-top: 3px solid var(--text); padding-top: 14px; margin-bottom: 40px; }
+  .masthead .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--text-soft); font-family: Consolas, "Cascadia Mono", monospace; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; margin: 18px 0 10px; }
+  .standfirst { font-size: 16px; color: var(--text-soft); max-width: 700px; margin: 0; }
+
+  /* 요약띠: 결론 세 가지 */
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); margin-bottom: 60px; }
+  .rule { padding: 18px 22px 20px 0; }
+  .rule + .rule { border-left: 1px solid var(--line-soft); padding-left: 22px; }
+  .rule .k { font-size: 12px; font-weight: 800; color: var(--text-soft); margin-bottom: 6px; }
+  .rule .t { font-size: 16px; font-weight: 800; line-height: 1.45; margin-bottom: 6px; }
+  .rule .d { font-size: 13.5px; color: var(--text-soft); }
+
+  /* 결정 시트: 회의에서 결정받을 안건 */
+  .sheet { margin-bottom: 64px; }
+  .sheet-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  .sheet-title .hint { font-weight: 400; color: var(--text-faint); margin-left: 10px; font-size: 12.5px; }
+  table.sheet-tbl { margin: 0; }
+  .sheet-tbl th { padding: 8px 14px 8px 0; }
+  .sheet-tbl td { padding: 11px 14px 11px 0; }
+  .sheet-tbl tr:last-child td { border-bottom: 2px solid var(--text); }
+  .sheet-tbl .n { color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 0; width: 26px; }
+  .sheet-tbl a { color: inherit; text-decoration: none; font-weight: 700; }
+  .sheet-tbl a:hover { text-decoration: underline; }
+  .sheet-tbl .rec { color: var(--text-soft); }
+  .sheet-tbl .decide { width: 26%; min-width: 150px; border-bottom: 1px solid var(--line); color: var(--text); outline: none; cursor: text; }
+  .sheet-tbl .decide:empty::before { content: "회의에서 기입"; color: var(--text-faint); }
+  .sheet-tbl .decide:focus { border-bottom-color: var(--text); }
+
+  /* 섹션 */
+  section { display: grid; grid-template-columns: 84px 1fr; gap: 0 28px; border-top: 1px solid var(--line); padding: 32px 0 36px; }
+  section .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--line); font-variant-numeric: tabular-nums; }
+  section .body { min-width: 0; }
+  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.015em; margin: 4px 0 14px; line-height: 1.45; }
+  h3 { font-size: 15px; font-weight: 800; margin: 20px 0 6px; }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-faint); }
+  strong { font-weight: 750; }
+  .soft { color: var(--text-soft); font-size: 14px; }
+  .kv { font-weight: 800; font-size: 13px; color: var(--text-soft); margin-right: 6px; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 3px; word-break: break-all; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; line-height: 1.6; background: var(--code-bg); color: var(--code-text); padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 12px; }
+  pre code { background: none; padding: 0; font-size: inherit; word-break: normal; }
+
+  /* 권장: 본문 마지막 줄 */
+  .verdict { margin-top: 16px; display: flex; gap: 12px; }
+  .verdict .k { flex: none; font-weight: 800; font-size: 13px; padding-top: 2px; }
+  .verdict .k::after { content: ""; display: block; width: 100%; height: 2px; background: var(--text); margin-top: 2px; }
+
+  /* 흐름: 순서와 단계 */
+  .timelines { margin: 18px 0 14px; }
+  .tl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+  .tl + .tl { border-top: 1px dashed var(--line-soft); }
+  .tl .lab { flex: none; width: 76px; font-size: 13px; font-weight: 800; }
+  .tl .arrow { color: var(--text-faint); font-size: 12px; }
+  .tl .note { flex-basis: 100%; padding-left: 84px; font-size: 12.5px; color: var(--text-soft); margin-top: -4px; }
+  .step { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 3px 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); white-space: nowrap; }
+  .step.solid { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+  .step.ring { border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+  .legend { font-size: 12.5px; color: var(--text-soft); margin: 10px 0 0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .legend .step { padding: 1px 9px; font-size: 12px; margin-right: 4px; }
+
+  /* 선택지 대조 */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 6px; }
+  .versus.three { grid-template-columns: repeat(3, 1fr); }
+  .versus .opt { padding: 2px 24px 6px 0; }
+  .versus .opt + .opt { border-left: 1px solid var(--line-soft); padding-left: 24px; padding-right: 0; }
+  .versus h3 { font-size: 14px; margin: 0 0 8px; }
+  .versus h3 .tag { font-weight: 400; color: var(--text-soft); font-size: 12.5px; margin-left: 8px; }
+  .versus ul { font-size: 13.5px; color: var(--text-soft); margin: 0; padding-left: 18px; }
+  .versus .pro::marker { content: "+  "; color: var(--text); }
+  .versus .con::marker { content: "−  "; color: var(--text-faint); }
+
+  /* 적용 범위 */
+  .scope { display: flex; gap: 10px; align-items: stretch; margin: 16px 0 8px; flex-wrap: wrap; }
+  .scope .item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 18px 8px; text-align: center; min-width: 96px; }
+  .scope .item .t { font-weight: 800; font-size: 14px; }
+  .scope .item .s { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; }
+  .scope .item.on { background: var(--text); border-color: var(--text); }
+  .scope .item.on .t { color: var(--bg); }
+  .scope .item.on .s { color: var(--bg); opacity: 0.75; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+  th { text-align: left; font-weight: 700; color: var(--text-soft); font-size: 12px; border-top: 2px solid var(--text); border-bottom: 1px solid var(--text); padding: 7px 12px 7px 0; }
+  td { border-bottom: 1px solid var(--line-soft); padding: 9px 12px 9px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 2px solid var(--text); }
+  td.c { text-align: center; white-space: nowrap; font-weight: 800; }
+  td.c.no { color: var(--text-faint); font-weight: 400; }
+  td.c.err { color: var(--mark); }
+  .ex { color: var(--text-soft); font-size: 13px; }
+
+  /* 경우별 설명 */
+  dl { margin: 0; }
+  dt { font-weight: 800; font-size: 13.5px; margin: 14px 0 4px; }
+  dd { margin: 0 0 4px; color: var(--text-soft); font-size: 14px; }
+  dd code { color: var(--code-text); }
+
+  /* 도표 */
+  figure { margin: 16px 0 12px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--text); }
+  figcaption { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+
+  /* 강조: 문서 전체에서 한 지점만 */
+  .mark { color: var(--mark); font-weight: 800; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 8px; padding-top: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-soft); font-size: 12.5px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .page { padding: 36px 18px 70px; }
+    .rules { grid-template-columns: 1fr; }
+    .rule + .rule { border-left: none; border-top: 1px solid var(--line-soft); padding-left: 0; }
+    section { grid-template-columns: 1fr; gap: 6px; }
+    section .num { font-size: 28px; }
+    .tl .note { padding-left: 0; }
+    .versus, .versus.three { grid-template-columns: 1fr; }
+    .versus .opt + .opt { border-left: none; border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-top: 10px; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; }
+    .sheet-tbl .decide:empty::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div class="row">
+    <span>치이카와 마을 생활 · 밸런스 패치 내역</span>
+    <span>2026-10-16</span>
+  </div>
+  <h1>밸런스 패치 내역<br>10월 13일부터 10월 16일까지</h1>
+  <p class="standfirst">치이카와 마을 생활에서 커밋 메시지가 balance로 시작하는 커밋 아홉 개를 모았다. 10월 16일 네 커밋은 점검과 시뮬레이션을 거쳐 바꾼 것이라 바뀐 값과 이유, 시뮬레이션 결과를 함께 적는다. 10월 13일 다섯 커밋은 바뀐 값만 적고 마지막 절에는 검토했지만 넣지 않은 안을 남긴다.</p>
+</div>
+
+<div class="rules">
+  <div class="rule">
+    <div class="k">보스</div>
+    <div class="t">보스는 친구와 잡는 상대가 됐다</div>
+    <div class="d">보스 넷의 체력이 1.5배가 되고 보스전에서는 음식을 30초에 하나만 먹는다. 피자호빵을 먹으며 맞붙어 잡던 길이 좁아졌다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">벌이</div>
+    <div class="t">덜 벌던 일을 평균 가까이 올렸다</div>
+    <div class="d">낚시는 1초에 2.4 ~ 3.2원에서 3.7 ~ 4.7원으로, 알바는 한 번에 350원쯤에서 520원쯤으로 올랐다. 전체 시간당 수입은 3% 안쪽으로만 움직였다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">목표</div>
+    <div class="t">큰 목표와 친밀도는 멀리, 막히던 시험은 덜 막히게 했다</div>
+    <div class="d">집 넓히기는 50,000원과 100,000원이 됐고 하트가 생기는 점수는 1.5배가 됐다. 2급과 1급 시험은 연속으로 뽑을 횟수가 하나씩 줄었다.</div>
+  </div>
+</div>
+
+<section id="s1">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>한눈에 보기</h2>
+    <p>아홉 커밋을 날짜순으로 적는다. 10월 16일 네 커밋은 2절부터 7절에서, 10월 13일 다섯 커밋은 8절에서 다룬다.</p>
+    <table>
+      <tr><th style="width:90px">날짜</th><th style="width:90px">커밋</th><th>바뀐 것</th><th style="width:60px">절</th></tr>
+      <tr><td>10월 13일</td><td><code>05a260e</code></td><td>랏코의 수련 보상을 돌 망치에서 목검으로</td><td>8</td></tr>
+      <tr><td>10월 13일</td><td><code>dc1dd8d</code></td><td>토벌 일감 보수와 하루 건수를 절반쯤으로</td><td>8</td></tr>
+      <tr><td>10월 13일</td><td><code>e0d6d70</code></td><td>위스키 봉봉은 쿠리만쥬가 권하고, 검은 별똥별은 치이카와 하트 3에 열림</td><td>8</td></tr>
+      <tr><td>10월 13일</td><td><code>db6e5f2</code></td><td>이야기가 열리는 차례를 나누고 연계 퀘스트는 하나씩</td><td>8</td></tr>
+      <tr><td>10월 13일</td><td><code>6007143</code></td><td>반짝 검 닿는 거리 1.7에서 2.0으로</td><td>8</td></tr>
+      <tr><td>10월 16일</td><td><code>5a2e1ec</code></td><td>집 넓히기 50,000원과 100,000원</td><td>2</td></tr>
+      <tr><td>10월 16일</td><td><code>dac1e35</code></td><td>보스 체력 1.5배, 보스전 먹기 30초, 무기 속도, 제초 시험, 10월 1일 시작, 가구 36가지</td><td>3 ~ 5</td></tr>
+      <tr><td>10월 16일</td><td><code>85ff0da</code></td><td>물고기 값 1.5배, 낚시 일감 보수, 알바 보수</td><td>6</td></tr>
+      <tr><td>10월 16일</td><td><code>d6bfb21</code></td><td>하트가 생기는 점수 1.5배 (3, 9, 18, 30, 45점)</td><td>7</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>집 넓히기</h2>
+    <p>내 집을 산 뒤 부동산에서 넓히는 값을 올렸다. 예전 값으로는 집(50,000원)을 산 뒤 넓은 방과 큰 방이 금방 끝나서 집 다음의 큰 목표 노릇을 못 했다. 넓은 방은 집값만큼, 큰 방은 그 두 배로 정했다. 마을 친구들이 자기 집을 넓히는 값은 하루 수백 원을 버는 친구 살림에 맞춰 예전 값 그대로 둔다.</p>
+    <table>
+      <tr><th>방</th><th>내가 넓히는 값</th><th>친구가 넓히는 값</th></tr>
+      <tr><td>넓은 방</td><td>15,000원 → 50,000원</td><td>15,000원 그대로</td></tr>
+      <tr><td>큰 방</td><td>30,000원 → 100,000원</td><td>30,000원 그대로</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>보스와 무기</h2>
+    <p>경제 점검에서 보스가 너무 쉬워 대부분 이야기 초반에 혼자 보스를 다 잡고 돈벌이만 한다는 것이 드러났다. 원래 의도는 친구들과 친해진 뒤 같이 토벌해서 보스를 잡는 것이다. 그래서 보스 체력을 1.5배로 올리고 보스전에서 먹는 음식에 쿨타임을 두고 대장 갑옷 씨가 친구와 같이 가라고 말하게 했다.</p>
+    <table>
+      <tr><th>보스</th><th>체력</th><th>목검으로 때리는 횟수</th></tr>
+      <tr><td>대왕 두더지</td><td>54 → 81</td><td>27 → 41</td></tr>
+      <tr><td>고목 거인</td><td>60 → 90</td><td>30 → 45</td></tr>
+      <tr><td>강가 왕집게</td><td>56 → 84</td><td>28 → 42</td></tr>
+      <tr><td>바위산 왕버섯</td><td>72 → 108</td><td>36 → 54</td></tr>
+    </table>
+    <table>
+      <tr><th>무기</th><th>휘두르는 틈</th><th>1초에 넣는 힘</th></tr>
+      <tr><td>목검 (1,200원)</td><td>0.5초 → 0.6초</td><td>4.0 → 3.3</td></tr>
+      <tr><td>돌 망치 (4,500원)</td><td>0.8초 → 0.7초</td><td>3.75 → 4.3</td></tr>
+      <tr><td>반짝 검 (12,000원)</td><td>0.45초 그대로</td><td>7.8 그대로</td></tr>
+    </table>
+    <dl>
+      <dt>보스전 먹기</dt>
+      <dd>보스와 싸우는 동안 음식을 하나 먹으면 30초가 지나야 또 먹는다. 기다리는 동안 가방의 음식 칸이 회색이 되고 시계처럼 도는 덮개 위에 남은 초가 뜬다. 보스전이 아닐 때는 언제든 먹는다.</dd>
+      <dt>무기</dt>
+      <dd>목검이 1초에 넣는 힘(4.0)이 돌 망치(3.75)보다 커서 망치를 살 까닭이 없었다. 목검은 0.6초, 돌 망치는 0.7초마다 휘두르게 바꿔 1초 힘이 목검 3.3, 돌 망치 4.3, 반짝 검 7.8 순서가 됐다. 한 대 힘은 그대로라 친구들이 무기를 사는 순서도 그대로다.</dd>
+      <dt>대장 대사</dt>
+      <dd>왕버섯 이야기를 들은 대장이 "혼자 가지는 마라"는 말을 덧붙이고 구역 보스 셋을 잡은 뒤에는 "믿을 만한 친구와 같이 가라"고 한다. 두 대사는 게임 오리지널이다.</dd>
+      <dt>함께 고친 것</dt>
+      <dd>이야기 초반에 입구를 살피러 갈 때 왕버섯이 이제 눈을 감고 제자리에서 잔다. 감은 눈 덮개와 땅에 묻힌 발이 붉은 그림자로 비치던 것도 고쳤다.</dd>
+    </dl>
+    <table>
+      <tr><th>시뮬레이션 (보통 실력, 잠을 자며 공격을 피하는 사람)</th><th style="width:120px">전</th><th style="width:120px">후</th></tr>
+      <tr><td>집을 사는 때</td><td>6.4시간</td><td>6.7시간</td></tr>
+      <tr><td>큰 방</td><td>17.4시간</td><td>18.2시간</td></tr>
+      <tr><td>시간당 수입</td><td>기준</td><td>6% 줄어듦</td></tr>
+      <tr><td>한 사람이 32시간 동안 잡는 보스</td><td>평균 346마리</td><td>평균 179마리</td></tr>
+      <tr><td>친구와 같이 간 보스전</td><td>22%</td><td>22%</td></tr>
+    </table>
+    <p>친구와 같이 간 보스전 비율은 22% 그대로였다. 체력이 늘어도 낮에 혼자 잡을 만해서 친구를 부를 이유가 아직 약하다. 이 문제는 9절에 남겼다.</p>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>제초 시험</h2>
+    <p>2급과 1급 승급 시험은 연속으로 깔끔하게 뽑을 횟수를 하나씩 줄였다. 반응이 0.2초 늦는 사람은 예전 횟수로 한 번에 붙을 확률이 19%, 9%뿐이라 응시료가 1만 원 넘게 들었다. 두 번에 나눠 뽑는 바위틈 이끼풀은 깔끔할 확률이 곱해지니 초록 칸 폭을 0.13에서 0.15로 넓혔다.</p>
+    <table>
+      <tr><th>시험</th><th>연속으로 깔끔하게 뽑을 횟수</th><th>예전 횟수로 한 번에 붙을 확률 (0.2초 늦는 사람)</th></tr>
+      <tr><td>3급 → 2급</td><td>4번 → 3번</td><td>19%</td></tr>
+      <tr><td>2급 → 1급</td><td>3번 → 2번</td><td>9%</td></tr>
+    </table>
+    <table>
+      <tr><th>시뮬레이션</th><th style="width:120px">전</th><th style="width:120px">후</th></tr>
+      <tr><td>1급까지 걸리는 시간 (1급을 목표로 하는 보통 실력 사람)</td><td>4.6시간</td><td>2.8시간</td></tr>
+      <tr><td>그동안 낸 응시료</td><td>23,600원</td><td>10,900원</td></tr>
+      <tr><td>우사기의 첫 2급 시험 합격 확률</td><td>55%</td><td>64%</td></tr>
+      <tr><td>랏코의 첫 2급 시험 합격 확률</td><td>72%</td><td>78%</td></tr>
+    </table>
+    <p class="soft">친구들 시험도 같은 횟수를 쓰기 때문에 우사기와 랏코의 합격 확률이 함께 올랐다.</p>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>가구와 시작 날짜</h2>
+    <p>가구점 가구를 9가지에서 45가지로 늘렸다. 새로 생긴 36가지는 모두 게임 오리지널이고 값은 100원부터 15,000원까지다. 하나씩 다 사면 85,960원이라, 집을 넓힌 뒤에도 모을 거리가 남는다. 가구점에는 분류 단추 여덟 개가 생겼다.</p>
+    <table>
+      <tr><th>분류</th><th style="width:90px">가구 수</th><th>값</th></tr>
+      <tr><td>침대와 소파</td><td>6</td><td>300원 ~ 9,000원</td></tr>
+      <tr><td>탁자와 의자</td><td>6</td><td>100원 ~ 1,500원</td></tr>
+      <tr><td>수납</td><td>5</td><td>180원 ~ 4,000원</td></tr>
+      <tr><td>조명</td><td>5</td><td>140원 ~ 2,500원</td></tr>
+      <tr><td>부엌</td><td>5</td><td>260원 ~ 3,000원</td></tr>
+      <tr><td>식물</td><td>5</td><td>80원 ~ 5,000원</td></tr>
+      <tr><td>깔개와 방석</td><td>4</td><td>50원 ~ 900원</td></tr>
+      <tr><td>장식</td><td>9</td><td>220원 ~ 15,000원</td></tr>
+    </table>
+    <p>새 게임은 늘 10월 1일(목)에 시작한다. 예전에는 게임을 시작한 실제 날짜가 1일째였다. 날짜에 맞춘 마을 일을 누구나 같은 차례로 만나게 하려는 것이다. 42일째가 11월 11일이다. 예전 저장은 그때 날짜를 그대로 쓴다.</p>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>낚시와 알바</h2>
+    <p>낚시는 1초에 2.4 ~ 3.2원으로 어떤 벌이보다 적어서 시뮬레이션 속 사람들은 낚싯대를 사도 낚시를 거의 하지 않았다. 알바는 하루 한 번 350원쯤이라 처음 몇 시간이 지나면 평균보다 덜 벌었다. 물고기 값을 1.5배로, 낚시 일감 보수를 180원, 250원, 250원으로, 알바를 기본급 150원과 한 그릇 50원으로 올렸다.</p>
+    <table>
+      <tr><th>항목</th><th>전</th><th>후</th></tr>
+      <tr><td>물고기 값</td><td>송사리 12원 … 문어 180원</td><td>1.5배 (송사리 18원 … 문어 270원, 빈 깡통은 3원 그대로)</td></tr>
+      <tr><td>낚시 일감 보수 (송사리, 붕어, 고등어)</td><td>110원, 150원, 150원</td><td>180원, 250원, 250원</td></tr>
+      <tr><td>친구가 받는 낚시 일감 보수</td><td>110원, 150원, 150원</td><td>그대로</td></tr>
+      <tr><td>알바 기본급</td><td>100원</td><td>150원</td></tr>
+      <tr><td>알바 한 그릇</td><td>30원</td><td>50원 (팁은 최대 20원 그대로)</td></tr>
+    </table>
+    <table>
+      <tr><th>할 일 (보통 실력)</th><th style="width:120px">1초에, 전</th><th style="width:120px">1초에, 후</th></tr>
+      <tr><td>낚시 10번 (호수, 낮)</td><td>2.4원</td><td>3.7원</td></tr>
+      <tr><td>낚시 10번 (바다, 낮)</td><td>2.8원</td><td>4.2원</td></tr>
+      <tr><td>낚시 10번 (바다, 밤)</td><td>3.2원</td><td>4.7원</td></tr>
+      <tr><td>낚시 일감</td><td>2.1원</td><td>3.3 ~ 3.5원</td></tr>
+      <tr><td>알바 한 번 (여섯 그릇)</td><td>3.5원 (352원)</td><td>5.2원 (522원)</td></tr>
+    </table>
+    <p class="soft">보통 사람의 평균 벌이는 시작하고 몇 시간이 지나면 1초에 4 ~ 5원이다.</p>
+    <dl>
+      <dt>친구 보수</dt>
+      <dd>처음에는 친구가 받는 낚시 일감 보수도 같이 올렸는데, 낚시를 하는 하치와레, 쿠리만쥬, 랏코의 목표가 3주쯤 당겨졌다. 하나씩 되돌려 보니 원인은 물고기 값이 아니라 일감 보수였다. 친구들은 물고기를 거의 팔지 않고 낚시 일감으로 벌기 때문이다. 그래서 친구가 받는 보수만 예전 값(110원, 150원, 150원)으로 두었다. 이렇게 하면 친구 시뮬레이션 200일의 목표 날짜가 바꾸기 전과 똑같다.</dd>
+      <dt>시뮬레이션</dt>
+      <dd>실력과 노는 방식마다 30명씩 돌려 보니 시간당 수입은 모든 경우에 3% 안쪽으로만 움직였다. 시뮬레이션 속 사람들은 여전히 토벌과 털뭉치를 더 자주 골라 낚시와 알바가 전체 수입에서 차지하는 몫은 1% 남짓이다. 낚시가 손해 보는 일이 아니게 됐을 뿐 경제를 흔들지는 않는다.</dd>
+    </dl>
+    <table>
+      <tr><th>넓은 방을 사는 날 (친구 시뮬레이션 세 번 평균)</th><th style="width:110px">바꾸기 전</th><th style="width:140px">친구 보수도 올림</th><th style="width:110px">지금</th></tr>
+      <tr><td>하치와레</td><td>98일째</td><td>74일째</td><td>98일째</td></tr>
+      <tr><td>쿠리만쥬</td><td>87일째</td><td>70일째</td><td>87일째</td></tr>
+      <tr><td>랏코</td><td>79일째</td><td>65일째</td><td>79일째</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>친밀도</h2>
+    <p>친구들 친밀도가 너무 빨리 오른다는 이야기가 있어 퀘스트 보상부터 셌다. 한 번만 받는 퀘스트 친밀도를 더하면 하치와레 49점, 우사기 44점, 치이카와 39점으로 하트 다섯 개에 드는 30점을 셋 다 넘는다. 그런데 사이드스토리는 이틀에 하나씩만 열려서 보상 대부분이 하트가 거의 다 찬 뒤에 들어온다. 날마다 쌓는 친밀도와 선물, 퀘스트를 함께 시뮬레이션해 보니 더 큰 원인은 바탕 곡선이었다. 퀘스트 친밀도를 아예 빼도 친한 셋과는 15일이면 하트가 다 찼다. 게임 하루가 실제 12분이라 3시간이다. 그래서 퀘스트 보상은 그대로 두고 하트가 생기는 점수를 1.5배로 늘렸다.</p>
+    <table>
+      <tr><th>하트</th><th>1개</th><th>2개</th><th>3개</th><th>4개</th><th>5개</th></tr>
+      <tr><td>모인 점수, 전</td><td>2점</td><td>6점</td><td>12점</td><td>20점</td><td>30점</td></tr>
+      <tr><td>모인 점수, 후</td><td>3점</td><td>9점</td><td>18점</td><td>30점</td><td>45점</td></tr>
+    </table>
+    <table>
+      <tr><th>하트 다섯 개가 되는 날 (보통 사람)</th><th>치이카와</th><th>하치와레</th><th>우사기</th><th>쿠리만쥬</th><th>랏코</th><th>모몽가</th></tr>
+      <tr><td>바꾸기 전</td><td>13일째</td><td>11일째</td><td>11일째</td><td>19일째</td><td>19일째</td><td>29일째</td></tr>
+      <tr><td>퀘스트 친밀도 0</td><td>15일째</td><td>15일째</td><td>15일째</td><td>25일째</td><td>26일째</td><td>41일째</td></tr>
+      <tr><td>퀘스트 친밀도 절반</td><td>14일째</td><td>13일째</td><td>13일째</td><td>21일째</td><td>21일째</td><td>35일째</td></tr>
+      <tr><td>하트 점수 1.5배 (넣은 안)</td><td>17일째</td><td>15일째</td><td>16일째</td><td>29일째</td><td>31일째</td><td>52일째</td></tr>
+      <tr><td>하트 점수 2배</td><td>22일째</td><td>20일째</td><td>22일째</td><td>43일째</td><td>45일째</td><td>74일째</td></tr>
+    </table>
+    <p class="soft">보통 사람은 치이카와, 하치와레, 우사기와 하루 1.4점, 쿠리만쥬와 랏코와 0.9점, 모몽가와 0.5점을 쌓고 이틀에 한 번 좋아하는 선물을 주고 퀘스트는 열리는 대로 한다고 쳤다.</p>
+    <dl>
+      <dt>예전 저장</dt>
+      <dd>불러올 때 점수를 새 곡선으로 옮긴다. 가진 하트 개수와 다음 하트까지 채운 비율은 그대로 두고 하트가 늘지 않게 내림으로 계산한다. 저장 형식 버전은 5에서 6이 됐다.</dd>
+      <dt>늦어지는 것</dt>
+      <dd>날마다 이야기하고 놀기만 하면 첫 하트는 첫날이 아니라 이튿날 생긴다. 선물 가구, 보스 동행, 연계 퀘스트가 열리는 하트 3개도 늦어진다. 보통 사람 기준으로 랏코는 9일째에서 13일째, 모몽가는 13일째에서 20일째쯤이다.</dd>
+      <dt>고르지 않은 안</dt>
+      <dd>퀘스트 친밀도만 절반으로 줄이면 하루이틀밖에 늦어지지 않았다. 하트 점수를 2배로 늘리면 랏코의 하트 3개가 18일째까지 밀려 친구와 같이 잡도록 체력을 올린 보스가 한동안 버거워진다.</dd>
+      <dt>함께 고친 것</dt>
+      <dd>사이드스토리 「수상한 섬 합숙」 대사의 '배멀미'를 '뱃멀미'로 고쳤다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>10월 13일 조정</h2>
+    <dl>
+      <dt>랏코의 수련 보상 <code>05a260e</code></dt>
+      <dd>돌 망치 대신 목검을 준다(이미 있으면 600원). 가게에서 4,500원인 돌 망치는 이른 보상으로 너무 셌다.</dd>
+      <dt>토벌 일감 <code>dc1dd8d</code></dt>
+      <dd>보수와 깔끔 보너스를 절반쯤으로 줄이고, 하루 건수를 3, 3, 3, 2, 1건에서 2, 2, 2, 1, 1건으로 줄였다. 잡은 몬스터의 전리품을 따로 팔 수 있어서 전리품까지 더해 4급과 3급 풀 일감 사이가 되게 맞췄다.</dd>
+      <dt>이야기를 권하는 친구 <code>e0d6d70</code></dt>
+      <dd>위스키 봉봉은 우사기 대신 쿠리만쥬가 권하고(쿠리만쥬 하트 2), 검은 별똥별은 하치와레 하트 3 대신 치이카와 하트 3이 있어야 열린다. 같은 친구의 하트 조건에 이야기가 몰리지 않게 했다.</dd>
+      <dt>이야기가 열리는 차례 <code>db6e5f2</code></dt>
+      <dd>위스키 봉봉은 쿠리만쥬의 새 안주 뒤에, 하치와레가 구덩이에!는 하치와레의 동굴 무대 뒤에, 피자호빵 소식은 우사기의 소풍 자리 뒤에 열린다. 연계 퀘스트는 한 번에 하나만 하고 끝낸 다음 날부터 다음 연계가 열린다.</dd>
+      <dt>반짝 검 <code>6007143</code></dt>
+      <dd>닿는 거리를 1.7에서 2.0으로 늘렸다.</dd>
+    </dl>
+    <table>
+      <tr><th>토벌 일감</th><th>보수</th><th>깔끔 보너스 (한 마리)</th><th>하루 건수</th></tr>
+      <tr><td>풀뭉치 4마리</td><td>320원 → 160원</td><td>20원 → 10원</td><td>3 → 2</td></tr>
+      <tr><td>물방울 슬라임 4마리</td><td>340원 → 180원</td><td>20원 → 10원</td><td>3 → 2</td></tr>
+      <tr><td>도토리 뿔벌레 3마리</td><td>380원 → 205원</td><td>25원 → 15원</td><td>3 → 2</td></tr>
+      <tr><td>이끼 거북 2마리</td><td>520원 → 300원</td><td>40원 → 20원</td><td>2 → 1</td></tr>
+      <tr><td>그림자 나방 3마리</td><td>480원 → 255원</td><td>30원 → 15원</td><td>1 → 1</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>검토했지만 넣지 않은 것</h2>
+    <p>보스 체력을 올려도 친구와 같이 가는 비율은 늘지 않았다. 그래서 시뮬레이션으로 안 세 가지를 더 봤다.</p>
+    <table>
+      <tr><th>안</th><th>친구와 같이 간 보스전</th><th>기절 (잠을 자는 보통 사람)</th><th>기절 (밤새며 맞붙는 사람)</th></tr>
+      <tr><td>지금</td><td>22%</td><td>9번</td><td>23번</td></tr>
+      <tr><td>밤(21시 ~ 6시 반)에 보스 1.5배</td><td>21%</td><td>10번</td><td>28번</td></tr>
+      <tr><td>밤에 보스 2배</td><td>18%</td><td>11번</td><td>22번</td></tr>
+      <tr><td>혼자 오면 보스 1.5배</td><td><span class="mark">94%</span></td><td>6번</td><td>54번</td></tr>
+      <tr><td>혼자 오면 1.5배와 밤 1.5배</td><td>94%</td><td>6번</td><td>51번</td></tr>
+    </table>
+    <p class="soft">보통 실력 사람 열 명씩, 32시간 플레이 기준이다. 기절은 한 사람 평균이다.</p>
+    <p>밤 강화만으로는 친구와 같이 가지 않는다. 밤에 막히면 낮에 혼자 가서 잡기 때문이다. 동행 하트를 3개에서 2개로 낮추는 안은 효과가 작았다.</p>
+    <div class="verdict"><span class="k">권장</span><p>혼자 오면 보스가 1.5배로 세게 치는 규칙을 넣는다. 밤에는 친구가 자니 밤 보스전은 늘 혼자라 이 규칙 하나로 밤도 덮인다. 밤새며 맞붙는 사람의 기절이 늘어나는 것은, 보스 앞에 혼자 가면 화난 표시와 대장 대사로 미리 알려 줄여야 한다.</p></div>
+    <p><span class="kv">결정할 것</span>혼자 오면 1.5배를 넣을지 정해야 한다. 날짜 이벤트(11월 11일 막대 과자 파티)와 처음 집을 산 날의 집들이는 그 뒤 기능 커밋 6722db5로 들어갔다.</p>
+  </div>
+</section>
+
+<footer>
+  <span>치이카와 마을 생활 · 밸런스 패치 내역 · 2026-10-16</span>
+  <span><a href="https://claude.ai/artifact/De7vTyb9eMi8jTs8tbA68V">경제 점검 보고서</a></span>
+</footer>
+
+</div>
+</body>
+</html>
