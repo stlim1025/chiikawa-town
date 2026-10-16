@@ -163,6 +163,7 @@ export const FURNITURE = {
   fountain: { id: 'fountain', name: '실내 분수', price: 15000, cat: 'deco' },
   // 선물로만 받는 가구(가게에서는 안 판다)
   djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true, cat: 'deco' }, // 사이드스토리 '우사기의 집' 선물
+  dollset: { id: 'dollset', name: '난토카바니아 인형 세트', price: 0, gift: true, cat: 'deco' }, // 사이드스토리 '난토카바니아' 선물: 넷의 인형(내 인형은 내 생김새 — actors/dolls.js)
   photo: { id: 'photo', name: '흔들린 사진 액자', price: 0, gift: true, cat: 'deco' } // 사이드스토리 '하치와레의 카메라' 선물: 그날 찍은 사진(world/photoframe.js)
 };
 

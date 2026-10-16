@@ -135,6 +135,9 @@ import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardi
 import { createStarDinerStory } from './stories/stardiner.js';
 import { createBonbonFront, createBonbonGlade } from './world/bonbon.js';
 import { createBonbonStory } from './stories/bonbon.js';
+import { createNantokaStage } from './world/nantoka.js';
+import { createNantokaStory } from './stories/nantoka.js';
+import { setDollLook } from './actors/dolls.js';
 import { createSwitchFront, createBeetleBuddy, createSwitchStage, buildSwitchGadget, holdSwitch, BEETLE_SCALE } from './world/switchcave.js';
 import { createSwitchStory } from './stories/switch.js';
 import { createOdeSpot, createOdeStage } from './world/odejail.js';
@@ -1333,6 +1336,16 @@ function boot() {
         player.setPosition(p.x + 3, p.z + 3);
         cam.snap(player.position);
       },
+      /** 난토카바니아: show 면 숲 장면만 바로(보상 없음), 아니면 부탁을 받은 채 오전 11시 서쪽 숲 오솔길 앞(걸어 들어가면 시작 · 보상까지). */
+      nantoka(show) {
+        if (nantokaStory.active) return;
+        if (show) { nantokaStory.play(() => hud.toast('테스트: 난토카바니아 끝', 2400)); return; }
+        const qs = { ...(state.quests || {}) };
+        delete qs.nantoka;
+        commit({ ...startQuest({ ...state, quests: qs }, 'nantoka'), clock: { day: Math.max(12, state.clock.day), t: (11 - 6) / 24 } });
+        player.setPosition(DOLL_PATH.x + 4, DOLL_PATH.z);
+        cam.snap(player.position);
+      },
       /** 위스키 봉봉: show 면 숲속 빈터 장면만 바로(보상 없음), 아니면 부탁을 받은 채 오전 11시 숲길 옆 덩굴 앞(걸어 들어가면 시작 · 보상까지). */
       whiskeyBonbon(show) {
         if (bonbonStory.active) return;
@@ -1718,6 +1731,7 @@ function boot() {
       starDiner.reset();
       blackStar.reset();
       bonbonStory.reset();
+      nantokaStory.reset();
       switchStory.reset();
       odeStory.reset();
       swapStory.reset();
@@ -2993,6 +3007,7 @@ function boot() {
     if (mode === 'bonbon') { if (down && bonbonStory && !guide.open) bonbonStory.press(); return; } // 위스키 봉봉 숲속 빈터: 배 두드리기(박자 · 펀치 화면도 스스로 받는다)
     if (mode === 'beetle') return; // 스위치 바위산 기슭: 대사 · 고르기 창만
     if (mode === 'odejail') return; // 오데와 함께 감옥: 땅 파기 · 응원 연타 · 싸움 타이밍은 놀이 화면이 스스로 받는다
+    if (mode === 'nantoka') return; // 난토카바니아: 대사 창만, 「지금!」 신호는 놀이 화면이 스스로 받는다
     if (mode === 'arcade') return; // 몸이 바뀌었다 게임센터: 대사 · 고르기 창, 릴 멈추기는 놀이 화면이 스스로 받는다
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
@@ -3072,13 +3087,14 @@ function boot() {
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
   let bonbonStory = null; // 사이드스토리 '위스키 봉봉'(stories/bonbon.js — 아래에서 만든다)
+  let nantokaStory = null; // 사이드스토리 '난토카바니아'(stories/nantoka.js — 아래에서 만든다)
   let switchStory = null; // 사이드스토리 '스위치'(stories/switch.js — 아래에서 만든다)
   let odeStory = null; // 사이드스토리 '오데와 함께 감옥'(stories/ode.js — 아래에서 만든다)
   let swapStory = null; // 사이드스토리 '몸이 바뀌었다'(stories/swap.js — 아래에서 만든다)
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (housewarm && housewarm.active) || (stickParty && stickParty.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (housewarm && housewarm.active) || (stickParty && stickParty.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active) || (nantokaStory && nantokaStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -3453,6 +3469,7 @@ function boot() {
       else if (step.scene === 'switchOpen' || step.scene === 'switchFinale') switchStory.play(step.scene, done);
       else if (step.scene === 'odePrison') odeStory.play(done);
       else if (step.scene === 'hachiCamera') cameraStory.play(done);
+      else if (step.scene === 'nantoka') nantokaStory.play(done);
       else if (step.scene.startsWith('swap')) swapStory.play(step.scene, done); // 몸이 바뀌었다: swapSlot · swapRamen · swapBack
       else if (step.scene.startsWith('black')) blackStar.play(step.scene, done);
       else usagiClub.play({ id, again: step.scene === 'clubNight', done });
@@ -3565,9 +3582,12 @@ function boot() {
   const WORK_PLACES = { bench: WORK_SPOTS.benches[0], pavilion: WORK_SPOTS.pavilion[0], clockTower: { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z + 1.1 }, gateNorth: { x: GATES.north.x, z: GATES.north.z + 2 }, gateEast: { x: GATES.east.x - 2, z: GATES.east.z } };
   const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
     : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : place === 'switchRock' ? switchFront.spot
-    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : place === 'arcade' ? arcadeFront.spot : place === 'ramenShop' ? village.spots.ramen : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
+    : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : place === 'arcade' ? arcadeFront.spot : place === 'ramenShop' ? village.spots.ramen : place === 'dollPath' ? DOLL_PATH : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
   const BRIDGE_SPOT = { x: BRIDGES[0].x, z: riverZ(BRIDGES[0].x) };
+  // 사이드스토리 '난토카바니아': 서쪽 문에서 숲으로 난 길 위(x = -34 에서 길 한가운데), 끝나고 돌아오는 남쪽 문 안쪽(강을 따라 걸어 들어온 자리 — 바깥 강가는 몬스터가 있다)
+  const DOLL_PATH = (() => { let best = { d: Infinity, z: 0 }; for (let z = -8; z <= 8; z += 0.25) { const d = roadDist(-34, z); if (d < best.d) best = { d, z }; } return village.nearestFree(-34, best.z, 0.5); })();
+  const NANTOKA_BACK = village.nearestFree(GATES.south.x + 2, GATES.south.z - 3, 0.5);
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
   let questT = 0, bossM = null, questHint = false, hourHint = null; // hourHint: 시간이 아닐 때 와서 몇 시에 오라고 알린 퀘스트(멀어지면 비운다)
   /**
@@ -4573,6 +4593,16 @@ function boot() {
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
     setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(), front: bonbonFront,
     // 같이 마을로 돌아온 친구: 내 옆에 세워 두고(일과는 잠시 미룬다), 이야기가 끝나면 놓아준다
+    arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
+    letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
+  });
+  // 사이드스토리 '난토카바니아'(stories/nantoka.js): 서쪽 숲 오솔길 · 숲 밖 강가 장면(처음 들어갈 때 만든다). 내 집 가구 「난토카바니아 인형 세트」의 내 인형은 내 생김새로
+  setDollLook(() => (state ? myLook() : null));
+  let nantokaStage = null;
+  nantokaStory = createNantokaStory({
+    hud, guide, sound, input, minigame, get stage() { return nantokaStage || (nantokaStage = createNantokaStage()); }, cam, getPlayer: () => player,
+    who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
+    setMode: (m) => { mode = m; }, setCinematic: (on) => setCinematic(on), myLook: () => myLook(), bank: NANTOKA_BACK,
     arriveBeside: (kind, x, z) => { const n = npcs.byKind(kind); if (!n) return; staged.add(kind); npcs.comeOut(n, x, z); npcs.hold(n, true); delete awayInfo[kind]; setDoing(kind, null, null); },
     letGo: (kind) => { const n = npcs.byKind(kind); if (n && staged.has(kind)) npcs.hold(n, false); staged.delete(kind); }
   });
@@ -6980,7 +7010,7 @@ function boot() {
     requestAnimationFrame(frame);
     // 절전: 초당 30번만 돌고 그린다(휴대폰 발열). 다만 풀 뽑기 게이지 · 우사기 클럽 박자처럼 순간을 재는 동안은 화면 새로 고침마다 돈다
     // (30번이면 기운이 낮을 때 좁은 초록 칸을 게이지가 건너뛰어 '깔끔하게'가 안 나오고, 북 · 하이햇 소리가 박자마다 들쭉날쭉했다)
-    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage) && !(odeStory && odeStory.onStage) && !(swapStory && swapStory.onStage)) return;
+    if (!perf.due(now) && !pulling && !(usagiClub && usagiClub.active) && !(islandTrip && islandTrip.inIsland) && !(idolStory && idolStory.onStage) && !(starDiner && starDiner.onStage) && !(blackStar && blackStar.onStage) && !(bonbonStory && bonbonStory.onStage) && !(switchStory && switchStory.onStage) && !(odeStory && odeStory.onStage) && !(swapStory && swapStory.onStage) && !(nantokaStory && nantokaStory.onStage)) return;
     // 0 아래로도 막는다: 첫 프레임의 시각(now)이 마을을 다 짓기 전에 잰 last 보다 앞설 수 있어 dt 가 음수가 되면
     // 솟아나는 중이던 몬스터의 크기가 음수(뒤집혀 땅속)로 굳어 분홍 실루엣만 보였다
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
@@ -7075,6 +7105,8 @@ function boot() {
       checkUpdate: () => updateCheck.check(),
       /** 별 세 개 레스토랑을 바로(보상 없음): 헤드리스 시험용. */
       dinerPlay: () => { if (!starDiner.active) starDiner.play(() => hud.toast('테스트: 레스토랑 끝', 2400)); },
+      nantokaPlay: () => { if (!nantokaStory.active) nantokaStory.play(() => hud.toast('테스트: 난토카바니아 끝', 2400)); },
+      nantoka: () => ({ phase: nantokaStory.phase, mode, witch: nantokaStage ? nantokaStage.witchMode : null }),
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
       beetleSwitch: (at) => devBeetleSwitch(at), // 스위치: 'open' · 'teeth' · 'finale' · 'show' · 'showEnd'(테스트 앱과 같다)
       ode: (at) => devOde(at), // 오데와 함께 감옥: 'spot' · 'show' · 'dig' · 'fight' · 'momonga'(테스트 앱과 같다)
@@ -7253,6 +7285,16 @@ function boot() {
       hud.placeLabels([], bonbonGlade.camera);
       return;
     }
+    // 난토카바니아(사이드스토리): 서쪽 숲 오솔길 · 숲 밖 강가. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
+    if (mode === 'nantoka' && state) {
+      nantokaStage.resize(aspect);
+      nantokaStory.tick(dt, t);
+      setCelLight(nantokaStage.light);
+      lights.update('off', player.position, player.yaw, 0);
+      if (!skipRender && drawNow) gfx.renderer.render(nantokaStage.scene, nantokaStage.camera);
+      hud.placeLabels([], nantokaStage.camera);
+      return;
+    }
     // 스위치(사이드스토리): 바위산 기슭. 장면을 보는 동안 마을 시계 · 친구들은 멈춰 있다
     if (mode === 'beetle' && state) {
       switchStage.resize(aspect);
@@ -7416,6 +7458,7 @@ function boot() {
       idolStory.update(dt);
       starDiner.update(dt, t);
       bonbonStory.update(dt);
+      nantokaStory.update(dt);
       switchStory.update(dt);
       odeStory.update(dt);
       swapStory.update(dt);

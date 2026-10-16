@@ -3,6 +3,7 @@ import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
 import { HOME_CELL as CELL, roomLayout, roomShape, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS } from '../core/home.js';
 import { photoFrameTexture } from './photoframe.js';
+import { buildDoll, dollLook } from '../actors/dolls.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
 // 방 크기 · 칸 격자 · 문간 · 옷장 · 보관 상자 자리는 집 크기마다 다르다(core/home.js roomLayout). 깔개와 방석은 밟고 지나갈 수 있다.
@@ -66,6 +67,19 @@ export function furnitureModel(id) {
       m(GEO.box, '#3a3236', { position: [0.55, 0.32, 0], scale: [0.26, 0.64, 0.3], shell: true });
       [0.2, 0.46].forEach((y) => m(GEO.cylinder, '#8f8174', { position: [0.55, y, 0.16], scale: [0.08, 0.02, 0.08], rotation: [Math.PI / 2, 0, 0], outline: 0.01 }));
       break;
+    case 'dollset': {
+      // 난토카바니아 인형 세트(사이드스토리 '난토카바니아'): 낮은 나무 받침 위에 넷의 인형(나 · 치이카와 · 하치와레 · 우사기)
+      m(GEO.box, '#c49a6c', { position: [0, 0.06, 0], scale: [0.9, 0.12, 0.42], shell: true });
+      ['me', 'chiikawa', 'hachiware', 'usagi'].forEach((k, i) => {
+        const d = buildDoll(k, k === 'me' ? dollLook() : null);
+        d.root.scale.setScalar(0.38);
+        d.root.position.set(-0.32 + i * 0.213, 0.12, 0.02);
+        d.root.rotation.y = (1.5 - i) * 0.12; // 가운데를 보듯 살짝 안쪽으로
+        animateChibi(d, 'idle', 0, {});
+        g.add(d.root);
+      });
+      break;
+    }
     case 'photo': {
       // 흔들린 사진 액자(하치와레의 카메라): 낮은 나무 장 위에 비스듬히 세운 액자, 사진은 그날 찍은 단체 사진(world/photoframe.js)
       m(GEO.box, '#c49a6c', { position: [0, 0.18, 0], scale: [0.56, 0.36, 0.36], shell: true });

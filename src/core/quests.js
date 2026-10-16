@@ -85,6 +85,7 @@ export const PLACES = {
   switchRock: { name: '바위산 끝 절벽 동굴', r: 3 }, // 바위산 북쪽 끝 절벽(창살로 막힌 동굴 입구가 늘 있다 — world/switchcave.js)
   arcade: { name: '낡은 게임센터', r: 3 }, // 숲 어귀의 낡은 게임센터(늘 서 있다 — world/arcade.js)
   ramenShop: { name: '라멘 로우', r: 3.2 }, // 라멘 로우 앞
+  dollPath: { name: '서쪽 숲 오솔길', r: 3.2 }, // 사이드스토리 '난토카바니아': 마을 서쪽 문에서 숲으로 난 길 위(main 의 DOLL_PATH)
   // 마을 가꾸기(core/works.js)로 생긴 곳
   bench: { name: '연못 쉼터', r: 2.6 },
   pavilion: { name: '강가 정자', r: 2.8 },
@@ -520,6 +521,19 @@ export const QUESTS = {
           { who: 'hachiware', text: '{name}도 하치와레 몸으로 고생 많았어~ 고마워!' }] }
     ],
     reward: { bond: 3, money: 300, friends: { chiikawa: 2, hachiware: 2 } }
+  },
+  // 난토카바니아(원작 애니 21 ~ 23화 「なんとかバニア」): 하치와레가 셋을 닮은 인형을 선물 → 인형으로 변하기 시작할 때 덤불 뒤에서 마녀가 나타나
+  // 원래 몸들을 그물 보따리에 싸 들고 간다 → 인형은 제대로 못 움직이고 하치와레만 조금씩 움직여 페트병 뚜껑을 굴린다 → 마녀가 뚜껑을 밟고 넘어지자
+  // 다들 원래 몸으로 돌아와 보따리에서 빠져나온다 → 강가에서 얼굴을 비춰 보며 안도한다. 장면은 stories/nantoka.js · world/nantoka.js.
+  // 게임에서 정한 부분: 나도 같이 인형이 된 것(내 인형은 연두 멜빵바지), 뚜껑을 굴릴 때의 「지금!」 신호 놀이, 장소(서쪽 숲 오솔길), 여는 조건, 대사 전부와 보상(인형 세트 가구)
+  nantoka: {
+    title: '난토카바니아', giver: 'hachiware', side: true, minDay: 12, hours: [10, 17], needHearts: 2, needFriends: { chiikawa: 2, usagi: 2 }, ask: '그 상자 뭐야?',
+    offer: ['(하치와레가 작은 상자를 소중히 안고 싱글벙글하고 있다)', '헤헤, 이거? 아직 비밀이야~!', '서쪽 숲 오솔길에서 다 같이 열어 볼래? 치이카와랑 우사기도 부를게!', '{name}도 꼭 와야 해~!'],
+    steps: [
+      { type: 'visit', place: 'dollPath', hours: [10, 17], scene: 'nantoka', speaker: 'hachiware', goal: '서쪽 숲 오솔길에서 하치와레가 가져온 상자를 같이 열어 보자! (오전 10시 ~ 오후 5시)',
+        say: ['(하치와레가 품에서 인형 넷을 꺼냈다)', '…사실 인형도 몰래 챙겨 왔어~', '이젠 그냥 인형이야! 하나씩 나눠 갖자~', '{name} 거는 집에 둬! 우리 넷이 같이 있는 것처럼~'] }
+    ],
+    reward: { bond: 3, money: 300, friends: { chiikawa: 2, usagi: 2 }, furniture: 'dollset' }
   },
   // ---------- 일상 부탁: 같이 라멘 먹기 · 같이 풀 뽑기 같은 사소한 일(며칠 지나면 또 부탁한다) ----------
   ramenDate: {

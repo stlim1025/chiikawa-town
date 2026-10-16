@@ -1373,6 +1373,7 @@ export function createPanels(ui, handlers) {
         row('별 세 개', '저녁 7시 가게 앞, 또는 가게 안 장면만(보상 없음)', go('가게 앞', () => D.starDiner()), go('장면만', () => D.starDiner('show'))),
         row('검은 별똥별', '그 단계 앞에 시각과 되풀이 상태까지 맞춰서: 별밤 들판, 되돌아온 같은 아침, 밤 12시 전, 표백제 담그기, 비 오는 아침',
           go('들판', () => D.blackStar('wish')), go('같은 아침', () => D.blackStar('dejavu')), go('밤 12시', () => D.blackStar('watch')), go('담그기', () => D.blackStar('soak')), go('비', () => D.blackStar('rain'))),
+        row('난토카바니아', '오전 11시 서쪽 숲 오솔길 앞, 또는 숲 장면만(보상 없음)', go('숲길', () => D.nantoka()), go('장면만', () => D.nantoka('show'))),
         row('위스키 봉봉', '오전 11시 숲길 옆 초콜릿 덩굴 앞, 또는 숲속 장면만(보상 없음)', go('덩굴 앞', () => D.whiskeyBonbon()), go('장면만', () => D.whiskeyBonbon('show'))),
         row('하치와레의 카메라', '오전 11시 광장 남쪽, 사진 찍은 다음 날 하치와레 옆(뽑은 사진), 또는 광장 장면만(보상 없음)',
           go('광장', () => D.hachiCamera('plaza')), go('뽑은 사진', () => D.hachiCamera('prints')), go('장면만', () => D.hachiCamera('show'))),
