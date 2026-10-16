@@ -5,6 +5,7 @@ import { NPC_LINES, lineOf } from '../src/core/npclines.js';
 import { createState } from '../src/core/state.js';
 import { ptsForHearts } from '../src/core/friends.js';
 import { isValidState } from '../src/core/save.js';
+import { MONSTERS } from '../src/core/combat.js';
 
 const fresh = () => ({ ...createState({ name: '나', look: {} }), tutorial: 'done' });
 const withHearts = (s, kind, n) => ({ ...s, friends: { ...(s.friends || {}), [kind]: { pts: ptsForHearts(n), talk: 0, play: 0, gift: true } } });
@@ -18,7 +19,7 @@ test('같이 잡으면 점수를 나눠 갖고 쓰러뜨린 수는 모두 하나
   assert.equal(H.hunterOf(s, 'rakko').points, 236 + 4);
   assert.equal(H.killPoints('fluff', 3), 1); // 3 / 3
   assert.equal(H.killPoints('hopper', 3), 1); // 적어도 1
-  assert.equal(H.killPoints('kingcap', 2), Math.round((72 + H.BOSS_BONUS) / 2));
+  assert.equal(H.killPoints('kingcap', 2), Math.round((MONSTERS.kingcap.hp + H.BOSS_BONUS) / 2));
   assert.equal(H.killPoints('dummy', 1), 0);
   assert.ok(isValidState(s));
 });

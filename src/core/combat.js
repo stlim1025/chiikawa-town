@@ -13,10 +13,12 @@ import { sleepFor } from './clock.js';
 export const WEAPONS = {
   // 예전 기본 무기(이제 가게에서는 팔지 않는다 · 가진 사람은 그대로 쓴다)
   stick: { name: '나무 막대기', price: 300, dmg: 1, range: 1.35, cool: 0.5, note: '가벼운 막대기' },
-  sword: { name: '목검', price: 1200, dmg: 2, range: 1.55, cool: 0.5, note: '다루기 쉬운 나무 검' },
+  // 목검: 0.6초마다(0.5초였을 때는 1초 힘 4.0 으로 돌 망치 3.75 보다 세서 망치를 살 까닭이 없었다)
+  sword: { name: '목검', price: 1200, dmg: 2, range: 1.55, cool: 0.6, note: '다루기 쉬운 나무 검' },
   // 사스마타(가장 기본 무기): 긴 분홍 자루 끝에 가시 돋친 둥근 U자 갈래. 휘두르지 않고 앞으로 찌른다 — 폭은 좁지만 멀리 닿고 밀어낸다
   fork: { name: '사스마타', price: 200, dmg: 1, range: 2.15, cool: 0.5, knock: 1.5, thrust: true, arc: 0.66, note: '멀리서 찔러 밀어내요' },
-  hammer: { name: '돌 망치', price: 4500, dmg: 3, range: 1.45, cool: 0.8, knock: 1.6, note: '느리지만 세게 밀어내요' },
+  // 돌 망치: 0.7초마다 힘 3(1초 힘 4.3 — 목검 3.3 과 반짝 검 7.8 사이). 한 대 힘은 반짝 검(3.5)보다 낮게 둔다(친구 무기 목표가 한 대 힘으로 다음 무기를 고른다 — core/goals.js)
+  hammer: { name: '돌 망치', price: 4500, dmg: 3, range: 1.45, cool: 0.7, knock: 1.6, note: '느리지만 세게 밀어내요' },
   // 반짝 검: 돌 망치보다 조금 세고(3.5) 빠르고 멀리 닿는다(힘 4 였을 때는 거의 다 한 방이라 돈이 너무 빨리 모였다)
   star: { name: '반짝 검', price: 12000, dmg: 3.5, range: 2.0, cool: 0.45, note: '가장 빠르고 멀리 닿는 반짝이는 검' }
 };
@@ -42,11 +44,12 @@ export const MONSTERS = {
   pebble: { name: '데굴 돌멩이', region: 'mountain', hp: 6, dmg: 11, speed: 2.0, aggro: 7, drop: 'ore', size: 0.48, attack: 'roll', atk: '굴러오기', note: '바위산을 굴러다니는 돌멩이. 멀리서 데굴데굴 굴러와 튕긴다.' },
   ram: { name: '구름 산양', region: 'mountain', hp: 5, dmg: 12, speed: 2.6, aggro: 7, drop: 'wool', size: 0.52, attack: 'stomp', atk: '높이 뛰어 짓밟기', note: '구름 같은 털에 말린 뿔. 높이 뛰어올라 넓게 짓밟는다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 4, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
-  kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 72, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 108, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
   // 구역 보스(동 · 서 · 남): 저마다 굴 · 빈터에 한 마리씩 산다. 쓰러뜨리면 다음 날 다시 나타난다(core/bosses.js).
-  bigmole: { name: '대왕 두더지', short: '대왕 두더지', region: 'fields', hp: 54, dmg: 14, speed: 1.7, aggro: 9, drop: 'goldclaw', size: 1.1, boss: true, attack: 'boss', atk: '할퀴기, 땅속 기습, 흙덩이 비, 부하 부르기', note: '동쪽 들판 굴밭의 주인. 땅속으로 숨었다가 발밑에서 솟구친다.' },
-  elder: { name: '고목 거인', short: '고목 거인', region: 'forest', hp: 60, dmg: 15, speed: 1.4, aggro: 9, drop: 'bigacorn', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 도토리 고리, 뿌리 솟구치기, 부하 부르기', note: '서쪽 숲 깊은 빈터의 오래된 나무. 땅속 뿌리를 일직선으로 솟구치게 한다.' },
-  bigcrab: { name: '강가 왕집게', short: '왕집게', region: 'river', hp: 56, dmg: 14, speed: 2.0, aggro: 9, drop: 'bigclaw', size: 1.15, boss: true, attack: 'boss', atk: '집게 연타, 옆걸음 돌진, 물방울 고리, 부하 부르기', note: '강가 진흙밭의 커다란 게. 붙으면 집게로 연달아 꼬집고, 멀면 옆걸음으로 돌진한다.' },
+  // 보스(구역 보스 셋 · 왕버섯) 체력은 하트를 쌓은 토벌 친구와 같이 잡도록 1.5배(예전 54 · 60 · 56 · 72 는 혼자서도 며칠 만에 다 잡혀 친구를 데려갈 일이 없었다)
+  bigmole: { name: '대왕 두더지', short: '대왕 두더지', region: 'fields', hp: 81, dmg: 14, speed: 1.7, aggro: 9, drop: 'goldclaw', size: 1.1, boss: true, attack: 'boss', atk: '할퀴기, 땅속 기습, 흙덩이 비, 부하 부르기', note: '동쪽 들판 굴밭의 주인. 땅속으로 숨었다가 발밑에서 솟구친다.' },
+  elder: { name: '고목 거인', short: '고목 거인', region: 'forest', hp: 90, dmg: 15, speed: 1.4, aggro: 9, drop: 'bigacorn', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 도토리 고리, 뿌리 솟구치기, 부하 부르기', note: '서쪽 숲 깊은 빈터의 오래된 나무. 땅속 뿌리를 일직선으로 솟구치게 한다.' },
+  bigcrab: { name: '강가 왕집게', short: '왕집게', region: 'river', hp: 84, dmg: 14, speed: 2.0, aggro: 9, drop: 'bigclaw', size: 1.15, boss: true, attack: 'boss', atk: '집게 연타, 옆걸음 돌진, 물방울 고리, 부하 부르기', note: '강가 진흙밭의 커다란 게. 붙으면 집게로 연달아 꼬집고, 멀면 옆걸음으로 돌진한다.' },
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
 /** 도감 · 안내서 순서(구역별로 셋씩, 그 구역 보스가 끝에). */
@@ -78,6 +81,12 @@ registerItems(DROPS);
 export const PLAYER_IFRAME = 1.0, PLAYER_KNOCK = 1.4;
 /** 기절하면 잃는 돈(가진 돈의 비율, 최대) · 깨어났을 때 기운 · 정신을 잃고 지나가는 시간(시). */
 export const FAINT_LOSS = 0.1, FAINT_LOSS_MAX = 300, FAINT_STAMINA = 25, FAINT_HOURS = 3;
+/**
+ * 보스전 먹기 쿨타임(초): 보스와 싸우는 동안 가방 음식을 한 번 먹으면 이만큼 지나야 또 먹는다(먹으며 피하지 않고 맞붙는 꼼수 막기).
+ * 보스전 밖에서는 언제든 먹는다. lastAt: 보스전에서 마지막으로 먹은 때(초, 없으면 null) → 아직 기다려야 하는 초(0 이면 먹을 수 있다)
+ */
+export const BOSS_EAT_COOL = 30;
+export const bossEatWait = (lastAt, now) => (lastAt == null ? 0 : Math.max(0, BOSS_EAT_COOL - (now - lastAt)));
 
 export const weaponOf = (state) => state.weapon || { owned: [], held: null };
 export const heldWeapon = (state) => { const w = weaponOf(state); return w.held && WEAPONS[w.held] ? w.held : null; };

@@ -91,19 +91,79 @@ export function useDecor(state, kind, id) {
   return { ok: true, bought: true, state: { ...paid.state, home: { ...home, [kind]: id, [key]: [...(home[key] || []), id] } } };
 }
 
-/** 살 수 있는 가구. price 는 원. */
+/** 가구점 분류(이 차례로 보인다). 가구마다 cat 이 이 중 하나. */
+export const FURNITURE_CATS = [
+  { id: 'rest', name: '침대와 소파' },
+  { id: 'table', name: '탁자와 의자' },
+  { id: 'store', name: '수납' },
+  { id: 'light', name: '조명' },
+  { id: 'kitchen', name: '부엌' },
+  { id: 'plant', name: '식물' },
+  { id: 'floor', name: '깔개와 방석' },
+  { id: 'deco', name: '장식' }
+];
+
+/**
+ * 살 수 있는 가구. price 는 원, cat 은 가구점 분류(FURNITURE_CATS). 하나가 한 칸이고, 같은 가구를 여러 개 살 수 있다.
+ * 처음 아홉 가지(침대 ~ 인형) 다음은 게임 오리지널로 늘린 가구: 값을 100원 ~ 15,000원으로 넓게 두어 집을 넓힌 뒤에도 채울 것이 있게 했다.
+ */
 export const FURNITURE = {
-  bed: { id: 'bed', name: '폭신 침대', price: 300 },
-  table: { id: 'table', name: '동그란 탁자', price: 120 },
-  cushion: { id: 'cushion', name: '분홍 방석', price: 50 },
-  rug: { id: 'rug', name: '동그란 러그', price: 90 },
-  plant: { id: 'plant', name: '화분', price: 80 },
-  lamp: { id: 'lamp', name: '스탠드', price: 140 },
-  shelf: { id: 'shelf', name: '책장', price: 180 },
-  stove: { id: 'stove', name: '작은 난로', price: 260 },
-  doll: { id: 'doll', name: '먼작귀 인형', price: 220 },
-  djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true }, // 사이드스토리 '우사기의 집' 선물(가게에서는 안 판다)
-  photo: { id: 'photo', name: '흔들린 사진 액자', price: 0, gift: true } // 사이드스토리 '하치와레의 카메라' 선물: 그날 찍은 사진(world/photoframe.js)
+  bed: { id: 'bed', name: '폭신 침대', price: 300, cat: 'rest' },
+  table: { id: 'table', name: '동그란 탁자', price: 120, cat: 'table' },
+  cushion: { id: 'cushion', name: '분홍 방석', price: 50, cat: 'floor' },
+  rug: { id: 'rug', name: '동그란 러그', price: 90, cat: 'floor' },
+  plant: { id: 'plant', name: '화분', price: 80, cat: 'plant' },
+  lamp: { id: 'lamp', name: '스탠드', price: 140, cat: 'light' },
+  shelf: { id: 'shelf', name: '책장', price: 180, cat: 'store' },
+  stove: { id: 'stove', name: '작은 난로', price: 260, cat: 'kitchen' },
+  doll: { id: 'doll', name: '먼작귀 인형', price: 220, cat: 'deco' },
+  // 침대와 소파
+  futon: { id: 'futon', name: '이불 깔개', price: 500, cat: 'rest' },
+  sofa: { id: 'sofa', name: '분홍 소파', price: 1200, cat: 'rest' },
+  hammock: { id: 'hammock', name: '노란 해먹', price: 2200, cat: 'rest' },
+  bunkbed: { id: 'bunkbed', name: '이층 침대', price: 3500, cat: 'rest' },
+  starbed: { id: 'starbed', name: '별밤 침대', price: 9000, cat: 'rest' },
+  // 탁자와 의자
+  stool: { id: 'stool', name: '동그란 걸상', price: 100, cat: 'table' },
+  chair: { id: 'chair', name: '나무 의자', price: 150, cat: 'table' },
+  lowtable: { id: 'lowtable', name: '좌식 탁자', price: 400, cat: 'table' },
+  desk: { id: 'desk', name: '공부 책상', price: 900, cat: 'table' },
+  teatable: { id: 'teatable', name: '찻상과 찻주전자', price: 1500, cat: 'table' },
+  // 수납
+  chest: { id: 'chest', name: '서랍장', price: 600, cat: 'store' },
+  toybox: { id: 'toybox', name: '장난감 상자', price: 700, cat: 'store' },
+  bookcase: { id: 'bookcase', name: '키 큰 책장', price: 1800, cat: 'store' },
+  cabinet: { id: 'cabinet', name: '반짝이 진열장', price: 4000, cat: 'store' },
+  // 조명
+  candle: { id: 'candle', name: '촛대', price: 250, cat: 'light' },
+  paperlamp: { id: 'paperlamp', name: '동그란 종이 등', price: 600, cat: 'light' },
+  shroomlamp: { id: 'shroomlamp', name: '버섯 조명', price: 1200, cat: 'light' },
+  starlamp: { id: 'starlamp', name: '별 무드등', price: 2500, cat: 'light' },
+  // 부엌
+  ramenpot: { id: 'ramenpot', name: '라멘 냄비 선반', price: 800, cat: 'kitchen' },
+  sink: { id: 'sink', name: '개수대', price: 1500, cat: 'kitchen' },
+  fridge: { id: 'fridge', name: '냉장고', price: 2000, cat: 'kitchen' },
+  oven: { id: 'oven', name: '벽돌 오븐', price: 3000, cat: 'kitchen' },
+  // 식물
+  cactus: { id: 'cactus', name: '꼬마 선인장', price: 120, cat: 'plant' },
+  sunflower: { id: 'sunflower', name: '해바라기 화분', price: 300, cat: 'plant' },
+  bonsai: { id: 'bonsai', name: '분재', price: 2000, cat: 'plant' },
+  tree: { id: 'tree', name: '방 안 열매나무', price: 5000, cat: 'plant' },
+  // 깔개와 방석
+  squarerug: { id: 'squarerug', name: '네모 러그', price: 250, cat: 'floor' },
+  beanbag: { id: 'beanbag', name: '말랑 빈백', price: 900, cat: 'floor' },
+  // 장식
+  radio: { id: 'radio', name: '빨간 라디오', price: 450, cat: 'deco' },
+  easel: { id: 'easel', name: '그림 이젤', price: 700, cat: 'deco' },
+  globe: { id: 'globe', name: '지구본', price: 1100, cat: 'deco' },
+  clock: { id: 'clock', name: '괘종시계', price: 2800, cat: 'deco' },
+  fishtank: { id: 'fishtank', name: '어항', price: 3500, cat: 'deco' },
+  trophy: { id: 'trophy', name: '황금 토벌 트로피', price: 6000, cat: 'deco' },
+  piano: { id: 'piano', name: '작은 피아노', price: 8000, cat: 'deco' },
+  fountain: { id: 'fountain', name: '실내 분수', price: 15000, cat: 'deco' },
+  // 선물로만 받는 가구(가게에서는 안 판다)
+  djbooth: { id: 'djbooth', name: '도토리 DJ 부스', price: 0, gift: true, cat: 'deco' }, // 사이드스토리 '우사기의 집' 선물
+  photo: { id: 'photo', name: '흔들린 사진 액자', price: 0, gift: true, cat: 'deco' } // 사이드스토리 '하치와레의 카메라' 선물: 그날 찍은 사진(world/photoframe.js)
 };
 
 /** 새 집: 침대 하나가 안쪽 가운데에 놓여 있다. */

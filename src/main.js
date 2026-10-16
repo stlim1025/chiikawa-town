@@ -98,7 +98,7 @@ import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, s
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
-import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS } from './core/combat.js';
+import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS, bossEatWait, BOSS_EAT_COOL } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
 import { WORKS, WORK_IDS, WORK_SPOTS, REST_RATE, donate, fundWork, workOf, dueWorks, markWorksOpen, workStatus, worksView, packWorks, unpackWorks, canPickFlower, pickFlower, canRingBell, ringBell } from './core/works.js';
@@ -1505,9 +1505,15 @@ function boot() {
       sound.play('click');
     },
     // 가방
+    /** 보스전 먹기 쿨타임: { left: 남은 초(보스전이 아니거나 먹을 수 있으면 0), total: 전체 초 } — 주머니의 음식 칸을 시계처럼 회색으로 덮는다 */
+    eatCooldown() { return { left: bossBgmHold > 0 ? bossEatWait(bossEatAt, performance.now() / 1000) : 0, total: BOSS_EAT_COOL }; },
     eatItem(id) {
+      // 보스전 중에는 한 번 먹으면 BOSS_EAT_COOL 초 뒤에야 또 먹는다(core/combat.js — 먹으며 맞붙는 꼼수 막기)
+      const now = performance.now() / 1000, fight = bossBgmHold > 0, wait = fight ? bossEatWait(bossEatAt, now) : 0;
+      if (wait > 0) { hud.toast(`보스와 싸우는 중이라 숨 돌릴 틈이 없어요. ${Math.ceil(wait)}초 뒤에 먹을 수 있어요`, 2400); return; }
       const r = eatItem(state, id, MAX_STAMINA);
       if (!r.ok) { hud.toast(r.reason === 'full' ? '지금은 배불러요' : '먹을 수 없어요'); return; }
+      if (fight) bossEatAt = now;
       commit(r.state);
       sound.play('eat');
       eatMotion(id);
@@ -6876,6 +6882,7 @@ function boot() {
 
   // ---------- 보스전 배경음악: 깨어난 보스가 나를 알아챘거나 맞았고 가까이 있으면 웅장한 곡으로(audio/sound.js 의 bossMusic) ----------
   let bossBgmHold = 0; // 보스가 곁에 있다가 사라진 뒤 남은 초(대왕 두더지가 땅속에 숨어 잠깐 안 보여도 곡이 끊기지 않게)
+  let bossEatAt = null; // 보스전에서 마지막으로 가방 음식을 먹은 때(실제 초, 먹기 쿨타임 — core/combat.js 의 bossEatWait)
   function updateBossMusic(dt) {
     const p = player && player.position;
     const fighting = mode === 'play' && !fainting && p && monsters.nearest(p.x, p.z, sound.bossOn ? 26 : 15, (m) => m.M.boss && (m.engaged || m.hp < m.M.hp));

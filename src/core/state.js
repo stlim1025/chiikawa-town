@@ -1,5 +1,5 @@
 import { createClock } from './clock.js';
-import { todayISO } from './calendar.js';
+import { GAME_START_DATE } from './calendar.js';
 
 /** 기운 최대치. */
 export const MAX_STAMINA = 100;
@@ -27,7 +27,7 @@ export function createState(profile) {
     tutorial: 'hello', // 하치와레의 첫날 안내(core/tutorial.js)
     home: { owned: { bed: 1 }, placed: [{ id: 'bed', cx: 2, cz: 0, rot: 0 }] }, // 집 안 가구(core/home.js 의 createHome 과 같다)
     housing: { own: false, unpaid: 0, lottery: null }, // 처음엔 빌린 집(core/housing.js)
-    startDate: todayISO() // 1일째의 달력 날짜(core/calendar.js)
+    startDate: GAME_START_DATE // 1일째의 달력 날짜: 새 게임은 늘 10월 1일(core/calendar.js)
   };
 }
 

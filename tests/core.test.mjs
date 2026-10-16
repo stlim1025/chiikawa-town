@@ -151,9 +151,10 @@ test('처음엔 제초 견습(급수 6): 잡초로 경험치를 채워 5급 시�
 });
 test('exam uses current-grade weeds and per-grade streak', () => {
   let e = Lc.startExam(3);
-  assert.equal(e.need, 4);
+  assert.equal(e.need, Lc.EXAM_STREAK[3]);
+  assert.ok(Lc.EXAM_STREAK[3] < Lc.EXAM_STREAK[4] && Lc.EXAM_STREAK[2] < Lc.EXAM_STREAK[3], '2급 · 1급 시험은 연속 횟수가 하나씩 적다');
   assert.ok(Lc.examCounts(e, 'thorny') && Lc.examCounts(e, 'reed') && !Lc.examCounts(e, 'weed'));
-  for (let i = 0; i < 3; i++) e = Lc.examStep(e, 'clean');
+  for (let i = 0; i < e.need - 1; i++) e = Lc.examStep(e, 'clean');
   assert.equal(e.done, false);
   e = Lc.examStep(e, 'clean'); assert.ok(e.done && e.passed);
   const old = { streak: 2 }; // 예전 저장의 시험

@@ -6,7 +6,7 @@ import { photoFrameTexture } from './photoframe.js';
 
 // 돔 집 안: 앞쪽 벽이 잘린 인형의 집처럼 비스듬히 위에서 들여다본다.
 // 방 크기 · 칸 격자 · 문간 · 옷장 · 보관 상자 자리는 집 크기마다 다르다(core/home.js roomLayout). 깔개와 방석은 밟고 지나갈 수 있다.
-const WALKABLE = new Set(['rug', 'cushion']);
+const WALKABLE = new Set(['rug', 'cushion', 'squarerug']);
 
 /** 칸 (cx, cz) 의 바닥 가운데(size: 집 크기 번호, 처음 방이 0). */
 export const cellCenter = (cx, cz, size = 0) => homeCellCenter(size, cx, cz);
@@ -85,6 +85,260 @@ export function furnitureModel(id) {
       g.add(doll.root);
       break;
     }
+    // ---------- 늘린 가구(게임 오리지널, core/home.js) ----------
+    // 침대와 소파
+    case 'futon':
+      m(GEO.box, '#fff4de', { position: [0, 0.04, 0.03], scale: [0.86, 0.08, 0.92], shell: true, outline: 0.02, receive: true });
+      m(GEO.box, '#a8c8f0', { position: [0, 0.1, 0.16], scale: [0.88, 0.05, 0.62], shell: true, outline: 0.02 });
+      m(GEO.sphere, '#ffffff', { position: [0, 0.13, -0.3], scale: [0.24, 0.07, 0.13], outline: 0.02 });
+      break;
+    case 'sofa':
+      m(GEO.box, '#f4a6b8', { position: [0, 0.2, 0.05], scale: [0.92, 0.3, 0.62], shell: true });
+      m(GEO.box, '#f4a6b8', { position: [0, 0.5, -0.22], scale: [0.92, 0.46, 0.18], shell: true });
+      [-0.42, 0.42].forEach((x) => m(GEO.box, '#e88ea4', { position: [x, 0.38, 0.05], scale: [0.12, 0.32, 0.64], shell: true, outline: 0.02 }));
+      [-0.18, 0.18].forEach((x) => m(GEO.box, '#ffd0dc', { position: [x, 0.39, 0.08], scale: [0.34, 0.08, 0.46], shell: true, outline: 0.015 }));
+      break;
+    case 'hammock':
+      [-0.44, 0.44].forEach((z) => m(GEO.cylinder, '#a77d5a', { position: [0, 0, z], scale: [0.045, 0.95, 0.045], outline: 0.015 }));
+      m(GEO.sphere, '#f7d24a', { position: [0, 0.48, 0], scale: [0.2, 0.08, 0.42], outline: 0.02 });
+      m(GEO.sphere, '#ffffff', { position: [0, 0.55, -0.26], scale: [0.13, 0.05, 0.08], outline: 0.015 });
+      break;
+    case 'bunkbed':
+      [[-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]].forEach(([x, z]) => m(GEO.cylinder, '#b98b62', { position: [x, 0, z], scale: [0.04, 1.25, 0.04], outline: 0.012 }));
+      m(GEO.box, '#d8b48c', { position: [0, 0.16, 0], scale: [0.88, 0.12, 0.9], shell: true, outline: 0.02 });
+      m(GEO.box, '#fff4de', { position: [0, 0.27, 0], scale: [0.82, 0.1, 0.84], shell: true, outline: 0.015 });
+      m(GEO.box, '#a8c8f0', { position: [0, 0.34, 0.12], scale: [0.84, 0.05, 0.6], shell: true, outline: 0.015 });
+      m(GEO.box, '#d8b48c', { position: [0, 0.8, 0], scale: [0.88, 0.12, 0.9], shell: true, outline: 0.02 });
+      m(GEO.box, '#fff4de', { position: [0, 0.91, 0], scale: [0.82, 0.1, 0.84], shell: true, outline: 0.015 });
+      m(GEO.box, '#ffb7cf', { position: [0, 0.98, 0.12], scale: [0.84, 0.05, 0.6], shell: true, outline: 0.015 });
+      [0.3, 0.55].forEach((y) => m(GEO.box, '#a77d5a', { position: [0.47, y + 0.25, 0.3], scale: [0.03, 0.03, 0.2], outline: false }));
+      break;
+    case 'starbed':
+      m(GEO.box, '#3d4a7a', { position: [0, 0.18, 0.05], scale: [0.92, 0.36, 0.95], shell: true });
+      m(GEO.box, '#fff8e6', { position: [0, 0.4, 0.07], scale: [0.84, 0.12, 0.88], shell: true });
+      m(GEO.box, '#6b7bd6', { position: [0, 0.47, 0.2], scale: [0.86, 0.07, 0.6], shell: true });
+      [[-0.22, 0.28], [0.18, 0.1], [0.05, 0.36], [-0.05, 0.02]].forEach(([x, z]) => m(GEO.dot, '#fff1a0', { position: [x, 0.51, z], scale: [0.035, 0.02, 0.035], outline: false }));
+      m(GEO.box, '#fcd95b', { position: [0, 0.6, -0.44], scale: [0.92, 0.85, 0.08], shell: true });
+      m(GEO.sphere, '#fff1a0', { position: [0, 0.92, -0.38], scale: [0.12, 0.12, 0.04], outline: 0.015 });
+      break;
+    // 탁자와 의자
+    case 'stool':
+      m(GEO.cylinder, '#c49a6c', { position: [0, 0, 0], scale: [0.05, 0.34, 0.05], outline: 0.012 });
+      m(GEO.cylinder, '#c49a6c', { position: [0, 0, 0], scale: [0.18, 0.03, 0.18], outline: 0.015 });
+      m(GEO.cylinder, '#ffb7cf', { position: [0, 0.34, 0], scale: [0.22, 0.08, 0.22], outline: 0.02 });
+      break;
+    case 'chair':
+      [[-0.17, -0.17], [0.17, -0.17], [-0.17, 0.17], [0.17, 0.17]].forEach(([x, z]) => m(GEO.cylinder, '#c49a6c', { position: [x, 0, z], scale: [0.03, 0.42, 0.03], outline: 0.01 }));
+      m(GEO.box, '#e2b77f', { position: [0, 0.44, 0], scale: [0.44, 0.06, 0.44], shell: true, outline: 0.02 });
+      m(GEO.box, '#e2b77f', { position: [0, 0.72, -0.2], scale: [0.44, 0.5, 0.05], shell: true, outline: 0.02 });
+      break;
+    case 'lowtable':
+      [[-0.32, -0.22], [0.32, -0.22], [-0.32, 0.22], [0.32, 0.22]].forEach(([x, z]) => m(GEO.cylinder, '#a77d5a', { position: [x, 0, z], scale: [0.035, 0.26, 0.035], outline: 0.01 }));
+      m(GEO.box, '#e2b77f', { position: [0, 0.29, 0], scale: [0.82, 0.06, 0.6], shell: true, outline: 0.02 });
+      m(GEO.cylinder, '#ffffff', { position: [0.18, 0.32, 0.05], scale: [0.06, 0.07, 0.06], outline: 0.01 });
+      m(GEO.sphere, '#f7a84a', { position: [-0.15, 0.36, -0.05], scale: [0.08, 0.06, 0.08], outline: 0.012 });
+      break;
+    case 'desk':
+      [-0.4, 0.4].forEach((x) => m(GEO.box, '#c49a6c', { position: [x, 0.3, 0], scale: [0.06, 0.6, 0.5], shell: true, outline: 0.015 }));
+      m(GEO.box, '#d8b48c', { position: [0, 0.63, 0], scale: [0.92, 0.06, 0.56], shell: true, outline: 0.02 });
+      m(GEO.box, '#e2b77f', { position: [0.22, 0.5, 0], scale: [0.3, 0.16, 0.48], shell: true, outline: 0.015 });
+      ['#7fa7d9', '#e0524f', '#8fd16a'].forEach((c, i) => m(GEO.box, c, { position: [-0.24, 0.69 + i * 0.05, -0.08], scale: [0.26, 0.045, 0.2], outline: 0.008 }));
+      m(GEO.cylinder, '#f7d24a', { position: [0.25, 0.66, -0.12], scale: [0.05, 0.12, 0.05], outline: 0.01 });
+      break;
+    case 'teatable':
+      m(GEO.cylinder, '#c49a6c', { position: [0, 0, 0], scale: [0.06, 0.48, 0.06], outline: 0.015 });
+      m(GEO.cylinder, '#f6c6d2', { position: [0, 0.48, 0], scale: [0.42, 0.06, 0.42], outline: 0.02 });
+      m(GEO.sphere, '#ffffff', { position: [0, 0.63, 0], scale: [0.11, 0.09, 0.11], outline: 0.015 });
+      m(GEO.cone, '#ffffff', { position: [0.1, 0.6, 0], scale: [0.03, 0.12, 0.03], rotation: [0, 0, -0.9], outline: 0.008 });
+      m(GEO.dot, '#e5788f', { position: [0, 0.73, 0], scale: [0.03, 0.03, 0.03], outline: false });
+      [[-0.24, 0.12], [0.22, 0.18]].forEach(([x, z]) => m(GEO.cylinder, '#ffffff', { position: [x, 0.54, z], scale: [0.05, 0.06, 0.05], outline: 0.01 }));
+      break;
+    // 수납
+    case 'chest':
+      m(GEO.box, '#d8b48c', { position: [0, 0.36, -0.08], scale: [0.8, 0.72, 0.5], shell: true });
+      [0.2, 0.44].forEach((y) => {
+        m(GEO.box, '#c49a6c', { position: [0, y, 0.18], scale: [0.72, 0.18, 0.02], outline: false });
+        m(GEO.dot, '#8f8174', { position: [0, y, 0.2], scale: [0.03, 0.03, 0.02], outline: false });
+      });
+      m(GEO.sphere, '#ffb7cf', { position: [0.22, 0.77, -0.1], scale: [0.08, 0.05, 0.08], outline: 0.012 });
+      break;
+    case 'toybox':
+      m(GEO.box, '#7fa7d9', { position: [0, 0.24, 0], scale: [0.72, 0.48, 0.5], shell: true });
+      m(GEO.box, '#5b86c4', { position: [0, 0.55, -0.2], scale: [0.74, 0.05, 0.3], rotation: [-0.9, 0, 0], shell: true, outline: 0.015 });
+      m(GEO.sphere, '#e0524f', { position: [-0.16, 0.52, 0.06], scale: [0.11, 0.11, 0.11], outline: 0.015 });
+      m(GEO.box, '#f7d24a', { position: [0.14, 0.52, 0.05], scale: [0.14, 0.14, 0.14], rotation: [0, 0.5, 0.3], shell: true, outline: 0.012 });
+      m(GEO.sphere, '#8fd16a', { position: [0.02, 0.56, 0.12], scale: [0.07, 0.07, 0.07], outline: 0.012 });
+      break;
+    case 'bookcase':
+      m(GEO.box, '#a77d5a', { position: [0, 0.72, -0.25], scale: [0.94, 1.44, 0.36], shell: true });
+      [0.36, 0.76, 1.16].forEach((y, row) => {
+        m(GEO.box, '#8a6446', { position: [0, y - 0.18, -0.07], scale: [0.86, 0.03, 0.02], outline: false });
+        ['#e0524f', '#7fa7d9', '#f7d24a', '#8fd16a', '#ffb7cf', '#b59af0'].forEach((c, i) => {
+          if ((i + row) % 5 === 4) return;
+          m(GEO.box, c, { position: [-0.34 + i * 0.13, y, -0.12], scale: [0.09, 0.26, 0.17], outline: 0.008 });
+        });
+      });
+      break;
+    case 'cabinet':
+      // 뒤판(하늘빛 유리 안쪽) 앞으로 선반을 내밀고 그 위에 반짝이를 늘어놓는다(몸통 안에 두면 가려 안 보인다)
+      m(GEO.box, '#c49a6c', { position: [0, 0.62, -0.3], scale: [0.86, 1.24, 0.22], shell: true });
+      m(GEO.box, '#dceefa', { position: [0, 0.72, -0.18], scale: [0.72, 0.92, 0.02], outline: false });
+      [0.4, 0.8].forEach((y) => m(GEO.box, '#a77d5a', { position: [0, y, -0.06], scale: [0.78, 0.04, 0.26], shell: true, outline: 0.01 }));
+      [['#fcd95b', -0.2, 0.5], ['#e0524f', 0.15, 0.5], ['#7fa7d9', -0.05, 0.9], ['#fff1a0', 0.22, 0.9]].forEach(([c, x, y]) => m(GEO.sphere, c, { position: [x, y, -0.04], scale: [0.07, 0.07, 0.07], outline: 0.01 }));
+      m(GEO.box, '#a77d5a', { position: [0, 0.1, -0.08], scale: [0.86, 0.2, 0.3], shell: true, outline: 0.015 });
+      break;
+    // 조명
+    case 'candle':
+      m(GEO.cylinder, '#e8b86a', { position: [0, 0, 0], scale: [0.14, 0.05, 0.14], outline: 0.015 });
+      m(GEO.cylinder, '#e8b86a', { position: [0, 0.05, 0], scale: [0.03, 0.4, 0.03], outline: 0.01 });
+      [-0.12, 0, 0.12].forEach((x, i) => {
+        m(GEO.cylinder, '#fffbe8', { position: [x, 0.44 + (i === 1 ? 0.06 : 0), 0], scale: [0.04, 0.16, 0.04], outline: 0.01 });
+        m(GEO.dot, '#ffcf5a', { position: [x, 0.64 + (i === 1 ? 0.06 : 0), 0], scale: [0.03, 0.05, 0.03], outline: false });
+      });
+      m(GEO.box, '#e8b86a', { position: [0, 0.44, 0], scale: [0.28, 0.03, 0.04], outline: false });
+      break;
+    case 'paperlamp':
+      m(GEO.cylinder, '#a77d5a', { position: [0, 0, 0], scale: [0.14, 0.05, 0.14], outline: 0.012 });
+      m(GEO.cylinder, '#a77d5a', { position: [0, 0.05, 0], scale: [0.02, 0.22, 0.02], outline: false });
+      m(GEO.sphere, '#fff3d6', { position: [0, 0.5, 0], scale: [0.24, 0.3, 0.24], outline: 0.02 });
+      [0.38, 0.5, 0.62].forEach((y) => m(GEO.cylinder, '#e8c99a', { position: [0, y, 0], scale: [0.235 * Math.sqrt(1 - ((y - 0.5) / 0.3) ** 2) + 0.005, 0.01, 0.235 * Math.sqrt(1 - ((y - 0.5) / 0.3) ** 2) + 0.005], outline: false }));
+      break;
+    case 'shroomlamp':
+      m(GEO.cylinder, '#fff4de', { position: [0, 0, 0], scale: [0.09, 0.48, 0.09], outline: 0.015 });
+      m(GEO.sphere, '#e0524f', { position: [0, 0.5, 0], scale: [0.3, 0.17, 0.3], outline: 0.02 });
+      [[0.12, 0.6, 0.1], [-0.14, 0.58, 0.05], [0.02, 0.63, -0.15], [-0.04, 0.66, 0.05]].forEach(([x, y, z]) => m(GEO.dot, '#ffffff', { position: [x, y, z], scale: [0.04, 0.02, 0.04], outline: false }));
+      break;
+    case 'starlamp':
+      m(GEO.cylinder, '#4a5585', { position: [0, 0, 0], scale: [0.15, 0.06, 0.15], outline: 0.015 });
+      m(GEO.cylinder, '#4a5585', { position: [0, 0.06, 0], scale: [0.025, 0.3, 0.025], outline: false });
+      m(GEO.sphere, '#fcd95b', { position: [0, 0.56, 0], scale: [0.12, 0.12, 0.06], outline: 0.015 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        m(GEO.cone, '#fcd95b', { position: [Math.sin(a) * 0.08, 0.56 + Math.cos(a) * 0.08, 0], scale: [0.07, 0.16, 0.05], rotation: [0, 0, -a], outline: 0.012 });
+      }
+      break;
+    // 부엌
+    case 'ramenpot':
+      m(GEO.box, '#c49a6c', { position: [0, 0.3, -0.05], scale: [0.66, 0.6, 0.46], shell: true });
+      m(GEO.cylinder, '#d9645a', { position: [-0.12, 0.6, -0.05], scale: [0.18, 0.2, 0.18], outline: 0.02 });
+      m(GEO.sphere, '#8f8174', { position: [-0.12, 0.81, -0.05], scale: [0.17, 0.04, 0.17], outline: 0.012 });
+      [0, 1, 2].forEach((i) => m(GEO.cylinder, '#ffffff', { position: [0.2, 0.6 + i * 0.05, 0.02], scale: [0.11, 0.045, 0.11], outline: 0.008 }));
+      break;
+    case 'sink':
+      m(GEO.box, '#dceefa', { position: [0, 0.38, -0.05], scale: [0.86, 0.76, 0.55], shell: true });
+      m(GEO.box, '#eceff1', { position: [0, 0.78, -0.05], scale: [0.92, 0.05, 0.6], shell: true, outline: 0.015 });
+      m(GEO.box, '#b0bec5', { position: [0, 0.8, -0.02], scale: [0.42, 0.03, 0.3], outline: false });
+      m(GEO.cylinder, '#9aa5a8', { position: [0, 0.8, -0.24], scale: [0.03, 0.22, 0.03], outline: 0.008 });
+      m(GEO.box, '#9aa5a8', { position: [0, 1.01, -0.16], scale: [0.04, 0.03, 0.18], outline: 0.008 });
+      [-0.2, 0.2].forEach((x) => m(GEO.dot, '#8f8174', { position: [x, 0.5, 0.23], scale: [0.03, 0.03, 0.02], outline: false }));
+      break;
+    case 'fridge':
+      m(GEO.box, '#f0f4f7', { position: [0, 0.62, -0.08], scale: [0.62, 1.24, 0.56], shell: true });
+      m(GEO.box, '#cfd8dc', { position: [0, 0.82, 0.2], scale: [0.58, 0.02, 0.01], outline: false });
+      [1.02, 0.52].forEach((y) => m(GEO.box, '#8f8174', { position: [0.22, y, 0.21], scale: [0.03, 0.18, 0.03], outline: false }));
+      [['#ffb7cf', -0.14, 1.05], ['#8fd16a', -0.05, 0.98], ['#f7d24a', -0.18, 0.6]].forEach(([c, x, y]) => m(GEO.dot, c, { position: [x, y, 0.21], scale: [0.04, 0.04, 0.015], outline: false }));
+      break;
+    case 'oven':
+      m(GEO.box, '#c9775a', { position: [0, 0.38, -0.05], scale: [0.76, 0.76, 0.6], shell: true });
+      m(GEO.sphere, '#c9775a', { position: [0, 0.76, -0.05], scale: [0.36, 0.26, 0.3], outline: 0.02 });
+      m(GEO.box, '#3a3236', { position: [0, 0.4, 0.25], scale: [0.38, 0.26, 0.02], outline: false });
+      m(GEO.sphere, '#f7a84a', { position: [0, 0.34, 0.2], scale: [0.12, 0.06, 0.04], outline: false });
+      m(GEO.cylinder, '#8f8174', { position: [0.18, 0.95, -0.12], scale: [0.06, 0.25, 0.06], outline: 0.012 });
+      break;
+    // 식물
+    case 'cactus':
+      m(GEO.cylinder, '#d8a47f', { position: [0, 0, 0], scale: [0.15, 0.22, 0.15], outline: 0.015 });
+      m(GEO.sphere, '#6cb87a', { position: [0, 0.44, 0], scale: [0.11, 0.24, 0.11], outline: 0.015 });
+      m(GEO.sphere, '#6cb87a', { position: [0.13, 0.46, 0], scale: [0.05, 0.1, 0.05], outline: 0.01 });
+      m(GEO.dot, '#ff8fb0', { position: [0, 0.69, 0], scale: [0.05, 0.03, 0.05], outline: false });
+      break;
+    case 'sunflower':
+      m(GEO.cylinder, '#c9775a', { position: [0, 0, 0], scale: [0.16, 0.24, 0.16], outline: 0.015 });
+      m(GEO.cylinder, '#5fae6a', { position: [0, 0.24, 0], scale: [0.02, 0.6, 0.02], outline: false });
+      [-1, 1].forEach((s) => m(GEO.sphere, '#6cc77e', { position: [s * 0.08, 0.5, 0], scale: [0.08, 0.03, 0.05], rotation: [0, 0, s * 0.4], outline: 0.01 }));
+      m(GEO.sphere, '#f7d24a', { position: [0, 0.88, 0.03], scale: [0.17, 0.17, 0.04], outline: 0.015 });
+      m(GEO.sphere, '#8a5a34', { position: [0, 0.88, 0.06], scale: [0.07, 0.07, 0.03], outline: false });
+      break;
+    case 'bonsai':
+      m(GEO.box, '#5b86c4', { position: [0, 0.06, 0], scale: [0.6, 0.12, 0.4], shell: true, outline: 0.015 });
+      m(GEO.cylinder, '#8a5a34', { position: [-0.05, 0.12, 0], scale: [0.04, 0.32, 0.04], rotation: [0, 0, 0.35], outline: 0.01 });
+      [[-0.18, 0.42, 0, 0.13], [0.05, 0.48, 0.02, 0.15], [0.2, 0.4, -0.02, 0.1]].forEach(([x, y, z, r]) => m(GEO.sphere, '#4f9a5c', { position: [x, y, z], scale: [r, r * 0.65, r], outline: 0.015 }));
+      break;
+    case 'tree':
+      m(GEO.cylinder, '#d8a47f', { position: [0, 0, 0], scale: [0.26, 0.3, 0.26], outline: 0.02 });
+      m(GEO.cylinder, '#a77d5a', { position: [0, 0.3, 0], scale: [0.07, 0.6, 0.07], outline: 0.012 });
+      [[0, 1.1, 0, 0.36], [-0.2, 0.95, 0.05, 0.24], [0.22, 0.98, -0.04, 0.24]].forEach(([x, y, z, r]) => m(GEO.sphere, '#6cc77e', { position: [x, y, z], scale: [r, r, r], outline: 0.02 }));
+      [[0.12, 1.02, 0.28], [-0.18, 1.16, 0.22], [0.28, 0.9, 0.12], [-0.3, 0.9, 0.12]].forEach(([x, y, z]) => m(GEO.dot, '#e0524f', { position: [x, y, z], scale: [0.05, 0.05, 0.05], outline: false }));
+      break;
+    // 깔개와 방석
+    case 'squarerug':
+      m(GEO.box, '#f6c6d2', { position: [0, 0.01, 0], scale: [0.96, 0.02, 0.96], outline: 0.015, shell: true, receive: true });
+      m(GEO.box, '#fff4de', { position: [0, 0.016, 0], scale: [0.62, 0.02, 0.62], outline: false, receive: true });
+      break;
+    case 'beanbag':
+      m(GEO.sphere, '#9fd3c7', { position: [0, 0.22, 0], scale: [0.42, 0.24, 0.42], outline: 0.025 });
+      m(GEO.sphere, '#86c2b4', { position: [0, 0.38, -0.1], scale: [0.3, 0.14, 0.24], outline: 0.02 });
+      break;
+    // 장식
+    case 'radio':
+      m(GEO.box, '#c49a6c', { position: [0, 0.12, 0], scale: [0.56, 0.24, 0.32], shell: true, outline: 0.015 });
+      m(GEO.box, '#e0524f', { position: [0, 0.38, 0], scale: [0.5, 0.28, 0.24], shell: true });
+      m(GEO.cylinder, '#3a3236', { position: [-0.1, 0.38, 0.12], scale: [0.09, 0.02, 0.09], rotation: [Math.PI / 2, 0, 0], outline: false });
+      [0.1, 0.18].forEach((x) => m(GEO.dot, '#fff4de', { position: [x, 0.38, 0.13], scale: [0.03, 0.03, 0.02], outline: false }));
+      m(GEO.cylinder, '#8f8174', { position: [0.18, 0.52, -0.05], scale: [0.008, 0.3, 0.008], rotation: [0, 0, -0.4], outline: false });
+      break;
+    case 'easel':
+      [-0.18, 0.18].forEach((x) => m(GEO.box, '#a77d5a', { position: [x, 0.5, 0], scale: [0.04, 1.0, 0.04], rotation: [-0.15, 0, x > 0 ? -0.12 : 0.12], outline: 0.01 }));
+      m(GEO.box, '#a77d5a', { position: [0, 0.48, -0.16], scale: [0.04, 0.95, 0.04], rotation: [0.3, 0, 0], outline: 0.01 });
+      m(GEO.box, '#ffffff', { position: [0, 0.74, 0.05], scale: [0.5, 0.52, 0.03], rotation: [-0.15, 0, 0], shell: true, outline: 0.015 });
+      [['#7fa7d9', 0, 0.84], ['#6cc77e', -0.1, 0.66], ['#ffb7cf', 0.12, 0.7]].forEach(([c, x, y]) => m(GEO.sphere, c, { position: [x, y, 0.08], scale: [0.11, 0.06, 0.015], outline: false }));
+      break;
+    case 'globe':
+      m(GEO.cylinder, '#8a5a34', { position: [0, 0, 0], scale: [0.13, 0.04, 0.13], outline: 0.012 });
+      m(GEO.cylinder, '#8a5a34', { position: [0, 0.04, 0], scale: [0.025, 0.3, 0.025], outline: false });
+      m(GEO.sphere, '#7fa7d9', { position: [0, 0.55, 0], scale: [0.2, 0.2, 0.2], outline: 0.015 });
+      [[0.08, 0.62, 0.15], [-0.12, 0.5, 0.12], [0.1, 0.45, -0.14], [-0.05, 0.68, -0.13]].forEach(([x, y, z]) => m(GEO.sphere, '#6cc77e', { position: [x, y, z], scale: [0.07, 0.05, 0.05], outline: false }));
+      break;
+    case 'clock':
+      m(GEO.box, '#8a5a34', { position: [0, 0.7, -0.22], scale: [0.44, 1.4, 0.3], shell: true });
+      m(GEO.cylinder, '#fff8e6', { position: [0, 1.12, -0.06], scale: [0.15, 0.02, 0.15], rotation: [Math.PI / 2, 0, 0], outline: 0.012 });
+      m(GEO.box, '#3a3236', { position: [0, 1.15, -0.04], scale: [0.015, 0.09, 0.01], outline: false });
+      m(GEO.box, '#3a3236', { position: [0.03, 1.12, -0.04], scale: [0.07, 0.015, 0.01], outline: false });
+      m(GEO.box, '#5a3c26', { position: [0, 0.55, -0.06], scale: [0.26, 0.5, 0.02], outline: false });
+      m(GEO.sphere, '#fcd95b', { position: [0, 0.42, -0.04], scale: [0.06, 0.06, 0.02], outline: 0.01 });
+      break;
+    case 'fishtank':
+      m(GEO.box, '#a77d5a', { position: [0, 0.25, -0.05], scale: [0.82, 0.5, 0.46], shell: true });
+      m(GEO.box, '#bfe6f5', { position: [0, 0.72, -0.05], scale: [0.78, 0.44, 0.42], shell: true, outline: 0.015 });
+      m(GEO.box, '#e8d4a8', { position: [0, 0.52, -0.05], scale: [0.74, 0.04, 0.38], outline: false });
+      [['#f2884a', -0.15, 0.74], ['#fcd95b', 0.18, 0.66]].forEach(([c, x, y]) => {
+        m(GEO.sphere, c, { position: [x, y, 0.1], scale: [0.07, 0.045, 0.03], outline: 0.008 });
+        m(GEO.cone, c, { position: [x - 0.06, y, 0.1], scale: [0.03, 0.06, 0.02], rotation: [0, 0, Math.PI / 2], outline: false });
+      });
+      m(GEO.sphere, '#5fae6a', { position: [0.28, 0.62, -0.1], scale: [0.04, 0.1, 0.04], outline: false });
+      break;
+    case 'trophy':
+      m(GEO.box, '#8a5a34', { position: [0, 0.12, 0], scale: [0.4, 0.24, 0.4], shell: true });
+      m(GEO.cylinder, '#fcd95b', { position: [0, 0.24, 0], scale: [0.05, 0.22, 0.05], outline: 0.01 });
+      m(GEO.sphere, '#fcd95b', { position: [0, 0.6, 0], scale: [0.19, 0.17, 0.19], outline: 0.015 });
+      [-1, 1].forEach((s) => m(GEO.sphere, '#fcd95b', { position: [s * 0.2, 0.62, 0], scale: [0.06, 0.08, 0.03], outline: 0.01 }));
+      m(GEO.dot, '#fff1a0', { position: [0, 0.6, 0.18], scale: [0.05, 0.05, 0.02], outline: false });
+      break;
+    case 'piano':
+      m(GEO.box, '#3a3236', { position: [0, 0.45, -0.18], scale: [0.95, 0.9, 0.44], shell: true });
+      m(GEO.box, '#3a3236', { position: [0, 0.58, 0.08], scale: [0.95, 0.06, 0.16], shell: true, outline: 0.015 });
+      m(GEO.box, '#ffffff', { position: [0, 0.63, 0.1], scale: [0.86, 0.03, 0.12], outline: false });
+      for (let i = 0; i < 6; i++) m(GEO.box, '#1e1a1d', { position: [-0.33 + i * 0.13, 0.655, 0.07], scale: [0.05, 0.02, 0.07], outline: false });
+      m(GEO.box, '#ffffff', { position: [0, 0.9, -0.02], scale: [0.36, 0.22, 0.02], rotation: [-0.2, 0, 0], outline: 0.01 });
+      break;
+    case 'fountain':
+      m(GEO.cylinder, '#eceff1', { position: [0, 0, 0], scale: [0.46, 0.2, 0.46], outline: 0.02 });
+      m(GEO.cylinder, '#9fd4f2', { position: [0, 0.18, 0], scale: [0.4, 0.03, 0.4], outline: false });
+      m(GEO.cylinder, '#eceff1', { position: [0, 0.2, 0], scale: [0.07, 0.52, 0.07], outline: 0.012 });
+      m(GEO.sphere, '#eceff1', { position: [0, 0.72, 0], scale: [0.22, 0.06, 0.22], outline: 0.015 });
+      m(GEO.sphere, '#bfe6f5', { position: [0, 0.78, 0], scale: [0.06, 0.12, 0.06], outline: false });
+      [0, 1, 2, 3].forEach((i) => { const a = (i / 4) * Math.PI * 2; m(GEO.dot, '#bfe6f5', { position: [Math.sin(a) * 0.24, 0.5, Math.cos(a) * 0.24], scale: [0.03, 0.08, 0.03], outline: false }); });
+      break;
     default:
       break;
   }

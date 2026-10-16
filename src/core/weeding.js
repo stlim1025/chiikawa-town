@@ -12,7 +12,8 @@ export const WEED_KINDS = {
   vine: { name: '덩굴풀', grade: 4, chargeTime: 1.0, width: 0.2, stages: 2, where: '숲', tip: '줄기가 길어서 두 번에 나눠 뽑아요.' },
   thorny: { name: '위험한 풀', grade: 3, chargeTime: 0.85, width: 0.1, where: '마을 울타리 가, 숲', tip: '가시투성이라 초록 칸이 아주 좁아요.' },
   reed: { name: '물가 갈대', grade: 3, chargeTime: 0.9, width: 0.15, drift: { amp: 0.13, speed: 2.4 }, where: '강가, 호숫가', tip: '물살에 흔들려서 초록 칸이 크게 오르내려요.' },
-  rockmoss: { name: '바위틈 이끼풀', grade: 2, chargeTime: 0.8, width: 0.13, stages: 2, where: '바위산', tip: '바위에 꽉 붙어 있어요. 좁은 칸을 두 번 맞혀요.' },
+  // 이끼풀은 두 번에 나눠 뽑아 깔끔할 확률이 곱해지므로 초록 칸을 조금 넓게(0.13 일 때 반응이 0.2초 늦는 사람이 한 포기 49%)
+  rockmoss: { name: '바위틈 이끼풀', grade: 2, chargeTime: 0.8, width: 0.15, stages: 2, where: '바위산', tip: '바위에 꽉 붙어 있어요. 좁은 칸을 두 번 맞혀요.' },
   moongrass: { name: '달빛 풀', grade: 2, chargeTime: 0.85, width: 0.13, drift: { amp: 0.14, speed: 3.4 }, night: true, where: '숲, 바위산 (밤에만)', tip: '밤에만 빛나며 나타나요. 랜턴을 들고 찾아봐요.' },
   giantweed: { name: '왕잡초', grade: 1, chargeTime: 1.15, width: 0.15, stages: 3, drift: { amp: 0.08, speed: 2.0 }, where: '숲 깊은 곳', tip: '어른 키만 한 잡초. 세 번에 나눠 뽑아요.' },
   poisonweed: { name: '독풀', grade: 1, chargeTime: 0.7, width: 0.1, drift: { amp: 0.1, speed: 4.0 }, poison: true, where: '바위산 깊은 곳', tip: '끊기면 독이 튀어 기운이 쭉 빠져요. 신중하게!' }

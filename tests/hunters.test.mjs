@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as H from '../src/core/hunters.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
+import { MONSTERS } from '../src/core/combat.js';
 
 const fresh = () => ({ ...createState({ name: '나', look: {} }), tutorial: 'done' });
 
@@ -20,7 +21,7 @@ test('쓰러뜨리면 체력만큼 점수, 왕버섯은 덤', () => {
   s = H.addKill(s, 'me', 'turtle');
   assert.equal(H.hunterOf(s, 'me').points, 8);
   s = H.addKill(s, 'me', 'kingcap');
-  assert.equal(H.hunterOf(s, 'me').points, 8 + 72 + H.BOSS_BONUS);
+  assert.equal(H.hunterOf(s, 'me').points, 8 + MONSTERS.kingcap.hp + H.BOSS_BONUS);
   assert.equal(H.hunterOf(s, 'me').kills, 2);
   assert.ok(isValidState(s));
 });

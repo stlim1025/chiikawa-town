@@ -269,7 +269,7 @@ const BUILD = {
       part(cap, GEO.sphere, '#fff3dc', { position: [x, y, z], scale: [r, r * 0.45, r] }));
     [-1, 1].forEach((sd) => {
       part(g, GEO.sphere, '#f3e6cf', { position: [sd * 0.66, 0.6, 0.08], rotation: [0, 0, sd * 0.6], scale: [0.14, 0.24, 0.14] });
-      part(g, GEO.sphere, '#d9c7a6', { position: [sd * 0.3, 0.06, 0.1], scale: [0.22, 0.09, 0.26] });
+      part(g, GEO.sphere, '#d9c7a6', { position: [sd * 0.3, 0.105, 0.1], scale: [0.22, 0.09, 0.26] }); // 발바닥이 땅에 묻히면 묻힌 곳이 가려진 실루엣으로 붉게 비친다
     });
     face(g, { y: 0.78, z: 0.56, dx: 0.2, r: 0.075, brow: 0.55, browY: 0.13, browLen: 0.13 });
     part(g, GEO.dot, '#6b2b2b', { position: [0, 0.48, 0.565], scale: [0.18, 0.08, 0.03], flat: true });
@@ -580,8 +580,24 @@ export function monsterMesh(species) {
       wings.push(pivot);
     });
   }
+  // 잠든 왕버섯(이야기에서 입구를 살피러 갈 때): 감은 눈(살색 눈꺼풀이 눈 · 화난 눈썹을 덮고 ‿ 선). 부품이 한 덩어리로 합쳐져 있어 눈만 끌 수 없어서 따로 덮는다
+  // 몸과 같은 재질(정점 색)로 그려야 빛을 받는 색이 몸과 같다. 표시(markMat)도 같이 그려야 덮개 뒤 얼굴이 '가려진 몸'으로 붉게 비치지 않는다
+  let sleepFace = null;
+  if (species === 'kingcap') {
+    const lids = new THREE.Group();
+    [-1, 1].forEach((sd) => {
+      part(lids, GEO.sphere, '#f3e6cf', { position: [sd * 0.2, 0.79, 0.585], scale: [0.1, 0.12, 0.035] });
+      part(lids, GEO.box, '#f3e6cf', { position: [sd * 0.2, 0.91, 0.58], rotation: [0, 0, sd * 0.55], scale: [0.16, 0.045, 0.015] });
+      part(lids, GEO.box, EYE, { position: [sd * 0.2, 0.77, 0.625], rotation: [0, 0, -sd * 0.18], scale: [0.12, 0.018, 0.012], flat: true });
+    });
+    const lidBody = mergeParts(lids, 'body'), lidFlat = mergeParts(lids, 'flat');
+    sleepFace = new THREE.Group();
+    sleepFace.add(new THREE.Mesh(lidBody, bodyMat), new THREE.Mesh(lidFlat, flatMat), overlay(lidBody, markMat, 4), overlay(lidFlat, markMat, 4));
+    sleepFace.visible = false;
+    inner.add(sleepFace);
+  }
   inner.position.y = M.hover || 0;
-  return { root, inner, body, ghost, wings, height: M.height, hover: M.hover || 0 };
+  return { root, inner, body, ghost, wings, sleepFace, height: M.height, hover: M.hover || 0 };
 }
 
 // ---------- 공격 예고(바닥의 빨간 표시) · 탄 · 충격파 ----------
@@ -1194,6 +1210,10 @@ export function createMonsters(scene, village, random = Math.random) {
       const f = Math.sin(ph * (m.state === 'chase' || m.state === 'act' ? 22 : 13)) * 0.55;
       if (wings.length) { wings[0].rotation.z = -0.3 - f; wings[1].rotation.z = 0.3 + f; }
       rx = 0.15;
+    } else if (sp === 'kingcap' && m.dormant) {
+      // 쿨쿨: 숨 쉬듯 천천히 부풀었다 가라앉고, 고개(갓)를 살짝 앞으로 떨군다
+      const b = Math.sin(ph * 1.3);
+      sy = 1 + b * 0.035; sx = 1 - b * 0.02; rx = 0.1; // 몸을 낮추면 앞으로 기운 발끝이 땅에 묻힌다
     } else if (sp === 'kingcap') {
       rz = Math.sin(ph * (moving ? 4 : 1)) * (moving ? 0.07 : 0.025);
       y += moving ? Math.abs(Math.sin(ph * 4)) * 0.06 : 0;
@@ -1237,6 +1257,7 @@ export function createMonsters(scene, village, random = Math.random) {
     inner.position.y = y;
     inner.scale.set(sx, sy, sx);
     inner.rotation.set(rx, ry, rz);
+    if (m.mesh.sleepFace) m.mesh.sleepFace.visible = !!m.dormant; // 잠든 동안만 감은 눈
     const blink = (m.state === 'wind' || m.pinch > 0) && Math.sin(t * 30) > 0;
     body.material = m.flash > 0 ? flashMat : blink ? warnMat : bodyMat;
     if (wings.length) wings.forEach((w) => { w.children[0].material = body.material; });
@@ -1742,6 +1763,10 @@ export function createMonsters(scene, village, random = Math.random) {
               const near = !m.foe && allies.filter((o) => Math.hypot(o.x - m.x, o.z - m.z) < M.aggro * 1.4);
               if (near && near.length && random() < 0.35) m.foe = near[Math.floor(random() * near.length)].kind;
               if (!ally || !ally.player) ctx.onAggro?.(m); // 나를 알아챘을 때만 으르릉
+            } else if (m.dormant) {
+              // 잠든 몬스터(이야기 속 왕버섯)는 제자리에서 잔다(어슬렁거리지 않는다). 들어오는 쪽(남쪽 협곡 입구)을 보고 있어 감은 얼굴이 보인다
+              m.goal = null;
+              turnTo(m, m.x, m.z + 4, dt, 2);
             } else if (ctx.active || players.length) {
               m.timer -= dt;
               if (m.timer <= 0 || !m.goal) {

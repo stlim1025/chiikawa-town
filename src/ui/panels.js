@@ -3,7 +3,7 @@ import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
-import { FURNITURE, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, sizeOf, decorOf, hasDecor } from '../core/home.js';
+import { FURNITURE, FURNITURE_CATS, WALLPAPERS, FLOORS, homeOf, gridOf, nextSize, sizeOf, decorOf, hasDecor } from '../core/home.js';
 import { RENT, HOUSE_PRICE, LOTTERY_FEE, LOTTERY_PRICE, RENT_DAY, ANNOUNCE_DAY, EVICT_AFTER, LODGING_PRICE, ROUGH_REST, housingOf } from '../core/housing.js';
 import { POCHETTES, THEFT_GUARD, pochetteOf, worn } from '../core/pochette.js';
 import { LICENSES, hasLicense, licensesOf, canWorkRamen } from '../core/licenses.js';
@@ -143,6 +143,7 @@ let boardTab = 'work';
 let sellSel = null; // 노동 접수 '팔기'에서 고른 물건 id
 let pochetteTab = 'pochette'; // 포셰트 가게 탭: 'pochette' | 'accessory'(마지막에 본 탭을 기억한다)
 let furnitureTab = 'furniture'; // 가구점 탭: 'furniture' | 'decor'(벽지와 바닥)
+let furnitureCat = 'all'; // 가구 탭의 분류: 'all' | core/home.js 의 FURNITURE_CATS id(마지막에 본 분류를 기억한다)
 /** 벽지 · 바닥 견본 그림(core/home.js): 벽지는 둥근 벽에 창, 바닥은 마루 결. */
 const decorSvg = (kind, c) => (kind === 'wall'
   ? `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 34V17a14 12 0 0 1 28 0v17z" fill="${c}" stroke="#5a4431" stroke-width="2"/><rect x="15" y="15" width="10" height="10" rx="1.5" fill="#c6e7f5" stroke="#5a4431" stroke-width="1.6"/><path d="M20 15v10M15 20h10" stroke="#5a4431" stroke-width="1.2"/></svg>`
@@ -504,6 +505,21 @@ export function createPanels(ui, handlers) {
       area, pick, msg,
       h('div', { class: 'save-io' }, read, fromFile),
       check];
+  }
+
+  // 보스전 먹기 쿨타임(core/combat.js BOSS_EAT_COOL): 주머니가 열려 있는 동안 음식 칸의 남은 초를 고쳐 쓰고, 끝나면 다시 그려 회색을 걷는다
+  let coolTimer = null;
+  function watchEatCool(cool) {
+    clearInterval(coolTimer);
+    coolTimer = null;
+    if (!(cool.left > 0)) return;
+    coolTimer = setInterval(() => {
+      if (!current || current.kind !== 'bag' || !current.panel) { clearInterval(coolTimer); coolTimer = null; return; }
+      const left = handlers.eatCooldown().left;
+      if (left <= 0) { clearInterval(coolTimer); coolTimer = null; render(); return; }
+      current.panel.querySelectorAll('[data-cool-n]').forEach((e) => { e.textContent = String(Math.ceil(left)); });
+      current.panel.querySelectorAll('[data-cool-label]').forEach((e) => { e.textContent = `${Math.ceil(left)}초 뒤에 먹어요`; });
+    }, 250);
   }
 
   function render() {
@@ -892,7 +908,16 @@ export function createPanels(ui, handlers) {
         out.push(h('div', { class: 'actions' }, closeBtn()));
         return out;
       }
-      if (!current.sel) current.sel = list[0].id;
+      // 분류 단추: 전체 + 분류마다(가구 수). 목록은 분류 차례, 같은 분류에서는 싼 것부터
+      const catOrder = (f) => FURNITURE_CATS.findIndex((c) => c.id === f.cat);
+      list.sort((a, b) => catOrder(a) - catOrder(b) || a.price - b.price);
+      if (furnitureCat !== 'all' && !FURNITURE_CATS.some((c) => c.id === furnitureCat)) furnitureCat = 'all';
+      const shown = furnitureCat === 'all' ? list : list.filter((f) => f.cat === furnitureCat);
+      const catBar = h('div', { class: 'cat-cats', role: 'group', 'aria-label': '가구 분류' }, [{ id: 'all', name: '전체' }, ...FURNITURE_CATS].map((c) =>
+        h('button', { class: 'cat-chip', type: 'button', 'aria-pressed': String(c.id === furnitureCat),
+          onClick: () => { if (furnitureCat === c.id) return; furnitureCat = c.id; current.sel = null; render(); } },
+        c.name, h('span', { class: 'n' }, String(c.id === 'all' ? list.length : list.filter((f) => f.cat === c.id).length)))));
+      if (!current.sel || !shown.some((f) => f.id === current.sel)) current.sel = shown[0].id;
       const view = h('div', { class: 'cat-view', 'aria-live': 'polite' });
       const drawView = () => {
         const f = FURNITURE[current.sel];
@@ -902,9 +927,9 @@ export function createPanels(ui, handlers) {
           h('div', { class: 'cat-meta' }, `가진 것 ${home.owned[f.id] || 0}개`),
           priceBtn(f.price, s.money, after(() => handlers.buyFurniture(f.id))));
       };
-      const items = list.map((f) => h('button', {
+      const items = shown.map((f) => h('button', {
         class: 'cat-item', type: 'button', 'aria-pressed': String(f.id === current.sel),
-        onClick: () => { current.sel = f.id; items.forEach((b, i) => b.setAttribute('aria-pressed', String(list[i].id === f.id))); drawView(); }
+        onClick: () => { current.sel = f.id; items.forEach((b, i) => b.setAttribute('aria-pressed', String(shown[i].id === f.id))); drawView(); }
       },
       thumbs[f.id] ? h('img', { class: 'thumb', src: thumbs[f.id], alt: '' }) : null,
       h('span', { class: 'nm' }, f.name),
@@ -913,6 +938,7 @@ export function createPanels(ui, handlers) {
       return [
         head('가구점', s.money),
         tabBar,
+        catBar,
         h('div', { class: 'catalog' }, h('div', { class: 'cat-list' }, items), view),
         h('div', { class: 'actions' }, closeBtn())
       ];
@@ -1062,14 +1088,21 @@ export function createPanels(ui, handlers) {
       const pick = (slot) => { current.sel = same(slot, current.sel) ? null : slot; current.dropPick = null; render(); };
       const nameOf = (x) => (x.type === 'weapon' ? WEAPONS[x.id].name : itemInfo(x.id).name);
       const artOf = (x) => (x.type === 'weapon' ? myWeaponArt(s, x.id) : itemSvg(x.id));
+      // 보스전 먹기 쿨타임: 음식 칸을 회색으로 덮고 시계처럼 걷어 낸다(남은 초는 watchEatCool 이 고쳐 쓴다)
+      const cool = handlers.eatCooldown ? handlers.eatCooldown() : { left: 0, total: 1 };
+      const cooling = (x) => cool.left > 0 && x.type === 'item' && !!(itemInfo(x.id) || {}).eat;
+      const coolLeft = () => Math.ceil(cool.left);
+      watchEatCool(cool);
       const grid = h('div', { class: 'pocket-grid', role: 'grid', 'aria-label': '주머니 칸' },
         Array.from({ length: SLOTS }, (_, i) => {
           const x = slots[i];
           if (!x) return h('span', { class: 'pocket-slot empty', 'aria-hidden': 'true' });
           const n = x.type === 'item' ? b.items[x.id] : 0, held = x.type === 'weapon' && wp.held === x.id;
-          const btn = h('button', { class: `pocket-slot${same(x, sel) ? ' on' : ''}${held ? ' held' : ''}`, type: 'button', 'data-slot': String(i),
-            'aria-label': `${nameOf(x)}${n > 1 ? ` ${n}개` : ''}${held ? ' (들고 있음)' : ''}`, 'aria-pressed': String(same(x, sel)), onClick: () => pick(x) },
+          const btn = h('button', { class: `pocket-slot${same(x, sel) ? ' on' : ''}${held ? ' held' : ''}${cooling(x) ? ' cooling' : ''}`, type: 'button', 'data-slot': String(i),
+            'aria-label': `${nameOf(x)}${n > 1 ? ` ${n}개` : ''}${held ? ' (들고 있음)' : ''}${cooling(x) ? ` (${coolLeft()}초 뒤에 먹을 수 있음)` : ''}`, 'aria-pressed': String(same(x, sel)), onClick: () => pick(x) },
           svgSpan('pocket-ico', artOf(x)),
+          cooling(x) ? h('span', { class: 'pocket-cool', 'aria-hidden': 'true', style: `--cool-total:${cool.total}s;animation-delay:-${(cool.total - cool.left).toFixed(2)}s` },
+            h('b', { 'data-cool-n': '' }, String(coolLeft()))) : null,
           n > 1 ? h('b', { class: 'pocket-cnt' }, String(n)) : null,
           held ? h('i', { class: 'pocket-held', 'aria-hidden': 'true' }, '✋') : null);
           // 마우스를 올리면 그 칸 위에 이름 말풍선
@@ -1100,7 +1133,8 @@ export function createPanels(ui, handlers) {
           if (sel.type === 'item' && canGift(sel.id)) acts.push(act(`${giftTo.name}에게 주기`, () => { close(true); handlers.giveGift(sel.id); }, { main: true }));
           else acts.push(act('줄 수 없어요', () => {}, { disabled: true }));
         } else {
-          if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
+          if (inf && inf.eat && cooling(sel)) acts.push(h('button', { class: 'pocket-act main', type: 'button', disabled: true, 'data-cool-label': '' }, `${coolLeft()}초 뒤에 먹어요`));
+          else if (inf && inf.eat) acts.push(act(s.stamina >= MAX_STAMINA ? '배불러요' : '먹기', () => handlers.eatItem(sel.id), { main: true, disabled: s.stamina >= MAX_STAMINA }));
           if (sel.type === 'weapon') acts.push(wp.held === sel.id ? act('빼기', () => handlers.holdWeapon(null)) : act('장착', () => handlers.holdWeapon(sel.id), { main: true }));
           if (!canDrop) acts.push(act('밖에서만 버릴 수 있어요', () => {}, { disabled: true }));
           // 여러 개면 '버리기…' → 개수 고르기(− / + · 막대 · 전체)로 바뀐다
