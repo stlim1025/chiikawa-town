@@ -1,9 +1,18 @@
 import { createScenery } from './scenery.js';
 import { gradeName } from '../core/license.js';
+import { installNow, runInstall, onInstallChange } from './webapp.js';
+
+/** 「홈 화면에 추가」를 눌렀는데 설치 창을 띄울 수 없을 때 보이는 안내(webapp.js 의 installKind). */
+const INSTALL_GUIDE = {
+  ios: '공유 버튼(네모에 위쪽 화살표)을 누르고 「홈 화면에 추가」를 골라 주세요.',
+  inapp: '이 앱 안에서는 추가할 수 없어요. 메뉴에서 「다른 브라우저로 열기」를 골라 Safari나 Chrome으로 연 뒤 다시 눌러 주세요.',
+  menu: '브라우저 메뉴(⋮)에서 「홈 화면에 추가」나 「앱 설치」를 골라 주세요.'
+};
 
 /**
  * 타이틀 화면. 저장이 있으면 "이어하기"와 "새로 시작하기", 없으면 "시작하기"를 보인다.
  * 고른 결과를 Promise 로 돌려준다: 'continue' | 'new'
+ * 브라우저로 연 휴대폰 · 태블릿이면 그 아래에 「홈 화면에 추가」 버튼도 보인다(홈 화면 앱으로 열었거나 아티팩트 안이면 안 보인다).
  */
 export function showTitle(ui, saved) {
   return new Promise((resolve) => {
@@ -19,8 +28,10 @@ export function showTitle(ui, saved) {
     el.prepend(createScenery());
     ui.appendChild(el);
     const actions = el.querySelector('.title-actions');
+    const install = homeScreenButton(el.querySelector('.title-card'));
 
     const leave = (choice) => {
+      install.off();
       el.classList.add('leaving');
       setTimeout(() => el.remove(), 350);
       resolve(choice);
@@ -50,4 +61,23 @@ export function showTitle(ui, saved) {
       button('시작하기', 'primary', () => leave('new')).focus();
     }
   });
+}
+
+/** 카드 맨 아래 「홈 화면에 추가」: 누르면 설치 창, 못 띄우면 그 아래에 안내 한 줄. → { off() } */
+function homeScreenButton(card) {
+  const box = document.createElement('div');
+  box.className = 'title-install';
+  box.innerHTML = '<button type="button" class="btn title-install-btn">홈 화면에 추가</button><p class="title-install-guide" hidden></p>';
+  card.appendChild(box);
+  const guide = box.querySelector('p');
+  const sync = () => { box.hidden = !installNow(); };
+  sync();
+  const off = onInstallChange(sync);
+  box.querySelector('button').addEventListener('click', async () => {
+    const outcome = installNow() === 'prompt' ? await runInstall() : null;
+    if (outcome) { if (outcome === 'accepted') box.hidden = true; return; } // 설치 창을 닫았으면 그대로 둔다
+    guide.textContent = INSTALL_GUIDE[installNow()] || INSTALL_GUIDE.menu;
+    guide.hidden = false;
+  });
+  return { off };
 }
