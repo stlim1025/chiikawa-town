@@ -1,5 +1,5 @@
 import { JOB_TYPES, availableJobs, isComplete, payout, gradedJob } from '../core/jobs.js';
-import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName } from '../core/fishing.js';
+import { FISH, DEX_FISH, DEX_PRIZES, dexCount, fishPrizeOf, fishLogOf, waterName, fishPrice } from '../core/fishing.js';
 import { PAY_MULT, XP_TO_EXAM, EXAM_STREAK, EXAM_FEE, canTakeExam, gradeName, NOVICE } from '../core/license.js';
 import { SHOPS, CHEERS_PRICE, CHEERS_STAMINA, PUB_HOURS, isOnSale } from '../core/shop.js';
 import { MAX_STAMINA } from '../core/state.js';
@@ -1408,7 +1408,7 @@ export function createPanels(ui, handlers) {
           h('div', {},
             h('div', { class: 't' }, rec ? F.name : '???', h('span', { class: 'weed-count' }, rec ? `${rec.n}마리` : '아직')),
             h('div', { class: 'mon-chips' }, chip('pin', '', F.waters.map(waterName).join(', ')), when ? chip(null, 'muted', when) : null,
-              rec && rec.best ? chip(null, 'muted', `가장 큰 것 ${rec.best}cm`) : null, rec ? chip(null, 'muted', `팔면 ${won(F.sell)}`) : null))));
+              rec && rec.best ? chip(null, 'muted', `가장 큰 것 ${rec.best}cm`) : null, rec ? chip(null, 'muted', `팔면 ${fishPrice(id, F.cm[0]).toLocaleString('ko-KR')} ~ ${won(fishPrice(id, F.cm[1]))}`) : null)))); // 크기에 따라(가장 작은 것 ~ 가장 큰 것)
       }
       return out;
     },
