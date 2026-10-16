@@ -1,4 +1,4 @@
-import { registerItems, countOf, takeItem, addItem } from './inventory.js';
+import { registerItems, countOf, takeItem, addItem, bagOf, sizesIn, withSizes } from './inventory.js';
 import { POND, LAKE, RIVER, SOUTH_SHORE, BRIDGES, riverZ } from './layout.js';
 
 /**
@@ -156,6 +156,28 @@ export function stepReel(r, dt, holding, random = Math.random) {
 export function fishLength(id, random = Math.random) {
   const c = FISH[id].cm;
   return c ? Math.round(c[0] + random() * (c[1] - c[0])) : null;
+}
+/**
+ * 크기에 따른 값(2026-10-16): 같은 물고기라도 크기 범위의 가장 작은 쪽은 sell 의 SIZE_RATE[0] 배, 가장 큰 쪽은 SIZE_RATE[1] 배(그 사이는 고르게).
+ * 크기가 범위 안에서 고르게 나오니 평균은 sell 그대로. 크기를 모르는 것(예전에 낚은 것 · 받은 것 · 쓰레기)은 1배.
+ * 친구 선물 점수와 마을 사람이 파는 값은 크기와 상관없이 sell 그대로다.
+ */
+export const SIZE_RATE = [0.8, 1.2];
+export function sizeRate(id, cm) {
+  const c = FISH[id] && FISH[id].cm;
+  if (!c || !Number.isFinite(cm)) return 1;
+  const k = Math.max(0, Math.min(1, (cm - c[0]) / (c[1] - c[0])));
+  return SIZE_RATE[0] + (SIZE_RATE[1] - SIZE_RATE[0]) * k;
+}
+/** 그 크기 물고기 한 마리를 팔 때 받는 값(원). cm 을 모르면 sell. */
+export const fishPrice = (id, cm) => Math.max(1, Math.round(FISH[id].sell * sizeRate(id, cm)));
+/** 가방에 있는 그 물고기 가운데 크기를 아는 것들(작은 것부터). */
+export const fishSizesOf = (s, id) => sizesIn(bagOf(s), id);
+/** 방금 가방에 넣은 물고기 한 마리의 크기를 적는다(addItem 다음에, 쓰레기는 빼고). */
+export function noteFishCm(s, id, cm) {
+  if (!FISH[id] || FISH[id].junk || !Number.isFinite(cm)) return s;
+  const b = bagOf(s), known = sizesIn(b, id), room = Math.max(0, (b.items[id] || 0) - 1);
+  return { ...s, bag: withSizes(b, id, [...known.slice(Math.max(0, known.length - room)), cm]) };
 }
 /** 낚시 기록 { [id]: { n: 잡은 수, best: 가장 큰 cm } }. */
 export const fishLogOf = (s) => (s.fishLog && typeof s.fishLog === 'object' ? s.fishLog : {});

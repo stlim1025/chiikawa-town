@@ -1,4 +1,5 @@
-import { itemInfo, bagOf, takeItem } from './inventory.js';
+import { itemInfo, bagOf, takeItem, sizesIn, withSizes } from './inventory.js';
+import { FISH, sizeRate, fishPrice } from './fishing.js';
 import { JOB_TYPES } from './jobs.js';
 import { WEED_KINDS, WEED_ORDER } from './weeding.js';
 import { DROPS } from './combat.js';
@@ -39,10 +40,37 @@ export function sellableIds(state) {
     .sort((a, b) => kindOf(a) - kindOf(b) || orderOf(a) - orderOf(b));
 }
 
-/** n 개를 판다(가진 만큼만). → { state, sold, earned } */
+/**
+ * 가방의 그 물고기를 파는 차례: 비싼(큰) 것부터 [{ cm, price }]. 크기를 모르는 것은 cm null, 값은 기본값(core/fishing.js sizeRate).
+ */
+export function fishQueue(state, id) {
+  const b = bagOf(state), known = sizesIn(b, id), unknown = Math.max(0, (b.items[id] || 0) - known.length);
+  return [...known.map((cm) => ({ cm, rate: sizeRate(id, cm) })), ...Array.from({ length: unknown }, () => ({ cm: null, rate: 1 }))]
+    .sort((a, b) => b.rate - a.rate).map(({ cm }) => ({ cm, price: fishPrice(id, cm) }));
+}
+/** 다음에 팔 하나의 값과 크기(물고기는 큰 것부터 팔아서 하나 팔 때마다 달라진다). → { price, cm: 크기 | null } */
+export function nextSale(state, id) {
+  if (!FISH[id]) return { price: sellPrice(id), cm: null };
+  const q = fishQueue(state, id)[0];
+  return q || { price: sellPrice(id), cm: null };
+}
+/** n 개를 팔면 받는 값(가진 만큼만). */
+export function saleTotal(state, id, n) {
+  if (!FISH[id]) return Math.min(n, bagOf(state).items[id] || 0) * sellPrice(id);
+  return fishQueue(state, id).slice(0, n).reduce((a, q) => a + q.price, 0);
+}
+
+/** n 개를 판다(가진 만큼만). 물고기는 큰 것부터 크기에 따른 값으로. → { state, sold, earned } */
 export function sellItem(state, id, n = 1) {
   const price = sellPrice(id);
   if (!price) return { state, sold: 0, earned: 0 };
+  if (FISH[id]) {
+    const queue = fishQueue(state, id), t = takeItem(state, id, n, false);
+    if (!t.taken) return { state, sold: 0, earned: 0 };
+    const earned = queue.slice(0, t.taken).reduce((a, q) => a + q.price, 0);
+    const left = queue.slice(t.taken).map((q) => q.cm).filter((cm) => cm != null); // 판 큰 것들을 빼고 남은 크기
+    return { state: { ...t.state, bag: withSizes(bagOf(t.state), id, left), money: t.state.money + earned }, sold: t.taken, earned };
+  }
   const t = takeItem(state, id, n, false); // 깔끔한 풀은 일감 보너스용으로 남기고 덜 깔끔한 것부터 판다
   if (!t.taken) return { state, sold: 0, earned: 0 };
   const earned = t.taken * price;

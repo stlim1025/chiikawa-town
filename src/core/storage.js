@@ -1,8 +1,8 @@
-import { takeItem, addItem, itemInfo, isValidBag } from './inventory.js';
+import { takeItem, addItem, itemInfo, isValidBag, bagOf, sizesIn, withSizes } from './inventory.js';
 
 /**
  * 집 보관 상자(두 번째 주머니): 집 안 상자에 물건을 넣어 두었다가 꺼낸다. 모양은 가방과 같다.
- * state.storage = { items: { id: 개수 }, clean: { id: 그중 깔끔한 수 } }. 한 가지에 STORE_STACK 개까지(주머니는 99).
+ * state.storage = { items: { id: 개수 }, clean: { id: 그중 깔끔한 수 }, cm?: { id: [물고기 크기] } }. 한 가지에 STORE_STACK 개까지(주머니는 99).
  * 넣을 때는 덜 깔끔한 것부터(깔끔한 풀은 일감용으로 주머니에 남긴다), 꺼낼 때는 깔끔한 것부터.
  * 퀘스트 물건은 넣지 않는다(이야기는 주머니에 있는지 본다). 무기는 주머니에서 들고 다닌다.
  * 같이 놀기: 손님은 친구 집 상자를 열 수 없다(world/interior.js 의 target 이 손님에게 상자를 열게 하지 않는다).
@@ -27,7 +27,11 @@ export function storeItem(state, id, n = 1) {
   if (!t.taken) return { ok: false, reason: 'none', state, moved: 0 };
   const clean = { ...s.clean };
   if (t.clean) clean[id] = (clean[id] || 0) + t.clean;
-  return { ok: true, state: { ...t.state, storage: { items: { ...s.items, [id]: have + t.taken }, clean } }, moved: t.taken };
+  // 낚은 물고기 크기도 같이 옮긴다(주머니에서 빠진 작은 것들)
+  const before = sizesIn(bagOf(state), id), moved = before.slice(0, before.length - sizesIn(bagOf(t.state), id).length);
+  let box = { ...s, items: { ...s.items, [id]: have + t.taken }, clean };
+  if (moved.length) box = withSizes(box, id, [...sizesIn(s, id), ...moved]);
+  return { ok: true, state: { ...t.state, storage: box }, moved: t.taken };
 }
 
 /** 상자 → 주머니 n 개(주머니가 한 가지 99개까지라 들어가는 만큼만). → { ok, state, moved, reason?: 'bag' | 'none' } */
@@ -39,7 +43,12 @@ export function takeOut(state, id, n = 1) {
   const c = Math.min(a.added, cleanHave), items = { ...s.items }, clean = { ...s.clean };
   if (have - a.added > 0) items[id] = have - a.added; else delete items[id];
   if (cleanHave - c > 0) clean[id] = cleanHave - c; else delete clean[id];
-  return { ok: true, state: { ...a.state, storage: { items, clean } }, moved: a.added };
+  // 낚은 물고기 크기도 같이 옮긴다(상자에서 작은 것부터)
+  const known = sizesIn(s, id), keep = Math.min(known.length, have - a.added), moved = known.slice(0, known.length - keep);
+  let box = { ...s, items, clean }, st = a.state;
+  if (s.cm && s.cm[id]) box = withSizes(box, id, known.slice(known.length - keep));
+  if (moved.length) st = { ...st, bag: withSizes(bagOf(st), id, [...sizesIn(bagOf(state), id), ...moved]) };
+  return { ok: true, state: { ...st, storage: box }, moved: a.added };
 }
 
 /** 저장된 상자 모양이 맞는지(save.js). 가방과 같다. */

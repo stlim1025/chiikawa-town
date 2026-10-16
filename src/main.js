@@ -94,7 +94,7 @@ import { VILLAGE_R, REGION_NAMES, GATES, POND, RIVER, BRIDGES, riverZ, regionAt,
 import { markExplored } from './core/explore.js';
 import { TOOLS, toolsOf, buyTool, lightOf, nextLight, hasTool } from './core/tools.js';
 import { CAR_RADIUS } from './actors/car.js';
-import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish, grillFish, claimDex } from './core/fishing.js';
+import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, stepReel, fishLength, logFish, grillFish, claimDex, fishPrice, noteFishCm } from './core/fishing.js';
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
@@ -2515,14 +2515,15 @@ function boot() {
     cancelFish();
     // 낚시 일감(core/jobs.js)의 그 물고기면 가방 대신 일감에 센다
     const forJob = !F.junk && jobKind() === id && !isComplete(state.job), before = state.job;
+    const cm = fishLength(id);
     let s = state;
     if (forJob) s = { ...s, job: recordPull(s.job, id, 'snapped') };
     else {
       const r = addItem(state, id, 1);
       if (!r.added) { hud.toast('가방이 꽉 찼어요'); return; }
-      s = r.state;
+      s = noteFishCm(r.state, id, cm); // 크기에 따라 파는 값이 다르다(core/fishing.js sizeRate)
     }
-    const cm = fishLength(id), lg = logFish(s, id, cm);
+    const lg = logFish(s, id, cm);
     commit(lg.state);
     if (forJob) celebrateIfDone(before, state.job); else hud.bagBump();
     splash(from, F.junk ? 0.6 : 1.3);
@@ -2535,7 +2536,7 @@ function boot() {
     sound.play('done');
     player.cheerTime = 2.0;
     const T = forJob && JOB_TYPES[state.job.typeId];
-    fishGame.catchCard({ title: `${josa(F.name, '을/를')} 낚았어요!`, art: itemSvg(id), chips: [`${cm}cm`, T ? `일감 ${state.job.count} / ${T.target}` : `팔면 ${won(F.sell)}`], ribbon: lg.first ? '처음 잡았어요!' : lg.best ? '최고 기록!' : null });
+    fishGame.catchCard({ title: `${josa(F.name, '을/를')} 낚았어요!`, art: itemSvg(id), chips: [`${cm}cm`, T ? `일감 ${state.job.count} / ${T.target}` : `팔면 ${won(fishPrice(id, cm))}`], ribbon: lg.first ? '처음 잡았어요!' : lg.best ? '최고 기록!' : null });
   }
   /**
    * 행동 버튼(down: 눌렀다 · 뗐다): 기다릴 때 누르면 너무 일러 놓치고, 찌가 잠기면 낚아채 끌어올리기 놀이로,

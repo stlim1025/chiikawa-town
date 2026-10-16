@@ -23,7 +23,7 @@ import { pochetteSvg, itemSvg, accessorySvg, TICKET_SVG } from './itemart.js';
 import { bagOf, itemInfo, countOf, MAX_STACK } from '../core/inventory.js';
 import { storageOf, storedOf, canStore, STORE_STACK } from '../core/storage.js';
 import { pantryOf } from '../core/pantry.js';
-import { sellPrice, sellableIds } from '../core/market.js';
+import { sellableIds, nextSale, saleTotal } from '../core/market.js';
 import { canGift } from '../core/gifts.js';
 import { ACCESSORY_ITEMS, wardrobeOf, SALON_PRICE } from '../core/wardrobe.js';
 import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS, weaponOf } from '../core/combat.js';
@@ -399,18 +399,19 @@ export function createPanels(ui, handlers) {
   function sellBox(s, ids) {
     const items = bagOf(s).items;
     if (!ids.includes(sellSel)) sellSel = null;
-    const sel = sellSel, n = sel ? items[sel] : 0, p = sel ? sellPrice(sel) : 0;
+    // 물고기는 큰 것부터 크기에 따른 값으로 판다(core/market.js nextSale): 칸에는 다음에 팔 하나 값
+    const sel = sellSel, n = sel ? items[sel] : 0, next = sel ? nextSale(s, sel) : null;
     const drops = ids.filter((id) => DROPS[id]), dropTotal = drops.reduce((a, id) => a + items[id] * DROPS[id].price, 0);
     return h('div', { class: 'sell-box' },
       h('div', { class: 'slots' }, ids.map((id) => h('button', {
         class: `slot${id === sel ? ' on' : ''}`, type: 'button', title: itemInfo(id).name, 'aria-pressed': String(id === sel),
-        'aria-label': `${itemInfo(id).name} ${items[id]}개, 하나에 ${won(sellPrice(id))}`, onClick: () => { sellSel = id === sellSel ? null : id; render(); }
-      }, svgSpan('art', itemSvg(id)), h('em', {}, `×${items[id]}`), h('small', { class: 'each' }, won(sellPrice(id)))))),
+        'aria-label': `${itemInfo(id).name} ${items[id]}개, 하나에 ${won(nextSale(s, id).price)}`, onClick: () => { sellSel = id === sellSel ? null : id; render(); }
+      }, svgSpan('art', itemSvg(id)), h('em', {}, `×${items[id]}`), h('small', { class: 'each' }, won(nextSale(s, id).price))))),
       sel ? h('div', { class: 'sell-pick' },
-        h('div', { class: 'sell-name' }, h('b', {}, itemInfo(sel).name), h('span', {}, `하나에 ${won(p)}, ${n}개 있어요`)),
+        h('div', { class: 'sell-name' }, h('b', {}, itemInfo(sel).name), h('span', {}, `${next.cm != null ? `${next.cm}cm짜리 ` : ''}하나에 ${won(next.price)}, ${n}개 있어요`)),
         h('div', { class: 'sell-btns' },
           h('button', { class: 'btn', type: 'button', onClick: after(() => handlers.sellItem(sel, 1)) }, '1개 팔기'),
-          n > 1 ? h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.sellItem(sel, n)) }, `모두 팔기 ${won(n * p)}`) : null))
+          n > 1 ? h('button', { class: 'btn pink', type: 'button', onClick: after(() => handlers.sellItem(sel, n)) }, `모두 팔기 ${won(saleTotal(s, sel, n))}`) : null))
         : h('p', { class: 'sell-hint' }, '팔 물건을 골라요'),
       drops.length ? h('div', { class: 'sell-foot' },
         h('span', { class: 'sum' }, '전리품 모두', h('b', {}, svgSpan('coin', COIN), won(dropTotal))),
