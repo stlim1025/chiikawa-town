@@ -41,7 +41,7 @@ import { buy, SHOPS, CHEERS_PRICE, CHEERS_STAMINA, isPubHour } from './core/shop
 import { createStore } from './core/save.js';
 import { encodeSave, decodeSave } from './core/savecode.js';
 import { createSound } from './audio/sound.js';
-import { TUTORIAL_LINES, HELP_TOPICS, tutorialActive, tutorialNext } from './core/tutorial.js';
+import { TUTORIAL_LINES, PHONE_TOUR, phoneTourLeft, HELP_ASK, helpTop, helpIn, tutorialActive, tutorialNext } from './core/tutorial.js';
 import { createGuide } from './ui/guide.js';
 import { playSleep } from './ui/sleepfx.js';
 import { createBerries } from './world/berries.js';
@@ -1398,7 +1398,15 @@ function boot() {
       return true;
     },
     onOpen: () => { cancelPull(); input.setEnabled(false); hud.setAction(null); },
-    onClose: () => { if (giftFor) { giftFor = null; endTalk(); return; } input.setEnabled(true); }, // 선물 고르다 닫으면 대화도 끝
+    onClose: () => {
+      // 마을폰 안내는 폰을 닫으면 끝(첫날 안내 중이면 못 본 줄을 닫은 뒤에 말한다)
+      if (phoneTourAt != null) { if (state && state.tutorial === 'phone') phoneTourClosedAt = phoneTourAt; phoneTourAt = null; }
+      if (giftFor) { giftFor = null; endTalk(); return; }
+      input.setEnabled(true);
+    }, // 선물 고르다 닫으면 대화도 끝
+    // 마을폰 안내(core/tutorial.js PHONE_TOUR): 폰 첫 화면 아래 하치와레 말풍선. 누르면 다음 줄, 맨 끝 줄은 닫을 때까지
+    phoneTour: () => (phoneTourAt != null && PHONE_TOUR[phoneTourAt] ? { ...PHONE_TOUR[phoneTourAt], last: phoneTourAt === PHONE_TOUR.length - 1 } : null),
+    phoneTourNext: () => { if (phoneTourAt != null && phoneTourAt < PHONE_TOUR.length - 1) phoneTourAt++; },
     acceptJob(typeId) {
       // 게시판 일감은 하루에 정해진 수만큼: 친구들이 먼저 받아 가면 마감
       const r = takeFromBoard(state, typeId, state.clock.day);
@@ -2115,8 +2123,9 @@ function boot() {
   const phoneOk = () => !!(state && (mode === 'play' || mode === 'visit' || (mode === 'home' && !homeUI.decorating)) && !guide.open && !sleeping && !funBusy());
   const openPhone = () => {
     if (!phoneOk()) return;
+    // 첫날 안내: 처음 열면 하치와레가 폰 안에서 앱을 하나씩 짚어 주고(PHONE_TOUR), 닫으면 마무리 말
+    if (state.tutorial === 'phone') { tutPhoneOpened = true; if (phoneTourAt == null && phoneTourClosedAt == null) phoneTourAt = 0; }
     panels.openSettings({ storage: store.available });
-    if (state.tutorial === 'phone') tutPhoneOpened = true; // 첫날 안내: 열어 봤으니 닫으면 하치와레가 마을폰 이야기를 한다
   };
   hud.onSettings(openPhone);
   // 퀘스트 쪽지가 시계 위까지 다 못 들어가 묶인 「외 N개」: 누르면 마을폰 퀘스트 앱
@@ -2712,6 +2721,8 @@ function boot() {
   // 할 일 카드 밑줄: 설명서 말투 말고 하치와레가 옆에서 말하듯
   const GOAL_HINTS = { house: '하얀 동그란 집이 내 집이래!', board: '하치와레를 따라 게시판으로!', pull: '꾹 눌렀다가 초록 칸에서 톡!', report: '하치와레가 게시판에서 기다려!', phone: '오른쪽 위 폰 버튼을 톡!' };
   let tutPhoneOpened = false; // 안내 'phone' 단계에서 마을폰을 열어 봤는지(닫으면 하치와레가 마을폰 이야기를 한다)
+  let phoneTourAt = null; // 마을폰 안내에서 지금 떠 있는 줄(PHONE_TOUR 차례, null: 안내 안 함)
+  let phoneTourClosedAt = null; // 마을폰 안내 중에 폰을 닫았을 때 떠 있던 줄(첫날 안내 마무리에서 못 본 줄을 말한다)
   const homeLabel = village.labels.find((l) => l.text === '내 집');
   const homeLead = { get x() { return village.spots.home.x + 1.1; }, get z() { return village.spots.home.z + 0.6; } }; // 하치와레가 서서 기다리는 현관 옆(넓힌 집이면 그 문 옆)
   const boardLead = { x: village.spots.board.x + 1.4, z: village.spots.board.z + 0.2 }; // 노동 접수 게시판 옆(내가 서는 게시판 앞자리는 비워 둔다)
@@ -2736,8 +2747,13 @@ function boot() {
     if (step === 'hello') sayGuide(TUTORIAL_LINES.hello, () => enterTutorial('house', 'hello'));
     else if (step === 'houseTour') sayGuide(TUTORIAL_LINES.houseTour, () => enterTutorial('board', 'houseTour'));
     else if (step === 'tips') { hud.pointStamina(true); sayGuide(TUTORIAL_LINES.tips, () => { hud.pointStamina(false); enterTutorial('phone', 'tips'); }); } // 기운 이야기 동안 기운 알약을 가리킨다
-    else if (step === 'phone') { tutPhoneOpened = false; sayGuide(TUTORIAL_LINES.phone, () => announceGoal(step)); }
-    else if (step === 'phoneTour') sayGuide(TUTORIAL_LINES.phoneTour, () => { enterTutorial('done', 'phoneTour'); hud.toast('안내 끝!', 2400); });
+    else if (step === 'phone') { tutPhoneOpened = false; phoneTourAt = phoneTourClosedAt = null; sayGuide(TUTORIAL_LINES.phone, () => announceGoal(step)); }
+    else if (step === 'phoneTour') {
+      // 폰 안 이야기를 다 못 보고 닫았으면 남은 앱 이야기부터(예전 저장이라 폰 안 이야기를 못 봤으면 전부)
+      const left = phoneTourLeft(phoneTourClosedAt);
+      phoneTourClosedAt = null;
+      sayGuide([...left, ...TUTORIAL_LINES.phoneTour], () => { enterTutorial('done', 'phoneTour'); hud.toast('안내 끝!', 2400); });
+    }
     else if (step === 'board') sayGuide(from === 'pull' || from === 'report' ? TUTORIAL_LINES.boardAgain : TUTORIAL_LINES.board, () => announceGoal(step));
     else if (TUTORIAL_LINES[step]) sayGuide(TUTORIAL_LINES[step], () => announceGoal(step));
     else announceGoal(step);
@@ -4334,15 +4350,22 @@ function boot() {
     endTalk();
   }
 
-  // 하치와레의 '궁금한 게 있어': 안내에서 배운 것 · 자주 묻는 것
+  // 하치와레의 '궁금한 게 있어': 안내에서 배운 것 · 자주 묻는 것. 처음엔 주제 묶음(core/tutorial.js HELP_GROUPS), 고르면 그 안의 질문들
   function askHelp(n, line) {
-    askAs(n, line, [...HELP_TOPICS.map((t) => t.q), '이제 괜찮아'], (i) => {
-      const topic = HELP_TOPICS[i];
-      if (!topic) { sayAs(n, ['궁금한 거 생기면 또 물어봐~'], endTalk); return; }
-      sayAs(n, topic.lines, () => {
-        if (topic.home) { endTalk(); escort = true; npcs.lead('hachiware', homeLead); }
-        else askHelp(n, '또 궁금한 거 있어?');
-      });
+    const top = helpTop();
+    askAs(n, line, [...top.map((o) => o.label), '이제 괜찮아'], (i) => {
+      const o = top[i];
+      if (!o) { sayAs(n, ['궁금한 거 생기면 또 물어봐~'], endTalk); return; }
+      if (o.topic) { answerHelp(n, o.topic); return; }
+      const list = helpIn(o.group);
+      askAs(n, HELP_ASK, [...list.map((t) => t.q), BACK], (j) => (list[j] ? answerHelp(n, list[j]) : askHelp(n, line)));
+    });
+  }
+  function answerHelp(n, topic) {
+    sayAs(n, topic.lines, () => {
+      if (topic.home) { endTalk(); escort = true; npcs.lead('hachiware', homeLead); }
+      else if (topic.phone) { endTalk(); phoneTourAt = 0; openPhone(); if (!panels.isOpen()) phoneTourAt = null; } // 마을폰을 같이 열어 앱을 하나씩 짚어 준다
+      else askHelp(n, '또 궁금한 거 있어?');
     });
   }
 

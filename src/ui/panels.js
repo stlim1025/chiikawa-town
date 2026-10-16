@@ -533,6 +533,9 @@ export function createPanels(ui, handlers) {
     if (current.afterRender) { const f = current.afterRender; current.afterRender = null; f(); }
     [p, p.querySelector('.cat-list')].forEach((e, i) => { if (e && keep[i]) e.scrollTop = keep[i]; });
     if (!current.phone) return;
+    // 마을폰 안내 맨 끝 줄('다 봤으면 닫아'): 아래 동그란 닫기 버튼이 반짝인다(홈 화면에서만)
+    const tour = current.kind === 'settings' && handlers.phoneTour ? handlers.phoneTour() : null;
+    current.phone.querySelector('.phone-home')?.classList.toggle('tour-on', !!tour && tour.apps.includes('home'));
     // 폰 상태 줄: 지금 시각 · 날짜(친구 마을에 놀러 간 동안은 그 마을 시계)
     const now = handlers.phoneNow ? handlers.phoneNow() : null;
     current.status.time.textContent = now ? now.time : timeLabel(s.clock);
@@ -1447,7 +1450,9 @@ export function createPanels(ui, handlers) {
     settings(s) {
       // 새로 생긴 앱(지도를 막 샀을 때)은 아이콘이 빛나고 빨간 점(handlers.appNudge → 앱 이름, 열면 사라진다)
       const nudge = handlers.appNudge ? handlers.appNudge() : null;
-      const app = (cls, icon, label, onClick) => h('button', { class: `app ${cls}${nudge === cls ? ' nudge' : ''}`, type: 'button', onClick, 'aria-label': nudge === cls ? `${label} (새로 생겼어요)` : null },
+      // 마을폰 안내(core/tutorial.js PHONE_TOUR): 하치와레가 말하는 앱 아이콘이 반짝이고, 아래에 말풍선(누르면 다음 줄)
+      const tour = handlers.phoneTour ? handlers.phoneTour() : null;
+      const app = (cls, icon, label, onClick) => h('button', { class: `app ${cls}${nudge === cls ? ' nudge' : ''}${tour && tour.apps.includes(cls) ? ' tour-on' : ''}`, type: 'button', onClick, 'aria-label': nudge === cls ? `${label} (새로 생겼어요)` : null },
         svgSpan('app-ico', icon), h('span', { class: 'app-label' }, label));
       return [
         h('h2', { class: 'phone-title', onClick: () => {
@@ -1474,6 +1479,8 @@ export function createPanels(ui, handlers) {
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
+        tour ? h(tour.last ? 'div' : 'button', { class: 'phone-tour', ...(tour.last ? {} : { type: 'button', onClick: () => { handlers.phoneTourNext?.(); render(); } }) },
+          h('b', { class: 'pt-who' }, '하치와레'), h('span', { class: 'pt-line' }, tour.line), tour.last ? null : h('small', { class: 'pt-next' }, '다음 ▸')) : null
       ];
     },
     // 마을폰 '검색' 앱(사이드스토리 '검은 별똥별' 동안만): 질문 게시판에서 찾은 글 하나 → 산소 표백제
