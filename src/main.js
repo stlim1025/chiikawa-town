@@ -485,7 +485,7 @@ function boot() {
       visiting.worksPaid = kp;
       if (changed) panels.refresh('works');
     }
-    if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r }); // 바깥에서 같이 토벌
+    if (Array.isArray(w.m) && !visiting.arriving) monsters.showGuest(w.m.slice(0, 80), { shots: w.s, rain: w.r, gas: w.g }); // 바깥에서 같이 토벌(g: 독가스)
     if (Array.isArray(w.g)) visiting.ground = parseGround(w.g);
     if (Array.isArray(w.z) && Number.isFinite(w.z[0]) && w.z[0] !== visiting.slept && !visiting.arriving && !visiting.leaving
       && Number.isFinite(w.z[1]) && Number.isFinite(w.z[2]) && ['morning', 'day', 'evening', 'night'].includes(w.z[3])) {
@@ -1017,7 +1017,7 @@ function boot() {
     worldT = afield.length ? 0.1 : 0.2;
     const w = { c: [state.clock.day, +state.clock.t.toFixed(5)], d: state.startDate, n: npcs.snapshot(), m: afield.length ? monsters.snapshot(afield) : [] };
     if (swapOn) w.sw = { me: realLook(), name: myName() }; // 몸이 바뀌었다: 손님 화면에서도 친구들이 바뀐 몸으로(내 원래 모습은 우사기가 든 내 몸)
-    if (afield.length) { const fx = monsters.fxSnapshot(afield); w.s = fx.shots; w.r = fx.rain; }
+    if (afield.length) { const fx = monsters.fxSnapshot(afield); w.s = fx.shots; w.r = fx.rain; w.g = fx.gas; }
     const now = performance.now();
     while (hostNews.length && hostNews[0].until < now) hostNews.shift();
     if (hostNews.length) w.e = hostNews.map((e) => [e.id, e.text, e.kind || '']); // 마을 소식(몇 초 동안 거듭 실어서 빠진 것 없이)
@@ -4081,7 +4081,9 @@ function boot() {
     iframe = PLAYER_IFRAME;
     const p = player.position, dx = p.x - (hit.x ?? m.x), dz = p.z - (hit.z ?? m.z), d = Math.hypot(dx, dz) || 1;
     cancelPull();
-    player.hurt((dx / d) * PLAYER_KNOCK, (dz / d) * PLAYER_KNOCK, PLAYER_IFRAME);
+    // soft: 독가스(줄무늬 가스벌레)처럼 머무는 피해는 밀어내지도 멈추지도 않는다(빠져나가려는 걸음을 막지 않게)
+    if (hit.soft) player.hurt(0, 0, PLAYER_IFRAME, 0);
+    else player.hurt((dx / d) * PLAYER_KNOCK, (dz / d) * PLAYER_KNOCK, PLAYER_IFRAME);
     sound.play('hurt');
     hud.hurt();
     hud.floatText({ x: p.x, y: 1.6, z: p.z, text: `기운 −${dmg}`, kind: 'hurt' });

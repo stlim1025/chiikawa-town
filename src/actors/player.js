@@ -93,8 +93,8 @@ export function createPlayer(scene, chibi, village) {
     get heldTags() { return heldTags; },
     /** 휘두르기 진행(0 → 1, 안 휘두르면 0). */
     get swingK() { return swingT > 0 ? 1 - swingT / api.swingDur : 0; },
-    /** 맞았다: 밀려나고, 잠깐 휘청이며 깜빡인다. (vx, vz) 는 밀려나는 거리. */
-    hurt(vx, vz, seconds = 1.0) { stopEat(); actT = 0; knock.x = vx * 7; knock.z = vz * 7; hurtT = 0.3; blinkT = seconds; },
+    /** 맞았다: 밀려나고, 잠깐 휘청이며 깜빡인다. (vx, vz) 는 밀려나는 거리, stagger: 조작이 안 먹는 시간(독가스처럼 밀지 않는 피해는 0). */
+    hurt(vx, vz, seconds = 1.0, stagger = 0.3) { stopEat(); actT = 0; knock.x = vx * 7; knock.z = vz * 7; hurtT = stagger; blinkT = seconds; },
     /** 깜빡임(맞은 뒤 잠깐 무적)을 멈춘다. */
     stopBlink() { blinkT = 0; model.root.visible = true; },
     /** 지점을 바라본다. */

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
-import { MONSTERS, inSwing } from '../core/combat.js';
+import { MONSTERS, inSwing, GAS_ATTACK } from '../core/combat.js';
 import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, canyonAt, ARENA_WALL } from '../core/layout.js';
 
 /**
@@ -25,6 +25,7 @@ const SPAWN = {
   turtle: { n: 5, area: 'mountain' },
   pebble: { n: 6, area: 'mountain' },
   ram: { n: 5, area: 'mountain' },
+  gasbug: { n: 5, area: 'mountain' },
   moth: { n: 12, area: 'night' }
 };
 const AREAS = {
@@ -56,8 +57,10 @@ const NOTICE_SCALE = 0.75, NOTICE_BEHIND = 0.7, NOTICE_SEC = 0.9;
  *  burrow 땅속으로 파고들어 발밑에서 튀어나옴  charge/roll/dive  겨눈 쪽으로 일직선 돌진(roll 은 벽에 한 번 튕긴다, dive 는 하늘에서)
  *  shoot/spit 멀리서 탄을 쏜다              slam  제자리에서 뛰어 둘레를 쿵
  *  tongue 일직선 혀 채찍                   combo 집게로 세 번 연달아       spin  등껍질 회전으로 따라오며 부딪친다
+ *  gas    멈춰 서서 내 자리에 독가스를 뿜는다(그 자리에 잠시 머물며 안에 있으면 조금씩 — core/combat.js 의 GAS_ATTACK)
  */
 const ATK = {
+  gas: GAS_ATTACK,
   bump: { reach: 0.5, wind: 0.45, cool: 1.0, rec: 0.3 },
   leap: { range: 5.2, wind: 0.6, lock: 0.6, air: 0.6, radius: 1.0, height: 1.3, cool: 1.5, rec: 0.6 },
   stomp: { range: 5.6, wind: 0.8, lock: 0.55, air: 0.85, radius: 1.45, height: 1.45, cool: 2.0, rec: 0.9 }, // 너무 높이 뛰면 화면 위로 나가 사라진 것처럼 보인다
@@ -165,6 +168,13 @@ function spike(g, color, cx, cy, cz, R, tilt, yaw, scale) {
   part(g, GEO.cone, color, { position: [x, y, z], rotation: [tilt, yaw, 0], scale });
 }
 const HORN = new THREE.TorusGeometry(1, 0.34, 8, 16, Math.PI * 1.5);
+/** 둥근 껍데기를 두르는 줄무늬 띠(반지름 1 · 가로로 눕힌다): 크기 [x 반지름, z 반지름, 두께 배수]. */
+const STRIPE = new THREE.TorusGeometry(1, 0.06, 6, 36).rotateX(Math.PI / 2);
+/** 타원체(가운데 높이 cy, 반지름 rx · ry · rz) 겉면을 높이 y 에서 두르는 띠: 그 높이의 단면 반지름에 맞춘 크기. */
+const ringAt = (rx, ry, rz, cy, y) => { const s = Math.sqrt(Math.max(0, 1 - ((y - cy) / ry) ** 2)); return [rx * s * 1.01, 0.42, rz * s * 1.01]; };
+/** 줄무늬 가스벌레 더듬이: 모자 위 뿌리 자리(오른쪽, 왼쪽은 거울) · 끝 방울 자리(몸 기준, 가스가 여기서 뿜어져 나온다). */
+const GAS_ROOT = [0.07, 1.2, 0], GAS_LEAN = 0.55, GAS_STEM = 0.3;
+const GAS_TIP = [GAS_ROOT[0] + Math.sin(GAS_LEAN) * GAS_STEM, GAS_ROOT[1] + Math.cos(GAS_LEAN) * GAS_STEM, 0];
 
 /** 종류별 모양. → { height: 머리 위 높이, hover: 떠 있는 높이 } 을 돌려주고 g 에 부품을 붙인다. wings 가 있으면 날개 부품 목록. */
 const BUILD = {
@@ -410,6 +420,30 @@ const BUILD = {
     part(g, GEO.dot, EYE, { position: [0, 0.15, 0.19], scale: [0.03, 0.018, 0.01], flat: true });
     return { height: 0.95 };
   },
+  // 줄무늬 가스벌레(원작 애니의 생물, 사용자가 보낸 장면을 따라): 진갈색 가로 줄무늬의 초록 종 껍데기(아래)와 줄무늬 모자(위) 사이로
+  // 하얀 동그란 얼굴(작은 눈 · 놀란 「o」 입 · 볼에 짧은 줄), 가는 막대 다리. 끝에 하얀 방울이 달린 더듬이 둘은 날개 자리에 따로 두어 흔들린다
+  gasbug(g, wings) {
+    const GREEN = '#9fcb6c', LINE = '#4a3426', WHITE = '#fbfaf5';
+    part(g, GEO.sphere, GREEN, { position: [0, 0.46, 0], scale: [0.42, 0.34, 0.4] }); // 껍데기
+    [0.3, 0.45, 0.6].forEach((y) => part(g, STRIPE, LINE, { position: [0, y, 0], scale: ringAt(0.42, 0.34, 0.4, 0.46, y) }));
+    part(g, GEO.sphere, WHITE, { position: [0, 0.84, 0.04], scale: [0.28, 0.27, 0.28] }); // 얼굴
+    part(g, GEO.sphere, GREEN, { position: [0, 1.06, 0], scale: [0.3, 0.17, 0.3] }); // 모자
+    [1.0, 1.1].forEach((y) => part(g, STRIPE, LINE, { position: [0, y, 0], scale: ringAt(0.3, 0.17, 0.3, 1.06, y) }));
+    [-1, 1].forEach((sd) => {
+      part(g, GEO.cylinder, LINE, { position: [sd * 0.12, 0, 0.04], rotation: [0, 0, sd * 0.15], scale: [0.022, 0.17, 0.022] }); // 다리
+      part(g, GEO.sphere, LINE, { position: [sd * 0.13, 0.015, 0.09], scale: [0.045, 0.022, 0.065] }); // 발
+      [0, 1].forEach((k) => part(g, GEO.box, EYE, { position: [sd * (0.17 + k * 0.025), 0.8, 0.25 - k * 0.02], rotation: [0, sd * 0.6, 0], scale: [0.007, 0.04, 0.006], flat: true })); // 볼에 짧은 줄
+    });
+    face(g, { y: 0.88, z: 0.305, dx: 0.085, r: 0.03, brow: null });
+    part(g, GEO.dot, EYE, { position: [0, 0.79, 0.31], scale: [0.034, 0.044, 0.012], flat: true }); // 「o」 입
+    part(g, GEO.dot, '#e98a8a', { position: [0, 0.778, 0.318], scale: [0.02, 0.022, 0.008], flat: true });
+    // 더듬이(오른쪽 기준, 뿌리가 원점): 가는 줄기 끝에 하얀 방울
+    const w = new THREE.Group();
+    part(w, GEO.cylinder, LINE, { position: [0, 0, 0], rotation: [0, 0, -GAS_LEAN], scale: [0.016, GAS_STEM, 0.016] });
+    part(w, GEO.sphere, WHITE, { position: [GAS_TIP[0] - GAS_ROOT[0], GAS_TIP[1] - GAS_ROOT[1], 0], scale: [0.055, 0.055, 0.055] });
+    wings.push(w);
+    return { height: 1.55, wingAt: GAS_ROOT, wingTilt: 0 };
+  },
   // 그루터기 장군: 나이테가 보이는 그루터기 몸, 뿌리 발, 잎 달린 가지 팔, 꼭대기 새싹, 부리부리한 눈
   stump(g) {
     part(g, GEO.cylinder, '#a0703f', { position: [0, 0, 0], scale: [0.4, 0.62, 0.4] });
@@ -562,10 +596,10 @@ export function monsterMesh(species) {
   const wings = [];
   if (M.wing) {
     [-1, 1].forEach((sd) => {
-      const pivot = new THREE.Group();
-      pivot.position.set(sd * 0.1, 0.03, -0.02);
+      const pivot = new THREE.Group(), at = M.wingAt || [0.1, 0.03, -0.02]; // wingAt: 날개(더듬이) 뿌리 자리(오른쪽)
+      pivot.position.set(sd * at[0], at[1], at[2]);
       pivot.scale.x = sd; // 왼쪽은 거울
-      pivot.rotation.z = sd * 0.3; // 살짝 V 자로 든다
+      pivot.rotation.z = sd * (M.wingTilt ?? 0.3); // 살짝 V 자로 든다
       const w = new THREE.Mesh(M.wing, bodyMat);
       w.castShadow = true;
       addOutline(w, 0.02);
@@ -823,12 +857,12 @@ export function createMonsters(scene, village, random = Math.random) {
    * 같이 토벌하는 마을 친구는 내가 돌아다니는 중이면(창 · 대화 중이 아니면), 나는 그러면서 마을 밖에 있으면.
    */
   const targetOn = (m) => (curFoe ? (curFoe.player ? !curFoe.safe : C.active) : C.active && !safeFrom(m));
-  /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). 노리는 상대가 친구면 그 친구를. */
-  function hurt(m, dmg, x, z) {
+  /** 나를 맞힌다(마을 안에 있거나 창이 떠 있으면 안 맞는다). 노리는 상대가 친구면 그 친구를. soft: 밀어내지 않는 피해(독가스). */
+  function hurt(m, dmg, x, z, soft = false) {
     if (!C || !targetOn(m)) return;
-    if (curFoe) { C.onAllyHit?.(curFoe.kind, { dmg, x, z }, m); return; }
+    if (curFoe) { C.onAllyHit?.(curFoe.kind, { dmg, x, z, soft }, m); return; }
     m.hitPlayer = true;
-    C.onHit?.(m, { dmg, x, z });
+    C.onHit?.(m, { dmg, x, z, soft });
   }
   /** 땅을 쿵: 고리 · 흙먼지, 둘레 r 안에 있으면 맞는다. */
   function impact(m, x, z, r, dmg) {
@@ -955,6 +989,85 @@ export function createMonsters(scene, village, random = Math.random) {
     }
   }
 
+  // ---------- 더듬이 독가스(줄무늬 가스벌레): 더듬이 끝에서 뿜은 노란 가스가 그 자리에 잠시 머문다. 안에 있으면 tick 초마다 조금씩 ----------
+  const clouds = [], guestClouds = new Map(); // guestClouds: 같이 놀기(손님) — 주인이 보낸 가스(id → 모양)
+  let nextGasId = 1;
+  const GAS_FLOOR = '#d9c45a', GAS_PUFFS = ['#e6d36a', '#d6c057'];
+  /** 가스가 뿜어질 자리: 굳힌 겨눈 곳(몸에서 reach 보다 멀면 그만큼만, 울타리 안이면 밖으로). */
+  function gasSpot(m, A) {
+    let x = m.aim.x, z = m.aim.z;
+    const dx = x - m.x, dz = z - m.z, d = Math.hypot(dx, dz);
+    if (d > A.reach) { x = m.x + (dx / d) * A.reach; z = m.z + (dz / d) * A.reach; }
+    const o = Math.hypot(x, z);
+    if (!m.exam && o < FENCE + A.radius * 0.5) { x *= (FENCE + A.radius * 0.5) / o; z *= (FENCE + A.radius * 0.5) / o; }
+    return { x, z };
+  }
+  /** 몬스터 더듬이 끝 방울 둘의 자리(가스가 여기서 뿜어져 나온다). */
+  const gasTips = (m) => [-1, 1].map((sd) => {
+    const lx = sd * GAS_TIP[0], c = Math.cos(m.yaw), s = Math.sin(m.yaw);
+    return { x: m.x + lx * c + GAS_TIP[2] * s, y: GAS_TIP[1], z: m.z - lx * s + GAS_TIP[2] * c };
+  });
+  /**
+   * 가스 모양: 바닥의 옅은 노란 원 + 몽글몽글한 덩어리 아홉. from(더듬이 끝들)이 있으면 덩어리가 거기서 날아와 자리를 잡는다.
+   * → { g, mats, floor, puffs }
+   */
+  function gasLook(x, z, r, from) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const floorMat = new THREE.MeshBasicMaterial({ color: GAS_FLOOR, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide });
+    const floor = new THREE.Mesh(D_DISC, floorMat);
+    floor.position.y = 0.05; floor.renderOrder = 3; floor.scale.set(r, 1, r);
+    g.add(floor);
+    const mats = GAS_PUFFS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55, depthWrite: false }));
+    const puffs = [];
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + random() * 0.6, d = i === 0 ? 0 : r * (0.35 + random() * 0.4), s = 0.34 + random() * 0.2;
+      const mesh = new THREE.Mesh(GEO.dot, mats[i % 2]);
+      mesh.renderOrder = 4;
+      g.add(mesh);
+      const src = from ? from[i % from.length] : null;
+      puffs.push({ mesh, hx: Math.sin(a) * d, hy: 0.35 + random() * 0.45, hz: Math.cos(a) * d, s, ph: random() * 6, fx: src ? src.x - x : 0, fy: src ? src.y : 0.4, fz: src ? src.z - z : 0 });
+    }
+    scene.add(g);
+    return { g, mats: [floorMat, ...mats], floor, puffs };
+  }
+  /** 가스 모양 움직이기: t 지난 시간, life 머무는 시간. 처음 0.35초는 더듬이 끝에서 퍼져 나오고, 끝 0.5초는 옅어진다. */
+  function gasDraw(look, t, life) {
+    const k = Math.min(1, t / 0.35), e = 1 - (1 - k) ** 2, fade = Math.max(0, Math.min(1, (life - t) / 0.5));
+    for (const p of look.puffs) {
+      const bob = Math.sin(t * 2.2 + p.ph) * 0.05;
+      p.mesh.position.set(p.fx + (p.hx - p.fx) * e, p.fy + (p.hy - p.fy) * e + bob, p.fz + (p.hz - p.fz) * e);
+      p.mesh.scale.setScalar(p.s * (0.35 + 0.65 * e) * (1 + Math.sin(t * 3 + p.ph) * 0.06));
+    }
+    look.mats[0].opacity = 0.24 * fade * e;
+    look.mats.slice(1).forEach((mt) => { mt.opacity = 0.55 * fade; });
+  }
+  function dropGasLook(look) { scene.remove(look.g); look.mats.forEach((mt) => mt.dispose()); }
+  /** 가스를 뿜는다: 더듬이 끝에서 노란 방울이 톡 터지고, 겨눈 곳에 가스 구름. */
+  function puffGas(m, A, spot) {
+    const tips = gasTips(m);
+    tips.forEach((p) => poof(p.x, p.y, p.z, 0.05, 4));
+    const look = gasLook(spot.x, spot.z, A.radius, tips);
+    clouds.push({ id: nextGasId++, owner: m, x: spot.x, z: spot.z, r: A.radius, life: A.life, tick: A.tick, dmg: m.M.dmg, t: 0, next: {}, look });
+  }
+  /** 가스: 안에 있는 나(또는 놀러 온 친구)는 tick 초마다 조금씩(밀려나지는 않는다). 시간이 다 되면 사라진다. */
+  function gasStep(dt, players) {
+    for (let i = clouds.length - 1; i >= 0; i--) {
+      const c = clouds[i];
+      c.t += dt;
+      gasDraw(c.look, c.t, c.life);
+      if (c.t >= 0.2) { // 가스가 다 퍼진 뒤부터
+        if (Math.hypot(P.x - c.x, P.z - c.z) < c.r + ME && c.t >= (c.next.me || 0)) { c.next.me = c.t + c.tick; hurt(c.owner, c.dmg, c.x, c.z, true); }
+        for (const o of players) {
+          if (o.safe || Math.hypot(o.x - c.x, o.z - c.z) >= c.r + ME || c.t < (c.next[o.kind] || 0)) continue;
+          c.next[o.kind] = c.t + c.tick;
+          C?.onAllyHit?.(o.kind, { dmg: c.dmg, x: c.x, z: c.z, soft: true }, c.owner);
+        }
+      }
+      if (c.t >= c.life) { dropGasLook(c.look); clouds.splice(i, 1); }
+    }
+  }
+
   // ---------- 뿌리 솟구치기(고목 거인): 겨눈 쪽 일직선으로 뿌리 가시가 차례로 솟았다가 들어간다. 그 띠 안에 있으면 맞는다 ----------
   const sprouts = [];
   function roots(m, A, dir) {
@@ -1032,6 +1145,7 @@ export function createMonsters(scene, village, random = Math.random) {
     else if (kind === 'slam') showCircle(m, m.x, m.z, A.radius, k);
     else if (kind === 'charge' || kind === 'roll' || kind === 'dive' || kind === 'roots') showLine(m, m.x, m.z, Math.atan2(m.aim.x - m.x, m.aim.z - m.z), A.len, A.width, k);
     else if (kind === 'tongue') showLine(m, m.x, m.z, m.yaw, A.len, A.width, k);
+    else if (kind === 'gas') { const s = gasSpot(m, A); showCircle(m, s.x, s.z, A.radius, k); } // 가스가 덮을 곳(굳기 전에는 나를 따라온다)
     m.wind -= dt;
     if (m.wind <= 0) startAct(m, A);
   }
@@ -1086,6 +1200,9 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (kind === 'spin') {
       m.act.dir = m.yaw;
       m.spinA = 0;
+    } else if (kind === 'gas') {
+      puffGas(m, A, gasSpot(m, A)); // 뿜고 나서 A.puff 초 동안 더듬이를 떨며 서 있다(actStep)
+      m.lunge = 0.2;
     } else endAct(m, A);
   }
 
@@ -1170,6 +1287,10 @@ export function createMonsters(scene, village, random = Math.random) {
       if (a.t >= A.dur) { m.spinA = 0; endAct(m, A); }
       return true;
     }
+    if (kind === 'gas') {
+      if (a.t >= A.puff) endAct(m, A);
+      return false;
+    }
     endAct(m, A);
     return false;
   }
@@ -1205,6 +1326,14 @@ export function createMonsters(scene, village, random = Math.random) {
       y += moving ? Math.abs(Math.sin(ph * 9)) * 0.06 : 0;
     } else if (sp === 'turtle') {
       rz = Math.sin(ph * (moving ? 5 : 1.2)) * 0.04;
+    } else if (sp === 'gasbug') {
+      // 종종걸음(좌우로 뒤뚱) · 더듬이가 살랑. 예고 · 뿜는 동안은 더듬이가 바르르
+      rz = Math.sin(ph * (moving ? 9 : 2)) * (moving ? 0.07 : 0.02);
+      y += moving ? Math.abs(Math.sin(ph * 9)) * 0.03 : 0;
+      const gas = m.atk && m.atk.kind === 'gas';
+      const shake = gas && m.state === 'wind' ? Math.sin(t * 45) * 0.14 * (1 - m.wind / m.windMax) : gas && m.state === 'act' ? Math.sin(t * 30) * 0.22 : 0;
+      const f = Math.sin(ph * (moving ? 9 : 2.5)) * 0.08 + shake;
+      if (wings.length) { wings[0].rotation.z = -f; wings[1].rotation.z = f; }
     } else if (sp === 'moth') {
       y += Math.sin(ph * 2.6) * 0.18;
       const f = Math.sin(ph * (m.state === 'chase' || m.state === 'act' ? 22 : 13)) * 0.55;
@@ -1302,6 +1431,7 @@ export function createMonsters(scene, village, random = Math.random) {
     for (const s of shots) { s.mesh.visible = !on; s.sh.visible = !on; }
     for (const h of hazards) h.g.visible = !on;
     for (const r of sprouts) r.s.visible = !on;
+    for (const c of clouds) c.look.g.visible = !on;
   }
   function puppet(id, species, x, z, yaw) {
     const M = MONSTERS[species], mesh = monsterMesh(species);
@@ -1396,6 +1526,7 @@ export function createMonsters(scene, village, random = Math.random) {
         scene.remove(s.mesh); scene.remove(s.sh);
         shots.splice(i, 1);
       }
+      for (let i = clouds.length - 1; i >= 0; i--) if (!list.includes(clouds[i].owner)) { dropGasLook(clouds[i].look); clouds.splice(i, 1); } // 가스도
     },
     /**
      * 마을 친구가 몬스터를 친다(토벌 일감): 밀어내지 않고 잠깐 멈칫, 체력만 깎는다. 몬스터는 친구를 쫓지 않는다(나만 노린다).
@@ -1482,6 +1613,8 @@ export function createMonsters(scene, village, random = Math.random) {
         guestShots.length = 0;
         for (const g of guestRain) scene.remove(g.g);
         guestRain.length = 0;
+        for (const c of guestClouds.values()) dropGasLook(c.look);
+        guestClouds.clear();
         hideOwn(false);
         return;
       }
@@ -1560,6 +1693,16 @@ export function createMonsters(scene, village, random = Math.random) {
         const f = Math.max(0.02, r * clamp01(k));
         h.fill.scale.set(f, 1, f);
       });
+      // 독가스: [id, x, z, 반지름, 지난 시간, 머무는 시간] — 새 가스는 그 자리에서 퍼져 나오고, 주인이 더 안 보내면 치운다
+      const gasRows = fx && Array.isArray(fx.gas) ? fx.gas.filter((c) => Array.isArray(c) && c.length >= 6 && c.slice(0, 6).every(Number.isFinite)).slice(0, 20) : [];
+      const gasSeen = new Set();
+      for (const [id, x, z, r, t, life] of gasRows) {
+        gasSeen.add(id);
+        let c = guestClouds.get(id);
+        if (!c) { c = { look: gasLook(x, z, Math.max(0.2, Math.min(4, r)), null), t, life: Math.max(0.1, Math.min(10, life)) }; guestClouds.set(id, c); }
+        else if (Math.abs(c.t - t) > 0.3) c.t = t; // 너무 어긋났으면 맞춘다
+      }
+      for (const [id, c] of guestClouds) if (!gasSeen.has(id)) { dropGasLook(c.look); guestClouds.delete(id); }
     },
     /** 같이 놀기(손님): 매 프레임 주인 마을 몬스터를 받은 자리로 부드럽게 옮기고 몸짓 · 예고 표시를 그린다. onWind(m): 공격 예고를 시작했다. */
     guestStep(dt, t, { onWind } = {}) {
@@ -1617,6 +1760,7 @@ export function createMonsters(scene, village, random = Math.random) {
         s.mesh.position.set(s.x, 0.45 + Math.sin(s.t * 10) * 0.05, s.z);
         s.sh.position.set(s.x, 0.03, s.z);
       }
+      for (const c of guestClouds.values()) { c.t = Math.min(c.life, c.t + dt); gasDraw(c.look, c.t, c.life); }
       fxStep(dt);
     },
     /**
@@ -1640,7 +1784,8 @@ export function createMonsters(scene, village, random = Math.random) {
       const r2 = (v) => Math.round(v * 100) / 100, near = (x, z) => points.some((q) => Math.hypot(x - q.x, z - q.z) < R);
       return {
         shots: shots.filter((s) => near(s.x, s.z)).map((s) => [r2(s.x), r2(s.z), r2(s.vx), r2(s.vz), s.r, s.c || '#ffffff']),
-        rain: hazards.filter((h) => near(h.x, h.z)).map((h) => [r2(h.x), r2(h.z), h.r, r2(Math.min(1, h.t / h.warn))])
+        rain: hazards.filter((h) => near(h.x, h.z)).map((h) => [r2(h.x), r2(h.z), h.r, r2(Math.min(1, h.t / h.warn))]),
+        gas: clouds.filter((c) => near(c.x, c.z)).map((c) => [c.id, r2(c.x), r2(c.z), c.r, r2(c.t), c.life]) // 독가스 [id, x, z, 반지름, 지난 시간, 머무는 시간]
       };
     },
     /** 머리 위 체력 줄 · 알아챔(!) 표시. */
@@ -1835,6 +1980,7 @@ export function createMonsters(scene, village, random = Math.random) {
       }
       hazardStep(dt);
       sproutStep(dt);
+      gasStep(dt, players);
       // 탄: 곧게 날아가다 나에게 닿거나 울타리에 닿거나 시간이 다 되면 톡 터진다
       for (let i = shots.length - 1; i >= 0; i--) {
         const s = shots[i];

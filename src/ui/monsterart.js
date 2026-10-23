@@ -51,6 +51,17 @@ const MON = {
     <path d="M29 16q-4-8-8-9M35 16q4-8 8-9" fill="none" ${S}/><circle cx="21" cy="7" r="2" fill="#9a88c4" ${S}/><circle cx="43" cy="7" r="2" fill="#9a88c4" ${S}/>
     <ellipse cx="32" cy="36" rx="7" ry="15" fill="#4a3a6a" ${S}/><circle cx="32" cy="22" r="7" fill="#3e3060" ${S}/>
     <ellipse cx="29" cy="22" rx="2.2" ry="2.6" fill="#ffe36e"/><ellipse cx="35" cy="22" rx="2.2" ry="2.6" fill="#ffe36e"/><circle cx="29" cy="22" r="1" fill="#2b2224"/><circle cx="35" cy="22" r="1" fill="#2b2224"/>`,
+  // 줄무늬 가스벌레(원작 애니의 생물): 줄무늬 초록 껍데기 위로 하얀 얼굴, 줄무늬 모자, 끝에 하얀 방울이 달린 더듬이 둘, 놀란 「o」 입
+  gasbug: () => `${shadow(18)}
+    <path d="M26 52l-2 6M38 52l2 6" fill="none" ${S}/>
+    <ellipse cx="32" cy="43" rx="20" ry="13" fill="#9fcb6c" ${S}/>
+    <path d="M14.5 40q17.5 7 35 0M15 47.5q17 6 34 0" fill="none" stroke="#4a3426" stroke-width="2.6" stroke-linecap="round"/>
+    <circle cx="32" cy="28" r="12" fill="#fbfaf5" ${S}/>
+    <path d="M17 23q0-13 15-13t15 13q-15 5-30 0z" fill="#9fcb6c" ${S}/><path d="M19.5 17.5q12.5 4 25 0" fill="none" stroke="#4a3426" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M28 11q-4-5-9-7M36 11q4-5 9-7" fill="none" ${S}/><circle cx="18" cy="4.5" r="3.2" fill="#fbfaf5" ${S}/><circle cx="46" cy="4.5" r="3.2" fill="#fbfaf5" ${S}/>
+    ${eyes(32, 28, 5.2, 1.9, null)}
+    <ellipse cx="32" cy="34" rx="2.3" ry="2.9" fill="#2b2224"/><ellipse cx="32" cy="35" rx="1.2" ry="1.2" fill="#e98a8a"/>
+    <path d="M22 30v3M24.2 30.6v3M42 30v3M39.8 30.6v3" stroke="#2b2224" stroke-width="1.2" stroke-linecap="round"/>`,
   hopper: () => `${shadow(18)}
     <path d="M12 52l7-13M52 52l-7-13" ${S} stroke-width="3"/>
     <ellipse cx="15" cy="36" rx="6" ry="11" fill="#7cbf4c" ${S} transform="rotate(-25 15 36)"/><ellipse cx="49" cy="36" rx="6" ry="11" fill="#7cbf4c" ${S} transform="rotate(25 49 36)"/>
@@ -159,6 +170,7 @@ const DROP = {
   horn: `${shadow(14)}<path d="M20 52q-2-24 10-38q8-8 14-6q-10 8-10 22t2 22z" fill="#f6e2b4" ${S}/><path d="M24 42q4-1 8 0M23 32q5-1 9 0M26 22q4-1 7 1" fill="none" stroke="#d9bf86" stroke-width="2" stroke-linecap="round"/><path d="M34 14q4-3 7-3" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>`,
   jelly: `${shadow(16)}<path d="M14 48q-2-16 4-24q6-8 14-8t14 8q6 8 4 24q-18 6-36 0z" fill="#8fd3f4" ${S}/><path d="M18 30q4-8 12-9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="38" r="3" fill="#c6ecff"/><circle cx="26" cy="42" r="2" fill="#c6ecff"/>`,
   shell: `${shadow(18)}<path d="M8 46l6-24 18-10 20 8 6 26z" fill="#a39a8f" ${S}/><path d="M14 22l12 10 6-20M26 32l-12 14M26 32l18 4 8-16M44 36l14 10" fill="none" stroke="#7d756c" stroke-width="2" stroke-linejoin="round"/><ellipse cx="24" cy="20" rx="6" ry="2.6" fill="#7fae5a"/><ellipse cx="42" cy="26" rx="5" ry="2.2" fill="#93c46a"/>`,
+  antennaball: `${shadow(14)}<path d="M18 54q-2-10 6-16t8-12" fill="none" stroke="#4a3426" stroke-width="3" stroke-linecap="round"/><circle cx="34" cy="25" r="12" fill="#f4f1e6" ${S}/><path d="M43 30q-4 6-12 5q8-3 9-11z" fill="#ddd6c4"/><ellipse cx="29.5" cy="20.5" rx="4" ry="3" fill="#fff"/><circle cx="47" cy="11" r="5" fill="#e6d36a" opacity="0.85"/><circle cx="54" cy="19" r="3.4" fill="#d6c057" opacity="0.8"/><circle cx="51" cy="5" r="2.4" fill="#e6d36a" opacity="0.7"/>`,
   moondust: `${shadow(14)}<path d="M22 22h20l-2-8H24z" fill="#cdbdf0" ${S}/><path d="M18 30q0-8 6-8h16q6 0 6 8v16q0 8-8 8H26q-8 0-8-8z" fill="#e8f4ff" ${S}/><path d="M21 38q11 6 22 0v8q0 6-6 6H27q-6 0-6-6z" fill="#ffe57a"/>
     <path d="M30 10l1.4 3 3 1.4-3 1.4L30 19l-1.4-3-3-1.4 3-1.4zM46 14l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#ffd94a"/><circle cx="28" cy="44" r="1.6" fill="#fff"/><circle cx="36" cy="42" r="1.2" fill="#fff"/>`,
   leafwing: `${shadow(14)}<path d="M14 50Q10 20 40 10q12 4 8 16Q42 44 14 50z" fill="#b5e07a" ${S}/><path d="M16 48Q28 30 44 14M24 38l-6-4M30 30l-4-6M36 22l-2-6" fill="none" stroke="#7cbf4c" stroke-width="2" stroke-linecap="round"/>`,

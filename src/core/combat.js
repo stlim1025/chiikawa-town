@@ -26,7 +26,7 @@ export const WEAPONS = {
 export const WEAPON_ORDER = ['fork', 'sword', 'hammer', 'star'];
 
 /**
- * 몬스터 종류(구역마다 셋 + 구역 보스 + 밤 나방 + 이야기 속 왕버섯). region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든).
+ * 몬스터 종류(구역마다 셋(바위산은 넷) + 구역 보스 + 밤 나방 + 이야기 속 왕버섯). region: 나타나는 구역(night 면 밤에만, 마을 밖 어디든).
  * hp: 몇 대 맞으면 쓰러지는지(무기 힘만큼 깎인다), dmg: 내 기운을 깎는 양, speed: 쫓아오는 빠르기, aggro: 이만큼 가까우면 쫓아온다,
  * drop: 전리품 id, size: 크기, attack: 공격 방식(world/monsters.js 의 ATK), atk: 안내서에 적는 짧은 공격 이름.
  */
@@ -43,6 +43,8 @@ export const MONSTERS = {
   turtle: { name: '이끼 거북', region: 'mountain', hp: 8, dmg: 12, speed: 1.3, aggro: 6, drop: 'shell', size: 0.6, attack: 'spin', atk: '등껍질 회전', note: '이끼 낀 바위 거북. 등껍질에 숨어 빙글빙글 돌며 쫓아온다.' },
   pebble: { name: '데굴 돌멩이', region: 'mountain', hp: 6, dmg: 11, speed: 2.0, aggro: 7, drop: 'ore', size: 0.48, attack: 'roll', atk: '굴러오기', note: '바위산을 굴러다니는 돌멩이. 멀리서 데굴데굴 굴러와 튕긴다.' },
   ram: { name: '구름 산양', region: 'mountain', hp: 5, dmg: 12, speed: 2.6, aggro: 7, drop: 'wool', size: 0.52, attack: 'stomp', atk: '높이 뛰어 짓밟기', note: '구름 같은 털에 말린 뿔. 높이 뛰어올라 넓게 짓밟는다.' },
+  // 줄무늬 가스벌레: 원작 애니에 나오는 생물(사용자가 보낸 장면) — 이름 · 능력치 · 전리품은 게임에서 정했다. dmg 는 가스 안에서 한 번(GAS_ATTACK.tick 초마다) 깎이는 양
+  gasbug: { name: '줄무늬 가스벌레', region: 'mountain', hp: 5, dmg: 5, speed: 1.8, aggro: 7, drop: 'antennaball', size: 0.48, attack: 'gas', atk: '더듬이 독가스', note: '초록 줄무늬 껍데기를 쓴 벌레. 멈춰 서서 더듬이 끝 방울로 독가스를 뿜는다. 가스 안에 있으면 기운이 조금씩 준다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 4, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
   kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 108, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
   // 구역 보스(동 · 서 · 남): 저마다 굴 · 빈터에 한 마리씩 산다. 쓰러뜨리면 다음 날 다시 나타난다(core/bosses.js).
@@ -53,7 +55,15 @@ export const MONSTERS = {
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
 /** 도감 · 안내서 순서(구역별로 셋씩, 그 구역 보스가 끝에). */
-export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'moth', 'kingcap'];
+export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'gasbug', 'moth', 'kingcap'];
+/**
+ * 더듬이 독가스(줄무늬 가스벌레, world/monsters.js 의 ATK.gas): 멈춰 서서 wind 초 동안 더듬이를 떨며 내 자리에 빨간 원(반지름 radius)이 차오르고,
+ * lock 비율이 지나면 자리를 굳힌다(그 뒤로 피할 수 있다). 다 차면 더듬이 끝에서 가스가 뿜어져 그 자리에 life 초 머문다.
+ * 가스 안에 있으면 tick 초마다 dmg 만큼(밀려나지는 않는다). reach: 몸에서 이보다 먼 곳으로는 뿜지 못한다. range: 이만큼 가까우면 뿜기 시작.
+ * 반응이 0.2초 늦는 사람도 예고를 보고 빠져나올 수 있게 맞췄다(tests/gasbug.test.mjs).
+ */
+// tick 은 맞은 뒤 무적 시간(PLAYER_IFRAME 1.0)보다 조금 길게: 같으면 두 번째 틱이 무적에 막혀 한 번씩 빠졌다
+export const GAS_ATTACK = { range: 4.2, reach: 3.2, wind: 0.9, lock: 0.3, radius: 1.4, life: 2.5, tick: 1.1, puff: 0.45, cool: 3.0, rec: 0.8 };
 /** 구역 순서(안내서 묶음). */
 export const MONSTER_REGIONS = ['fields', 'forest', 'river', 'mountain', 'night', 'boss'];
 /** 전리품: 가방(core/inventory.js 의 registerItems)과 노동 접수 매입가. */
@@ -71,6 +81,7 @@ export const DROPS = {
   ore: { name: '반짝 원석', kind: 'drop', price: 70, note: '데굴 돌멩이 속에서 나온 반짝이는 돌.' },
   wool: { name: '구름 양털', kind: 'drop', price: 65, note: '구름 산양에게서 얻은 폭신한 털.' },
   moondust: { name: '달빛 가루', kind: 'drop', price: 60, note: '그림자 나방의 날개에서 모은 반짝이는 가루.' },
+  antennaball: { name: '더듬이 방울', kind: 'drop', price: 60, note: '줄무늬 가스벌레 더듬이 끝의 동그란 방울. 아직 조금 매캐하다.' },
   kingcap: { name: '왕버섯 갓', kind: 'drop', price: 1000, note: '바위산 왕버섯의 커다란 갓 조각. 귀한 물건이다.' },
   goldclaw: { name: '황금 발톱', kind: 'drop', price: 600, note: '대왕 두더지의 커다란 황금빛 발톱. 귀한 물건이다.' },
   bigacorn: { name: '고목 왕도토리', kind: 'drop', price: 600, note: '고목 거인이 떨어뜨린 주먹만 한 도토리. 귀한 물건이다.' },
