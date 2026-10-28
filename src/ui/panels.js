@@ -1479,8 +1479,9 @@ export function createPanels(ui, handlers) {
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
           // 메인(타이틀)으로: 진행은 저장되고, 새로 하고 싶으면 타이틀의 '새로 시작하기'
           app('exit', APP_ICON.exit, '메인으로', () => { close(true); handlers.toTitle(); })),
-        tour ? h(tour.last ? 'div' : 'button', { class: 'phone-tour', ...(tour.last ? {} : { type: 'button', onClick: () => { handlers.phoneTourNext?.(); render(); } }) },
-          h('b', { class: 'pt-who' }, '하치와레'), h('span', { class: 'pt-line' }, tour.line), tour.last ? null : h('small', { class: 'pt-next' }, '다음 ▸')) : null
+        // 말풍선은 안내 중에만(없을 때 null 을 두면 replaceChildren 이 'null' 글자로 그린다)
+        ...(tour ? [h(tour.last ? 'div' : 'button', { class: 'phone-tour', ...(tour.last ? {} : { type: 'button', onClick: () => { handlers.phoneTourNext?.(); render(); } }) },
+          h('b', { class: 'pt-who' }, '하치와레'), h('span', { class: 'pt-line' }, tour.line), tour.last ? null : h('small', { class: 'pt-next' }, '다음 ▸'))] : [])
       ];
     },
     // 마을폰 '검색' 앱(사이드스토리 '검은 별똥별' 동안만): 질문 게시판에서 찾은 글 하나 → 산소 표백제
