@@ -6883,6 +6883,7 @@ function boot() {
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
     if (tg.type === 'pit') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'pit' };
+    if (tg.type === 'ode') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'ode' }; // 사이드스토리: 숲속 빈터의 오데(없으면 키보드로 할 때 'Space 말 걸기' 가 안 떴다)
     if (tg.type === 'story') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'story' }; // 사이드스토리(토끼굴 들어가기)
     if (tg.type === 'wish') return { x: player.position.x, z: player.position.z, r: 0.7, y: 1.9, id: 'wish' }; // 내 발밑 · 머리 위에
     if (tg.type === 'wakeMp') return { x: tg.x, z: tg.z, r: 0.6, y: 1.1, id: 'mpw' + tg.id }; // 같이 놀기: 쓰러진 친구
