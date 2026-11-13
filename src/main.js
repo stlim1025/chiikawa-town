@@ -129,8 +129,9 @@ import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
 import { PLAZA, ANOKO_LAIR, doorAngle } from './core/layout.js';
-import { frontGuard, rideKind } from './core/anoko.js';
+import { frontGuard, rideKind, anokoPhase, ANOKO_ROAR } from './core/anoko.js';
 import { createAnokoHome } from './world/anokohome.js';
+import { createAnokoMood } from './world/anokomood.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
@@ -3648,6 +3649,7 @@ function boot() {
   const anokoSpot = village.nearestFree(ANOKO_LAIR.x, ANOKO_LAIR.z, 1.5);
   const anokoGate = { x: ANOKO_LAIR.x + Math.sin(doorAngle(ANOKO_LAIR)) * (ANOKO_LAIR.r + 1.5), z: ANOKO_LAIR.z + Math.cos(doorAngle(ANOKO_LAIR)) * (ANOKO_LAIR.r + 1.5) };
   let anokoM = null;
+  const anokoMood = createAnokoMood(scene, ANOKO_LAIR); // 아노코가 단계를 바꾸면 마당에 솜털이 흩날리고(1) 눈보라가 친다(2) — 하늘빛은 applySky
   let questT = 0, bossM = null, questHint = false, hourHint = null; // hourHint: 시간이 아닐 때 와서 몇 시에 오라고 알린 퀘스트(멀어지면 비운다)
   /**
    * 구역 보스(core/bosses.js): 오늘 쓰러뜨리지 않았으면 제 굴 · 빈터에 한 마리씩 있다(내 눈앞에서 솟아나지 않게 멀리 있을 때 놓는다).
@@ -4096,6 +4098,54 @@ function boot() {
   function sceneAfterKill(id) {
     killScenes.add(id);
     setTimeout(() => { killScenes.delete(id); questSceneStep(id); }, 1600);
+  }
+  /**
+   * 아노코가 단계를 바꾸며 포효한다(world/monsters.js 의 startRoar · core/anoko.js 의 ANOKO_ROAR): 큰 글씨로 알리고, 마당 가까이 있으면
+   * 2초 동안 나는 움직이지 못하고 맞지도 않는다. 카메라는 아노코에게 다가갔다가(roarCamPose) 돌아오고, 충격파 때 밀려나며 화면이 흔들린다.
+   * 같이 놀기 손님은 글 · 소리 · 흔들림만(주인 쪽 몬스터가 모두 멈춰 있어 맞지 않는다).
+   */
+  let roarCam = null, quakeT = 0;
+  function anokoRoar(m, r) {
+    sound.play('roar');
+    hud.banner(r >= 2 ? '아노코가 잔뜩 화났다!' : '아노코가 화났다!', r >= 2 ? '솜털 눈보라가 몰아친다' : '솜털이 바람에 흩날린다', 2600);
+    if (visiting || mode !== 'play' || !player || Math.hypot(player.position.x - m.x, player.position.z - m.z) > 16) return;
+    iframe = Math.max(iframe, ANOKO_ROAR.safe);
+    cancelPull();
+    input.setEnabled(false);
+    hud.setAction(null);
+    roarCam = { m, t: 0 };
+  }
+  /** 포효 진행(world/monsters.js 의 onRoar): 'start' 손님 쪽에서 포효가 시작됐다, 'peak' 충격파(가까우면 흔들리고 주인은 밀려난다), 'end' 끝. */
+  function onAnokoRoar(m, at) {
+    const p = player && player.position, near = !!p && Math.hypot(p.x - m.x, p.z - m.z) < 16;
+    if (at === 'start') anokoRoar(m, anokoPhase(m.hp, m.M.hp));
+    else if (at === 'peak' && near) {
+      quakeT = 0.8;
+      sound.play('thud');
+      if (roarCam) { const dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1; player.hurt((dx / d) * ANOKO_ROAR.shove, (dz / d) * ANOKO_ROAR.shove, 0, 0.35); }
+    }
+  }
+  /** 포효 카메라: 0.45초 동안 아노코 쪽으로 낮게 다가가 올려다보고, 끝나기 0.45초 전부터 따라가기 자리로 돌아온다(끝나면 다시 움직인다). */
+  function roarCamPose(dt) {
+    if (!roarCam) return null;
+    const R = roarCam, D = ANOKO_ROAR.dur;
+    R.t += dt;
+    if (R.t >= D || !player) { roarCam = null; if (!fainting && !sleeping) input.setEnabled(true); return null; }
+    const p = player.position, m = R.m, e = (x) => x * x * (3 - 2 * x);
+    const home = cam.poseFor(p.x, p.z), close = cam.poseFor(m.x * 0.7 + p.x * 0.3, m.z * 0.7 + p.z * 0.3, 6);
+    close.look.set(m.x, 1.7, m.z);
+    const k = R.t < 0.45 ? e(R.t / 0.45) : R.t > D - 0.45 ? e((D - R.t) / 0.45) : 1;
+    const pos = home.pos.lerp(close.pos, k), look = home.look.lerp(close.look, k);
+    quake(pos, dt);
+    return { pos, look };
+  }
+  /** 화면 흔들림(포효 충격파): quakeT 동안 카메라 자리를 조금씩 흔든다(점점 잦아든다). */
+  function quake(pos, dt) {
+    if (quakeT <= 0) return;
+    quakeT = Math.max(0, quakeT - dt);
+    const a = 0.3 * (quakeT / 0.8);
+    pos.x += (Math.random() - 0.5) * a;
+    pos.y += (Math.random() - 0.5) * a;
   }
   let guardT = 0;
   function onAnokoGuard(m) {
@@ -7030,6 +7080,15 @@ function boot() {
   // ---------- 하늘 ----------
   const skyTop = new THREE.Color(), skyHorizon = new THREE.Color();
   const celTint = new THREE.Color(), CEL_DAY = new THREE.Color('#ffffff'), CEL_NIGHT = new THREE.Color('#9aa6d6');
+  // 아노코 마당 분위기(world/anokomood.js 의 level): 1 노을빛, 2 솜털 눈보라 속 어둑한 보랏빛
+  const DUSK_TOP = new THREE.Color('#e9925f'), DUSK_HOR = new THREE.Color('#ffc98a'), CEL_DUSK = new THREE.Color('#ffd0a6');
+  const STORM_TOP = new THREE.Color('#4a3f63'), STORM_HOR = new THREE.Color('#8f7fa6'), CEL_STORM = new THREE.Color('#b6a8d8');
+  /** 아노코 마당 분위기: 싸우고 있는 아노코(같이 놀기 손님은 주인 마을 아노코)의 단계를 따라가고, 마당에서 멀어지면 걷힌다. */
+  function updateAnokoMood(dt, focus) {
+    const a = mode === 'play' ? monsters.active().find((m) => m.species === 'anoko' && !m.dead && m.engaged) : null;
+    const d = Math.hypot(focus.x - ANOKO_LAIR.x, focus.z - ANOKO_LAIR.z);
+    anokoMood.update(dt, a ? anokoPhase(a.hp, a.M.hp) : 0, 1 - (d - ANOKO_LAIR.r - 3) / 8, cam.camera.position);
+  }
   function applySky(clock) {
     let h = hourOf(clock);
     if (h < SKY[0].h) h += 24;
@@ -7040,9 +7099,11 @@ function boot() {
     skyHorizon.copy(a.horC).lerp(b.horC, k);
     const wet = weather.rain; // 비가 오면 하늘은 잿빛, 해와 빛은 어둑하게
     if (wet > 0.001) { skyTop.lerp(RAIN_TOP, wet * 0.85); skyHorizon.lerp(RAIN_HOR, wet * 0.85); }
+    const mood = anokoMood.level, dusk = Math.min(1, mood), storm = Math.max(0, mood - 1); // 아노코 마당: 노을빛 → 어둑한 눈보라
+    if (mood > 0.001) { skyTop.lerp(DUSK_TOP, dusk * 0.75).lerp(STORM_TOP, storm * 0.85); skyHorizon.lerp(DUSK_HOR, dusk * 0.75).lerp(STORM_HOR, storm * 0.85); }
     gfx.setSky(skyTop, skyHorizon);
-    sun.intensity = (a.sun + (b.sun - a.sun) * k) * (1 - 0.65 * wet);
-    hemi.intensity = (a.hemi + (b.hemi - a.hemi) * k) * (1 - 0.3 * wet);
+    sun.intensity = (a.sun + (b.sun - a.sun) * k) * (1 - 0.65 * wet) * (1 - 0.12 * dusk - 0.35 * storm);
+    hemi.intensity = (a.hemi + (b.hemi - a.hemi) * k) * (1 - 0.3 * wet) * (1 - 0.25 * storm);
     // 캐릭터는 명암 대신 빛 색만 따른다: 밤에는 푸르스름하게(마을보다는 밝게 두어 잘 보이게)
     const day = Math.min(1, Math.max(0, (sun.intensity + hemi.intensity - 0.95) / 2.25));
     // 마을 밖의 밤은 훨씬 어둡다: 울타리에서 멀어질수록 밤의 빛을 더 줄인다(불을 들면 캐릭터는 조금 밝게)
@@ -7054,7 +7115,9 @@ function boot() {
     hemi.intensity *= dim;
     nightNow = night;
     const lit = state && lightOf(state) !== 'off' ? 0.3 * night : 0;
-    setCelLight(celTint.copy(CEL_NIGHT).lerp(CEL_DAY, Math.min(1, day * dim + lit)));
+    celTint.copy(CEL_NIGHT).lerp(CEL_DAY, Math.min(1, day * dim + lit));
+    if (mood > 0.001) celTint.lerp(CEL_DUSK, dusk * 0.5).lerp(CEL_STORM, storm * 0.55);
+    setCelLight(celTint);
     village.tintSigns(celTint);
     village.setNight(Math.min(1, Math.max(0, (0.6 - day) / 0.4))); // 해가 지면 가로등과 창문에 불이 들어온다
   }
@@ -7570,7 +7633,7 @@ function boot() {
     const hunting = mode === 'play' && !!state && !visiting && !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !downed && !sticker;
     if (visiting && !visiting.arriving) {
       // 친구 마을: 몬스터는 주인 쪽에서 움직이고, 나는 받은 모습을 따라 그린다(공격 예고 소리만 가까우면)
-      monsters.guestStep(dt, t, { onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); } });
+      monsters.guestStep(dt, t, { onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); }, onRoar: onAnokoRoar });
     } else {
       monsters.update(dt, t, {
         player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro, allies: [...(hunting ? partyAllies() : []), ...(state && !visiting ? guestAllies() : [])], onAllyHit,
@@ -7578,7 +7641,8 @@ function boot() {
         onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
         onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },
         onGuard: (m) => onAnokoGuard(m), // 아노코의 앞쪽 솜털에 막혔다
-        onRage: (m, r) => { sound.play('thud'); hud.toast(m.species === 'kingcap' && r >= 2 ? '왕버섯이 포자를 마구 뿜으며 날뛰어요!' : `${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
+        onRoar: onAnokoRoar, // 아노코 포효의 충격파 · 끝
+        onRage: (m, r) => { if (m.species === 'anoko') { anokoRoar(m, r); return; } sound.play('thud'); hud.toast(m.species === 'kingcap' && r >= 2 ? '왕버섯이 포자를 마구 뿜으며 날뛰어요!' : `${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
       });
     }
     if (state) ground.sync(visiting ? visiting.ground || [] : groundOf(state), groundKind); // 친구 마을에서는 그 마을 바닥 물건
@@ -7705,12 +7769,13 @@ function boot() {
       if (starShow) starCamera(dt);
       else if (closeup) closeupCamera(dt);
       else {
-        const pp = pajama.camPose(dt) || housewarm.camPose(dt) || stickParty.camPose(dt) || cameraStory.camPose(); // 이야기 카메라(별 보기 · 뷰파인더)
+        const pp = pajama.camPose(dt) || housewarm.camPose(dt) || stickParty.camPose(dt) || cameraStory.camPose() || roarCamPose(dt); // 이야기 카메라(별 보기 · 뷰파인더 · 아노코 포효)
         if (pp) { cam.set(pp.pos, pp.look); storyCam = true; }
         else {
           // 이야기 카메라가 끝나면 따라가기 카메라를 바로 내 자리에 붙인다(연출 전 자리 — 마을 — 에서 날아오지 않게)
           if (storyCam) { storyCam = false; cam.snap(focus); }
           cam.follow(focus, dt);
+          if (quakeT > 0) quake(cam.camera.position, dt); // 아노코 포효 충격파(같이 놀기 손님 · 멀리서 본 사람)
         }
       }
     }
@@ -7722,6 +7787,7 @@ function boot() {
     }
     starfall.update(dt, cam.camera);
     weather.update(dt, focus); // 비(검은 별똥별의 비 오는 아침 등)
+    updateAnokoMood(dt, focus);
     gfx.followSun(focus.x, focus.z);
     if (!skipRender && drawNow) {
       lod.update(cam.camera, performance.now(), mode !== 'title'); // 타이틀은 마을을 멀리서 내려다봐서 외곽선을 다 남긴다

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ANOKO_SIZE, ANOKO_SHIELD, ANOKO_TURN, ANOKO_ATK, frontGuard, inSweep, rideKind, isValidRide } from '../src/core/anoko.js';
+import { ANOKO_SIZE, ANOKO_SHIELD, ANOKO_TURN, ANOKO_ATK, ANOKO_RAGE_AT, ANOKO_ROAR, anokoPhase, frontGuard, inSweep, rideKind, isValidRide } from '../src/core/anoko.js';
 import { MONSTERS, MONSTER_ORDER, WEAPONS } from '../src/core/combat.js';
 import { bossSeen } from '../src/core/bosses.js';
 import { QUESTS, QUEST_ORDER, PLACES, canOffer, startQuest, completeStep, isDone, checkQuestData, bossOf } from '../src/core/quests.js';
@@ -285,4 +285,23 @@ test('저장: 탈것 고르기 값(ride)은 car, anoko, 없음만 받는다', ()
   assert.equal(isValidState({ ...s, ride: 'anoko' }), true);
   assert.equal(isValidState({ ...s, ride: 'car' }), true);
   assert.equal(isValidState({ ...s, ride: 'bike' }), false);
+});
+
+test('아노코 단계: 체력 75% 이하면 1(화남), 50% 이하면 2(마지막 단계) — 손님 화면 분위기도 이 값으로 정한다', () => {
+  assert.deepEqual(ANOKO_RAGE_AT, [0.75, 0.5]);
+  const max = MONSTERS.anoko.hp;
+  assert.equal(anokoPhase(max, max), 0);
+  assert.equal(anokoPhase(max * 0.75 + 1, max), 0);
+  assert.equal(anokoPhase(max * 0.75, max), 1);
+  assert.equal(anokoPhase(max * 0.5 + 1, max), 1);
+  assert.equal(anokoPhase(max * 0.5, max), 2);
+  assert.equal(anokoPhase(0, max), 2);
+  assert.equal(anokoPhase(-5, max), 2);
+});
+
+test('아노코 포효: 2초 동안 싸움이 멈추고, 충격파는 몸을 일으킨 뒤(앞 3분의 1쯤)에 온다', () => {
+  assert.equal(ANOKO_ROAR.dur, 2);
+  assert.ok(ANOKO_ROAR.peak > 0.5 && ANOKO_ROAR.peak < ANOKO_ROAR.dur / 2);
+  assert.ok(ANOKO_ROAR.shove > 0 && ANOKO_ROAR.shove <= 1.5); // 밀려나기만 하고 피해는 없다(PLAYER_KNOCK 정도)
+  assert.ok(ANOKO_ROAR.safe >= ANOKO_ROAR.dur); // 포효가 끝날 때까지는 맞지 않는다
 });

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
 import { MONSTERS, inSwing, GAS_ATTACK } from '../core/combat.js';
-import { ANOKO_ATK, ANOKO_TURN, frontGuard, inSweep } from '../core/anoko.js';
+import { ANOKO_ATK, ANOKO_TURN, ANOKO_RAGE_AT, ANOKO_ROAR, anokoPhase, frontGuard, inSweep } from '../core/anoko.js';
 import { buildAnoko } from '../actors/anoko.js';
 import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, canyonAt, ARENA_WALL } from '../core/layout.js';
 
@@ -164,6 +164,8 @@ const ELITE_BASE = 0.45;
 const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true, anoko: true };
 /** 쓰러진 아노코가 엎드려 웃는 얼굴로 머무는 초(그 뒤 다른 몬스터처럼 사라진다). */
 const ANOKO_REST = 6;
+/** 아노코 앞발 할퀴기 한 번: 앞발을 휘두르는 초(다음 할퀴기까지 ANOKO_ATK.claw.gap 0.32초 안), 앞으로 나간 몸이 따라붙는 초(판정 자리는 바로 옮긴다). */
+const CLAW_SWING = 0.28, CLAW_SLIDE = 0.12;
 
 // ---------- 모양 ----------
 const EYE = '#2b2224', SHINE = '#ffffff', BLUSH = '#ff9fb4';
@@ -940,7 +942,7 @@ export function createMonsters(scene, village, random = Math.random) {
   }
   /** 보스가 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
   // 화남: 구역 보스는 체력 60% · 30% 에서, 마지막 보스 왕버섯은 일찍(75%) 화내고 절반부터 마지막 단계
-  const RAGE_AT = { kingcap: [0.75, 0.5], anoko: [0.75, 0.5] }; // 최종 보스 아노코도 왕버섯처럼
+  const RAGE_AT = { kingcap: [0.75, 0.5], anoko: ANOKO_RAGE_AT }; // 최종 보스 아노코도 왕버섯처럼
   const rage = (m) => { if (!m.M.boss) return 0; const [a, b] = RAGE_AT[m.species] || [0.6, 0.3]; return m.hp <= m.M.hp * b ? 2 : m.hp <= m.M.hp * a ? 1 : 0; };
   /**
    * 지금 쓸 공격. 보스(KITS): 가까우면 near, 아니면 멀 때 쓸 공격을 한 번 골라 둔다
@@ -989,6 +991,27 @@ export function createMonsters(scene, village, random = Math.random) {
     m.airY = 0; m.diveY = 0;
     m.strafe = random() < 0.5 ? -1 : 1;
     hideTele(m);
+  }
+  /**
+   * 아노코가 더 화났다(core/anoko.js 의 ANOKO_ROAR): 하던 공격을 거두고 뒷다리로 일어서 포효한다. 그동안(holdT) 모든 몬스터가 멈추고,
+   * 날아가던 탄 · 떨어지던 포자 비는 사라진다. 충격파와 부하 부르기는 update 에서 때가 되면.
+   */
+  let holdT = 0;
+  function startRoar(m) {
+    for (const o of list) {
+      if (o.dead) continue;
+      if (o.state === 'wind' || o.state === 'act') cancel(o);
+      else hideTele(o);
+      o.pendingShot = null;
+      o.lunge = 0; o.pinch = 0;
+    }
+    for (const s of shots) { scene.remove(s.mesh); scene.remove(s.sh); poof(s.x, 0.5, s.z, 0.2, 3); }
+    shots.length = 0;
+    for (const h of hazards) scene.remove(h.g);
+    hazards.length = 0;
+    m.state = 'roar'; m.nextAtk = null; m.bossPick = null; m.clawT = 0; m.tailT = 0;
+    m.roarT = ANOKO_ROAR.dur; m.roarHit = false;
+    holdT = ANOKO_ROAR.dur;
   }
   /** 뛰어오를 자리를 굳힌다: 너무 멀면 줄이고, 울타리 안 · 나무 위는 피한다. */
   function lockLeap(m, A) {
@@ -1349,9 +1372,12 @@ export function createMonsters(scene, village, random = Math.random) {
         a.i++;
         a.next = A.gap;
         if (m.species !== 'anoko') m.yaw = Math.atan2(P.x - m.x, P.z - m.z); // 아노코는 할퀼 때도 천천히 돈다(솜털 방패)
-        const go = Math.min(0.32, Math.max(0, dp - M.size - 0.3));
+        const go = Math.min(0.32, Math.max(0, dp - M.size - 0.3)), ox = m.x, oz = m.z;
         moveBy(m, ((P.x - m.x) / (dp || 1)) * go, ((P.z - m.z) / (dp || 1)) * go);
-        m.lunge = 0.15; m.pinch = 0.12;
+        if (m.species === 'anoko') { // 순간이동 · 몸 늘이기 · 깜빡임 대신: 좌우 앞발을 번갈아 휘두르고, 몸은 미끄러지듯 따라 나간다(판정 자리는 지금 옮긴 그대로)
+          m.slide = { x: m.x - ox, z: m.z - oz, t: CLAW_SLIDE };
+          m.clawT = CLAW_SWING; m.clawSide = -(m.clawSide || -1);
+        } else { m.lunge = 0.15; m.pinch = 0.12; }
         if (Math.hypot(m.x - P.x, m.z - P.z) < M.size + A.reach) hurt(m, M.dmg, m.x, m.z);
       }
       return true;
@@ -1437,18 +1463,35 @@ export function createMonsters(scene, village, random = Math.random) {
       ry = Math.sin(ph * (moving ? 10 : 1.2)) * (moving ? 0.18 : 0.06);
       y += moving ? Math.abs(Math.sin(ph * 10)) * 0.04 : 0;
     } else if (sp === 'anoko') {
-      // 아노코: 잠든 동안(2장에서 골짜기를 들여다볼 때) · 쓰러진 뒤에는 엎드려 눈을 감고, 깨어 있으면 서서 빙글빙글 눈. 꼬리 휩쓸기 때는 몸을 한 바퀴 휙
-      const A = m.mesh.anoko, calm = m.dormant || m.dead;
-      A.setPose(calm ? 'lie' : 'stand');
+      // 아노코: 잠든 동안(2장에서 골짜기를 들여다볼 때) · 쓰러진 뒤에는 엎드려 눈을 감고, 깨어 있으면 서서 빙글빙글 눈(마지막 단계는 붉은 눈 · 부푼 털).
+      // 자세는 바뀔 때만 다시 잡는다(setPose 가 걸음 세기를 0 으로 되돌려서, 매 프레임 부르면 걸을 때 들썩임이 거의 없다).
+      // 앞발 할퀴기는 좌우 앞발을 번갈아, 꼬리 휩쓸기는 몸은 그대로 두고 꼬리만(맞는 곳과 같은 뒤쪽 반원). 단계가 바뀌면 포효(startRoar)
+      const A = m.mesh.anoko, calm = m.dormant || m.dead, pose = calm ? 'lie' : 'stand', atk = m.atk && m.atk.kind;
+      if (m.mesh.pose !== pose) { m.mesh.pose = pose; A.setPose(pose); }
       A.setFace(calm ? 'happy' : 'swirl');
-      A.animate(ph, { moving, step: ph * 6 });
-      if (m.tailT > 0) { m.tailT = Math.max(0, m.tailT - dt); ry = (1 - m.tailT / 0.45) * Math.PI * 2; }
+      A.setRage(calm ? 0 : anokoPhase(Math.max(0, m.hp), m.M.hp));
+      const opts = { moving: moving && m.state !== 'act', step: ph * 6 };
+      if (m.state === 'roar') opts.roar = Math.min(1, 1 - (m.roarT || 0) / ANOKO_ROAR.dur);
+      else if (m.state === 'wind' && atk === 'combo') opts.claw = { wind: 1 - m.wind / m.windMax, side: -(m.clawSide || -1) };
+      else if (m.clawT > 0) opts.claw = { swing: 1 - m.clawT / CLAW_SWING, side: m.clawSide };
+      else if (m.state === 'wind' && atk === 'sweep') opts.tail = { wind: 1 - m.wind / m.windMax };
+      else if (m.tailT > 0) opts.tail = { sweep: 1 - m.tailT / 0.45 };
+      A.animate(ph, opts);
+      m.clawT = Math.max(0, (m.clawT || 0) - dt);
+      m.tailT = Math.max(0, (m.tailT || 0) - dt);
+      if (m.slide && !m.dead) { // 할퀼 때 앞으로 나간 몸이 CLAW_SLIDE 초에 걸쳐 따라붙는다(남은 만큼 뒤에 그린다 — 자리는 이 프레임에 막 놓였다)
+        m.slide.t = Math.max(0, m.slide.t - dt);
+        const k = (m.slide.t / CLAW_SLIDE) ** 2;
+        m.mesh.root.position.x -= m.slide.x * k;
+        m.mesh.root.position.z -= m.slide.z * k;
+        if (m.slide.t <= 0) m.slide = null;
+      } else m.slide = null;
     } else if (sp === 'dummy') {
       rz = Math.sin(m.wobble * 16) * Math.max(0, m.wobble) * 0.9;
       m.wobble = Math.max(0, (m.wobble || 0) - dt * 1.2);
     }
     const kind = m.atk && m.atk.kind;
-    if (m.state === 'wind') {
+    if (m.state === 'wind' && !(sp === 'anoko' && (kind === 'combo' || kind === 'sweep'))) { // 아노코 앞발 · 꼬리 예고는 모델이 직접(움츠림 · 떨림 없이)
       // 예고: 움츠렸다가(납작) 튀어 나간다
       const k = 1 - m.wind / m.windMax;
       sy *= 1 - 0.22 * k; sx *= 1 + 0.15 * k;
@@ -1481,7 +1524,7 @@ export function createMonsters(scene, village, random = Math.random) {
   }
 
   /** 무기가 닿을 수 있는 몬스터인지(쓰러졌거나 잠들었거나 땅속 · 높이 뛰어오른 것은 안 맞는다). */
-  const hittable = (m) => !m.dead && !m.dormant && !m.under && !(m.airY > 0.7);
+  const hittable = (m) => !m.dead && !m.dormant && !m.under && !(m.airY > 0.7) && m.state !== 'roar'; // 포효하는 아노코도 안 맞는다(싸움이 멈춘 동안)
   /**
    * 무기에 맞았다: 체력이 줄고 밀려나며 멈칫한다(예고 중인 가벼운 몬스터는 공격이 끊긴다. 돌진 · 회전처럼 한번 시작한 공격은 밀리지 않는다).
    * (x, z): 친 사람 자리. → 쓰러뜨렸는지
@@ -1514,7 +1557,7 @@ export function createMonsters(scene, village, random = Math.random) {
   // ---------- 같이 놀기(손님): 친구 마을에 놀러 간 동안은 내 몬스터를 숨기고 멈춘 채, 주인이 보낸 몬스터 모습을 따라 보여 준다 ----------
   let guest = null; // 주인 몬스터 id → 꼭두각시(모양 · 몸짓만, 생각과 공격은 주인 쪽에서)
   const guestShots = [], guestRain = []; // 주인 마을에서 날아가는 탄 · 포자 비 표시
-  const STATES = new Set(['wander', 'chase', 'wind', 'act', 'recover', 'return']);
+  const STATES = new Set(['wander', 'chase', 'wind', 'act', 'recover', 'return', 'roar']); // roar: 아노코 포효(startRoar)
   const clamp01 = (v) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
   /** 내 몬스터 · 탄 · 표시를 숨긴다(on=false 면 다음 update 에서 다시 보인다). */
   function hideOwn(on) {
@@ -1627,7 +1670,7 @@ export function createMonsters(scene, village, random = Math.random) {
      * → 쓰러뜨렸는지
      */
     npcHit(m, dmg, fromX, fromZ, by = null) {
-      if (m.dead || m.under || m.dormant || m.airY > 0.7) return false;
+      if (m.dead || m.under || m.dormant || m.airY > 0.7 || m.state === 'roar') return false;
       if (m.species === 'anoko') { // 앞쪽 솜털 방패는 마을 친구가 쳐도 같다(applyHit 과 같게)
         const k = frontGuard(m.yaw, m.x, m.z, fromX, fromZ);
         dmg *= k;
@@ -1742,6 +1785,11 @@ export function createMonsters(scene, village, random = Math.random) {
         m.tx = x; m.tz = z;
         if (Number.isFinite(yaw)) m.tyaw = yaw;
         if (m.state !== 'wind' && st === 'wind') m.windStart = true;
+        if (sp === 'anoko' && st !== m.state) { // 아노코: 주인 쪽 타이머(포효 · 앞발 · 꼬리)는 오지 않으니 바뀌는 순간부터 여기서 센다
+          if (st === 'roar') { m.roarT = ANOKO_ROAR.dur; m.roarStart = true; }
+          if (st === 'act' && kind === 'combo') { m.comboN = 0; m.comboT = 0; }
+          if (st === 'act' && kind === 'sweep') m.tailT = 0.45;
+        }
         m.state = STATES.has(st) ? st : 'wander';
         m.windMax = 1;
         m.wind = 1 - clamp01(wk);
@@ -1805,7 +1853,7 @@ export function createMonsters(scene, village, random = Math.random) {
       for (const [id, c] of guestClouds) if (!gasSeen.has(id)) { dropGasLook(c.look); guestClouds.delete(id); }
     },
     /** 같이 놀기(손님): 매 프레임 주인 마을 몬스터를 받은 자리로 부드럽게 옮기고 몸짓 · 예고 표시를 그린다. onWind(m): 공격 예고를 시작했다. */
-    guestStep(dt, t, { onWind } = {}) {
+    guestStep(dt, t, { onWind, onRoar } = {}) {
       if (!guest) return;
       const k = 1 - Math.exp(-dt * 16), now = performance.now();
       TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
@@ -1838,6 +1886,17 @@ export function createMonsters(scene, village, random = Math.random) {
         if (m.state === 'act' && m.atk && m.atk.kind === 'spin') m.spinA += dt * 18; else m.spinA = 0;
         if (m.state === 'act' && m.atk && m.atk.kind === 'roll') m.rollA += dt * 8; else m.rollA = 0;
         if (m.windStart) { m.windStart = false; onWind?.(m); }
+        if (m.species === 'anoko') { // 주인 쪽과 같은 박자: 포효 진행(충격파 때 알린다) · 앞발 세 번(0.32초 간격, 첫 번은 바로)
+          if (m.roarStart) { m.roarStart = false; m.roarHit = false; onRoar?.(m, 'start'); }
+          if (m.roarT > 0) {
+            m.roarT = Math.max(0, m.roarT - dt);
+            if (!m.roarHit && ANOKO_ROAR.dur - m.roarT >= ANOKO_ROAR.peak) { m.roarHit = true; wave(m.x, m.z, 4.5); poof(m.x, 1.6, m.z, 1.1, 18); onRoar?.(m, 'peak'); }
+          }
+          if (m.state === 'act' && m.atk && m.atk.kind === 'combo' && m.comboN < ANOKO_ATK.claw.n) {
+            m.comboT -= dt;
+            if (m.comboT <= 0) { m.comboN++; m.comboT = ANOKO_ATK.claw.gap; m.clawT = CLAW_SWING; m.clawSide = -(m.clawSide || -1); }
+          }
+        }
         root.visible = true;
         root.position.set(m.x, groundY(m.x, m.z), m.z);
         root.rotation.y = m.yaw;
@@ -1923,6 +1982,7 @@ export function createMonsters(scene, village, random = Math.random) {
       glowMat.emissive.setRGB(1, 0.85, 0.4).multiplyScalar(0.3 + 0.9 * nightK);
       TELE_EDGE.opacity = 0.6 + 0.3 * Math.sin(t * 18);
       playerSafe = inVillage(p.x, p.z, 0.6);
+      holdT = Math.max(0, holdT - dt); // 아노코 포효 동안은 모든 몬스터가 멈춘다(startRoar)
       const players = allies.filter((o) => o.player); // 같이 놀기: 놀러 온 친구들(몬스터는 나와 친구 중 가까운 사람을 노린다)
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i], M = m.M, root = m.mesh.root;
@@ -1972,7 +2032,13 @@ export function createMonsters(scene, village, random = Math.random) {
         m.pinch = Math.max(0, m.pinch - dt);
         if (m.pendingShot) { m.pendingShot.t -= dt; if (m.pendingShot.t <= 0) { fire(m, m.pendingShot.A, m.pendingShot.yaw); m.pendingShot = null; } }
         // 왕버섯이 더 화났다: 쿵 울리며 부하를 바로 부른다
-        if (M.boss) { const r = rage(m); if (r > (m.rage || 0)) { m.rage = r; wave(m.x, m.z, 3.2); poof(m.x, 1.2, m.z, 0.8, 12); m.flash = 0.3; summon(m); C?.onRage?.(m, r); } }
+        // 아노코는 부하를 바로 부르지 않고 포효부터(startRoar) — 충격파는 몸을 다 일으켰을 때, 부하는 포효가 끝날 때
+        if (M.boss) { const r = rage(m); if (r > (m.rage || 0)) { m.rage = r; wave(m.x, m.z, 3.2); poof(m.x, 1.2, m.z, 0.8, 12); m.flash = 0.3; if (m.species === 'anoko') startRoar(m); else summon(m); C?.onRage?.(m, r); } }
+        if (m.roarT > 0) {
+          m.roarT = Math.max(0, m.roarT - dt);
+          if (!m.roarHit && ANOKO_ROAR.dur - m.roarT >= ANOKO_ROAR.peak) { m.roarHit = true; wave(m.x, m.z, 4.5); poof(m.x, 1.6, m.z, 1.1, 18); C?.onRoar?.(m, 'peak'); }
+          if (m.roarT <= 0) { m.state = 'chase'; m.cool = Math.max(m.cool, 0.6); summon(m); C?.onRoar?.(m, 'end'); }
+        }
         let moving = false;
         // 밀려남
         if (!m.under && Math.abs(m.kx) + Math.abs(m.kz) > 0.01) {
@@ -1998,7 +2064,7 @@ export function createMonsters(scene, village, random = Math.random) {
         if (m.foe && !ally) m.foe = null;
         const pd = ally ? Math.hypot(m.x - ally.x, m.z - ally.z) : dp;
         if (ally) { P = ally; curFoe = ally; }
-        if (M.speed > 0) {
+        if (M.speed > 0 && !holdT) { // 아노코 포효 동안은 모두 제자리(holdT)
           const fromHome = Math.hypot(m.x - m.home.x, m.z - m.home.z);
           // 노리는 상대가 들어가 있는 보스 마당: 안팎이 갈리면 서로 못 본다(바깥 몬스터는 분지 · 협곡 안의 나를 쫓지 않고, 보스는 분지 안의 나만 본다)
           const tArena = arenaAt(P.x, P.z, 0.2), tZone = tArena || canyonAt(P.x, P.z);

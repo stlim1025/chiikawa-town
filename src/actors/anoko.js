@@ -61,6 +61,32 @@ const POSES = {
 /** 걸을 때 다리가 앞뒤로 흔들리는 박자: 대각선 다리끼리 같이 나간다. */
 const GAIT_PHASE = [0, Math.PI, Math.PI, 0];
 
+/**
+ * 싸움 동작(앞발 할퀴기 · 꼬리 쓸기 · 포효)과 화난 털이 평소 자세에 더하는 값들의 번호. 값이 모두 0 이면 평소 모습 그대로다.
+ * 매 장면 목표값을 정하고 지금 값을 절반씩 따라가게 해(FX_EASE), 동작이 바뀌거나 끝날 때 툭 끊기지 않는다.
+ */
+const FX = {
+  TP: 0, TYAW: 1, REAR: 2, HP: 3, HZ: 4, HYAW: 5, SHAKE: 6, FUR: 7, PLANT: 8,
+  LEG: 9, // 앞다리 둘 × [앞뒤 각, 벌린 각, 발 오므림, 엉덩관절 앞뒤] = 9 ~ 16
+  TW: 17, TY: 18, // 꼬리: 쓸기 정도(펴지고 늘어난다), 마디 다섯의 옆 꺾임 = 18 ~ 22
+  N: 23
+};
+const FX_EASE = 0.5;
+/** 포효로 일어설 때 몸통이 들리는 각(28.6°)과 그 축이 되는 뒷다리 엉덩관절(몸통 묶음 기준 y, z). */
+const REAR_MAX = 0.5, REAR_PIVOT = [0.95, -0.9];
+/** 꼬리 쓸기: 마디별로 몸 뒤쪽에서 벗어나는 각(끝으로 갈수록 크게 감긴다), 쓸 때 펴지는 마디 각, 늘어나는 비율(끝이 반지름 3 쯤에 닿는다). */
+const SWEEP_ARC = [0.9, 1.25, 1.55, 1.8, 2.0], SWEEP_FLAT = [-0.3, 0.1, 0.08, 0.06, 0.05], SWEEP_STRETCH = 0.3;
+/** 화났을 때(2 단계) 눈 색: 붉은 눈에 검붉은 소용돌이. */
+const RAGE_FILL = '#e5463a', RAGE_SWIRL = '#5c0f12';
+
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const lerp = (a, b, k) => a + (b - a) * k;
+/** a 에서 b 사이를 부드럽게 0 → 1. */
+function smooth(a, b, x) {
+  const u = clamp01((x - a) / (b - a));
+  return u * u * (3 - 2 * u);
+}
+
 /** 머리(가운데가 원점) 겉면에서 얼굴 면 (x, y) 자리와 그 자리를 바라보는 회전. push 만큼 겉면 밖으로 띄운다. */
 function onHead(x, y, push = 0) {
   const [rx, ry, rz] = HEAD_R;
@@ -91,19 +117,19 @@ function omega(y, w, r) {
   return stroke([[-w, y + h * 0.5], [-w * 0.86, y - h * 0.5], [-w * 0.5, y - h], [-w * 0.14, y - h * 0.5], [0, y + h * 0.35], [w * 0.14, y - h * 0.5], [w * 0.5, y - h], [w * 0.86, y - h * 0.5], [w, y + h * 0.5]], r, INK);
 }
 
-/** 싸울 때 얼굴: 짙은 테두리의 베이지 둥근 눈에 갈색 소용돌이, 작은 ω 입. */
-function swirlFace() {
+/** 싸울 때 얼굴: 짙은 테두리의 베이지 둥근 눈에 갈색 소용돌이, 작은 ω 입. 눈 색과 소용돌이 색을 바꾸면 화난 붉은 눈이 된다. */
+function swirlFace(fill = EYE_FILL, swirl = SWIRL) {
   const parts = [], EX = 0.4, EY = -0.06;
   for (const sd of [-1, 1]) {
     parts.push(decal(sd * EX, EY, [0.215, 0.215, 0.04], INK, 0.012));
-    parts.push(decal(sd * EX, EY, [0.185, 0.185, 0.045], EYE_FILL, 0.03));
+    parts.push(decal(sd * EX, EY, [0.185, 0.185, 0.045], fill, 0.03));
     // 소용돌이: 가운데에서 바깥으로 한 바퀴 반 남짓 풀리는 선(왼쪽 눈은 거울처럼 뒤집는다)
     const N = 30, pts = [];
     for (let k = 0; k <= N; k++) {
       const u = k / N, th = 0.6 + u * Math.PI * 3.4, rad = 0.02 + 0.11 * u;
       pts.push([sd * (EX + rad * Math.cos(th)), EY + rad * Math.sin(th)]);
     }
-    parts.push(...stroke(pts, 0.014, SWIRL, 0.07));
+    parts.push(...stroke(pts, 0.014, swirl, 0.07));
   }
   parts.push(...omega(-0.3, 0.085, 0.013));
   return mergedGeometry(parts);
@@ -189,9 +215,16 @@ function furMesh(geometry, material, line = LINE) {
 }
 
 /**
- * 아노코 하나. → { root, height(크기 1 일 때 선 키), setFace('swirl' | 'happy'), setPose('stand' | 'lie'), animate(t, { moving, step }) }.
+ * 아노코 하나. → { root, height(크기 1 일 때 선 키), setFace('swirl' | 'happy'), setPose('stand' | 'lie'), setRage(0 | 1 | 2),
+ *   animate(t, { moving, step, claw, tail, roar }), bob }.
  * root 에 모두 들어 있어 부르는 쪽은 root 의 자리 · 방향 · 크기만 바꾼다. 처음에는 서서 소용돌이 눈.
  * 묶음: trunk(몸통 전체 — 걸을 때 통통, 엎드리면 내려앉는다) 아래 head(목이 축), legs 넷(엉덩관절이 축, 그 아래 paw 가 발목 축), tail 마디 다섯(앞 마디에 이어 붙는다).
+ * 싸움 동작(보스만 쓴다. 한 번에 하나만 넘기고, 없거나 null 이면 평소 걷기 · 서기 그대로. 끝나면 0.1 초쯤에 걸쳐 평소 자세로 돌아온다):
+ *  · claw: { wind: 0 ~ 1, side } 앞발을 들어 바깥 뒤로 젖힌다 / { swing: 0 ~ 1, side } 그 앞발로 가슴 앞을 바깥에서 안으로 가로 할퀸다.
+ *    side 1 은 +x 쪽 앞다리(legs[1]), -1 은 -x 쪽 앞다리(legs[0]). 안 주면 1
+ *  · tail: { wind: 0 ~ 1 } 꼬리를 +x 쪽으로 감아 든다 / { sweep: 0 ~ 1 } +x 쪽에서 바로 뒤(-z)를 지나 -x 쪽까지 뒤 반원을 휘두른다(몸은 앞을 본 채)
+ *  · roar: 0 ~ 1. 뒷다리로 일어섰다(0 ~ 0.3) 털을 부풀려 떨며 버티고(~ 0.75) 앞발로 내려앉는다. 충격파는 0.35 쯤
+ *  · setRage(2): 소용돌이 눈이 붉어지고 갈기 · 가슴 털이 8% 부푼다. 0 · 1 은 평소 모습
  */
 export function buildAnoko() {
   const P = shared(), root = new THREE.Group(), trunk = new THREE.Group();
@@ -244,6 +277,128 @@ export function buildAnoko() {
   });
 
   let pose = 'stand', base = POSES.stand, gait = 0; // gait: 걷는 정도(0 ~ 1, 서고 걷는 사이를 부드럽게 잇는다)
+  const fxTgt = new Array(FX.N).fill(0), fxCur = new Array(FX.N).fill(0); // 싸움 동작이 더하는 값: 목표와 지금
+  let fxOn = false, rage = 0;
+
+  /** 화난 정도(싸움 단계 0 · 1 · 2)에 맞는 모습. 2 면 소용돌이 눈이 붉어지고 털이 부푼다(털은 animate 에서 천천히). 같은 값으로 다시 불러도 아무 일도 하지 않는다. */
+  function setRage(level) {
+    const lv = level >= 2 ? 2 : level >= 1 ? 1 : 0;
+    if (lv === rage) return;
+    rage = lv;
+    if (lv === 2 && !P.swirlRage) P.swirlRage = swirlFace(RAGE_FILL, RAGE_SWIRL); // 붉은 눈 도형은 처음 화날 때 한 번만 만든다
+    faces.swirl.geometry = lv === 2 ? P.swirlRage : P.swirl;
+  }
+
+  /** 싸움 동작의 목표값을 정하고 지금 값을 따라가게 한다. → 이번 장면에 더할 값이 있는지. */
+  function updateFx(opts) {
+    const claw = opts.claw, sweep = opts.tail, roar = opts.roar, puff = rage === 2 ? 0.08 : 0;
+    if (!fxOn && !claw && !sweep && roar == null && !puff) return false;
+    const T = fxTgt;
+    T.fill(0);
+    T[FX.FUR] = puff;
+    if (claw) {
+      // 앞발 할퀴기: side 쪽 앞다리(+x 가 legs[1])를 들어 바깥에서 안으로 휘두른다
+      const s = claw.side < 0 ? -1 : 1, L = FX.LEG + (s < 0 ? 0 : 4);
+      T[FX.PLANT] = 1;
+      if (claw.swing != null) {
+        const k = clamp01(claw.swing);
+        const e = 1 - (1 - clamp01((k - 0.15) / 0.45)) ** 3; // 처음에 확 나가고 끝에서 느려진다
+        const hold = 1 - 0.85 * smooth(0.6, 1, k); // 휘두른 뒤 발을 내려 다음 할퀴기로 이어진다
+        T[L] = hold * (-0.85 - 0.3 * Math.sin(e * Math.PI));
+        T[L + 1] = hold * s * lerp(1.1, -1.0, e);
+        T[L + 2] = hold * 0.6;
+        T[L + 3] = hold * lerp(-0.1, 0.2, e);
+        T[FX.TP] = hold * lerp(-0.07, 0.1, e);
+        T[FX.TYAW] = hold * s * lerp(0.08, -0.14, e);
+        T[FX.HP] = hold * lerp(-0.12, 0.2, e);
+        T[FX.HZ] = hold * lerp(-0.08, 0.05, e);
+      } else {
+        const w = smooth(0, 1, claw.wind ?? 0);
+        T[L] = -0.85 * w;
+        T[L + 1] = s * 1.1 * w;
+        T[L + 2] = 0.6 * w;
+        T[L + 3] = -0.1 * w;
+        T[FX.TP] = -0.07 * w; // 몸을 살짝 뒤로 젖히고 머리를 당긴다
+        T[FX.TYAW] = s * 0.08 * w;
+        T[FX.HP] = -0.12 * w;
+        T[FX.HZ] = -0.08 * w;
+      }
+    } else if (sweep) {
+      // 꼬리 쓸기: 마디마다 조금씩 늦게 따라가 끝이 채찍처럼 뒤따른다. 엉덩이는 꼬리 반대쪽으로 8° 까지만 틀고 머리는 그만큼 되돌려 앞을 본다
+      let w, d0 = -1;
+      const dir = [-1, -1, -1, -1, -1]; // -1: +x 쪽, 0: 바로 뒤, 1: -x 쪽
+      if (sweep.sweep != null) {
+        const k = clamp01(sweep.sweep);
+        w = 1 - smooth(0.7, 1, k);
+        for (let i = 0; i < 5; i++) dir[i] = -1 + 2 * smooth(0, 1, (k - i * 0.06) / 0.42);
+        d0 = dir[0];
+      } else w = smooth(0, 1, sweep.wind ?? 0);
+      let prev = 0;
+      for (let i = 0; i < 5; i++) {
+        const c = SWEEP_ARC[i] * dir[i] * w;
+        T[FX.TY + i] = c - prev;
+        prev = c;
+      }
+      T[FX.TW] = w;
+      T[FX.TYAW] = -0.14 * d0 * w;
+      T[FX.HYAW] = 0.14 * d0 * w;
+    } else if (roar != null) {
+      // 포효: 일어선다 → 버티며 털을 부풀리고 떤다 → 앞발로 내려앉아 한 번 살짝 튄다
+      const k = clamp01(roar);
+      let up, nod = 0;
+      if (k < 0.3) up = Math.sin((k / 0.3) * Math.PI / 2);
+      else if (k < 0.75) up = 1;
+      else if (k < 0.9) up = 1 - ((k - 0.75) / 0.15) ** 2;
+      else { up = 0.1 * Math.sin(((k - 0.9) / 0.1) * Math.PI); nod = up; }
+      T[FX.PLANT] = 1;
+      T[FX.REAR] = up;
+      T[FX.HP] = -0.2 * up + nod;
+      for (const L of [FX.LEG, FX.LEG + 4]) { T[L] = -0.35 * up; T[L + 2] = 1.3 * up; } // 든 앞발은 앞으로 모으고 발끝을 늘어뜨린다
+      T[FX.SHAKE] = smooth(0.28, 0.36, k) * (1 - smooth(0.68, 0.78, k));
+      T[FX.FUR] += 0.13 * smooth(0.2, 0.36, k) * (1 - smooth(0.75, 0.95, k));
+    }
+    let live = 0;
+    for (let i = 0; i < FX.N; i++) {
+      fxCur[i] += (T[i] - fxCur[i]) * FX_EASE;
+      live = Math.max(live, Math.abs(fxCur[i]));
+    }
+    fxOn = !!claw || !!sweep || roar != null || puff > 0 || live > 0.001;
+    if (!fxOn) fxCur.fill(0); // 다 돌아왔으면 0 으로 한 번 더 적용해 평소 값으로 되돌려 놓고 끝낸다
+    return true;
+  }
+
+  /** 싸움 동작 값을 평소 움직임 위에 더한다(animate 가 평소 값을 다 넣은 뒤 부른다). */
+  function applyFx(t) {
+    const C = fxCur, shake = C[FX.SHAKE];
+    // 몸통: 일어설 때는 뒷다리 엉덩관절을 축으로 들려 뒷발이 바닥에 그대로 있다
+    const th = -REAR_MAX * C[FX.REAR], cs = Math.cos(th), sn = Math.sin(th), [py, pz] = REAR_PIVOT;
+    trunk.rotation.x += th + C[FX.TP];
+    trunk.rotation.y = C[FX.TYAW];
+    trunk.position.y += py - (py * cs - pz * sn) + Math.max(0, C[FX.TP]) * 0.4; // 앞으로 숙일 때 앞발이 바닥에 파묻히지 않게 살짝 든다
+    trunk.position.z = pz - (py * sn + pz * cs);
+    trunk.position.x = Math.sin(t * 61) * 0.014 * shake;
+    head.rotation.x += C[FX.HP];
+    head.rotation.y = C[FX.HYAW] + Math.sin(t * 34) * 0.1 * shake;
+    head.rotation.z = Math.sin(t * 34 + 1.3) * 0.04 * shake;
+    head.position.z = NECK[2] + C[FX.HZ];
+    chest.scale.multiplyScalar(1 + C[FX.FUR]);
+    mane.scale.multiplyScalar(1 + C[FX.FUR]);
+    legs.forEach(({ group, paw }, i) => {
+      if (i < 2) {
+        const b = base.legs[i], L = FX.LEG + i * 4;
+        group.rotation.x += C[L];
+        group.rotation.y = b.yaw + C[L + 1];
+        paw.rotation.x += -C[L] + C[L + 2]; // 다리가 들린 만큼 발을 되돌리고 그 위에 오므린다
+        group.position.z = b.p[2] + C[L + 3];
+      } else group.rotation.x -= th; // 뒷다리는 몸통이 들린 만큼 되돌려 곧게 선 채로
+    });
+    tail[0].scale.setScalar(1 + SWEEP_STRETCH * C[FX.TW]);
+    tail.forEach((seg, i) => {
+      seg.rotation.y += C[FX.TY + i];
+      seg.rotation.x += (SWEEP_FLAT[i] - base.tail[i][0]) * C[FX.TW];
+    });
+    tail[0].rotation.x += -th + 0.35 * C[FX.REAR]; // 일어서도 꼬리가 바닥에 박히지 않게 들어 준다
+  }
 
   /** 얼굴을 바꾼다: 'swirl'(소용돌이 눈) · 'happy'(웃는 얼굴). */
   function setFace(kind) {
@@ -272,9 +427,11 @@ export function buildAnoko() {
   /**
    * 매 장면 부른다(t: 초). moving 이면 네 다리 걸음(step 이 있으면 그 값을 걸음 박자로, 없으면 시간에서)과 몸 통통.
    * 늘: 가슴 · 갈기 숨쉬기와 느린 꼬리 흔들기. 엎드린 자세에서는 다리는 그대로 두고 숨쉬기와 느긋한 꼬리만.
+   * claw · tail · roar 를 넘기면 그 싸움 동작을 평소 움직임 위에 얹는다(값의 뜻은 buildAnoko 설명). 할퀴거나 포효하는 동안은 제자리걸음을 하지 않는다.
    */
   function animate(t, opts = {}) {
-    const lying = pose === 'lie', moving = !lying && !!opts.moving;
+    const fx = updateFx(opts), plant = fx ? fxCur[FX.PLANT] : 0;
+    const lying = pose === 'lie', moving = !lying && !!opts.moving && !opts.claw && opts.roar == null;
     gait += ((moving ? 1 : 0) - gait) * 0.2;
     if (gait < 0.001) gait = 0;
     const ph = opts.step != null ? opts.step : t * 8;
@@ -290,7 +447,7 @@ export function buildAnoko() {
     head.rotation.x = base.headTilt + 0.012 * breath - gait * Math.sin(ph * 2 + 1.4) * 0.09; // 몸과 엇갈려 끄덕
     mane.scale.y *= 1 + gait * Math.sin(ph * 2 + 2) * 0.04; // 갈기 털이 출렁
     legs.forEach(({ group, paw, phase }, i) => {
-      const b = base.legs[i], swing = Math.sin(ph + phase) * 0.75 * gait;
+      const b = base.legs[i], swing = Math.sin(ph + phase) * 0.75 * gait * (1 - plant);
       group.rotation.x = b.pitch + swing;
       paw.rotation.x = -b.pitch - swing * 0.6;
     });
@@ -299,11 +456,12 @@ export function buildAnoko() {
       seg.rotation.y = base.tail[i][1] + Math.sin(t * speed - i * 0.6) * amp + gait * Math.sin(ph - i * 0.7) * 0.14;
       seg.rotation.x = base.tail[i][0] + (i ? gait * Math.sin(ph * 2 - i * 0.5) * 0.1 : 0); // 달리면 꼬리가 위아래로 출렁
     });
+    if (fx) applyFx(t);
   }
 
   setPose('stand');
   return {
-    root, height: HEIGHT, setFace, setPose, animate,
+    root, height: HEIGHT, setFace, setPose, setRage, animate,
     /** 달리며 몸통이 튀어 오른 높이(크기 1 기준): 등에 탄 캐릭터도 이만큼 같이 들썩인다. */
     get bob() { return trunk.position.y - base.trunkY; }
   };

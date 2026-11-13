@@ -15,6 +15,15 @@ export const ANOKO_SIZE = 1.4;
 export const ANOKO_SHIELD = { arc: Math.PI / 3, front: 1 / 3 };
 /** 노리는 상대 쪽으로 도는 빠르기(라디안/초): 다른 보스(9 ~ 10)보다 느려서 재빨리 돌아 들어가면 잠깐 옆이나 뒤를 잡는다. */
 export const ANOKO_TURN = 2.4;
+/** 단계가 바뀌는 체력 비율(world/monsters.js 의 RAGE_AT.anoko): 이 아래로 내려가면 1(화남), 2(마지막 단계). */
+export const ANOKO_RAGE_AT = [0.75, 0.5];
+/** 체력 hp(최대 max)일 때 단계 0 · 1 · 2. 같이 놀기 손님은 받은 체력으로 마당 분위기 · 붉은 눈을 정한다. */
+export const anokoPhase = (hp, max) => (hp <= max * ANOKO_RAGE_AT[1] ? 2 : hp <= max * ANOKO_RAGE_AT[0] ? 1 : 0);
+/**
+ * 단계가 바뀔 때의 포효(게임 오리지널 연출): dur 초 동안 모든 몬스터가 멈추고(하던 공격 · 날아오던 탄은 지운다) 아노코가 뒷다리로 일어서 포효한다.
+ * peak 초에 충격파가 나를 shove 만큼 밀어낸다(피해 없음). safe 초 동안 나는 맞지 않는다. 부하는 포효가 끝날 때 나온다.
+ */
+export const ANOKO_ROAR = { dur: 2, peak: 0.7, shove: 1.4, safe: 2.3 };
 /**
  * 공격 값(world/monsters.js 의 ATK 와 같은 모양, 거기서 그대로 가져다 쓴다).
  *  할퀴기는 예고를 늘리고 닿는 거리를 줄였다(붙어 있다가 0.2초 늦게 물러나도 첫 할퀴기 밖으로 나가게).

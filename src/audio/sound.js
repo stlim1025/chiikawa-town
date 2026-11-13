@@ -238,6 +238,12 @@ export function createSound(storage) {
       tone({ freq: 520, slideTo: 300, type: 'triangle', start: 0.08, dur: 0.12, vol: 0.12 });
     },
     growl: () => tone({ freq: 150, slideTo: 210, type: 'sawtooth', dur: 0.28, vol: 0.05 }),
+    /** 아노코 포효(단계가 바뀔 때): 낮게 길게 울리는 으르렁 + 거센 바람 소리. */
+    roar: () => {
+      tone({ freq: 130, slideTo: 82, type: 'sawtooth', dur: 1.15, vol: 0.09, attack: 0.08 });
+      tone({ freq: 196, slideTo: 118, type: 'sawtooth', start: 0.04, dur: 1.05, vol: 0.05, attack: 0.08 });
+      noise({ dur: 1.2, vol: 0.12, freq: 900, sweepTo: 260, q: 0.7, type: 'lowpass', attack: 0.06 });
+    },
     // 친구 집에서 같이 부르는 짧은 노래(하치와레)
     song: () => [72, 74, 76, 79, 76, 77, 79, 84, 79, 76, 74, 72].forEach((n, i) => {
       tone({ freq: midi(n), type: 'triangle', start: i * 0.24, dur: 0.3, vol: 0.12 });
