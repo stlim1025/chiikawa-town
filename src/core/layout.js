@@ -72,10 +72,16 @@ export const BOSS_LAIRS = {
  */
 export const KING_LAIR = { x: -22, z: -90.4, r: 7, door: { x: -22, z: -66.5 }, len: 16, lead: 8.5 };
 /**
+ * 최종 보스 아노코의 숲(메인 이야기 2장 — core/anoko.js): 월드 서쪽 끝 너머(왕버섯 굴 · 두더지 굴밭처럼 입구만 맵 끝자락). 숲 서쪽 끝에서 동쪽을 향해 뻗은 협곡으로 들어가고,
+ * 입구에서 숲-호수 길(-48, 14)까지 숲을 가로지르는 흙길(lead)로 이어진다. 고목 빈터(BOSS_LAIRS.elder)와 입구 · 흙길이 겹치지 않게 남쪽에 둔다
+ * (z 16 이면 흙길이 고목 빈터 입구 쪽 숲길 끝으로 이어져서 18 로). 구역 보스가 아니라 BOSS_LAIRS 에는 넣지 않는다.
+ */
+export const ANOKO_LAIR = { x: -90.4, z: 18, r: 7.5, place: '아노코의 숲', door: { x: -70.5, z: 18 }, len: 11.5, lead: 22.5 };
+/**
  * 보스 마당(world/lairs.js): 높은 지형(절벽 · 언덕 · 고목)에 둘러싸인 분지 + door 쪽으로 뻗은 좁은 협곡(길이 len, 기본 CANYON.len) 하나로만 들어간다.
  * 구역 보스 셋 + 왕버섯 굴. 일반 몬스터는 분지 · 협곡에 못 들어오고 근처에 생기지도 않으며, 보스 · 부하는 분지 밖으로 못 나간다(world/monsters.js).
  */
-export const ARENAS = [...Object.entries(BOSS_LAIRS).map(([id, L]) => ({ id, ...L })), { id: 'kingcap', ...KING_LAIR }];
+export const ARENAS = [...Object.entries(BOSS_LAIRS).map(([id, L]) => ({ id, ...L })), { id: 'kingcap', ...KING_LAIR }, { id: 'anoko', ...ANOKO_LAIR }];
 /** 막는 울타리가 마당 가장자리에서 떨어진 거리. */
 export const ARENA_WALL = 0.9;
 /** 마당 입구 협곡: 기본 길이 · 폭의 절반. */

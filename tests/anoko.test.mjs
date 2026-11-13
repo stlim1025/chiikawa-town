@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ANOKO_SIZE, ANOKO_SHIELD, ANOKO_TURN, ANOKO_ATK, frontGuard, inSweep, rideKind, isValidRide } from '../src/core/anoko.js';
 import { MONSTERS, MONSTER_ORDER, WEAPONS } from '../src/core/combat.js';
 import { bossSeen } from '../src/core/bosses.js';
+import { ANOKO_LAIR, ARENAS, BOSS_LAIRS, ROADS, ARCADE, WORLD_HALF, arenaAt, canyonMouth, lairReach } from '../src/core/layout.js';
 
 const SPEED = 3.2, ME = 0.32, REACTS = [0.15, 0.2, 0.25];
 const close = (a, b) => Math.abs(a - b) < 1e-9;
@@ -207,4 +208,33 @@ test('균형: 혼자면 체력 절반쯤에서 기운이 바닥나고, 친구 �
   const soloTime = median(SEEDS.map((seed) => simulateFight({ seed, endless: true }).time));
   const partyTime = median(party.map((r) => r.time));
   assert.ok(soloTime >= partyTime * 3, `혼자 ${soloTime.toFixed(0)}초, 친구 둘 ${partyTime.toFixed(0)}초`);
+});
+
+/** 선분 (a → b) 와 점 p 의 거리. */
+const segDist = (p, a, b) => { const dx = b.x - a.x, dz = b.z - a.z, L = dx * dx + dz * dz, t = L ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / L)) : 0; return Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t)); };
+/** 길(ROADS) 위에서 p 에 가장 가까운 점. */
+const nearestRoad = (p) => {
+  let best = null, bd = Infinity;
+  for (const r of ROADS) for (let k = 1; k < r.pts.length; k++) {
+    const a = { x: r.pts[k - 1][0], z: r.pts[k - 1][1] }, b = { x: r.pts[k][0], z: r.pts[k][1] }, dx = b.x - a.x, dz = b.z - a.z, L = dx * dx + dz * dz;
+    const t = L ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / L)) : 0, q = { x: a.x + dx * t, z: a.z + dz * t }, d = Math.hypot(p.x - q.x, p.z - q.z);
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best;
+};
+
+test('아노코 마당: 서쪽 월드 끝 너머, 고목 거인과 40 넘게, 오데 빈터와 게임센터와 10 넘게', () => {
+  const A = ARENAS.find((a) => a.id === 'anoko');
+  assert.ok(A && A === ARENAS[ARENAS.length - 1], 'ARENAS 맨 끝');
+  assert.equal(A.x, ANOKO_LAIR.x);
+  assert.equal(arenaAt(ANOKO_LAIR.x, ANOKO_LAIR.z).id, 'anoko');
+  assert.ok(!('anoko' in BOSS_LAIRS), '구역 보스가 아니다');
+  assert.ok(ANOKO_LAIR.x + ANOKO_LAIR.r < -WORLD_HALF, '월드 서쪽 끝 너머');
+  assert.ok(Math.hypot(ANOKO_LAIR.x - BOSS_LAIRS.elder.x, ANOKO_LAIR.z - BOSS_LAIRS.elder.z) > 40, '고목 거인 마당과 멀리');
+  const mouth = canyonMouth(A), road = nearestRoad(mouth);
+  assert.ok(Math.hypot(mouth.x - BOSS_LAIRS.elder.door.x, mouth.z - BOSS_LAIRS.elder.door.z) > 20, '고목 거인 입구와 떨어진 입구');
+  assert.ok(Math.hypot(road.x - BOSS_LAIRS.elder.door.x, road.z - BOSS_LAIRS.elder.door.z) > 15, '흙길이 고목 거인 입구 쪽 길로 가지 않는다');
+  for (const [name, p] of [['오데 빈터', { x: -40, z: 22 }], ['게임센터', ARCADE]]) assert.ok(segDist(p, mouth, road) >= 10, `${name}와 흙길이 10 넘게`);
+  assert.ok(lairReach(ANOKO_LAIR.x, ANOKO_LAIR.z) && lairReach(mouth.x - 1, mouth.z), '마당과 협곡은 걸어 들어간다');
+  assert.ok(!lairReach(ANOKO_LAIR.x, ANOKO_LAIR.z + 14), '마당 밖 월드 끝 너머는 못 간다');
 });

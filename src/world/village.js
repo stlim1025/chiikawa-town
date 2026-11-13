@@ -119,6 +119,7 @@ export function buildVillage(scene) {
     let x0, x1, z0, z1;
     if (A.x + A.r + ARENA_WALL > WORLD_HALF) { x0 = WORLD_HALF + 3.5; x1 = A.x + A.r + 48; z0 = A.z - A.r - 40; z1 = A.z + A.r + 30; }
     else if (A.z - A.r - ARENA_WALL < -WORLD_HALF) { x0 = A.x - A.r - 40; x1 = A.x + A.r + 40; z0 = A.z - A.r - 48; z1 = -WORLD_HALF - 3.5; } // 카메라가 북쪽을 보니 뒤로 더 멀리
+    else if (A.x - A.r - ARENA_WALL < -WORLD_HALF) { x0 = A.x - A.r - 48; x1 = -WORLD_HALF - 3.5; z0 = A.z - A.r - 40; z1 = A.z + A.r + 30; } // 서쪽 아노코의 숲
     else continue;
     const gx = Math.ceil((x1 - x0) / 1.6), gy = Math.ceil((z1 - z0) / 1.6);
     const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, gx, gy).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, -0.006, (z0 + z1) / 2);
@@ -825,11 +826,13 @@ export function buildVillage(scene) {
   // ---------- 길찾기: 월드 전체 0.5 칸 격자(칸마다 처음 볼 때 그때까지 놓인 단단한 장애물 · 물로 정한다) ----------
   // 동쪽 · 북쪽은 월드 끝 너머의 보스 마당(두더지 굴밭 · 왕버섯 굴)까지 늘린다: 같이 토벌하는 친구도 따라 들어온다
   const NAV = 0.5, NAV_R = 0.38;
-  const NAV_EAST = Math.max(WORLD_HALF, ...ARENAS.map((A) => A.x + A.r + ARENA_WALL + 2)), NAV_NX = Math.ceil((NAV_EAST + WORLD_HALF) / NAV);
+  // 서쪽도 월드 끝 너머 아노코의 숲까지
+  const NAV_WEST = Math.max(WORLD_HALF, ...ARENAS.map((A) => -(A.x - A.r - ARENA_WALL - 2)));
+  const NAV_EAST = Math.max(WORLD_HALF, ...ARENAS.map((A) => A.x + A.r + ARENA_WALL + 2)), NAV_NX = Math.ceil((NAV_EAST + NAV_WEST) / NAV);
   const NAV_NORTH = Math.max(WORLD_HALF, ...ARENAS.map((A) => -(A.z - A.r - ARENA_WALL - 2))), NAV_N = Math.ceil((NAV_NORTH + WORLD_HALF) / NAV);
   const nav = new Uint8Array(NAV_NX * NAV_N); // 0 아직 모름 · 1 열림 · 2 막힘
-  const navPos = (i, j) => [-WORLD_HALF + (i + 0.5) * NAV, -NAV_NORTH + (j + 0.5) * NAV];
-  const navCell = (x, z) => [Math.min(NAV_NX - 1, Math.max(0, Math.floor((x + WORLD_HALF) / NAV))), Math.min(NAV_N - 1, Math.max(0, Math.floor((z + NAV_NORTH) / NAV)))];
+  const navPos = (i, j) => [-NAV_WEST + (i + 0.5) * NAV, -NAV_NORTH + (j + 0.5) * NAV];
+  const navCell = (x, z) => [Math.min(NAV_NX - 1, Math.max(0, Math.floor((x + NAV_WEST) / NAV))), Math.min(NAV_N - 1, Math.max(0, Math.floor((z + NAV_NORTH) / NAV)))];
   function navBlocked(i, j) {
     const k = j * NAV_NX + i;
     if (!nav[k]) { const [x, z] = navPos(i, j); nav[k] = isFree(x, z, NAV_R) ? 1 : 2; }

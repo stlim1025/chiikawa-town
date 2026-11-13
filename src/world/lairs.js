@@ -48,6 +48,15 @@ const DECOR = {
     });
     [[1.4, -2.6], [-3.4, 1.8], [3.6, -0.4]].forEach(([x, z], i) =>
       g.add(toonMesh(GEO.cone, '#ffb6c9', { position: [x, 0.02, z], rotation: [Math.PI / 2, i * 1.3, 0], scale: [0.16, 0.2, 0.16], outline: 0.015, shadow: false })));
+  },
+  // 아노코의 숲: 이끼 낀 풀밭에 아노코가 흘린 하얀 솜털 뭉치(둥근 덩어리 셋씩)
+  anoko(g, r) {
+    floor(g, '#86b562', r);
+    around(5, 0.6).forEach((a, i) => {
+      const d = r * (i % 2 ? 0.5 : 0.74), x = Math.sin(a) * d, z = Math.cos(a) * d, s = 0.22 + (i % 3) * 0.05;
+      [[0, 0, 1], [s * 0.9, 0.05, 0.7], [-s * 0.8, 0.12, 0.65]].forEach(([dx, dz, k]) =>
+        g.add(toonMesh(GEO.sphere, '#fbf7ef', { position: [x + dx, s * k * 0.6, z + dz], scale: [s * k, s * k * 0.8, s * k], outline: 0.015, shadow: false })));
+    });
   }
 };
 
@@ -59,7 +68,8 @@ const TERRAIN = {
   kingcap: { kind: 'rock', colors: ['#8f8174', '#a39486', '#b3a597'], w: 2.0, h: [3.8, 5.4] },
   bigcrab: { kind: 'rock', colors: ['#a39a8f', '#b9b2a6', '#8f8174'], w: 1.9, h: [2.8, 3.8], cap: '#86b85e' },
   bigmole: { kind: 'hill', colors: ['#95d488', '#aee08f', '#8fcd86'], bush: '#79c46c', w: 1.7, h: [1.3, 1.9] },
-  elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8] }
+  elder: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8] },
+  anoko: { kind: 'tree', colors: ['#4f9f58', '#5fb36e', '#6cc77e'], trunk: '#7a5136', w: 1.9, h: [4.6, 5.8] } // 아노코의 숲: 고목 빈터처럼 고목이 빙 둘러선다
 };
 /** 카메라 쪽 덩어리를 이만큼씩 묶어 한 번에 반투명하게(그리기 횟수를 줄인다). */
 const FADE_GROUP = 3;
@@ -133,7 +143,7 @@ function fences(A, obstacles) {
 }
 
 /** 월드 동쪽 · 북쪽 끝(WORLD_HALF) 너머에 있는 마당(두더지 굴밭 · 왕버섯 굴): 입구만 맵 끝자락에 나와 있다. */
-const beyondEdge = (A) => A.x + A.r + ARENA_WALL > WORLD_HALF || A.z - A.r - ARENA_WALL < -WORLD_HALF;
+const beyondEdge = (A) => A.x + A.r + ARENA_WALL > WORLD_HALF || A.z - A.r - ARENA_WALL < -WORLD_HALF || A.x - A.r - ARENA_WALL < -WORLD_HALF; // 서쪽: 아노코의 숲
 const MOUND = ['#aee08f', '#95d488'];
 
 /**
