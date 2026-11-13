@@ -674,6 +674,14 @@ function boot() {
       cutBossMusic();
       hud.banner(`${josa(multi.nameOf(id) || '친구', '이/가')} ${josa(m.M.name, '을/를')} 쓰러뜨렸다!`, '내일 다시 나타나요', 3200);
     }
+    if (m.species === 'anoko') { // 메인 이야기 2장: 손님이 마지막 한 방을 쳐도 내가 쓰러뜨린 것처럼 이야기가 넘어간다(onKill 과 같게)
+      anokoM = null;
+      monsters.clear((o) => o.summoned);
+      commit({ ...state, story: { ...(state.story || {}), anokoSeen: (state.story && state.story.anokoSeen) || state.clock.day, anokoDown: state.clock.day } });
+      cutBossMusic();
+      hud.banner(`${josa(multi.nameOf(id) || '친구', '이/가')} 아노코를 쓰러뜨렸다!`, '', 3200);
+      if (stepOf(state, 'anoko') && stepOf(state, 'anoko').type === 'boss') sceneAfterKill('anoko');
+    }
   }
   /** 나에게만 온 것: 'hurt' 몬스터에게 맞았다(손님) · 'kill' 내가 쓰러뜨렸다(손님) · 'got' 주운 물건(손님) · 'wake' 깨워 줬다. */
   function takeDirect(id, a) {
@@ -3757,6 +3765,11 @@ function boot() {
         return;
       }
     }
+    // 이야기 보스는 쓰러졌는데 마무리 장면을 못 봤다(쓰러뜨린 직후 새로고침): 싸울 차례에 머물러 있으면 장면을 다시 연다
+    if (free) for (const [id, down] of [['story', 'bossDown'], ['anoko', 'anokoDown']]) {
+      const st = stepOf(state, id);
+      if (st && st.type === 'boss' && state.story && state.story[down] && !killScenes.has(id)) { questSceneStep(id); return; }
+    }
     // 퀘스트 자리에 왔는데 그 시간이 아니면(장면이 열리지 않는다) 몇 시에 오면 되는지 한 번 알린다. 멀어졌다 다시 오면 또
     if (free) for (const id of activeQuests(state)) {
       const step = stepOf(state, id), place = step && step.type === 'visit' ? questPlaceAt(step.place) : null;
@@ -4075,6 +4088,15 @@ function boot() {
    * 아노코의 앞쪽 솜털에 막혔다(world/monsters.js 의 onGuard): 머리 위에 「솜털에 막혔다!」(한 번 치는 동안 한 번),
    * 처음 한 번은 옆이나 뒤를 노리라는 안내. 같은 순간 여러 번(친구 · 같이 놀기) 막혀도 0.6초에 한 번만 띄운다.
    */
+  /**
+   * 이야기 보스(왕버섯 · 아노코)를 쓰러뜨렸다: 1.6초 뒤 그 퀘스트의 마무리 장면. 기다리는 동안은 updateQuests 가 먼저 열지 않는다
+   * (쓰러뜨린 직후 새로고침해서 장면을 못 봤으면 updateQuests 가 다시 연다).
+   */
+  const killScenes = new Set();
+  function sceneAfterKill(id) {
+    killScenes.add(id);
+    setTimeout(() => { killScenes.delete(id); questSceneStep(id); }, 1600);
+  }
   let guardT = 0;
   function onAnokoGuard(m) {
     const now = performance.now();
@@ -4122,7 +4144,7 @@ function boot() {
       happen({ type: 'playerBoss', who: 'me', boss: m.M.short }); // 온 마을에 소문이 난다
       monsters.clear((o) => o.summoned);
       hud.banner('왕버섯을 쓰러뜨렸다!', '', 3000);
-      if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
+      if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') sceneAfterKill('story');
     }
     // 메인 이야기 2장의 아노코를 쓰러뜨렸다: 엎드려 웃는 얼굴로 잠깐 있다가(world/monsters.js 의 ANOKO_REST) 사라진다
     if (m.species === 'anoko') {
@@ -4130,7 +4152,7 @@ function boot() {
       happen({ type: 'playerBoss', who: 'me', boss: m.M.short }); // 온 마을에 소문이 난다
       monsters.clear((o) => o.summoned);
       hud.banner('아노코를 쓰러뜨렸다!', '', 3000);
-      if (stepOf(state, 'anoko') && stepOf(state, 'anoko').type === 'boss') setTimeout(() => questSceneStep('anoko'), 1600);
+      if (stepOf(state, 'anoko') && stepOf(state, 'anoko').type === 'boss') sceneAfterKill('anoko');
     }
     if (m.bounty) {
       bountyM = null;
@@ -7179,7 +7201,8 @@ function boot() {
       party: (kind) => startParty(npcs.byKind(kind)), // 같이 토벌을 바로 시작(대화 없이)
       ally: (kind) => ({ hp: allyHp[kind], down: !!(npcs.byKind(kind) || {}).down }),
       monsterHp: (id, hp) => { const m = monsters.list.find((o) => o.id === id); if (m) m.hp = hp; },
-      npcEat: (kind) => npcEat(npcs.byKind(kind)),
+      guestAct: (id, a) => takeGuestAct(id, a), // 같이 놀기(주인): 손님 행동을 서버 없이 넣어 보기(예: { t: 'hit', id, dmg, knock, x, z })
+      npcEat:(kind) => npcEat(npcs.byKind(kind)),
       npcHome: (kind, why = 'nap') => npcGoHome(npcs.byKind(kind), why), // 친구를 집으로 들여보내기(문 두드리기 확인용)
       npcHunt: (kind, typeId) => npcHunt(npcs.byKind(kind), typeId),
       npcExam: (kind) => npcExam(npcs.byKind(kind)),

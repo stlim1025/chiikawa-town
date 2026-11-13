@@ -1628,6 +1628,12 @@ export function createMonsters(scene, village, random = Math.random) {
      */
     npcHit(m, dmg, fromX, fromZ, by = null) {
       if (m.dead || m.under || m.dormant || m.airY > 0.7) return false;
+      if (m.species === 'anoko') { // 앞쪽 솜털 방패는 마을 친구가 쳐도 같다(applyHit 과 같게)
+        const k = frontGuard(m.yaw, m.x, m.z, fromX, fromZ);
+        dmg *= k;
+        if (k < 1) C?.onGuard?.(m, fromX, fromZ);
+      }
+      m.lastDmg = dmg; // 실제로 들어간 피해(숫자를 띄울 때)
       m.hp -= dmg;
       if (by && !m.M.boss && m.state !== 'wind' && m.state !== 'act' && random() < 0.55) m.foe = by; // 때린 친구에게 덤빈다
       m.flash = 0.13;
