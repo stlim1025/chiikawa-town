@@ -79,6 +79,7 @@ export const PLACES = {
   // 연계 퀘스트: 구역 보스 마당으로 들어가는 협곡 입구(core/layout.js 의 BOSS_LAIRS door) · 랏코 수련장
   moleGate: { name: '두더지 굴밭 입구', r: 4 },
   elderGate: { name: '고목 빈터 입구', r: 4 },
+  anokoLair: { name: '아노코의 숲', r: 9 }, // 메인 이야기 2장: 서쪽 끝 너머 아노코의 숲 협곡 입구 안쪽(core/layout.js 의 ANOKO_LAIR)
   crabGate: { name: '강가 진흙밭 입구', r: 4 },
   dojo: { name: '수련장', r: 3.4 },
   bonbonVine: { name: '초콜릿 덩굴', r: 2.8 }, // 서쪽 숲길 옆(이야기를 받은 동안만 덩굴이 있다 — world/bonbon.js)
@@ -128,6 +129,20 @@ export const QUESTS = {
       { type: 'talk', goal: '대장 갑옷 씨에게 알려 주자!', say: ['…해냈군, {name}!', '이제 바위산도 조용해질 거다. 마을 모두를 대신해서… 고맙다.', '이건 마을이 너에게 주는 선물이다. 흠흠, 잘 어울리겠군.'] }
     ],
     reward: { money: 5000, bond: 6, accessory: 'crown', village: 3 }
+  },
+  // 메인 이야기 2장(게임 오리지널 — 아노코가 숲에 사는 것만 원작을 따랐다, core/anoko.js): 왕버섯 이야기를 끝낸 다음 날부터 대장 갑옷 씨가 준다.
+  // 이미 끝낸 저장도 바로 받는다(이야기 끝에 단계를 붙이면 끝낸 저장이 못 만난다). 다 끝내면 아노코가 집 앞으로 와서 탈것이 된다
+  anoko: {
+    title: '숲 너머의 아노코', giver: 'captain', story: true, needHearts: 0, tutorial: true, after: 'story', afterGap: 1,
+    ask: '또 무슨 일이에요?',
+    offer: ['흠흠. {name}, 왕버섯 일은 다시 한 번 고맙다.', '그런데 요즘 서쪽 숲 끝에서 쿵쿵 울리는 소리가 난다는군. 숲 몬스터들도 그쪽으로 몰려간다고 하고.', '랏코가 뭔가 아는 눈치였다. 가서 물어봐라.'],
+    steps: [
+      { type: 'talk', to: 'rakko', goal: '랏코에게 서쪽 숲 너머 소문을 물어보자!', say: ['…서쪽 숲 끝 말인가.', '숲이 끝나는 곳에 좁은 골짜기가 있다. 그 너머에 커다란 녀석이 산다.', '하얀 털이 구름처럼 부풀어 있어서, 앞에서 치면 칼이 털에 묻혀 잘 들지 않는다.', '혼자 가지 마라. 믿을 만한 친구와 같이 가서 옆이나 뒤를 노려라.', '먼저 골짜기 입구부터 살펴보고 와라.'] },
+      { type: 'visit', place: 'anokoLair', goal: '숲 서쪽 끝 골짜기 안을 살펴보자! (숲-호수 길에서 서쪽 흙길로)', speaker: null, say: ['(골짜기 안쪽 빈터에 하얀 솜털 덩어리가 웅크리고 있다…)', '(숨을 쉴 때마다 솜털이 커다랗게 부풀었다 가라앉는다)', '(…잠든 것 같다. 기운을 채우고 친구와 같이 와서 깨우자!)'] },
+      { type: 'boss', species: 'anoko', goal: '서쪽 숲 너머의 아노코를 쓰러뜨리자! (친구와 같이 가면 좋다)', speaker: null, say: ['(아노코가 털썩 주저앉더니… 빙글빙글하던 눈이 스르르 풀렸다)', '(눈을 감고 헤헤 웃으며 꼬리를 살랑살랑 흔든다)', '(…더는 싸울 마음이 없는 것 같다. 대장 갑옷 씨에게 알리자!)'] },
+      { type: 'talk', goal: '대장 갑옷 씨에게 알려 주자!', say: ['…아노코가 얌전해졌다고?!', '흠흠, 숲이 시끄러웠던 건 그 녀석이 잔뜩 성이 나 있던 탓이었군.', '그런데 그 녀석이 너를 졸졸 따라왔다고? 등에 태워 주겠다니, 잘됐군.', '이건 마을이 주는 선물이다. 앞으로도 잘 부탁한다, {name}.', '(아노코가 내 집 앞으로 따라와 자리를 잡았다. 말을 걸면 탈 것을 고를 수 있다)'] }
+    ],
+    reward: { money: 6000, bond: 6, village: 3 }
   },
   // ---------- 친구들의 고충 ----------
   pillow: {
@@ -658,6 +673,8 @@ export const bodySwapped = (state) => { const q = questState(state, 'bodySwap');
 export const stepOf = (state, id) => { const q = questState(state, id); return q && !q.done ? QUESTS[id].steps[q.step] : null; };
 /** 그 단계를 누구에게 알리는지. */
 export const reportTo = (id, step) => step.to || QUESTS[id].giver;
+/** boss 단계가 어느 보스를 쓰러뜨리는 단계인지(메인 이야기 왕버섯 단계는 species 가 없다 — 메인 이야기 2장은 'anoko'). */
+export const bossOf = (step) => step.species || 'kingcap';
 /** '우사기의 피자호빵' 아침 소식(라멘 로우 새 메뉴)을 띄울 때인지: 셋째 날부터 아침(8 ~ 12시), 우사기의 소풍 자리를 끝냈고 우사기와 조금 친하고 다른 이야기를 하는 중이 아닐 때 한 번. */
 export function pizzaNewsDue(state) {
   if (!state.clock || state.tutorial !== 'done' || (state.story || {}).pizzaNews || state.clock.day < 3 || !isDone(state, 'picnic')) return false;
@@ -790,6 +807,7 @@ function baseOffer(state, id, viaBoard = false) {
   if (Q.needLicense && !hasLicense(state, Q.needLicense)) return false;
   if (Q.unlessLicense && hasLicense(state, Q.unlessLicense)) return false; // 이미 그 자격이 있으면 따라는 부탁은 안 한다
   if (Q.after && !isDone(state, Q.after)) return false;
+  if (Q.afterGap && !(state.clock && state.clock.day - questState(state, Q.after).done >= Q.afterGap)) return false; // 앞 이야기를 끝낸 날로부터 이만큼 지나야(메인 이야기 2장은 다음 날부터)
   if (Q.needWork && (!state.clock || workStatus(state, Q.needWork) !== 'open')) return false; // 마을 가꾸기로 그 시설이 생긴 뒤에
   if (Q.minDay && state.clock && state.clock.day < Q.minDay) return false;
   if (Q.needStory) { const d = (state.story || {})[Q.needStory]; if (!d || (typeof d === 'number' && state.clock && (Q.sameDay ? state.clock.day < d : state.clock.day <= d))) return false; } // sameDay: 그날부터
@@ -1008,6 +1026,7 @@ export function checkQuestData() {
       if (st.type === 'bosses' && !(Array.isArray(st.species) && st.species.length && st.species.every((sp) => MONSTERS[sp]))) errs.push(id + ': bosses');
       if (st.type === 'pull' && !WEED_KINDS[st.kind]) errs.push(id + ': weed');
       if (st.type === 'visit' && !PLACES[st.place]) errs.push(id + ': place');
+      if (st.type === 'boss' && !MONSTERS[bossOf(st)]) errs.push(id + ': boss');
       if (st.type === 'together' && (!ACTS[st.act] || !(st.n > 0))) errs.push(id + ': act');
       if (st.type === 'scene' && typeof st.scene !== 'string') errs.push(id + ': scene');
       if (st.type === 'study' && !STUDY[st.id]) errs.push(id + ': study');

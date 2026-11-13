@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { ANOKO_SIZE, ANOKO_SHIELD, ANOKO_TURN, ANOKO_ATK, frontGuard, inSweep, rideKind, isValidRide } from '../src/core/anoko.js';
 import { MONSTERS, MONSTER_ORDER, WEAPONS } from '../src/core/combat.js';
 import { bossSeen } from '../src/core/bosses.js';
+import { QUESTS, QUEST_ORDER, PLACES, canOffer, startQuest, completeStep, isDone, checkQuestData, bossOf } from '../src/core/quests.js';
+import { createState } from '../src/core/state.js';
 import { ANOKO_LAIR, ARENAS, BOSS_LAIRS, ROADS, ARCADE, WORLD_HALF, arenaAt, canyonMouth, lairReach } from '../src/core/layout.js';
 
 const SPEED = 3.2, ME = 0.32, REACTS = [0.15, 0.2, 0.25];
@@ -237,4 +239,40 @@ test('아노코 마당: 서쪽 월드 끝 너머, 고목 거인과 40 넘게, �
   for (const [name, p] of [['오데 빈터', { x: -40, z: 22 }], ['게임센터', ARCADE]]) assert.ok(segDist(p, mouth, road) >= 10, `${name}와 흙길이 10 넘게`);
   assert.ok(lairReach(ANOKO_LAIR.x, ANOKO_LAIR.z) && lairReach(mouth.x - 1, mouth.z), '마당과 협곡은 걸어 들어간다');
   assert.ok(!lairReach(ANOKO_LAIR.x, ANOKO_LAIR.z + 14), '마당 밖 월드 끝 너머는 못 간다');
+});
+
+/** 메인 이야기를 day 에 끝낸 저장(첫날 안내도 끝). */
+const storyDone = (done, day) => ({ ...createState({ name: '치이', look: {} }), tutorial: 'done', clock: { day, t: 0.3 }, quests: { story: { step: QUESTS.story.steps.length, base: 0, done } } });
+
+test('2장: 메인 이야기를 끝낸 다음 날부터, 오래전에 끝냈으면 바로 열린다', () => {
+  assert.equal(canOffer(storyDone(38, 38), 'anoko'), false, '끝낸 날');
+  assert.equal(canOffer(storyDone(38, 39), 'anoko'), true, '다음 날');
+  assert.equal(canOffer(storyDone(38, 52), 'anoko'), true, '오래전에 끝낸 저장');
+  const s = storyDone(38, 52);
+  assert.equal(canOffer({ ...s, quests: {} }, 'anoko'), false, '메인 이야기를 안 끝냈으면');
+  assert.equal(QUESTS.anoko.giver, 'captain');
+  assert.ok(QUESTS.anoko.story);
+  assert.equal(QUEST_ORDER[QUEST_ORDER.indexOf('story') + 1], 'anoko', '메인 이야기 바로 다음');
+});
+
+test('2장 단계: 랏코, 협곡 입구, 아노코, 대장', () => {
+  const st = QUESTS.anoko.steps;
+  assert.deepEqual(st.map((x) => x.type), ['talk', 'visit', 'boss', 'talk']);
+  assert.equal(st[0].to, 'rakko');
+  assert.equal(st[1].place, 'anokoLair');
+  assert.equal(PLACES.anokoLair.name, '아노코의 숲');
+  assert.equal(st[2].species, 'anoko');
+  assert.equal(bossOf(st[2]), 'anoko');
+  assert.equal(bossOf(QUESTS.story.steps.find((x) => x.type === 'boss')), 'kingcap', '왕버섯 단계는 species 가 없어도');
+  assert.deepEqual(checkQuestData(), []);
+});
+
+test('2장 보상: 6000원, 대장과 마을 친구 친밀도, 끝내면 아노코를 얻는다', () => {
+  let s = startQuest(storyDone(38, 52), 'anoko');
+  const money = s.money;
+  for (let i = 0; i < QUESTS.anoko.steps.length; i++) s = completeStep(s, 'anoko', 53).state;
+  assert.equal(s.money - money, 6000);
+  assert.ok(isDone(s, 'anoko'));
+  assert.equal(rideKind(s), 'anoko');
+  assert.deepEqual(QUESTS.anoko.reward, { money: 6000, bond: 6, village: 3 });
 });
