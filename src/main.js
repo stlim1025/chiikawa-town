@@ -128,7 +128,8 @@ import { createFestival } from './world/festival.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
-import { PLAZA } from './core/layout.js';
+import { PLAZA, ANOKO_LAIR, doorAngle } from './core/layout.js';
+import { frontGuard } from './core/anoko.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
@@ -546,7 +547,7 @@ function boot() {
       if (!m || m.exam || m === bossM || !Number.isFinite(a.x) || !Number.isFinite(a.z) || Math.hypot(a.x - m.x, a.z - m.z) > m.M.size + 6) return;
       const dmg = Math.max(1, Math.min(GUEST_HIT_MAX, Math.round(a.dmg * 2) / 2 || 1)); // 0.5 단위(반짝 검 3.5)
       const killed = monsters.playerHit(m, { x: a.x, z: a.z, dmg, knock: Math.max(0, Math.min(3, Number(a.knock) || 1)), by: 'mp:' + id });
-      hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${dmg}`, kind: 'dmg' });
+      hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${hitNum(m, dmg)}`, kind: 'dmg' });
       if (killed) guestKilled(id, m);
       return;
     }
@@ -1363,6 +1364,8 @@ function boot() {
       beetleSwitch: (at) => devBeetleSwitch(at),
       /** 오데와 함께 감옥: 'spot' 열흘째 오전 11시 숲속 빈터 근처(말을 걸면 시작 · 보상까지), 'show' · 'dig' · 'fight' · 'momonga' 그 장면부터(보상 없음). */
       odePrison: (at) => devOde(at),
+      /** 메인 이야기 2장 아노코: 'start' 대장에게서 받을 수 있게, 'boss' 싸울 차례로 마당 입구에, 'done' 다 끝내고 집 앞(아노코 타기). */
+      anoko: (at) => devAnoko(at),
       /** 몸이 바뀌었다: 'slot' · 'ramen' · 'cry' · 'chase' · 'back' 그 단계 앞(보상까지), 'show' · 'showBack' 장면만(보상 없음). */
       bodySwap: (at) => devSwap(at),
       /**
@@ -3597,7 +3600,7 @@ function boot() {
   /** 퀘스트에 나오는 곳의 월드 자리. */
   // 마을 가꾸기로 생긴 곳(퀘스트 visit): 연못 쉼터 · 강가 정자 · 시계탑 앞 · 북쪽 · 동쪽 문 돌기둥
   const WORK_PLACES = { bench: WORK_SPOTS.benches[0], pavilion: WORK_SPOTS.pavilion[0], clockTower: { x: WORK_SPOTS.clock[0].x, z: WORK_SPOTS.clock[0].z + 1.1 }, gateNorth: { x: GATES.north.x, z: GATES.north.z + 2 }, gateEast: { x: GATES.east.x - 2, z: GATES.east.z } };
-  const questPlaceAt = (place) => place === 'cave' ? village.spots.hachiCave : place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
+  const questPlaceAt = (place) => place === 'anokoLair' ? anokoGate : place === 'cave' ? village.spots.hachiCave :place === 'lair' ? lairSpot : place === 'pub' ? village.spots.pub : place === 'bridge' ? BRIDGE_SPOT : place === 'plaza' ? village.spots.plaza : place === 'exam' ? village.spots.exam : place === 'home' ? village.spots.home : place === 'pier' ? pier.spot : place === 'diner' ? dinerFront.spot
     : place === 'chiiHome' ? homeDoor('chiikawa') : place === 'starfield' ? STAR_FIELD : place === 'bonbonVine' ? bonbonFront.spot : place === 'switchRock' ? switchFront.spot
     : place === 'moleGate' ? BOSS_LAIRS.bigmole.door : place === 'elderGate' ? BOSS_LAIRS.elder.door : place === 'crabGate' ? BOSS_LAIRS.bigcrab.door : place === 'dojo' ? village.spots.dojo : place === 'arcade' ? arcadeFront.spot : place === 'ramenShop' ? village.spots.ramen : place === 'dollPath' ? DOLL_PATH : WORK_PLACES[place] || null; // 연계 퀘스트: 보스 마당 협곡 입구 · 랏코 수련장, 마을 가꾸기 시설
   const STAR_FIELD = { x: GATES.east.x + 7, z: 5 }; // 사이드스토리 '검은 별똥별': 동쪽 문 바로 바깥 길가 풀밭
@@ -3606,6 +3609,10 @@ function boot() {
   const DOLL_PATH = (() => { let best = { d: Infinity, z: 0 }; for (let z = -8; z <= 8; z += 0.25) { const d = roadDist(-34, z); if (d < best.d) best = { d, z }; } return village.nearestFree(-34, best.z, 0.5); })();
   const NANTOKA_BACK = village.nearestFree(GATES.south.x + 2, GATES.south.z - 3, 0.5);
   const lairSpot = village.nearestFree(KING_LAIR.x, KING_LAIR.z, 1.5); // 왕버섯 굴 마당 가운데(core/layout.js — 둘레에 벽, 오솔길 쪽 입구)
+  // 메인 이야기 2장: 아노코가 사는 마당 가운데 · 골짜기를 살피는 자리(마당 가장자리 바로 앞 협곡 안 — 여기서 잠든 아노코가 보인다)
+  const anokoSpot = village.nearestFree(ANOKO_LAIR.x, ANOKO_LAIR.z, 1.5);
+  const anokoGate = { x: ANOKO_LAIR.x + Math.sin(doorAngle(ANOKO_LAIR)) * (ANOKO_LAIR.r + 1.5), z: ANOKO_LAIR.z + Math.cos(doorAngle(ANOKO_LAIR)) * (ANOKO_LAIR.r + 1.5) };
+  let anokoM = null;
   let questT = 0, bossM = null, questHint = false, hourHint = null; // hourHint: 시간이 아닐 때 와서 몇 시에 오라고 알린 퀘스트(멀어지면 비운다)
   /**
    * 구역 보스(core/bosses.js): 오늘 쓰러뜨리지 않았으면 제 굴 · 빈터에 한 마리씩 있다(내 눈앞에서 솟아나지 않게 멀리 있을 때 놓는다).
@@ -3717,6 +3724,7 @@ function boot() {
       if (free && step.type === 'visit' && arrived(step, questPlaceAt(step.place), p.x, p.z, hour) && (!step.with || buddyNear(reportTo(id, step))) && (!step.scene || (usagiClub.canPlay(state.clock.day) && !islandTrip.active))
         && loopGate(state, step)) { // 검은 별똥별: 되풀이되는 날 · 한 번 더 되돌아온 날 · 쫓아낸 다음 날에만 열리는 단계
         if (step.place === 'lair') commit({ ...state, story: { ...(state.story || {}), bossSeen: true } });
+        if (step.place === 'anokoLair') commit({ ...state, story: { ...(state.story || {}), anokoSeen: state.clock.day } }); // 메인 이야기 2장: 잠든 아노코를 봤다(도감)
         if (step.with) endBuddy(reportTo(id, step));
         questSceneStep(id);
         return;
@@ -3754,6 +3762,17 @@ function boot() {
     if (bossM && !bossM.dead) {
       bossM.dormant = !(sStep && sStep.type === 'boss');
       if (!bossTime) { monsters.clear((m) => m === bossM); bossM = null; }
+    }
+    // 메인 이야기 2장: 아노코는 골짜기를 살피러 가는 단계부터 마당에 있다(싸울 차례 전에는 잠들어 있다). 쓰러뜨리면 다시는 나타나지 않는다
+    const aq = state.quests && state.quests.anoko, aStep = stepOf(state, 'anoko');
+    const anokoTime = !!aq && !aq.done && aq.step >= QUESTS.anoko.steps.findIndex((s) => s.type === 'visit') && !(state.story && state.story.anokoDown);
+    if (anokoTime && (!anokoM || anokoM.dead) && Math.hypot(p.x - anokoSpot.x, p.z - anokoSpot.z) < 46) {
+      monsters.clear((m) => m.species === 'anoko');
+      anokoM = monsters.spawnAt('anoko', anokoSpot.x, anokoSpot.z);
+    }
+    if (anokoM && !anokoM.dead) {
+      anokoM.dormant = !(aStep && aStep.type === 'boss');
+      if (!anokoTime) { monsters.clear((m) => m === anokoM); anokoM = null; }
     }
     updateLairBosses(p);
     updateBounty(p);
@@ -4007,7 +4026,8 @@ function boot() {
       if (!hits.length) return;
       sound.play('hit', id);
       for (const { m } of hits) {
-        hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${W.dmg}`, kind: 'dmg' });
+        const shown = m.species === 'anoko' ? Math.round(W.dmg * frontGuard(m.yaw, m.x, m.z, p.x, p.z) * 10) / 10 : W.dmg; // 아노코는 앞쪽 솜털에 막히면 작게(진짜 피해는 주인 쪽에서)
+        hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${shown}`, kind: 'dmg' });
         multi.act({ t: 'hit', id: m.id, dmg, knock: W.knock || 1, x: r2(p.x), z: r2(p.z) });
       }
       return;
@@ -4016,9 +4036,26 @@ function boot() {
     if (!hits.length) return;
     sound.play('hit', id);
     for (const { m, killed } of hits) {
-      hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${W.dmg}`, kind: 'dmg' });
+      hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${hitNum(m, W.dmg)}`, kind: 'dmg' });
       if (killed) onKill(m);
     }
+  }
+  /** 맞힌 숫자: 아노코는 실제로 들어간 피해(앞쪽 솜털에 막히면 3분의 1 — world/monsters.js 의 m.lastDmg), 다른 몬스터는 무기 힘 그대로. */
+  function hitNum(m, dmg) {
+    return m.species === 'anoko' && Number.isFinite(m.lastDmg) ? Math.round(m.lastDmg * 10) / 10 : dmg;
+  }
+  /**
+   * 아노코의 앞쪽 솜털에 막혔다(world/monsters.js 의 onGuard): 머리 위에 「솜털에 막혔다!」(한 번 치는 동안 한 번),
+   * 처음 한 번은 옆이나 뒤를 노리라는 안내. 같은 순간 여러 번(친구 · 같이 놀기) 막혀도 0.6초에 한 번만 띄운다.
+   */
+  let guardT = 0;
+  function onAnokoGuard(m) {
+    const now = performance.now();
+    if (now - guardT < 600) return;
+    guardT = now;
+    hud.floatText({ x: m.x, y: m.mesh.height + 0.4, z: m.z, text: '솜털에 막혔다!', kind: 'mini' });
+    sound.play('poof');
+    if (!seen('anokoGuard')) { markSeen('anokoGuard'); hud.toast('아노코는 앞에서 치면 솜털에 막혀요. 옆이나 뒤를 노려 봐요', 4200, { icon: monsterSvg('anoko') }); }
   }
   /** 몬스터를 쓰러뜨렸다: 전리품은 가방에(같이 놀기 파티면 그 자리 바닥에), 토벌 일감이면 센다(한 번도 안 맞고 잡으면 깔끔하게). */
   function onKill(m) {
@@ -4034,6 +4071,7 @@ function boot() {
     for (const pid of partners) multi.direct(pid, { t: 'pkill', sp: m.species, x: r2(m.x), z: r2(m.z), clean: m.hitPlayer ? 0 : 1, n: split });
     // 친구 마을에서 잡은 것(m.remote)은 전리품 · 점수 · 일감만: 내 마을 이야기 · 구역 보스는 그대로
     if (m.species === 'kingcap' && !m.remote) s = { ...s, story: { ...(s.story || {}), bossSeen: true, bossDown: true } };
+    if (m.species === 'anoko' && !m.remote) s = { ...s, story: { ...(s.story || {}), anokoSeen: (s.story && s.story.anokoSeen) || s.clock.day, anokoDown: s.clock.day } }; // 메인 이야기 2장: 다시는 나타나지 않는다
     if (BOSS_LAIRS[m.species] && !m.remote) s = markBossDown(s, m.species, s.clock.day); // 구역 보스: 오늘은 끝, 내일 다시 나타난다
     const before = s.job;
     if (s.job && JOB_TYPES[s.job.typeId].kind === m.species) s = { ...s, job: recordPull(s.job, m.species, m.hitPlayer ? 'snapped' : 'clean') };
@@ -4058,6 +4096,14 @@ function boot() {
       monsters.clear((o) => o.summoned);
       hud.banner('왕버섯을 쓰러뜨렸다!', '', 3000);
       if (stepOf(state, 'story') && stepOf(state, 'story').type === 'boss') setTimeout(() => questSceneStep('story'), 1600);
+    }
+    // 메인 이야기 2장의 아노코를 쓰러뜨렸다: 엎드려 웃는 얼굴로 잠깐 있다가(world/monsters.js 의 ANOKO_REST) 사라진다
+    if (m.species === 'anoko') {
+      anokoM = null;
+      happen({ type: 'playerBoss', who: 'me', boss: m.M.short }); // 온 마을에 소문이 난다
+      monsters.clear((o) => o.summoned);
+      hud.banner('아노코를 쓰러뜨렸다!', '', 3000);
+      if (stepOf(state, 'anoko') && stepOf(state, 'anoko').type === 'boss') setTimeout(() => questSceneStep('anoko'), 1600);
     }
     if (m.bounty) {
       bountyM = null;
@@ -4742,6 +4788,24 @@ function boot() {
    * 테스트 앱 '오데와 함께 감옥'(디버그 ode 도 같다): 'spot' 열흘째 오전 11시 숲속 빈터 근처(다른 사이드스토리 중이어도 오데가 보인다 · 말을 걸면 시작 · 보상까지),
    * 'show' · 'dig' · 'fight' · 'momonga' 처음 · 땅 파기 · 오데와 고블린들의 싸움 · 모몽가 장면부터(보상 없음).
    */
+  /**
+   * 테스트 앱 '아노코'(메인 이야기 2장 — 디버그 anoko 도 같다): 'start' 메인 이야기를 어제 끝낸 것으로(대장 갑옷 씨가 2장을 준다),
+   * 'boss' 아노코와 싸울 차례로 아노코의 숲 골짜기 앞(오전 10시), 'done' 2장을 끝낸 것으로 내 집 앞(집 앞 아노코 · 타기).
+   */
+  function devAnoko(at) {
+    const day = Math.max(state.clock.day, 2), qs = { ...(state.quests || {}) };
+    qs.story = { step: QUESTS.story.steps.length, base: 0, done: day - 1 };
+    delete qs.anoko;
+    if (at === 'boss') qs.anoko = { step: QUESTS.anoko.steps.findIndex((s) => s.type === 'boss'), base: 0 };
+    if (at === 'done') qs.anoko = { step: QUESTS.anoko.steps.length, base: 0, done: day };
+    const story = { ...(state.story || {}), bossSeen: true, bossDown: true };
+    delete story.anokoDown;
+    if (at !== 'start') story.anokoSeen = day;
+    commit({ ...state, quests: qs, story, clock: { day, t: (10 - 6) / 24 }, questTrack: at === 'start' ? state.questTrack : 'anoko' });
+    const to = at === 'boss' ? { x: anokoGate.x + 6, z: anokoGate.z } : at === 'done' ? { x: village.spots.home.x, z: village.spots.home.z + 2 } : null;
+    if (to) { player.setPosition(to.x, to.z); cam.snap(player.position); }
+    if (at === 'start') hud.toast('테스트: 대장 갑옷 씨에게 말을 걸면 2장을 받아요', 3200);
+  }
   function devOde(at) {
     if (odeStory.active) return;
     if (at !== 'spot') { odeStory.play(() => hud.toast('테스트: 오데와 함께 감옥 끝', 2400), at === 'show' ? null : at); return; }
@@ -5482,7 +5546,7 @@ function boot() {
       find: () => monsters.nearest(player.position.x, player.position.z, 8, (m) => !m.exam && m.species !== 'dummy'),
       hit: (m) => {
         const before = m.hp, killed = monsters.npcHit(m, power, n.x, n.z, kind); // 맞은 몬스터는 이 친구에게 덤비기도 한다
-        if (m.hp < before) hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${power}`, kind: 'dmg' });
+        if (m.hp < before) hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${hitNum(m, power)}`, kind: 'dmg' });
         return killed;
       },
       onKill: (m) => partyKill(n, m)
@@ -7137,6 +7201,7 @@ function boot() {
       bonbonPlay: () => { if (!bonbonStory.active) bonbonStory.play(() => hud.toast('테스트: 위스키 봉봉 끝', 2400)); },
       beetleSwitch: (at) => devBeetleSwitch(at), // 스위치: 'open' · 'teeth' · 'finale' · 'show' · 'showEnd'(테스트 앱과 같다)
       ode: (at) => devOde(at), // 오데와 함께 감옥: 'spot' · 'show' · 'dig' · 'fight' · 'momonga'(테스트 앱과 같다)
+      anoko: (at) => { if (at) devAnoko(at); const a = state && state.quests && state.quests.anoko; return { step: a ? a.step : null, done: !!(a && a.done), spawned: !!(anokoM && !anokoM.dead), hp: anokoM ? anokoM.hp : null, dormant: !!(anokoM && anokoM.dormant), down: !!(state.story && state.story.anokoDown) }; }, // 메인 이야기 2장(테스트 앱과 같다)
       swap: (at) => devSwap(at), // 몸이 바뀌었다: 'slot' · 'ramen' · 'cry' · 'chase' · 'back' · 'show' · 'showBack'(테스트 앱과 같다)
       swapInfo: () => ({ phase: swapStory.phase, mode, swapped: swapOn, force: swapForce, mood: arcadeStage ? arcadeStage.mood : null, spot: arcadeFront.spot, reels: arcadeStage ? [0, 1, 2].map((i) => arcadeStage.cell(i)) : null, mini: minigame.active }),
       odeInfo: () => ({ phase: odeStory.phase, mode, mood: odeStage ? odeStage.mood : null, spot: odeSpot.spot, shown: odeSpot.visible }),
@@ -7455,6 +7520,7 @@ function boot() {
         // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
         onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
         onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },
+        onGuard: (m) => onAnokoGuard(m), // 아노코의 앞쪽 솜털에 막혔다
         onRage: (m, r) => { sound.play('thud'); hud.toast(m.species === 'kingcap' && r >= 2 ? '왕버섯이 포자를 마구 뿜으며 날뛰어요!' : `${josa(m.M.short || m.M.name, '이/가')} ${r >= 2 ? '잔뜩 ' : ''}화났어요!`, 2600, { icon: monsterSvg(m.species) }); } // 무슨 공격을 새로 쓰는지는 알려 주지 않는다(직접 겪어 보며 알아 가게)
       });
     }

@@ -1386,6 +1386,8 @@ export function createPanels(ui, handlers) {
           go('처음 장면', () => D.beetleSwitch('show')), go('마지막 장면', () => D.beetleSwitch('showEnd'))),
         row('오데와 함께 감옥', '열흘째 오전 11시 숲속 빈터 근처(가까이 가면 오데, 말을 걸면 시작하고 보상까지), 또는 장면만(보상 없음): 처음부터, 땅 파기부터, 오데와 고블린들의 싸움부터, 모몽가',
           go('빈터', () => D.odePrison('spot')), go('처음 장면', () => D.odePrison('show')), go('땅 파기', () => D.odePrison('dig')), go('싸움', () => D.odePrison('fight')), go('모몽가', () => D.odePrison('momonga'))),
+        row('아노코', '메인 이야기 2장: 대장 갑옷 씨에게 받기, 아노코와 싸울 차례로 골짜기 앞, 다 끝내고 집 앞(아노코 타기)',
+          go('받기', () => D.anoko('start')), go('싸움', () => D.anoko('boss')), go('다 끝냄', () => D.anoko('done'))),
         row('몸이 바뀌었다', '오전 10시 숲 어귀 게임센터 앞(걸어 들어가면 시작), 바뀐 몸으로 라멘 로우 앞, 다음 날 우는 치이카와 옆, 메달을 숨긴 우사기 옆, 되돌리러 게임센터 앞(보상까지), 또는 장면만(보상 없음)',
           go('게임센터', () => D.bodySwap('slot')), go('라멘', () => D.bodySwap('ramen')), go('울음', () => D.bodySwap('cry')), go('메달', () => D.bodySwap('chase')), go('되돌리기', () => D.bodySwap('back')),
           go('처음 장면', () => D.bodySwap('show')), go('되돌리기 장면', () => D.bodySwap('showBack')))];

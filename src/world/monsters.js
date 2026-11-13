@@ -162,6 +162,8 @@ const ELITE_MOVES = {
 const ELITE_BASE = 0.45;
 /** 맞아도 움츠리기를 멈추지 않는 단단한 몬스터. */
 const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true, anoko: true };
+/** 쓰러진 아노코가 엎드려 웃는 얼굴로 머무는 초(그 뒤 다른 몬스터처럼 사라진다). */
+const ANOKO_REST = 6;
 
 // ---------- 모양 ----------
 const EYE = '#2b2224', SHINE = '#ffffff', BLUSH = '#ff9fb4';
@@ -1924,7 +1926,12 @@ export function createMonsters(scene, village, random = Math.random) {
         m.mesh.ghost.visible = ghostsOn && dp < 18; // 가려진 실루엣은 내 둘레 몬스터만(멀리 숲속까지 비치면 어지럽다)
         if (m.dead) {
           m.deadT += dt;
-          const k = m.deadT / 0.35;
+          if (m.species === 'anoko' && m.deadT < ANOKO_REST) { // 쓰러진 아노코: 엎드려 눈을 감고 웃는 얼굴로 한동안 있다가 사라진다(마무리 대사를 읽는 동안)
+            m.mesh.body.material = bodyMat;
+            animate(m, dt, t, false);
+            continue;
+          }
+          const k = (m.deadT - (m.species === 'anoko' ? ANOKO_REST : 0)) / 0.35;
           root.scale.setScalar(Math.max(0.01, (1 + k * 0.3) * (1 - k)) * (m.big || 1));
           root.rotation.y += dt * 14;
           if (m.mound) m.mound.visible = false;
