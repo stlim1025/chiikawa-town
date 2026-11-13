@@ -29,6 +29,8 @@ const LIGHT_ICON = {
 };
 /** 자동차 버튼 그림: 하늘색 자동차(actors/car.js) 옆모습 — 앞(왼쪽) 보닛의 얼굴, 꼭대기가 뾰족한 높은 지붕과 분홍 꽃, 아치 창 둘, 바퀴 둘. */
 const CAR_ICON = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 31Q3 31 3 27Q3 22 9 21Q10 13 16 10Q20 8 21.5 5Q23 8 27 10Q33 14 34 22Q37 23 37 27Q37 31 34 31Z" fill="#bcd9fa" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M15 21v-4.5a2.6 2.6 0 0 1 5.2 0V21zM23 21v-4.5a2.6 2.6 0 0 1 5.2 0V21z" fill="#eef7ff" stroke="#5a4431" stroke-width="1.5" stroke-linejoin="round"/><circle cx="21.5" cy="3.6" r="2.3" fill="#f7a3c0" stroke="#5a4431" stroke-width="1.2"/><circle cx="21.5" cy="3.6" r=".8" fill="#ffe066"/><path d="M5.5 24.2q1-1 2 0" fill="none" stroke="#5a4431" stroke-width="1.2" stroke-linecap="round"/><circle cx="6.6" cy="27" r="1.3" fill="#f6a9bd"/><circle cx="11" cy="31" r="4" fill="#5b5e67" stroke="#5a4431" stroke-width="1.8"/><circle cx="29" cy="31" r="4" fill="#5b5e67" stroke="#5a4431" stroke-width="1.8"/><circle cx="11" cy="31" r="1.5" fill="#fff"/><circle cx="29" cy="31" r="1.5" fill="#fff"/></svg>';
+/** 탈것 버튼 그림(아노코를 골랐을 때): 하얀 솜털 머리 · 주황 뿔 · 감은 웃는 눈 · 분홍 볼 · ω 입. */
+const ANOKO_ICON = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 6c3 0 4 2 6 2c2 2 5 1 5 4c3 1 3 4 2 6c2 2 1 5-1 6c0 3-2 5-5 5c-1 2-5 3-7 1c-2 2-6 1-7-1c-3 0-5-2-5-5c-2-1-3-4-1-6c-1-2-1-5 2-6c0-3 3-2 5-4c2 0 3-2 6-2z" fill="#fff" stroke="#5a4431" stroke-width="2" stroke-linejoin="round"/><path d="M18.6 9l1.4-5l1.4 5z" fill="#f2a46a" stroke="#5a4431" stroke-width="1.2" stroke-linejoin="round"/><path d="M13 19q2-2 4 0M23 19q2-2 4 0" fill="none" stroke="#5a4431" stroke-width="1.6" stroke-linecap="round"/><ellipse cx="12" cy="23" rx="2.4" ry="1.6" fill="#f6b3b8"/><ellipse cx="28" cy="23" rx="2.4" ry="1.6" fill="#f6b3b8"/><path d="M17.5 23.5q1.25 1.6 2.5 0q1.25 1.6 2.5 0" fill="none" stroke="#5a4431" stroke-width="1.4" stroke-linecap="round"/></svg>';
 /** 집으로 버튼 그림: 마을의 하얀 동그란 내 집(분홍 문 · 둥근 창). 납작한 돔이라 그림 칸(viewBox)을 돔 쪽으로 옮겨 버튼 가운데에 오게. */
 const HOME_ICON = '<svg viewBox="2 8 36 36" aria-hidden="true"><path d="M5 33a15 15 0 0 1 30 0z" fill="#fff8ea" stroke="#5a4431" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 26q3-5 9-6.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.9"/><path d="M17 33v-5.5a3.5 3.5 0 0 1 7 0v5.5" fill="#f2a7bb" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><circle cx="27.5" cy="25.5" r="2.8" fill="#bfe3f2" stroke="#5a4431" stroke-width="1.8"/><path d="M3 33h34" stroke="#5a4431" stroke-width="2.4" stroke-linecap="round"/><path d="M33.5 33c0-2.5 1-4.2 3-5" fill="none" stroke="#6fb15a" stroke-width="2.2" stroke-linecap="round"/></svg>';
 
@@ -335,12 +337,15 @@ export function createHud(ui, input) {
     /** 자동차 버튼을 누르면(타기 · 내리기). */
     onCar(fn) { carBtn.addEventListener('click', fn); },
     /** 자동차 버튼 모양: null 숨김(차가 없거나 못 탈 때) · 'off' 내려 있음 · 'on' 타고 있음. */
-    setCar(mode) {
+    /** 탈것 버튼: mode 'on'(탄 채) · 'off' · null(숨김), kind 'car' | 'anoko'(집 앞 아노코에게 고른 탈것 — 그림 · 이름이 바뀐다). */
+    setCar(mode, kind = 'car') {
       carBtn.hidden = mode == null;
-      if (mode == null || shown.car === mode) return;
+      if (mode == null || (shown.car === mode && shown.carKind === kind)) return;
       shown.car = mode;
+      if (shown.carKind !== kind) { shown.carKind = kind; carBtn.innerHTML = kind === 'anoko' ? ANOKO_ICON : CAR_ICON; carBtn.title = kind === 'anoko' ? '아노코 (C)' : '자동차 (C)'; }
+      const name = kind === 'anoko' ? '아노코' : '자동차';
       carBtn.setAttribute('aria-pressed', String(mode === 'on'));
-      carBtn.setAttribute('aria-label', mode === 'on' ? '자동차에서 내리기' : '자동차 타기');
+      carBtn.setAttribute('aria-label', mode === 'on' ? `${name}에서 내리기` : `${name} 타기`);
     },
     /** 퀘스트 쪽지의 압정(고정)을 누르면 fn(퀘스트 id). */
     onQuestPin(fn) { questPinFns.push(fn); },

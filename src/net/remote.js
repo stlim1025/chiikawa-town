@@ -1,5 +1,6 @@
 import { buildChibi, animateChibi, SEAT_LIFT } from '../actors/models.js';
 import { buildCar, rollCar, DRIVE_LIFT } from '../actors/car.js';
+import { buildAnoko, ANOKO_RIDE_SCALE, ANOKO_SEAT } from '../actors/anoko.js';
 import { groundY } from '../core/layout.js';
 
 /**
@@ -58,6 +59,7 @@ export function createRemotePlayers(scene, area = 'village') {
     scene.remove(p.chibi.root);
     chibi.root.visible = p.chibi.root.visible;
     if (p.car) chibi.root.add(p.car.root); // 탄 차는 새 모습으로 옮겨 태운다
+    if (p.mount) chibi.root.add(p.mount.root);
     p.chibi = chibi;
     p.lookKey = key;
     p.label = lookLabel(look);
@@ -86,6 +88,8 @@ export function createRemotePlayers(scene, area = 'village') {
     p.at = now;
     if (m.anim !== p.anim) p.animT = 0; // 휘두르기는 시작부터 다시
     p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area; p.held = heldOf(m);
+    // 탄 것: 소품 꼬리표에 'ride-anoko' 가 있으면 아노코(서버가 move 칸을 정해 두어서 꼬리표 칸에 싣는다 — 모르는 옛 버전은 자동차로 그린다)
+    p.rd = p.held.split(',').includes('ride-anoko') ? 'anoko' : null;
   }
   function say(id, text) { const p = list.get(id); if (p) { p.say = text; p.sayT = SAY_SEC; } }
   function emote(id, name) { const p = list.get(id); if (p && ANIMS.has(name)) { p.emote = name; p.emoteT = 2; } }
@@ -119,9 +123,19 @@ export function createRemotePlayers(scene, area = 'village') {
       p.phase += Math.hypot(p.x - ox, p.z - oz) * 3.2; // 걸음은 실제로 움직인 만큼(내 캐릭터와 같은 비율)
       const drive = p.anim === 'drive', anim = drive ? 'drive' : p.emoteT > 0 ? p.emote : ANIMS.has(p.anim) ? p.anim : 'idle'; // 차에 탄 동안은 몸짓을 바꾸지 않는다
       // 하늘색 자동차: 처음 탈 때 차를 만들어 캐릭터 뿌리에 붙이고, 내리면 숨긴다
-      if (drive && !p.car) { p.car = buildCar(); p.chibi.root.add(p.car.root); }
-      if (p.car) { p.car.root.visible = drive; if (drive) rollCar(p.car, Math.hypot(p.x - ox, p.z - oz), p.t); }
-      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : drive ? DRIVE_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로, 차에 탔으면 의자 높이로
+      // 아노코(메인 이야기 2장 보상): 자동차 대신 등에 올라앉는다
+      const onAnoko = drive && p.rd === 'anoko', anokoLift = ANOKO_SEAT.y * ANOKO_RIDE_SCALE;
+      if (drive && !onAnoko && !p.car) { p.car = buildCar(); p.chibi.root.add(p.car.root); }
+      if (p.car) { p.car.root.visible = drive && !onAnoko; if (drive && !onAnoko) rollCar(p.car, Math.hypot(p.x - ox, p.z - oz), p.t); }
+      if (onAnoko && !p.mount) {
+        p.mount = buildAnoko();
+        p.mount.setFace('happy');
+        p.mount.root.scale.setScalar(ANOKO_RIDE_SCALE);
+        p.mount.root.position.set(0, -anokoLift, -ANOKO_SEAT.z * ANOKO_RIDE_SCALE);
+        p.chibi.root.add(p.mount.root);
+      }
+      if (p.mount) { p.mount.root.visible = onAnoko; if (onAnoko) { p.mountStep = (p.mountStep || 0) + Math.hypot(p.x - ox, p.z - oz) * 2.2; p.mount.animate(p.t, { moving: Math.hypot(p.x - ox, p.z - oz) > 1e-4, step: p.mountStep }); } }
+      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : onAnoko ? anokoLift : drive ? DRIVE_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로, 차에 탔으면 의자 높이로
       p.chibi.root.rotation.y = p.yaw;
       const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
       showHeld(p);

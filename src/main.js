@@ -129,7 +129,8 @@ import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
 import { PLAZA, ANOKO_LAIR, doorAngle } from './core/layout.js';
-import { frontGuard } from './core/anoko.js';
+import { frontGuard, rideKind } from './core/anoko.js';
+import { createAnokoHome } from './world/anokohome.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
@@ -1006,7 +1007,7 @@ function boot() {
       multi.tick(dt, { x: r2(q.x), z: r2(q.z), yaw: r2(interior.playerYaw), anim: interior.playerMoving ? 'walk' : 'idle', area: 'home' });
     } else {
       const p = player.position, outside = visiting ? mode === 'play' || mode === 'intro' : mode === 'play';
-      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away', h: player.heldTags }); // h: 손에 든 무기 · 등불 · 음식
+      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away', h: player.rideKind === 'anoko' ? ['ride-anoko', player.heldTags].filter(Boolean).join(',') : player.heldTags }); // h: 손에 든 무기 · 등불 · 음식(아노코를 탔으면 맨 앞에 'ride-anoko' — net/remote.js)
     }
     sendPartyHp(dt); // 같이 토벌 파티원에게 내 기운
     if (multi.status !== 'open' || !multi.count) return;
@@ -1055,6 +1056,7 @@ function boot() {
    * 내 시간 · 퀘스트 이야기는 멈춘다.
    */
   function guestTick(dt) {
+    anokoHome.show({}); // 친구 마을에서는 내 집 앞 아노코가 없다
     const shown = viewState(); // 시계 · 날짜는 주인 마을 것
     panels.tick(shown);
     player.update(dt, input);
@@ -2155,15 +2157,39 @@ function boot() {
   }
   function toggleCar(fromKey) {
     if (!state || mode !== 'play' || !player) return;
-    if (!hasTool(state, 'car')) { if (fromKey) hud.toast('자동차가 아직 없어요', 2200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.car.price)}` }] }); return; }
+    // 탈 것: 집 앞 아노코에게 고른 탈것(core/anoko.js — 아노코를 얻기 전에는 자동차)
+    const kind = rideKind(state);
+    if (!kind) { if (fromKey) hud.toast('자동차가 아직 없어요', 2200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.car.price)}` }] }); return; }
     if (player.riding) { getOffCar(); return; }
     if (!carStay() || panels.isOpen() || guide.open || talking) return;
-    // 차가 들어갈 자리: 좁은 곳이면 가까운 빈자리로 살짝 비켜 탄다(너무 멀면 못 탄다)
-    const p = player.position, at = village.nearestFree(p.x, p.z, CAR_RADIUS);
-    if (Math.hypot(at.x - p.x, at.z - p.z) > 1.2) { hud.toast('여기는 자동차를 꺼낼 자리가 없어요', 2200); return; }
+    // 차(아노코)가 들어갈 자리: 좁은 곳이면 가까운 빈자리로 살짝 비켜 탄다(너무 멀면 못 탄다)
+    const p = player.position, at = village.nearestFree(p.x, p.z, kind === 'anoko' ? 0.6 : CAR_RADIUS);
+    if (Math.hypot(at.x - p.x, at.z - p.z) > 1.2) { hud.toast(kind === 'anoko' ? '여기는 아노코를 부를 자리가 없어요' : '여기는 자동차를 꺼낼 자리가 없어요', 2200); return; }
     player.placeAt(at.x, at.z);
-    player.setRiding(true);
-    sound.play('honk');
+    player.setRiding(true, kind);
+    sound.play(kind === 'anoko' ? 'heart' : 'honk');
+  }
+  /** 집 앞 아노코에게 말을 걸었다: 탈 것을 고른다(state.ride — 자동차가 없으면 아노코만). */
+  function talkAnokoHome() {
+    cancelPull();
+    player.face(anokoHome.spot.x, anokoHome.spot.z);
+    input.setEnabled(false);
+    hud.setAction(null);
+    sound.play('heart');
+    const opts = ['아노코 타고 다니기', ...(hasTool(state, 'car') ? ['자동차 타고 다니기'] : []), '그만두기'];
+    guide.ask('(아노코가 꼬리를 살랑살랑 흔든다)', opts, (i) => {
+      input.setEnabled(true);
+      if (opts[i] === '아노코 타고 다니기') { commit({ ...state, ride: 'anoko' }); hud.toast('이제 탈것 버튼(C 키)으로 아노코를 타요', 3000, { icon: monsterSvg('anoko') }); }
+      else if (opts[i] === '자동차 타고 다니기') { commit({ ...state, ride: 'car' }); hud.toast('이제 탈것 버튼(C 키)으로 자동차를 타요', 3000); }
+    }, NARRATOR);
+  }
+  /** 집 앞 아노코(메인 이야기 2장을 끝내면 — world/anokohome.js): 타고 나가 있지 않은 탈것이 집 앞에 있다. 처음 한 번 안내. */
+  function syncAnokoHome() {
+    if (!state || !isDone(state, 'anoko') || visiting) { anokoHome.show({}); return; }
+    anokoHome.place(village.spots.home);
+    const on = player && player.riding ? player.rideKind : null;
+    anokoHome.show({ anoko: on !== 'anoko', car: hasTool(state, 'car') && on !== 'car' });
+    if (mode === 'play' && !seen('anokoHome')) { markSeen('anokoHome'); hud.toast('집 앞에서 아노코가 기다려요. 말을 걸면 탈 것을 고를 수 있어요', 4600, { icon: monsterSvg('anoko') }); }
   }
   hud.onCar(() => toggleCar(false));
   // 퀘스트 쪽지 압정: 고정하면 접어도 늘 보이고 맨 위로(다시 누르면 풀기). 저장에 남는다
@@ -3081,6 +3107,7 @@ function boot() {
     else if (target.type === 'wish') startWish();
     else if (target.type === 'pit') hachiPit.press();
     else if (target.type === 'ode') odeStory.press();
+    else if (target.type === 'anokoHome') talkAnokoHome();
     else if (target.type === 'rough') sleepRough();
     else if (target.type === 'factory') startSticker();
     else if (target.type === 'berry') pickBerry(target.bush);
@@ -4693,6 +4720,8 @@ function boot() {
   });
   // 사이드스토리 '오데와 함께 감옥'(stories/ode.js): 숲 호숫가 길 옆 빈터에서 버섯을 먹는 오데(이야기가 열린 동안) · 숲속 빈터와 고블린 감옥 장면(처음 들어갈 때 만든다)
   const odeSpot = createOdeSpot(scene, village);
+  // 메인 이야기 2장 보상: 집 앞 아노코(말을 걸면 탈 것 고르기) · 세워 둔 자동차
+  const anokoHome = createAnokoHome(scene, village);
   let odeStage = null;
   odeStory = createOdeStory({
     getState: () => state, hud, guide, sound, input, minigame, get stage() { return odeStage || (odeStage = createOdeStage()); }, spot: odeSpot, cam, getPlayer: () => player,
@@ -6594,6 +6623,8 @@ function boot() {
     if (isEvicted(state) && bedtime()) options.push({ d: 1.7, t: { type: 'rough', label: '노숙하기' } });
     const pitT = hachiPit.target(p); // 숲 구덩이(하치와레가 구덩이에!)
     if (pitT) options.push({ d: 0.2, t: pitT });
+    // 집 앞 아노코(메인 이야기 2장 보상): 말 걸기 → 탈 것 고르기
+    if (anokoHome.resting) { const s = anokoHome.spot, ad = Math.hypot(s.x - p.x, s.z - p.z); if (ad < 1.8) options.push({ d: ad - 0.5, t: { type: 'anokoHome', label: '말 걸기', x: s.x, z: s.z, r: 1.1, y: 1.6 } }); }
     const odeT = odeStory.target(p); // 숲속 빈터의 오데(오데와 함께 감옥)
     if (odeT) options.push({ d: 0.2, t: odeT });
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
@@ -6947,6 +6978,7 @@ function boot() {
     if (tg.type === 'pickup') return { x: tg.x, z: tg.z, r: 0.42, y: 0.7, id: 'g' + tg.g };
     if (tg.type === 'attack') { const m = tg.monster; return { x: m.x, z: m.z, r: m.M.size + 0.25, y: m.mesh.height + 0.2, id: 'm' + m.id, skipLabel: true, foe: true }; }
     if (tg.type === 'pit') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'pit' };
+    if (tg.type === 'anokoHome') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'anokoHome' }; // 집 앞 아노코(키보드로 할 때 'Space 말 걸기')
     if (tg.type === 'ode') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'ode' }; // 사이드스토리: 숲속 빈터의 오데(없으면 키보드로 할 때 'Space 말 걸기' 가 안 떴다)
     if (tg.type === 'story') return { x: tg.x, z: tg.z, r: tg.r, y: tg.y, id: 'story' }; // 사이드스토리(토끼굴 들어가기)
     if (tg.type === 'wish') return { x: player.position.x, z: player.position.z, r: 0.7, y: 1.9, id: 'wish' }; // 내 발밑 · 머리 위에
@@ -7493,6 +7525,8 @@ function boot() {
     bonbonFront.visible = !!state && !visiting && isActive(state, 'whiskeyBonbon');
     bonbonFront.update(dt, t);
     odeSpot.update(dt, t); // 오데와 함께 감옥: 숲속 빈터에서 버섯을 먹는 오데(이야기가 열린 동안)
+    syncAnokoHome(); // 메인 이야기 2장: 집 앞 아노코 · 세워 둔 자동차
+    anokoHome.update(dt, t);
     // 스위치 동굴: 바위산 북쪽 끝 절벽에 늘 있다. 창살은 이야기 속에서 연 뒤로(이야기를 끝낸 뒤에도) 열린 채. 그사이 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep();
     switchFront.setOpen(!visiting && !!state && (bstep >= 1 || isDone(state, 'beetleSwitch')));
@@ -7636,7 +7670,7 @@ function boot() {
     hud.setRecall(canRecall()); // 마을 밖에 있을 때만 집으로 버튼
     // 하늘색 자동차: 걸어야 할 때(이야기 · 다른 장면 · 쓰러짐 · 앉아 쉬기 …)는 저절로 내리고, 버튼은 차가 있을 때만(타고 있으면 눌린 모양)
     if (player && player.riding && !carStay()) getOffCar(true);
-    hud.setCar(mode === 'play' && state && hasTool(state, 'car') ? (player && player.riding ? 'on' : 'off') : null);
+    hud.setCar(mode === 'play' && state && rideKind(state) ? (player && player.riding ? 'on' : 'off') : null, (state && rideKind(state)) || 'car'); // 탈것 버튼: 고른 탈것(자동차 · 아노코) 그림
     hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)

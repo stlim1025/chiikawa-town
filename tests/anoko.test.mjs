@@ -5,6 +5,7 @@ import { MONSTERS, MONSTER_ORDER, WEAPONS } from '../src/core/combat.js';
 import { bossSeen } from '../src/core/bosses.js';
 import { QUESTS, QUEST_ORDER, PLACES, canOffer, startQuest, completeStep, isDone, checkQuestData, bossOf } from '../src/core/quests.js';
 import { createState } from '../src/core/state.js';
+import { isValidState } from '../src/core/save.js';
 import { ANOKO_LAIR, ARENAS, BOSS_LAIRS, ROADS, ARCADE, WORLD_HALF, arenaAt, canyonMouth, lairReach } from '../src/core/layout.js';
 
 const SPEED = 3.2, ME = 0.32, REACTS = [0.15, 0.2, 0.25];
@@ -276,4 +277,12 @@ test('2장 보상: 6000원, 대장과 마을 친구 친밀도, 끝내면 아노�
   assert.ok(isDone(s, 'anoko'));
   assert.equal(rideKind(s), 'anoko');
   assert.deepEqual(QUESTS.anoko.reward, { money: 6000, bond: 6, village: 3 });
+});
+
+test('저장: 탈것 고르기 값(ride)은 car, anoko, 없음만 받는다', () => {
+  const s = { ...createState({ name: '치이', look: {} }), clock: { day: 3, t: 0.3 } };
+  assert.equal(isValidState(s), true);
+  assert.equal(isValidState({ ...s, ride: 'anoko' }), true);
+  assert.equal(isValidState({ ...s, ride: 'car' }), true);
+  assert.equal(isValidState({ ...s, ride: 'bike' }), false);
 });

@@ -1,10 +1,13 @@
 import { animateChibi } from './models.js';
 import { buildCar, rollCar, DRIVE_LIFT, CAR_SPEED, CAR_RADIUS } from './car.js';
+import { buildAnoko, ANOKO_RIDE_SCALE, ANOKO_SEAT } from './anoko.js';
 import { groundY } from '../core/layout.js';
 
 const SPEED = 3.2;
 const RADIUS = 0.35;
 const SWING_SLOW = 0.55; // 휘두르는 동안은 발걸음이 느려진다(미끄러지듯 팔만 휘두르지 않게)
+/** 아노코를 탈 때(메인 이야기 2장 보상): 등 위에 올라앉는 높이 · 부딪힘 반지름. 빠르기는 자동차와 같다. */
+const ANOKO_LIFT = ANOKO_SEAT.y * ANOKO_RIDE_SCALE, ANOKO_RADIUS = 0.6;
 
 /** 입력을 받아 내 캐릭터를 움직인다. */
 export function createPlayer(scene, chibi, village) {
@@ -18,6 +21,7 @@ export function createPlayer(scene, chibi, village) {
   let eatT = 0, eatDur = 1, eatMode = null, food = null; // 먹는 중: 몸짓('slurp' | 'gulp' | 'nibble') · 손에 든 음식 꼬리표('f-…')
   let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
   let riding = false, car = null; // 하늘색 자동차(actors/car.js)에 탔는지 · 차 모형(캐릭터 뿌리에 붙인다 — 깜빡이거나 숨으면 같이)
+  let rideKind = 'car', mount = null, mountStep = 0; // 탄 것('car' | 'anoko') · 아노코 모형(처음 탈 때 만든다, 차처럼 캐릭터 뿌리에) · 아노코 걸음 위상
   const knock = { x: 0, z: 0 };
   // 먹는 동안은 음식만 든다(무기 · 손전등은 잠깐 넣어 둔다)
   let heldTags = ''; // 지금 보이는 소품 꼬리표(쉼표로) — 같이 놀기에서 다른 사람 화면에도 같게
@@ -59,17 +63,32 @@ export function createPlayer(scene, chibi, village) {
       model = next;
       scene.add(model.root);
       if (car) model.root.add(car.root); // 탄 차는 새 모형으로 옮겨 태운다
+      if (mount) model.root.add(mount.root);
       showHeld();
     },
-    /** 하늘색 자동차에 탔는지. */
+    /** 하늘색 자동차나 아노코에 탔는지. */
     get riding() { return riding; },
-    /** 자동차에 타거나(on) 내린다. 차 모형은 처음 탈 때 만든다. 걷기 · 맞기 · 먹기 몸짓은 그만둔다. */
-    setRiding(on) {
+    /** 지금 탄 것('car' | 'anoko', 안 탔으면 null). */
+    get rideKind() { return riding ? rideKind : null; },
+    /**
+     * 자동차(kind 'car')나 아노코('anoko')에 타거나(on) 내린다. 모형은 처음 탈 때 만든다. 걷기 · 맞기 · 먹기 몸짓은 그만둔다.
+     * 아노코는 웃는 얼굴로, 등 위에 올라앉는다(ANOKO_SEAT 만큼 아노코를 내리고 앞으로).
+     */
+    setRiding(on, kind = 'car') {
       on = !!on;
-      if (on === riding) return;
+      if (on === riding && (!on || kind === rideKind)) return;
       riding = on;
-      if (on && !car) { car = buildCar(); model.root.add(car.root); }
-      if (car) car.root.visible = on;
+      if (on) rideKind = kind;
+      if (on && kind === 'car' && !car) { car = buildCar(); model.root.add(car.root); }
+      if (on && kind === 'anoko' && !mount) {
+        mount = buildAnoko();
+        mount.setFace('happy');
+        mount.root.scale.setScalar(ANOKO_RIDE_SCALE);
+        mount.root.position.set(0, -ANOKO_LIFT, -ANOKO_SEAT.z * ANOKO_RIDE_SCALE);
+        model.root.add(mount.root);
+      }
+      if (car) car.root.visible = on && rideKind === 'car';
+      if (mount) mount.root.visible = on && rideKind === 'anoko';
       stopEat(); actT = 0; swingT = 0;
     },
     /** 손에 드는 불 'lantern' | 'flashlight' | null. 모델을 바꿔도 유지한다. */
@@ -103,7 +122,7 @@ export function createPlayer(scene, chibi, village) {
       t += dt;
       let moving = false;
       // 자동차에 타면 두 배 빠르고, 차 크기만큼 넓게 부딪힌다(집 · 나무에 파묻히지 않게)
-      const speed = riding ? CAR_SPEED : SPEED, rad = riding ? CAR_RADIUS : RADIUS, sx = position.x, sz = position.z;
+      const speed = riding ? CAR_SPEED : SPEED, rad = riding ? (rideKind === 'anoko' ? ANOKO_RADIUS : CAR_RADIUS) : RADIUS, sx = position.x, sz = position.z;
       if (api.walkTo) {
         // 연출: 목표까지 충돌 검사 없이 걷는다
         const w = api.walkTo, dx = w.x - position.x, dz = w.z - position.z, d = Math.hypot(dx, dz);
@@ -156,9 +175,10 @@ export function createPlayer(scene, chibi, village) {
       if (show !== weaponShown) { weaponShown = show; showHeld(); }
       // 맞은 뒤 무적 시간에는 깜빡인다
       if (blinkT > 0) { blinkT = Math.max(0, blinkT - dt); model.root.visible = blinkT === 0 || Math.floor(blinkT * 14) % 2 === 0; }
-      model.root.position.set(position.x, groundY(position.x, position.z) + (riding ? DRIVE_LIFT : api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로(차에 타면 의자 높이)
+      model.root.position.set(position.x, groundY(position.x, position.z) + (riding ? (rideKind === 'anoko' ? ANOKO_LIFT : DRIVE_LIFT) : api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로(차에 타면 의자 높이)
       model.root.rotation.y = yaw;
-      if (riding && car) rollCar(car, Math.hypot(position.x - sx, position.z - sz), t);
+      if (riding && rideKind === 'car' && car) rollCar(car, Math.hypot(position.x - sx, position.z - sz), t);
+      if (riding && rideKind === 'anoko' && mount) { mountStep += Math.hypot(position.x - sx, position.z - sz) * 2.2; mount.animate(t, { moving: Math.hypot(position.x - sx, position.z - sz) > 1e-4, step: mountStep }); } // 아노코: 간 만큼 발을 놀린다
       animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0, moving, eat: eatT > 0 ? 1 - eatT / eatDur : undefined });
     }
   };

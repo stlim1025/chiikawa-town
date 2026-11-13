@@ -17,6 +17,7 @@ import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep, STORY_BOSSES_AT } from './quests.js';
 import { isValidRaffle } from './raffle.js';
+import { isValidRide } from './anoko.js';
 import { isValidGround } from './ground.js';
 import { isValidHunters } from './hunters.js';
 import { isValidStarfall } from './starfall.js';
@@ -72,6 +73,7 @@ export function isValidState(s) {
   if (s.questTrack !== undefined && s.questTrack !== null && !QUESTS[s.questTrack]) return false;
   if (s.questPins !== undefined && !(Array.isArray(s.questPins) && s.questPins.every((id) => typeof id === 'string'))) return false; // 고정(압정)한 퀘스트 쪽지
   if (s.story !== undefined && !isValidStory(s.story)) return false;
+  if (!isValidRide(s.ride)) return false; // 탈것 고르기(집 앞 아노코 — 자동차 · 아노코, 없으면 자동차)
   if (s.truce !== undefined && !num(s.truce)) return false;
   if (s.ground !== undefined && !isValidGround(s.ground)) return false; // 바닥에 떨어뜨린 물건
   if (s.hunters !== undefined && !isValidHunters(s.hunters)) return false; // 토벌꾼 기록 · 랭킹
