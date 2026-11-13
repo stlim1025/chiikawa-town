@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
 import { MONSTERS, inSwing, GAS_ATTACK } from '../core/combat.js';
+import { ANOKO_ATK, ANOKO_TURN, frontGuard, inSweep } from '../core/anoko.js';
+import { buildAnoko } from '../actors/anoko.js';
 import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, canyonAt, ARENA_WALL } from '../core/layout.js';
 
 /**
@@ -103,6 +105,13 @@ const ATK = {
   crabCharge2: { range: 9, wind: 0.6, lock: 0.6, speed: 11, len: 11, width: 1.5, bounce: 1, cool: 1.8, rec: 0.9, kind: 'charge' },
   crabBubble: { range: 10, wind: 0.8, n: 8, spread: (Math.PI * 2) / 8, ring: true, speed: 3.8, r: 0.38, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.7, rec: 0.6, kind: 'shoot' },
   crabBubble2: { range: 10, wind: 0.7, n: 11, spread: (Math.PI * 2) / 11, ring: true, twice: 0.45, speed: 4.2, r: 0.36, life: 2.8, color: '#4fa3e6', dmgK: 0.7, cool: 1.6, rec: 0.5, kind: 'shoot' },
+  // 최종 보스 아노코(core/anoko.js — 값은 거기서 가져와 0.2초 늦은 회피 테스트와 같게): 가까우면 앞발 할퀴기, 화나면 이어서 꼬리 휩쓸기(뒤쪽 반원 · sweep),
+  // 멀면 뛰어 덮치기나 솜털 뭉치 고리(마지막 단계에는 두 겹)
+  anokoClaw: ANOKO_ATK.claw,
+  anokoTail: ANOKO_ATK.tail,
+  anokoLeap: ANOKO_ATK.leap,
+  anokoFluff: ANOKO_ATK.fluff,
+  anokoFluff2: ANOKO_ATK.fluff2,
   // 현상금 황금 대장(core/bounty.js · 게임 오리지널): 원래 공격에 섞어 쓰는 것들(ELITE_MOVES). 보스보다 한 단계 작게
   eliteStomp: { range: 6, wind: 0.75, lock: 0.6, air: 0.8, radius: 1.6, height: 1.4, cool: 1.8, rec: 0.8, kind: 'stomp' }, // 뛰어 덮치기
   eliteSlam: { range: 2.3, wind: 0.85, radius: 2.4, cool: 1.8, rec: 0.8, kind: 'slam' }, // 쿵 내려찍기 · 둘레 할퀴기
@@ -128,7 +137,9 @@ const KITS = {
   kingcap: { near: ATK.bossSlam, again: ATK.bossSlam2, pick: (r, roll) => (r >= 1 && roll < (r >= 2 ? 0.55 : 0.38) ? ATK.bossRain : roll < 0.75 ? ATK.bossLeap : r >= 1 ? ATK.bossShoot2 : ATK.bossShoot), minion: (r, k) => (r >= 2 && k < 2 ? 'shroom' : 'fluff') },
   bigmole: { near: ATK.moleSwipe, again: ATK.moleSwipe2, pick: (r, roll) => (roll < 0.5 ? ATK.moleBurrow : r >= 1 ? ATK.moleRain2 : ATK.moleRain), minion: (r, k) => (r >= 2 && k === 0 ? 'mole' : 'fluff') },
   elder: { near: ATK.elderSlam, again: ATK.elderSlam2, pick: (r, roll) => (roll < 0.45 ? ATK.elderRoots : r >= 1 ? ATK.elderAcorn2 : ATK.elderAcorn), minion: (r, k) => (r >= 2 && k === 0 ? 'shroom' : 'beetle') },
-  bigcrab: { near: ATK.crabPinch, again: null, pick: (r, roll) => (roll < 0.5 ? (r >= 1 ? ATK.crabCharge2 : ATK.crabCharge) : r >= 1 ? ATK.crabBubble2 : ATK.crabBubble), minion: (r, k) => (r >= 2 && k === 0 ? 'crab' : 'slime') }
+  bigcrab: { near: ATK.crabPinch, again: null, pick: (r, roll) => (roll < 0.5 ? (r >= 1 ? ATK.crabCharge2 : ATK.crabCharge) : r >= 1 ? ATK.crabBubble2 : ATK.crabBubble), minion: (r, k) => (r >= 2 && k === 0 ? 'crab' : 'slime') },
+  // 아노코(최종 보스): 마지막 단계 전에는 숲 뿔벌레, 마지막 단계에는 그루터기와 버섯
+  anoko: { near: ATK.anokoClaw, again: ATK.anokoTail, pick: (r, roll) => (roll < 0.5 ? ATK.anokoLeap : r >= 2 ? ATK.anokoFluff2 : ATK.anokoFluff), minion: (r, k) => (r >= 2 ? (k === 0 ? 'stump' : 'shroom') : 'beetle') }
 };
 /**
  * 현상금 황금 대장(게임 오리지널): 원래 공격(ELITE_BASE 만큼)과 함께 섞어 쓰는 공격 둘. 이름은 core/bounty.js 의 ELITE_TRICKS(같은 차례).
@@ -150,7 +161,7 @@ const ELITE_MOVES = {
 };
 const ELITE_BASE = 0.45;
 /** 맞아도 움츠리기를 멈추지 않는 단단한 몬스터. */
-const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true };
+const HEAVY = { turtle: true, kingcap: true, stump: true, pebble: true, bigmole: true, elder: true, bigcrab: true, anoko: true };
 
 // ---------- 모양 ----------
 const EYE = '#2b2224', SHINE = '#ffffff', BLUSH = '#ff9fb4';
@@ -583,6 +594,7 @@ function modelOf(species) {
 
 /** 몬스터 모양 하나(도감 · 시험 미리보기에서도 쓴다). → { root, inner, body, wings: [왼, 오] } */
 export function monsterMesh(species) {
+  if (species === 'anoko') return anokoMesh();
   const M = modelOf(species);
   const root = new THREE.Group(), inner = new THREE.Group();
   root.add(inner);
@@ -634,12 +646,49 @@ export function monsterMesh(species) {
   return { root, inner, body, ghost, wings, sleepFace, height: M.height, hover: M.hover || 0 };
 }
 
+/**
+ * 최종 보스 아노코: 움직이는 부품(머리 · 다리 · 꼬리)이 따로라 다른 몬스터처럼 한 덩어리로 합치지 않고 actors/anoko.js 모델을 그대로 쓴다.
+ * 맞으면 하얗게 번쩍 · 예고 중 붉게 깜빡이는 것은 이 아노코만의 재질 사본 색(uColor)을 바꿔서(모델 재질은 집 앞 · 탈 때와 같이 쓴다).
+ * body 는 다른 몬스터와 같은 자리에서 bodyMat · flashMat · warnMat 을 받는 대리 객체. 가려진 실루엣(ghost)은 없다.
+ */
+function anokoMesh() {
+  const a = buildAnoko(), root = new THREE.Group(), inner = new THREE.Group();
+  root.add(inner);
+  inner.add(a.root);
+  const copies = new Map(); // 원래 재질 → 이 아노코의 사본
+  a.root.traverse((o) => {
+    const mat = o.material;
+    if (!o.isMesh || !mat || !mat.uniforms || !mat.uniforms.uColor) return; // 외곽선은 그대로
+    if (!copies.has(mat)) {
+      const c = mat.clone();
+      if (mat.uniforms.uLight) c.uniforms.uLight = mat.uniforms.uLight; // 마을 빛(낮 · 밤)은 함께 쓰는 값을 그대로 따라간다
+      copies.set(mat, { m: c, base: mat.uniforms.uColor.value.clone() });
+    }
+    o.material = copies.get(mat).m;
+  });
+  const FLASH = new THREE.Color(1.7, 1.7, 1.7), WARN = new THREE.Color(1.25, 0.72, 0.66), PLAIN = new THREE.Color(1, 1, 1);
+  let cur = bodyMat;
+  const body = {
+    get material() { return cur; },
+    set material(v) {
+      if (v === cur) return;
+      cur = v;
+      const k = v === flashMat ? FLASH : v === warnMat ? WARN : PLAIN;
+      for (const { m, base } of copies.values()) m.uniforms.uColor.value.copy(base).multiply(k);
+    }
+  };
+  return { root, inner, body, ghost: new THREE.Group(), wings: [], sleepFace: null, height: a.height, hover: 0, anoko: a };
+}
+
 // ---------- 공격 예고(바닥의 빨간 표시) · 탄 · 충격파 ----------
 const TELE_EDGE = new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
 const TELE_FILL = new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide });
 const TELE_BASE = new THREE.MeshBasicMaterial({ color: 0xff6a5a, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
 const D_DISC = new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2);
 const D_RING = new THREE.RingGeometry(0.88, 1, 48).rotateX(-Math.PI / 2);
+// 반원 표시(아노코 꼬리 휩쓸기): 뒤쪽(-z) 반쪽. 그룹을 몬스터가 보는 쪽(yaw)으로 돌리면 몸 뒤 반원이 된다
+const D_HALF = new THREE.CircleGeometry(1, 24, 0, Math.PI).rotateX(-Math.PI / 2);
+const D_HALF_RING = new THREE.RingGeometry(0.88, 1, 24, 1, 0, Math.PI).rotateX(-Math.PI / 2);
 /** 바닥 띠: 원점에서 앞(+z)으로 길이 1. */
 const D_RECT = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0).rotateX(Math.PI / 2);
 const SHADOW_MAT = new THREE.MeshBasicMaterial({ color: 0x2b2224, transparent: true, opacity: 0.18, depthWrite: false });
@@ -744,8 +793,22 @@ export function createMonsters(scene, village, random = Math.random) {
     g.visible = false;
     scene.add(g);
     const mk = (geo, mat) => { const o = new THREE.Mesh(geo, mat); o.renderOrder = 3; g.add(o); return o; };
-    m.tele = { g, c: [mk(D_DISC, TELE_BASE), mk(D_DISC, TELE_FILL), mk(D_RING, TELE_EDGE)], l: [mk(D_RECT, TELE_BASE), mk(D_RECT, TELE_FILL), mk(D_RECT, TELE_EDGE), mk(D_RECT, TELE_EDGE)] };
+    m.tele = { g, c: [mk(D_DISC, TELE_BASE), mk(D_DISC, TELE_FILL), mk(D_RING, TELE_EDGE)], l: [mk(D_RECT, TELE_BASE), mk(D_RECT, TELE_FILL), mk(D_RECT, TELE_EDGE), mk(D_RECT, TELE_EDGE)],
+      h: [mk(D_HALF, TELE_BASE), mk(D_HALF, TELE_FILL), mk(D_HALF_RING, TELE_EDGE)] };
+    m.tele.h.forEach((o) => { o.visible = false; });
     return m.tele;
+  }
+  /** 반원 표시(꼬리 휩쓸기): (x, z) 를 가운데로 yaw 쪽을 보는 몸 뒤쪽 반원, 반지름 r. 안쪽은 k 만큼 차오른다. */
+  function showHalf(m, x, z, yaw, r, k) {
+    m.teleInfo = ['h', x, z, yaw, r, k];
+    const T = tele(m), [base, fill, ring] = T.h, f = Math.max(0.02, r * Math.min(1, k));
+    T.g.visible = true;
+    T.g.position.set(x, 0.045, z);
+    T.g.rotation.y = yaw;
+    T.c.forEach((o) => { o.visible = false; });
+    T.l.forEach((o) => { o.visible = false; });
+    T.h.forEach((o) => { o.visible = true; });
+    base.scale.set(r, 1, r); ring.scale.set(r, 1, r); fill.scale.set(f, 1, f);
   }
   const hideTele = (m) => { if (m.tele) m.tele.g.visible = false; m.teleInfo = null; };
   /** 둥근 표시: 테두리는 다 친 넓이, 안쪽은 k(0..1) 만큼 차오른다. 다 차면 그 자리를 친다. */
@@ -757,6 +820,7 @@ export function createMonsters(scene, village, random = Math.random) {
     T.g.rotation.y = 0;
     T.c.forEach((o) => { o.visible = true; });
     T.l.forEach((o) => { o.visible = false; });
+    T.h.forEach((o) => { o.visible = false; });
     base.scale.set(r, 1, r); ring.scale.set(r, 1, r); fill.scale.set(f, 1, f);
   }
   /** 띠 표시: (x, z) 에서 yaw 쪽으로 길이 len, 폭 w. 안쪽은 k 만큼 차오른다. */
@@ -768,6 +832,7 @@ export function createMonsters(scene, village, random = Math.random) {
     T.g.rotation.y = yaw;
     T.c.forEach((o) => { o.visible = false; });
     T.l.forEach((o) => { o.visible = true; });
+    T.h.forEach((o) => { o.visible = false; });
     base.scale.set(w, 1, len); fill.scale.set(w, 1, Math.max(0.02, len * Math.min(1, k)));
     a.position.x = -w / 2; b.position.x = w / 2;
     a.scale.set(0.06, 1, len); b.scale.set(0.06, 1, len);
@@ -873,7 +938,7 @@ export function createMonsters(scene, village, random = Math.random) {
   }
   /** 보스가 얼마나 화났는지: 체력 60% 이하 1, 30% 이하 2(빨라지고 · 쉬는 틈이 줄고 · 새 공격을 쓴다). */
   // 화남: 구역 보스는 체력 60% · 30% 에서, 마지막 보스 왕버섯은 일찍(75%) 화내고 절반부터 마지막 단계
-  const RAGE_AT = { kingcap: [0.75, 0.5] };
+  const RAGE_AT = { kingcap: [0.75, 0.5], anoko: [0.75, 0.5] }; // 최종 보스 아노코도 왕버섯처럼
   const rage = (m) => { if (!m.M.boss) return 0; const [a, b] = RAGE_AT[m.species] || [0.6, 0.3]; return m.hp <= m.M.hp * b ? 2 : m.hp <= m.M.hp * a ? 1 : 0; };
   /**
    * 지금 쓸 공격. 보스(KITS): 가까우면 near, 아니면 멀 때 쓸 공격을 한 번 골라 둔다
@@ -1103,7 +1168,7 @@ export function createMonsters(scene, village, random = Math.random) {
     if (!canSee) { m.state = m.M.boss ? 'return' : 'wander'; m.engaged = false; m.goal = { ...m.home }; hideTele(m); return false; } // 보스는 제자리로 돌아간다(체력은 그대로: 멀리 떠나야 다시 찬다)
     if (m.stun > 0) return false;
     const M = m.M, A = attackOf(m, dp), kind = A.kind;
-    turnTo(m, P.x, P.z, dt, 9);
+    turnTo(m, P.x, P.z, dt, m.species === 'anoko' ? ANOKO_TURN : 9); // 아노코는 천천히 돈다(앞쪽 솜털 방패 — 재빨리 돌아 들어가면 옆이나 뒤를 잡는다)
     let near, trig;
     if (kind === 'bump') { near = M.size + 0.4; trig = M.size + 0.5; }
     else if (A.keep) { near = A.keep; trig = A.range; }
@@ -1133,16 +1198,18 @@ export function createMonsters(scene, village, random = Math.random) {
     const A = m.atk, kind = A.kind;
     if (!targetOn(m)) { cancel(m); return; }
     const k = 1 - m.wind / m.windMax;
+    const turn = m.species === 'anoko' ? ANOKO_TURN : 10;
     if (!m.locked) {
       m.aim.x = P.x; m.aim.z = P.z;
-      turnTo(m, P.x, P.z, dt, 10);
+      if (kind !== 'sweep') turnTo(m, P.x, P.z, dt, turn); // 꼬리 휩쓸기는 돌지 않는다(예고한 뒤쪽 반원 그대로)
       if (A.lock != null && k >= A.lock) {
         m.locked = true;
         if (kind === 'leap' || kind === 'stomp') lockLeap(m, A);
       }
-    } else if (kind !== 'tongue') turnTo(m, m.aim.x, m.aim.z, dt, 10);
+    } else if (kind !== 'tongue' && kind !== 'sweep') turnTo(m, m.aim.x, m.aim.z, dt, turn);
     if (kind === 'leap' || kind === 'stomp') { if (m.locked) showCircle(m, m.aim.x, m.aim.z, A.radius, k); else hideTele(m); }
     else if (kind === 'slam') showCircle(m, m.x, m.z, A.radius, k);
+    else if (kind === 'sweep') showHalf(m, m.x, m.z, m.yaw, A.radius, k);
     else if (kind === 'charge' || kind === 'roll' || kind === 'dive' || kind === 'roots') showLine(m, m.x, m.z, Math.atan2(m.aim.x - m.x, m.aim.z - m.z), A.len, A.width, k);
     else if (kind === 'tongue') showLine(m, m.x, m.z, m.yaw, A.len, A.width, k);
     else if (kind === 'gas') { const s = gasSpot(m, A); showCircle(m, s.x, s.z, A.radius, k); } // 가스가 덮을 곳(굳기 전에는 나를 따라온다)
@@ -1203,6 +1270,12 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (kind === 'gas') {
       puffGas(m, A, gasSpot(m, A)); // 뿜고 나서 A.puff 초 동안 더듬이를 떨며 서 있다(actStep)
       m.lunge = 0.2;
+    } else if (kind === 'sweep') {
+      // 꼬리 휩쓸기(아노코): 몸을 비틀어 꼬리로 뒤쪽 반원을 쓴다(앞쪽 반원은 안전)
+      m.tailT = 0.45;
+      wave(m.x, m.z, A.radius);
+      if (inSweep(m.yaw, m.x, m.z, P.x, P.z, A.radius, ME)) hurt(m, M.dmg, m.x, m.z);
+      endAct(m, A);
     } else endAct(m, A);
   }
 
@@ -1264,10 +1337,16 @@ export function createMonsters(scene, village, random = Math.random) {
     if (kind === 'combo') {
       a.next -= dt;
       if (a.next <= 0) {
-        if (a.i >= A.n) { endAct(m, A); return false; }
+        if (a.i >= A.n) {
+          endAct(m, A);
+          // 화난 보스(아노코)는 할퀸 뒤 곧바로 꼬리 휩쓸기
+          const kit = M.boss && KITS[m.species];
+          if (kit && kit.again && A === kit.near && rage(m) >= 1) { m.nextAtk = kit.again; m.rec = 0.15; m.cool = 0; }
+          return false;
+        }
         a.i++;
         a.next = A.gap;
-        m.yaw = Math.atan2(P.x - m.x, P.z - m.z);
+        if (m.species !== 'anoko') m.yaw = Math.atan2(P.x - m.x, P.z - m.z); // 아노코는 할퀼 때도 천천히 돈다(솜털 방패)
         const go = Math.min(0.32, Math.max(0, dp - M.size - 0.3));
         moveBy(m, ((P.x - m.x) / (dp || 1)) * go, ((P.z - m.z) / (dp || 1)) * go);
         m.lunge = 0.15; m.pinch = 0.12;
@@ -1355,6 +1434,13 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (sp === 'bigcrab') {
       ry = Math.sin(ph * (moving ? 10 : 1.2)) * (moving ? 0.18 : 0.06);
       y += moving ? Math.abs(Math.sin(ph * 10)) * 0.04 : 0;
+    } else if (sp === 'anoko') {
+      // 아노코: 잠든 동안(2장에서 골짜기를 들여다볼 때) · 쓰러진 뒤에는 엎드려 눈을 감고, 깨어 있으면 서서 빙글빙글 눈. 꼬리 휩쓸기 때는 몸을 한 바퀴 휙
+      const A = m.mesh.anoko, calm = m.dormant || m.dead;
+      A.setPose(calm ? 'lie' : 'stand');
+      A.setFace(calm ? 'happy' : 'swirl');
+      A.animate(ph, { moving, step: ph * 6 });
+      if (m.tailT > 0) { m.tailT = Math.max(0, m.tailT - dt); ry = (1 - m.tailT / 0.45) * Math.PI * 2; }
     } else if (sp === 'dummy') {
       rz = Math.sin(m.wobble * 16) * Math.max(0, m.wobble) * 0.9;
       m.wobble = Math.max(0, (m.wobble || 0) - dt * 1.2);
@@ -1399,6 +1485,12 @@ export function createMonsters(scene, village, random = Math.random) {
    * (x, z): 친 사람 자리. → 쓰러뜨렸는지
    */
   function applyHit(m, x, z, dmg, knock) {
+    if (m.species === 'anoko') { // 앞쪽 솜털 방패(core/anoko.js): 정면 좌우 60도 안에서 치면 3분의 1만 들어간다
+      const k = frontGuard(m.yaw, m.x, m.z, x, z);
+      dmg *= k;
+      if (k < 1) C?.onGuard?.(m, x, z);
+    }
+    m.lastDmg = dmg; // 실제로 들어간 피해(숫자를 띄울 때)
     m.hp -= dmg;
     m.flash = 0.13;
     m.engaged = true;
@@ -1652,7 +1744,7 @@ export function createMonsters(scene, village, random = Math.random) {
         m.engaged = !!eng;
         m.dormant = !!dorm;
         m.stun = stun ? 0.2 : 0;
-        m.teleInfo = Array.isArray(tel) && (tel[0] === 'c' || tel[0] === 'l') && tel.slice(1).every(Number.isFinite) ? tel : null;
+        m.teleInfo = Array.isArray(tel) && (tel[0] === 'c' || tel[0] === 'l' || tel[0] === 'h') && tel.slice(1).every(Number.isFinite) ? tel : null;
         m.tongueLen = Number.isFinite(tng) ? Math.max(0, Math.min(6, tng)) : 0;
         if (dead) { m.dead = true; m.deadT = 0; hideTele(m); if (m.tongue) setTongue(m, 0); poof(m.x, 0.4 + m.mesh.hover, m.z, m.M.size); }
       }
@@ -1745,6 +1837,7 @@ export function createMonsters(scene, village, random = Math.random) {
         const T = m.teleInfo;
         if (T && T[0] === 'c') showCircle(m, T[1], T[2], T[3], T[4]);
         else if (T && T[0] === 'l') showLine(m, T[1], T[2], T[3], T[4], T[5], T[6]);
+        else if (T && T[0] === 'h') showHalf(m, T[1], T[2], T[3], T[4], T[5]); // 아노코 꼬리 휩쓸기
         else hideTele(m);
         if (m.tongueLen > 0.02 || m.tongue) setTongue(m, m.tongueLen);
         if (m.under) {

@@ -125,7 +125,8 @@ function rng(seed) {
  *    예고(wind)와 공격(act) 동안은 피하느라 휘두르지 못한다. 공격 하나는 다 피하지만, 부하 공격이 아노코 공격과 0.5초 안으로 겹치면 아노코 쪽을 맞는다.
  *  · 친구(힘 allies)는 1.05초마다 친다. 칠 때마다 30% 로 아노코가 그 친구를 노린다(그 친구는 앞에서 쳐서 방패, 나머지는 그대로). 노린 친구는 공격마다 한 대를 맞고,
  *    체력 40 이 다 떨어지면 쓰러진다 — 나는 2초 동안 깨우고(그동안 못 친다) 12 로 일어난다.
- *  · 부하는 처음 4초, 그 뒤 9초(화나면 7초)마다 나오고(마지막 단계에는 둘), 3초마다 나를 공격한다. 혼자면 12초, 친구가 있으면 6초 만에 쓰러뜨린다.
+ *  · 부하는 world/monsters.js 의 summon 처럼 처음 4초, 그 뒤 9 · 7 · 5초(화남 0 · 1 · 2)마다 2 · 2 · 3마리(살아 있는 부하 4 · 5 · 6 까지) 나오고,
+ *    3초마다 나를 공격한다. 혼자면 12초, 친구가 있으면 6초 만에 쓰러뜨린다. 쉬는 틈 · 다음 공격까지는 화날수록 짧다(endAct 처럼).
  * → { won, stamina, hpLeft(비율), time }
  */
 function simulateFight({ allies = [], seed = 1, stamina = 100, endless = false }) {
@@ -159,15 +160,15 @@ function simulateFight({ allies = [], seed = 1, stamina = 100, endless = false }
     // 아노코
     left -= dt;
     if (left <= 0) {
-      const k = rage() >= 2 ? 0.7 : 1;
+      const r = rage();
       if (phase === 'cool') { atk = pick(); phase = 'wind'; left = atk.wind; }
       else if (phase === 'wind') { phase = 'act'; left = actLen(atk); }
-      else if (phase === 'act') { if (target === 'me' && (atk.kind === 'stomp' || atk.kind === 'shoot')) back = 1.2; land(); phase = 'rec'; recT = 0; left = queued ? 0.15 : atk.rec * k; }
-      else { phase = 'cool'; left = queued ? 0 : atk.cool * k; }
+      else if (phase === 'act') { if (target === 'me' && (atk.kind === 'stomp' || atk.kind === 'shoot')) back = 1.2; land(); phase = 'rec'; recT = 0; left = queued ? 0.15 : atk.rec * (1 - 0.25 * r); }
+      else { phase = 'cool'; left = queued ? 0 : atk.cool * (1 - 0.2 * r); }
     }
     // 부하
     summonT -= dt;
-    if (summonT <= 0) { summonT = rage() >= 1 ? 7 : 9; for (let n = rage() >= 2 ? 2 : 1; n > 0; n--) minions.push({ life: allies.length ? 6 : 12, next: 1.5, since: 9 }); }
+    if (summonT <= 0) { const r = rage(); summonT = [9, 7, 5][r]; for (let n = Math.min([2, 2, 3][r], [4, 5, 6][r] - minions.length); n > 0; n--) minions.push({ life: allies.length ? 6 : 12, next: 1.5, since: 9 }); }
     for (const m of minions) { m.life -= dt; m.next -= dt; m.since += dt; if (m.next <= 0) { m.next = 3; m.since = 0; } }
     for (let i = minions.length - 1; i >= 0; i--) if (minions[i].life <= 0) minions.splice(i, 1);
     // 나
