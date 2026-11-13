@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>최종 보스 아노코 설계서</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --text: #1f2328; --text-soft: #5b636c; --text-faint: #9aa1a9;
+    --line: #cfd4da; --line-soft: #e6e9ec; --code-bg: #f0f1f3; --code-text: #24292f;
+    --mark: #b4530a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191d; --text: #e2e5e9; --text-soft: #9aa3ad; --text-faint: #6b7480;
+      --line: #40464e; --line-soft: #2b3037; --code-bg: #262b32; --code-text: #d5d9de;
+      --mark: #e69a55;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 52px 32px 110px; }
+
+  /* 머리 */
+  .masthead { border-top: 3px solid var(--text); padding-top: 14px; margin-bottom: 40px; }
+  .masthead .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--text-soft); font-family: Consolas, "Cascadia Mono", monospace; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; margin: 18px 0 10px; }
+  .standfirst { font-size: 16px; color: var(--text-soft); max-width: 700px; margin: 0; }
+
+  /* 요약띠: 결론 세 가지 */
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); margin-bottom: 60px; }
+  .rule { padding: 18px 22px 20px 0; }
+  .rule + .rule { border-left: 1px solid var(--line-soft); padding-left: 22px; }
+  .rule .k { font-size: 12px; font-weight: 800; color: var(--text-soft); margin-bottom: 6px; }
+  .rule .t { font-size: 16px; font-weight: 800; line-height: 1.45; margin-bottom: 6px; }
+  .rule .d { font-size: 13.5px; color: var(--text-soft); }
+
+  /* 결정 시트: 회의에서 결정받을 안건 */
+  .sheet { margin-bottom: 64px; }
+  .sheet-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  .sheet-title .hint { font-weight: 400; color: var(--text-faint); margin-left: 10px; font-size: 12.5px; }
+  table.sheet-tbl { margin: 0; }
+  .sheet-tbl th { padding: 8px 14px 8px 0; }
+  .sheet-tbl td { padding: 11px 14px 11px 0; }
+  .sheet-tbl tr:last-child td { border-bottom: 2px solid var(--text); }
+  .sheet-tbl .n { color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 0; width: 26px; }
+  .sheet-tbl a { color: inherit; text-decoration: none; font-weight: 700; }
+  .sheet-tbl a:hover { text-decoration: underline; }
+  .sheet-tbl .rec { color: var(--text-soft); }
+  .sheet-tbl .decide { width: 26%; min-width: 150px; border-bottom: 1px solid var(--line); color: var(--text); outline: none; cursor: text; }
+  .sheet-tbl .decide:empty::before { content: "회의에서 기입"; color: var(--text-faint); }
+  .sheet-tbl .decide:focus { border-bottom-color: var(--text); }
+
+  /* 섹션 */
+  section { display: grid; grid-template-columns: 84px 1fr; gap: 0 28px; border-top: 1px solid var(--line); padding: 32px 0 36px; }
+  section .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--line); font-variant-numeric: tabular-nums; }
+  section .body { min-width: 0; }
+  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.015em; margin: 4px 0 14px; line-height: 1.45; }
+  h3 { font-size: 15px; font-weight: 800; margin: 20px 0 6px; }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-faint); }
+  strong { font-weight: 750; }
+  .soft { color: var(--text-soft); font-size: 14px; }
+  .kv { font-weight: 800; font-size: 13px; color: var(--text-soft); margin-right: 6px; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 3px; word-break: break-all; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; line-height: 1.6; background: var(--code-bg); color: var(--code-text); padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 12px; }
+  pre code { background: none; padding: 0; font-size: inherit; word-break: normal; }
+
+  /* 권장: 본문 마지막 줄 */
+  .verdict { margin-top: 16px; display: flex; gap: 12px; }
+  .verdict .k { flex: none; font-weight: 800; font-size: 13px; padding-top: 2px; }
+  .verdict .k::after { content: ""; display: block; width: 100%; height: 2px; background: var(--text); margin-top: 2px; }
+
+  /* 흐름: 순서와 단계 */
+  .timelines { margin: 18px 0 14px; }
+  .tl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+  .tl + .tl { border-top: 1px dashed var(--line-soft); }
+  .tl .lab { flex: none; width: 76px; font-size: 13px; font-weight: 800; }
+  .tl .arrow { color: var(--text-faint); font-size: 12px; }
+  .tl .note { flex-basis: 100%; padding-left: 84px; font-size: 12.5px; color: var(--text-soft); margin-top: -4px; }
+  .step { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 3px 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); white-space: nowrap; }
+  .step.solid { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+  .step.ring { border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+  .legend { font-size: 12.5px; color: var(--text-soft); margin: 10px 0 0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .legend .step { padding: 1px 9px; font-size: 12px; margin-right: 4px; }
+
+  /* 선택지 대조 */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 6px; }
+  .versus.three { grid-template-columns: repeat(3, 1fr); }
+  .versus .opt { padding: 2px 24px 6px 0; }
+  .versus .opt + .opt { border-left: 1px solid var(--line-soft); padding-left: 24px; padding-right: 0; }
+  .versus h3 { font-size: 14px; margin: 0 0 8px; }
+  .versus h3 .tag { font-weight: 400; color: var(--text-soft); font-size: 12.5px; margin-left: 8px; }
+  .versus ul { font-size: 13.5px; color: var(--text-soft); margin: 0; padding-left: 18px; }
+  .versus .pro::marker { content: "+  "; color: var(--text); }
+  .versus .con::marker { content: "−  "; color: var(--text-faint); }
+
+  /* 적용 범위 */
+  .scope { display: flex; gap: 10px; align-items: stretch; margin: 16px 0 8px; flex-wrap: wrap; }
+  .scope .item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 18px 8px; text-align: center; min-width: 96px; }
+  .scope .item .t { font-weight: 800; font-size: 14px; }
+  .scope .item .s { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; }
+  .scope .item.on { background: var(--text); border-color: var(--text); }
+  .scope .item.on .t { color: var(--bg); }
+  .scope .item.on .s { color: var(--bg); opacity: 0.75; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+  th { text-align: left; font-weight: 700; color: var(--text-soft); font-size: 12px; border-top: 2px solid var(--text); border-bottom: 1px solid var(--text); padding: 7px 12px 7px 0; }
+  td { border-bottom: 1px solid var(--line-soft); padding: 9px 12px 9px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 2px solid var(--text); }
+  td.c { text-align: center; white-space: nowrap; font-weight: 800; }
+  td.c.no { color: var(--text-faint); font-weight: 400; }
+  td.c.err { color: var(--mark); }
+  .ex { color: var(--text-soft); font-size: 13px; }
+
+  /* 경우별 설명 */
+  dl { margin: 0; }
+  dt { font-weight: 800; font-size: 13.5px; margin: 14px 0 4px; }
+  dd { margin: 0 0 4px; color: var(--text-soft); font-size: 14px; }
+  dd code { color: var(--code-text); }
+
+  /* 도표 */
+  figure { margin: 16px 0 12px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--text); }
+  figcaption { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+
+  /* 강조: 문서 전체에서 한 지점만 */
+  .mark { color: var(--mark); font-weight: 800; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 8px; padding-top: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-soft); font-size: 12.5px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .page { padding: 36px 18px 70px; }
+    .rules { grid-template-columns: 1fr; }
+    .rule + .rule { border-left: none; border-top: 1px solid var(--line-soft); padding-left: 0; }
+    section { grid-template-columns: 1fr; gap: 6px; }
+    section .num { font-size: 28px; }
+    .tl .note { padding-left: 0; }
+    .versus, .versus.three { grid-template-columns: 1fr; }
+    .versus .opt + .opt { border-left: none; border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-top: 10px; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; }
+    .sheet-tbl .decide:empty::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div class="row">
+    <span>치이카와 마을 생활 설계서</span>
+    <span>2026-11-13</span>
+  </div>
+  <h1>최종 보스 아노코<br>싸움과 메인 이야기 2장, 아노코 타기</h1>
+  <p class="standfirst">치이카와 마을 생활에 최종 보스 아노코를 넣는 설계다. 왕버섯 이야기를 끝낸 사람에게 메인 이야기 2장이 열리고, 서쪽 숲 끝 너머의 마당에서 아노코와 싸운다. 이기면 아노코가 내 집 앞에서 지내며 탈것이 된다. 만드는 사람은 이 문서만 보고 계획을 세울 수 있어야 한다.</p>
+</div>
+
+<div class="rules">
+  <div class="rule">
+    <div class="k">싸움</div>
+    <div class="t">막지 않고, 앞쪽 솜털 방패로 혼자서는 거의 못 이기게 한다</div>
+    <div class="d">마당에는 혼자서도 들어갈 수 있다. 아노코는 노리는 상대 쪽을 본다. 앞에서 맞으면 솜털에 막혀 3분의 1만 들어간다. 친구가 있으면 아노코가 한쪽을 보는 동안 다른 쪽이 등을 때린다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">이야기</div>
+    <div class="t">메인 이야기 2장으로 따로 둔다</div>
+    <div class="d">지금 메인 이야기는 왕버섯 다음 대장에게 알리는 단계로 끝난다. 이미 끝낸 저장도 아노코를 만날 수 있게, 끝에 단계를 붙이지 않고 새 이야기 퀘스트로 만든다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">보상</div>
+    <div class="t">집 앞 아노코에게 말을 걸어 탈것을 고른다</div>
+    <div class="d">이긴 뒤 아노코는 내 집 앞에 엎드려 지낸다. 말을 걸면 자동차와 아노코 가운데 탈 것을 고르고, 오른쪽 위 탈것 버튼은 고른 것을 탄다.</div>
+  </div>
+</div>
+
+<section id="s1">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>왜 만드는가</h2>
+    <p>사용자는 왕버섯 다음에 이어지는 최종 보스를 원한다. 최종 보스답게 강해야 하고 동료와 같이 잡는 싸움이어야 한다. 보상은 아노코 타기다. 사용자가 정한 내용은 이렇다.</p>
+    <ul>
+      <li>아노코는 사용자가 준 사진 두 장의 모습을 따른다.</li>
+      <li>메인 이야기에서 왕버섯을 쓰러뜨린 뒤에 잡을 수 있다.</li>
+      <li>아노코는 숲에 산다. 왕버섯 굴이나 두더지 굴밭처럼 월드맵 바깥에 보스 마당을 두고 숲 고목 거인 마당과 겹치지 않게 한다.</li>
+      <li>혼자 들어가는 것을 막지 않고 강하게만 한다. 앞쪽 솜털 방패로 혼자서는 어렵게 만든다.</li>
+      <li>아노코를 타는 빠르기는 자동차와 비슷하게 한다.</li>
+      <li>탈것은 집에서 바꾼다. 집 앞에 쉬는 아노코에게 말을 걸어 고른다.</li>
+      <li>모델링은 fable 모델 에이전트에게 맡긴다. 에이전트 도구는 fable 이라는 이름까지만 고를 수 있어서 5.2 를 콕 집을 수는 없다.</li>
+    </ul>
+    <h3>목표</h3>
+    <ul>
+      <li>왕버섯을 끝낸 사람이 다음 날부터 2장을 받아 아노코를 쓰러뜨리고 탈 수 있다.</li>
+      <li>친구 둘과 가면 이기고 혼자서는 거의 진다.</li>
+      <li>모든 공격은 0.2초 늦게 반응하는 사람도 예고를 보고 피할 수 있다.</li>
+    </ul>
+    <h3>하지 않을 것</h3>
+    <ul>
+      <li>아노코와 다시 싸우기. 이긴 뒤 마당은 비어 있다.</li>
+      <li>아노코를 하트와 부탁이 있는 마을 친구로 만들기.</li>
+      <li>마당에 들어가는 조건 걸기(동료 수 같은).</li>
+    </ul>
+    <h3>실패로 보는 것</h3>
+    <ul>
+      <li>예고를 봐도 피할 수 없는 공격이 있다.</li>
+      <li>숲 나무, 오데 빈터, 게임센터 같은 지금 자리가 하나라도 옮겨진다. 저장과 이야기 장면이 자리에 기대고 있다.</li>
+      <li>이미 메인 이야기를 끝낸 저장이 아노코를 못 만난다.</li>
+      <li>키보드로 할 때 집 앞 아노코 앞에서 「Space 말 걸기」가 안 뜬다(오데 때와 같은 실수).</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>만드는 방식</h2>
+    <div class="versus three">
+      <div class="opt">
+        <h3>A. 지금 틀에 얹기<span class="tag">고른 방식</span></h3>
+        <ul>
+          <li class="pro">보스 마당(<code>core/layout.js</code> 의 <code>ARENAS</code>, <code>world/lairs.js</code>), 보스 공격 꾸러미(<code>world/monsters.js</code> 의 <code>KITS</code>), 이야기 퀘스트(<code>core/quests.js</code>), 자동차 타기(<code>actors/car.js</code>, <code>actors/player.js</code>)를 그대로 쓰고 아노코 몫만 더한다.</li>
+          <li class="pro">친구 파티, 같이 놀기, 보스 곡, 기절과 랏코 조언이 그대로 붙는다.</li>
+          <li class="con">꼬리 휩쓸기처럼 새 공격 종류 하나는 새로 짜야 한다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>B. 메인 이야기 끝에 단계 붙이기</h3>
+        <ul>
+          <li class="pro">퀘스트가 하나로 이어져서 좋다.</li>
+          <li class="con">이미 끝낸 저장은 못 만난다. 열려면 저장을 고쳐야 하며 왕관 보상이 두 번 나갈 수 있다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>C. 오데처럼 따로 그리는 장면 속 싸움</h3>
+        <ul>
+          <li class="pro">연출을 마음대로 할 수 있다.</li>
+          <li class="con">월드맵 바깥 마당에서 친구와 같이 싸운다는 요청과는 맞지 않는다.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="verdict"><span class="k">권장</span><p>A 를 고른다. 사용자도 진행하라고 했다.</p></div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>메인 이야기 2장</h2>
+    <p>새 퀘스트 <code>anoko</code> 를 둔다. 제목은 「숲 너머의 아노코」(게임에서 정한 가칭)이고, 주는 사람은 대장 갑옷 씨(<code>captain</code>), <code>story: true</code> 다.</p>
+    <p><span class="kv">여는 조건</span><code>story</code> 를 끝낸 다음 날부터. <code>after: 'story'</code> 만으로는 같은 날 열리므로 필드를 하나 더해(예: <code>afterGap: 1</code>) 끝낸 날 다음 날부터 열리게 한다. 첫날 안내가 끝나 있어야 하고 하트 조건은 없다.</p>
+    <div class="timelines">
+      <div class="tl">
+        <span class="lab">단계</span>
+        <span class="step">1. 랏코에게 소문 듣기</span><span class="arrow">→</span>
+        <span class="step">2. 협곡 입구 살펴보기</span><span class="arrow">→</span>
+        <span class="step solid">3. 아노코 쓰러뜨리기</span><span class="arrow">→</span>
+        <span class="step">4. 대장에게 알리기</span>
+      </div>
+    </div>
+    <ol>
+      <li>랏코에게 서쪽 숲 너머 소문을 듣는다(<code>talk</code>, <code>to: rakko</code>).</li>
+      <li>숲 서쪽 끝 협곡 입구를 살펴본다(<code>visit</code>, <code>place: anokoLair</code>). 도착하면 마당 안쪽에 잠든 아노코가 보이는 짧은 해설.</li>
+      <li>아노코를 쓰러뜨린다(<code>boss</code>). 지금 <code>boss</code> 단계는 왕버섯 전용이라 단계에 <code>species</code> 를 적어 어느 보스인지 고르게 넓힌다. 왕버섯 단계는 <code>species</code> 가 없어도 <code>kingcap</code> 으로 본다.</li>
+      <li>대장 갑옷 씨에게 알린다(<code>talk</code>). 이 말을 마치면 아노코가 집 앞으로 온다.</li>
+    </ol>
+    <p><span class="kv">확인 필요</span>보상은 내가 정한 값이다. 돈 6000원, 대장 친밀도 6, 마을 사람 친밀도 3, 아노코 타기. 왕버섯 이야기가 5000원이라 그보다 조금 많게 한다.</p>
+    <p>대사는 모두 게임에서 새로 쓴다. 원작 대사를 옮기지 않는다.</p>
+    <p>아노코는 이 2장의 <code>boss</code> 단계에서만 마당에 나타난다(왕버섯의 <code>bossTime</code> 처럼). 쓰러뜨리면 <code>state.story.anokoDown</code> 에 날짜를 적고 그 뒤로는 나타나지 않는다.</p>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>아노코 마당</h2>
+    <p><span class="kv">확인 필요</span>자리는 내가 정한 후보다. 가운데 (−90.4, 16), 반지름 7.5, 입구 (−70.5, 16). 월드 서쪽 끝(−80) 너머에 마당이 있고 입구만 맵 끝자락에 걸친다. 입구 밖은 흙길(<code>lead</code>)로 숲-호수 길(<code>forest-lake</code>, (−46, 3) 에서 (−48, 14) 사이)까지 잇는다.</p>
+    <figure>
+      <svg viewBox="0 0 420 380" role="img" aria-label="월드 지도 위 보스 마당 자리: 마을, 왕버섯 굴, 두더지 굴밭, 고목 거인, 새 아노코 마당과 오데 빈터">
+        <rect x="40" y="40" width="320" height="320" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity="0.5"/>
+        <text x="356" y="56" text-anchor="end" font-size="11" fill="currentColor" opacity="0.7">월드 끝(±80)</text>
+        <circle cx="200" cy="200" r="56" fill="none" stroke="currentColor"/>
+        <text x="200" y="204" text-anchor="middle" font-size="12" fill="currentColor">마을</text>
+        <polyline points="144,200 128,196 108,206 88,198 64,188" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>
+        <polyline points="108,206 104,228 116,248 120,262 120,284 128,296" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>
+        <circle cx="156" cy="19" r="14" fill="currentColor" opacity="0.25"/>
+        <text x="176" y="23" font-size="11" fill="currentColor">왕버섯 굴</text>
+        <circle cx="381" cy="206" r="14" fill="currentColor" opacity="0.25"/>
+        <text x="381" y="232" text-anchor="middle" font-size="11" fill="currentColor">두더지 굴밭</text>
+        <circle cx="80" cy="148" r="15" fill="currentColor" opacity="0.25"/>
+        <text x="80" y="128" text-anchor="middle" font-size="11" fill="currentColor">고목 거인</text>
+        <line x1="34" y1="232" x2="59" y2="232" stroke-width="3" style="stroke: var(--mark)"/>
+        <line x1="59" y1="232" x2="104" y2="228" stroke-width="2" stroke-dasharray="3 3" style="stroke: var(--mark)"/>
+        <circle cx="19" cy="232" r="15" fill="none" stroke-width="3" style="stroke: var(--mark)"/>
+        <text x="19" y="262" text-anchor="middle" font-size="12" font-weight="800" style="fill: var(--mark)">아노코 마당</text>
+        <circle cx="120" cy="244" r="4" fill="currentColor"/>
+        <text x="128" y="248" font-size="11" fill="currentColor">오데 빈터</text>
+      </svg>
+      <figcaption>위에서 내려다본 월드 지도다(북쪽이 위). 굵은 원과 선이 새 아노코 마당, 협곡, 입구 밖 흙길이다. 옅은 선은 숲길과 숲-호수 길이다. 자리는 후보라 ±6 안에서 바뀔 수 있다.</figcaption>
+    </figure>
+    <p>고목 거인 마당은 가운데 (−60, −26), 입구 (−67, −6) 라 40 넘게 떨어진다. 오데 빈터 (−40, 22) 와도 흙길 끝에서 10 넘게 떨어진다. 만드는 사람은 하치와레 구덩이, 초콜릿 덩굴, 토끼굴, 게임센터, 난토카바니아 숲길 자리와 10 이상 떨어졌는지 확인하고, 모자라면 z 를 ±6 안에서 옮긴다.</p>
+    <p>둘레 지형은 숲 마당처럼 고목(<code>tree</code>)으로 두르고, 바닥은 이끼 낀 풀밭에 하얀 솜털 뭉치 몇 개를 둔다. 입구 이름표는 「아노코의 숲」(가칭)이다.</p>
+    <h3>꼭 지킬 것</h3>
+    <ul>
+      <li>숲 나무와 바위는 공유 난수로 심는다. 새 협곡과 흙길 때문에 나무를 빼더라도 난수는 그대로 소비해야 한다(<code>outdoors.js</code> 에서 두더지 굴밭 흙길을 뺄 때처럼). 바꾸기 전후로 마당 밖 장애물 목록이 같은지 테스트로 확인한다.</li>
+      <li>길찾기 격자(<code>village.js</code> 의 <code>NAV_EAST</code>, <code>NAV_NORTH</code>)는 동쪽과 북쪽으로만 넓어진다. 서쪽 마당까지 친구들이 따라 들어오게 서쪽(<code>NAV_WEST</code>)도 넓힌다.</li>
+      <li>월드 끝 너머 땅, 마당 둘레 울타리, 지도 앱에 그리는 마당은 두더지 굴밭과 왕버섯 굴이 하는 대로 따라 한다.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>싸움</h2>
+    <p>아노코는 <code>monsters</code> 의 보스(<code>attack: 'boss'</code>)로 둔다. 숫자는 시작값이고 시뮬레이션으로 맞춘다.</p>
+    <table>
+      <tr><th>항목</th><th>아노코</th><th>왕버섯(비교)</th></tr>
+      <tr><td>체력</td><td>220</td><td class="ex">108</td></tr>
+      <tr><td>한 대 피해</td><td>18</td><td class="ex">16</td></tr>
+      <tr><td>크기</td><td>1.4</td><td class="ex">1.2</td></tr>
+      <tr><td>빠르기</td><td>1.8</td><td class="ex">1.6</td></tr>
+      <tr><td>화남</td><td>왕버섯처럼 체력 75% 에서 1단계, 50% 에서 마지막 단계. 마지막 단계에는 쉬는 틈이 줄어든다.</td><td class="ex">75%, 50%</td></tr>
+      <tr><td>부하</td><td>지금 보스 틀의 박자(처음 9초마다, 화난 뒤 7초마다)를 그대로 쓴다. 마지막 단계 전에는 뿔벌레 하나씩, 마지막 단계에는 그루터기와 버섯을 둘까지 부른다(고목 거인과 비슷하다).</td><td class="ex">풀뭉치, 마지막 단계에 독버섯 둘</td></tr>
+    </table>
+    <p>가까이 있는 동료도 노린다. 지금 보스 틀이 이미 그렇게 한다. 친구가 때리면 그 친구에게 덤비기도 한다.</p>
+    <h3>앞쪽 솜털 방패 (사용자가 고른 협동 장치)</h3>
+    <ul>
+      <li>아노코는 지금 노리는 상대 쪽으로 몸을 돌린다. 도는 빠르기에는 한계가 있어서 빠르게 돌아 들어가면 잠깐 옆이나 뒤를 잡을 수 있다.</li>
+      <li>아노코 앞쪽(정면에서 좌우 60도 안)에서 맞으면 솜털에 막혀 피해가 3분의 1만 들어간다. 옆과 뒤는 그대로 들어간다. 나, 같이 토벌하는 친구, 같이 놀기 파티원 모두에게 같다.</li>
+      <li>앞에서 막히면 숫자를 작게 띄우고 솜털이 폭 튀는 효과와 「솜털에 막혔다!」를 한 번씩 보인다. 처음 막혔을 때 한 번만 「옆이나 뒤를 노려 봐요」 안내를 띄운다.</li>
+      <li>혼자면 아노코가 늘 나를 보니 공격 틈에 돌아 들어가야 하고 싸움이 아주 길어진다. 친구 둘과 가면 아노코가 한 명에게 몸을 돌린 사이 나머지가 옆과 뒤를 때린다.</li>
+    </ul>
+    <h3>공격 (모두 게임에서 정함)</h3>
+    <table>
+      <tr><th>공격</th><th>언제</th><th>종류</th><th>설명</th></tr>
+      <tr><td>앞발 할퀴기</td><td>가까울 때</td><td><code>combo</code></td><td class="ex">주황 발톱으로 세 번 할퀸다(강가 왕집게 집게 연타처럼).</td></tr>
+      <tr><td>꼬리 휩쓸기</td><td>화났을 때 할퀴기 뒤에 이어서</td><td><code>sweep</code> (새로 만든다)</td><td class="ex">몸을 돌려 초록 꼬리로 옆과 뒤를 반원으로 쓴다. 바닥에 반원 예고가 차오른 뒤 쓸고, 아노코 앞쪽은 안전하다.</td></tr>
+      <tr><td>뛰어 덮치기</td><td>멀 때</td><td><code>stomp</code></td><td class="ex">내가 있던 자리로 뛰어 쿵 덮친다(왕버섯 <code>bossLeap</code> 처럼).</td></tr>
+      <tr><td>솜털 뭉치 날리기</td><td>멀 때</td><td><code>shoot</code></td><td class="ex">하얀 솜털 뭉치를 사방으로 고리처럼 쏜다. 마지막 단계에는 두 겹으로 쏜다.</td></tr>
+    </table>
+    <h3>균형 목표 (시뮬레이션 테스트로 확인)</h3>
+    <dl>
+      <dt>공격 하나하나</dt>
+      <dd>0.2초(±0.05) 늦게 반응해도 예고를 보고 피할 수 있다. 가스벌레 테스트처럼 공격마다 확인한다.</dd>
+      <dt>시뮬레이션 속 사람 (내가 정한 모형)</dt>
+      <dd>붙어서 계속 휘두르다가 예고가 뜨면 0.2초 늦게 걸어서 빠져나간다. 공격 하나는 다 피하지만 부하의 공격과 아노코의 공격이 겹치는 순간에는 하나만 피한다. 아노코 앞쪽에서 휘두르고, 아노코가 공격 뒤 쉬는 틈(<code>rec</code>)에만 옆으로 돌아 들어갈 수 있다.</dd>
+      <dt>혼자</dt>
+      <dd>반짝 검, 기운 100, 먹을 것 없이 싸우면 아노코 체력을 절반쯤 깎았을 때 기운이 바닥난다. 걸리는 시간은 친구 둘과 갈 때의 세 배를 넘는다.</dd>
+      <dt>친구 둘과 같이</dt>
+      <dd>친구 힘은 무기를 사 주지 않은 우사기(2)와 하치와레(1)로 잡는다(<code>npcPower</code> 는 사 준 무기에 따라 오른다). 같은 사람이 기운을 30 넘게 남기고 이긴다.</dd>
+      <dt>친구 체력</dt>
+      <dd>지금처럼 40 이라 세 대면 쓰러진다. 다가가 깨우는 흐름을 그대로 쓴다.</dd>
+    </dl>
+    <p>지면 다른 보스처럼 기절한다. 랏코 도시락은 지금처럼 어느 보스에게든 처음 졌을 때 한 번만 준다. 아노코만의 새 방문은 없다. 보스 곡도 그대로 쓴다.</p>
+    <p>같이 놀기에서는 주인 마을의 아노코를 손님도 같이 때린다. 이야기 진행과 보상은 주인에게만 있다(왕버섯과 같다).</p>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>모습과 모델</h2>
+    <p>모델은 새 파일 <code>actors/anoko.js</code> 의 <code>buildAnoko()</code> 하나로 만들고 세 곳에서 쓴다. 보스(<code>monsters.js</code> 의 <code>BUILD.anoko</code> 가 감싼다), 집 앞에서 쉬는 아노코, 탈 때 내 밑의 아노코다.</p>
+    <h3>모습 (사진 두 장 기준)</h3>
+    <ul>
+      <li>동그랗고 하얀 솜털 머리와 들쭉날쭉한 갈기, 이마 가운데 작은 주황 뿔, 양옆으로 처진 작은 귀.</li>
+      <li>앞가슴은 하얀 솜털, 몸 뒤쪽은 베이지색. 네 발 끝에 주황 발톱.</li>
+      <li>초록 꼬리, 꼬리 밑면에 하얀 마디.</li>
+      <li>얼굴 둘: 싸울 때는 첫 사진의 빙글빙글 눈. 이긴 뒤와 집 앞, 탈 때는 둘째 사진처럼 눈을 감고 웃는 얼굴에 빗살무늬 분홍 볼과 작은 송곳니가 보이는 「ω」 입.</li>
+      <li>자세: 서기와 걷기(보스, 탈 때), 엎드리기(집 앞, 첫 사진처럼).</li>
+      <li>크기: 보스는 키 3쯤. 탈 때와 집 앞은 같은 모델을 줄여 자동차 높이(1.9쯤)로 하고, 내가 등에 올라앉는다.</li>
+    </ul>
+    <p>모델링은 fable 모델 에이전트에게 맡긴다. 에이전트에게 사진 두 장(이 세션 작업 폴더의 <code>anoko/anoko-lying.png</code> 엎드린 모습, <code>anoko/anoko-happy.png</code> 웃는 얼굴)과 이 절, 그리고 비슷한 예로 <code>actors/car.js</code> 와 <code>models.js</code> 의 얼굴 부품을 준다. 사진은 원작 그림이라 저장소에는 넣지 않는다. 나온 결과는 브라우저에서 확인하고 고친다.</p>
+    <p>도감에는 보스 칸에 아노코 그림(<code>ui/monsterart.js</code>)을 넣는다. 전리품은 없다.</p>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>타기와 집 앞 아노코</h2>
+    <ul>
+      <li>2장을 끝내면 아노코가 내 집 문 옆 마당에 엎드려 쉰다. 집 크기(<code>homeext</code> 의 단계)가 바뀌면 그 집 문 옆 빈자리로 옮긴다. 쫓겨났을 때도 그 자리에 있다.</li>
+      <li>가까이 가면 「말 걸기」. 고르기: 「아노코 타고 다니기」, 「자동차 타고 다니기」(자동차가 있을 때만), 「그만두기」. 고른 것은 <code>state.ride</code> 에 남는다. 기본은 자동차다.</li>
+      <li>아노코를 고르면 아노코가 쉬던 자리에 하늘색 자동차가 서 있고(자동차가 있을 때), 자동차를 고르면 아노코가 그 자리에서 쉰다. 아노코를 타고 나가 있는 동안은 그 자리가 비어 있다.</li>
+      <li>키보드로 할 때 「Space 말 걸기」와 노란 고리가 뜨게 <code>targetSpot</code> 에 경우를 넣는다.</li>
+      <li>오른쪽 위 탈것 버튼과 C 키는 고른 것을 탄다. 버튼 그림도 자동차나 아노코 얼굴로 바꾼다. 자동차가 없어도 아노코가 있으면 버튼이 생긴다.</li>
+      <li>빠르기는 자동차와 같은 6.4, 부딪힘 반지름은 0.6. 타고 내리는 규칙(<code>carStay</code>: 이야기 장면, 낚시, 기절 같은 때 저절로 내린다)은 자동차와 같다.</li>
+      <li>같이 놀기: 다른 사람 화면에도 아노코를 탄 모습으로 보인다. 지금 탈 때 보내는 몸짓 <code>drive</code> 에 무엇을 탔는지를 함께 보낸다. 이 값이 없는 옛 손님은 자동차로 그린다.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>저장과 함께 고칠 것</h2>
+    <ul>
+      <li>저장: <code>state.ride</code>(<code>'car' | 'anoko'</code>), <code>state.story.anokoDown</code>(날짜). 아노코를 얻었는지는 <code>isDone(state, 'anoko')</code> 로 본다.</li>
+      <li>저장 코드 사전(<code>core/savedict.js</code>)은 건드리지 않는다. 한 글자만 바꿔도 이미 내보낸 CTW3 코드를 못 풀고, 새 키는 사전에 없어도 그대로 저장된다.</li>
+      <li>테스트: 퀘스트 여는 조건(끝낸 다음 날), <code>boss</code> 단계 <code>species</code>, 숲 자리 불변, 공격마다 0.2초 늦은 회피, 솜털 방패(앞 3분의 1, 옆과 뒤 그대로), 혼자와 친구 둘 균형, 탈것 고르기와 버튼, 저장 코드 왕복.</li>
+      <li>노션 퀘스트 페이지(메인 이야기 2장)와 돈 페이지(보상 6000원)를 코드에서 뽑은 값으로 고친다.</li>
+      <li>끝나면 main 에 올리고, <code>version.json</code> 과 바뀐 파일을 아티팩트에 다시 올린다.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>만드는 사람이 정할 것</h2>
+    <ul>
+      <li>마당 정확한 자리(±6 안), 흙길 모양, 이름표 글.</li>
+      <li>체력, 피해, 공격 간격 같은 숫자의 최종값(균형 목표를 지키는 안에서).</li>
+      <li><code>sweep</code> 공격의 반원 크기와 예고 시간.</li>
+      <li>솜털 방패의 앞쪽 각도(60도 근처)와 아노코가 도는 빠르기(균형 목표를 지키는 안에서).</li>
+      <li>모델 세부(부품 수, 색 값), 탈 때 앉는 높이.</li>
+      <li>2장 대사(게임에서 새로 쓴다).</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <span>최종 보스 아노코 설계서 2026-11-13</span>
+  <span>관련 문서: <a href="Balance-Patch-Notes-2026-10-16.html">밸런스 패치 내역</a></span>
+</footer>
+
+</div>
+</body>
+</html>
