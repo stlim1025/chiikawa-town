@@ -187,7 +187,7 @@ function monsterCards(s, withCount) {
           chip('zap', 'atk-chip', M.atk),
           chip('shield', 'tough-chip', '단단함', shields),
           chip('heart', 'hit', `−${M.dmg}`),
-          chip(svgSpan('ico', dropSvg(M.drop)), 'drop', D.name, h('b', {}, won(D.price)))),
+          D ? chip(svgSpan('ico', dropSvg(M.drop)), 'drop', D.name, h('b', {}, won(D.price))) : null), // 아노코는 전리품이 없다(쓰러뜨리면 탈것이 된다)
         withCount ? h('div', { class: 'd weed-tip' }, M.note) : null));
   };
   const out = [];

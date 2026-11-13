@@ -47,6 +47,8 @@ export const MONSTERS = {
   gasbug: { name: '줄무늬 가스벌레', region: 'mountain', hp: 5, dmg: 5, speed: 1.8, aggro: 7, drop: 'antennaball', size: 0.48, attack: 'gas', atk: '더듬이 독가스', note: '초록 줄무늬 껍데기를 쓴 벌레. 멈춰 서서 더듬이 끝 방울로 독가스를 뿜는다. 가스 안에 있으면 기운이 조금씩 준다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 4, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
   kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 108, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
+  // 최종 보스 아노코(메인 이야기 2장 — core/anoko.js): 숲에 사는 것은 원작을 따르고, 능력치 · 공격 · 앞쪽 솜털 방패는 게임에서 정했다. 쓰러뜨리면 전리품 대신 집 앞에서 탈것이 된다
+  anoko: { name: '아노코', short: '아노코', region: 'boss', hp: 220, dmg: 18, speed: 1.8, aggro: 9, size: 1.4, boss: true, attack: 'boss', atk: '앞발 할퀴기, 꼬리 휩쓸기, 뛰어 덮치기, 솜털 뭉치 날리기, 부하 부르기', note: '서쪽 숲 너머에 사는 커다란 솜털 짐승. 앞에서 치면 솜털에 막혀 잘 안 들어가니 친구와 같이 옆이나 뒤를 노리자.' },
   // 구역 보스(동 · 서 · 남): 저마다 굴 · 빈터에 한 마리씩 산다. 쓰러뜨리면 다음 날 다시 나타난다(core/bosses.js).
   // 보스(구역 보스 셋 · 왕버섯) 체력은 하트를 쌓은 토벌 친구와 같이 잡도록 1.5배(예전 54 · 60 · 56 · 72 는 혼자서도 며칠 만에 다 잡혀 친구를 데려갈 일이 없었다)
   bigmole: { name: '대왕 두더지', short: '대왕 두더지', region: 'fields', hp: 81, dmg: 14, speed: 1.7, aggro: 9, drop: 'goldclaw', size: 1.1, boss: true, attack: 'boss', atk: '할퀴기, 땅속 기습, 흙덩이 비, 부하 부르기', note: '동쪽 들판 굴밭의 주인. 땅속으로 숨었다가 발밑에서 솟구친다.' },
@@ -55,7 +57,7 @@ export const MONSTERS = {
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
 /** 도감 · 안내서 순서(구역별로 셋씩, 그 구역 보스가 끝에). */
-export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'gasbug', 'moth', 'kingcap'];
+export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'gasbug', 'moth', 'kingcap', 'anoko'];
 /**
  * 더듬이 독가스(줄무늬 가스벌레, world/monsters.js 의 ATK.gas): 멈춰 서서 wind 초 동안 더듬이를 떨며 내 자리에 빨간 원(반지름 radius)이 차오르고,
  * lock 비율이 지나면 자리를 굳힌다(그 뒤로 피할 수 있다). 다 차면 더듬이 끝에서 가스가 뿜어져 그 자리에 life 초 머문다.

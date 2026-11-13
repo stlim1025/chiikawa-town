@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ANOKO_SIZE, ANOKO_SHIELD, ANOKO_TURN, ANOKO_ATK, frontGuard, inSweep, rideKind, isValidRide } from '../src/core/anoko.js';
+import { MONSTERS, MONSTER_ORDER, WEAPONS } from '../src/core/combat.js';
+import { bossSeen } from '../src/core/bosses.js';
 
 const SPEED = 3.2, ME = 0.32, REACTS = [0.15, 0.2, 0.25];
 const close = (a, b) => Math.abs(a - b) < 1e-9;
@@ -94,4 +96,115 @@ test('솜털 뭉치 날리기: 0.2초(± 0.05) 늦어도 틈으로 피한다(두
     for (const d of [3.5, 4, 6]) assert.ok(ringEscapes(ANOKO_ATK.fluff2, r, d), `두 겹, 반응 ${r}, 거리 ${d}`);
   }
   assert.ok(ANOKO_ATK.fluff2.twice > 0 && ANOKO_ATK.fluff2.ring && ANOKO_ATK.fluff.ring);
+});
+
+test('아노코: 최종 보스 항목(전리품 없음, 도감 맨 끝)', () => {
+  const M = MONSTERS.anoko;
+  assert.ok(M && M.boss && M.attack === 'boss' && M.region === 'boss');
+  assert.equal(M.hp, 220);
+  assert.equal(M.dmg, 18);
+  assert.equal(M.size, ANOKO_SIZE);
+  assert.equal(M.drop, undefined);
+  assert.equal(MONSTER_ORDER[MONSTER_ORDER.length - 1], 'anoko');
+  assert.equal(bossSeen({ story: { anokoSeen: 53 } }, 'anoko'), true);
+  assert.equal(bossSeen({ story: {} }, 'anoko'), false);
+});
+
+/** 시드 난수(같은 시드면 같은 싸움). */
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+/**
+ * 아노코와의 싸움 모형(설계서 5절). 나는 반짝 검, 기운 stamina, 먹을 것 없이 붙어서 휘두른다.
+ *  · 아노코가 나를 노리면 앞에서 쳐서 솜털 방패만큼만 들어가고, 공격 뒤 쉬는 틈(rec)에만 옆으로 돌아(AROUND 초 걸어서) 그대로 들어간다.
+ *    멀리서 하는 공격(뛰어 덮치기 · 솜털 고리)을 피해 달아났으면 다시 붙는 데 1.2초(4칸쯤) 걸린다.
+ *    예고(wind)와 공격(act) 동안은 피하느라 휘두르지 못한다. 공격 하나는 다 피하지만, 부하 공격이 아노코 공격과 0.5초 안으로 겹치면 아노코 쪽을 맞는다.
+ *  · 친구(힘 allies)는 1.05초마다 친다. 칠 때마다 30% 로 아노코가 그 친구를 노린다(그 친구는 앞에서 쳐서 방패, 나머지는 그대로). 노린 친구는 공격마다 한 대를 맞고,
+ *    체력 40 이 다 떨어지면 쓰러진다 — 나는 2초 동안 깨우고(그동안 못 친다) 12 로 일어난다.
+ *  · 부하는 처음 4초, 그 뒤 9초(화나면 7초)마다 나오고(마지막 단계에는 둘), 3초마다 나를 공격한다. 혼자면 12초, 친구가 있으면 6초 만에 쓰러뜨린다.
+ * → { won, stamina, hpLeft(비율), time }
+ */
+function simulateFight({ allies = [], seed = 1, stamina = 100, endless = false }) {
+  const M = MONSTERS.anoko, A = ANOKO_ATK, W = WEAPONS.star, rnd = rng(seed), dt = 0.05, H = M.hp;
+  let t = 0, hp = H, st = stamina, target = 'me', swingCd = 0, wake = 0, summonT = 4, back = 0;
+  const team = allies.map((power, i) => ({ i, power, hp: 40, down: false, cd: 0.3 + i * 0.5 }));
+  const minions = [];
+  let phase = 'cool', left = 1.2, atk = null, queued = null, recT = 0;
+  const AROUND = (ANOKO_SHIELD.arc * (ANOKO_SIZE + 0.4)) / SPEED; // 앞에서 옆까지 몸을 돌아 걷는 시간
+  const rage = () => (hp <= H * 0.5 ? 2 : hp <= H * 0.75 ? 1 : 0);
+  const pick = () => {
+    if (queued) { const q = queued; queued = null; return q; }
+    if (target !== 'me') return A.claw;
+    const r = rnd();
+    return r < 0.6 ? A.claw : r < 0.8 ? A.leap : rage() >= 2 ? A.fluff2 : A.fluff;
+  };
+  const actLen = (a) => (a.kind === 'combo' ? a.n * a.gap : a.kind === 'stomp' ? a.air : 0);
+  const land = () => { // 아노코 공격이 닿는 순간
+    const dmg = Math.round(M.dmg * (atk.dmgK || 1));
+    if (target === 'me') {
+      if (minions.some((m) => Math.abs(m.next) < 0.5 || m.since < 0.5)) st -= dmg; // 부하와 겹쳤다
+    } else {
+      const a = team[target];
+      a.hp -= dmg;
+      if (a.hp <= 0) { a.down = true; target = 'me'; }
+    }
+    if (atk === A.claw && rage() >= 1 && target === 'me') queued = A.tail;
+  };
+  while (hp > 0 && (endless || st > 0) && t < 600) {
+    t += dt;
+    // 아노코
+    left -= dt;
+    if (left <= 0) {
+      const k = rage() >= 2 ? 0.7 : 1;
+      if (phase === 'cool') { atk = pick(); phase = 'wind'; left = atk.wind; }
+      else if (phase === 'wind') { phase = 'act'; left = actLen(atk); }
+      else if (phase === 'act') { if (target === 'me' && (atk.kind === 'stomp' || atk.kind === 'shoot')) back = 1.2; land(); phase = 'rec'; recT = 0; left = queued ? 0.15 : atk.rec * k; }
+      else { phase = 'cool'; left = queued ? 0 : atk.cool * k; }
+    }
+    // 부하
+    summonT -= dt;
+    if (summonT <= 0) { summonT = rage() >= 1 ? 7 : 9; for (let n = rage() >= 2 ? 2 : 1; n > 0; n--) minions.push({ life: allies.length ? 6 : 12, next: 1.5, since: 9 }); }
+    for (const m of minions) { m.life -= dt; m.next -= dt; m.since += dt; if (m.next <= 0) { m.next = 3; m.since = 0; } }
+    for (let i = minions.length - 1; i >= 0; i--) if (minions[i].life <= 0) minions.splice(i, 1);
+    // 나
+    const downed = team.find((a) => a.down);
+    if (wake > 0) { wake -= dt; if (wake <= 0 && downed) { downed.down = false; downed.hp = 12; } }
+    else if (downed) wake = 2;
+    else {
+      swingCd -= dt;
+      if (back > 0) back -= dt;
+      if (phase === 'rec') recT += dt;
+      const dodging = back > 0 || (target === 'me' && (phase === 'wind' || phase === 'act' || (phase === 'rec' && recT < AROUND)));
+      if (swingCd <= 0 && !dodging) {
+        swingCd = W.cool;
+        hp -= W.dmg * (target === 'me' && phase !== 'rec' ? ANOKO_SHIELD.front : 1);
+      }
+    }
+    // 친구들
+    for (const a of team) {
+      if (a.down) continue;
+      a.cd -= dt;
+      if (a.cd > 0) continue;
+      a.cd = 1.05;
+      hp -= a.power * (target === a.i ? ANOKO_SHIELD.front : 1);
+      if (target !== a.i && rnd() < 0.3) target = a.i;
+    }
+  }
+  return { won: hp <= 0, stamina: Math.max(0, st), hpLeft: Math.max(0, hp) / H, time: t };
+}
+const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
+
+test('균형: 혼자면 체력 절반쯤에서 기운이 바닥나고, 친구 둘이면 기운 30 넘게 남기고 이긴다', () => {
+  const solo = SEEDS.map((seed) => simulateFight({ seed }));
+  const left = median(solo.map((r) => r.hpLeft));
+  assert.ok(left >= 0.35 && left <= 0.65, `혼자: 기운이 바닥날 때 아노코 체력 ${(left * 100).toFixed(0)}% 남음`);
+  const party = SEEDS.map((seed) => simulateFight({ seed, allies: [2, 1] }));
+  assert.ok(median(party.map((r) => (r.won ? 1 : 0))) === 1, '친구 둘이면 이긴다');
+  const st = median(party.map((r) => r.stamina));
+  assert.ok(st > 30, `친구 둘: 남은 기운 ${st}`);
+  const soloTime = median(SEEDS.map((seed) => simulateFight({ seed, endless: true }).time));
+  const partyTime = median(party.map((r) => r.time));
+  assert.ok(soloTime >= partyTime * 3, `혼자 ${soloTime.toFixed(0)}초, 친구 둘 ${partyTime.toFixed(0)}초`);
 });

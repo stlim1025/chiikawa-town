@@ -22,7 +22,7 @@ export const ANOKO_TURN = 2.4;
  *  두 겹 고리는 첫 고리와 탄 수를 같게 두어 반 칸 비튼 둘째 고리 사이로도 옮겨 설 틈이 있게 했다.
  */
 export const ANOKO_ATK = {
-  claw: { range: 2.4, wind: 0.7, n: 3, gap: 0.32, reach: 0.9, cool: 1.4, rec: 0.8, kind: 'combo' },
+  claw: { range: 2.4, wind: 0.7, n: 3, gap: 0.32, reach: 0.9, cool: 1.4, rec: 1.2, kind: 'combo' }, // 세 번 할퀸 뒤 1.2초 숨을 고른다(그사이 옆으로 돌아 들어가 칠 틈)
   tail: { range: 99, wind: 0.85, radius: 3.0, cool: 1.4, rec: 1.0, kind: 'sweep' },
   leap: { range: 9, wind: 0.85, lock: 0.65, air: 0.95, radius: 2.4, height: 1.6, cool: 1.8, rec: 0.9, kind: 'stomp' },
   fluff: { range: 10, wind: 0.8, n: 10, spread: (Math.PI * 2) / 10, ring: true, speed: 4.2, r: 0.34, life: 2.6, color: '#fbf7ef', dmgK: 0.7, cool: 1.6, rec: 0.6, kind: 'shoot' },

@@ -15,6 +15,7 @@ export const bossesOf = (state) => state.bosses || {};
 /** 이 보스를 마주친 적이 있는지(도감에 이름 · 모습이 드러난다). 왕버섯은 이야기 기록으로 본다. */
 export function bossSeen(state, species) {
   if (species === 'kingcap') return !!(state.story && state.story.bossSeen);
+  if (species === 'anoko') return !!(state.story && state.story.anokoSeen); // 최종 보스 아노코: 2장에서 협곡 안을 들여다봤을 때
   const r = bossesOf(state)[species];
   return !!(r && r.seen);
 }

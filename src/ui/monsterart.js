@@ -126,6 +126,17 @@ const MON = {
     <path d="M4 30Q4 6 32 6t28 24q-28 8-56 0z" fill="#c0473c" ${S}/>
     <ellipse cx="32" cy="12" rx="5" ry="2.4" fill="#fff3dc"/><ellipse cx="16" cy="20" rx="4" ry="2" fill="#fff3dc"/><ellipse cx="47" cy="18" rx="4.4" ry="2.2" fill="#fff3dc"/><ellipse cx="28" cy="24" rx="3" ry="1.5" fill="#fff3dc"/>
     ${eyes(32, 40, 6.5, 2.6, 0.9)}<path d="M26 49q6-4 12 0q-6 4-12 0z" fill="#6b2b2b"/><path d="M30 48v2M34 48v2" stroke="#fff" stroke-width="1.6"/>`,
+  // 최종 보스 아노코: 들쭉날쭉한 하얀 솜털 머리 · 이마의 작은 주황 뿔 · 처진 귀 · 빙글빙글 눈 · ω 입 · 빗살 볼, 베이지 몸, 하얀 마디의 초록 꼬리, 주황 발톱
+  anoko: () => `${shadow(25)}
+    <path d="M46 51q12 1 14-10q1-6-3-8q-1 8-10 10z" fill="#7aa66e" ${S}/><path d="M48 50l2-3M52 48l1-3M55 45l1-3" stroke="#f6f1e6" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M11 53q-2-11 7-15h28q9 4 7 15z" fill="#eadbc6" ${S}/>
+    ${[17, 47].map((x) => `<ellipse cx="${x}" cy="53" rx="5" ry="3.2" fill="#fff" ${S} stroke-width="1.8"/><path d="M${x - 3} 55l-1 3M${x} 56v3M${x + 3} 55l1 3" stroke="#f2a46a" stroke-width="2.4" stroke-linecap="round"/>`).join('')}
+    <path d="M8 22q-6 1-4 7q4 1 6-3M56 22q6 1 4 7q-4 1-6-3" fill="#fff" ${S} stroke-width="1.8"/>
+    <path d="M32 7c5 0 6 3 10 3c3 3 7 2 8 6c4 2 5 6 3 9c3 3 2 7-1 9c1 4-2 7-6 7c-2 3-7 4-10 2c-3 2-7 2-8 0c-3 2-7 1-9-2c-4 0-7-3-6-7c-3-2-4-6-1-9c-2-3-1-7 3-9c1-4 5-3 8-6c4 0 5-3 10-3z" fill="#fff" ${S}/>
+    <path d="M30 9l2-6l2 6z" fill="#f2a46a" ${S} stroke-width="1.6"/>
+    ${[24, 40].map((x) => `<circle cx="${x}" cy="25" r="4.6" fill="#f3e2cf" stroke="${L}" stroke-width="1.4"/><path d="M${x} 25a1.2 1.2 0 1 1 1.2 1.2a2.4 2.4 0 1 1 -2.4 -2.4a3.6 3.6 0 1 1 3.6 3.6" fill="none" stroke="#b07a52" stroke-width="1.3" stroke-linecap="round"/>`).join('')}
+    ${[17, 47].map((x) => `<ellipse cx="${x}" cy="32" rx="3.6" ry="2.4" fill="#f6b3b8"/><path d="M${x - 1.6} 31l-0.8 2M${x} 31l-0.8 2M${x + 1.6} 31l-0.8 2" stroke="#d9707c" stroke-width="0.9" stroke-linecap="round"/>`).join('')}
+    <path d="M28 32q2 3 4 0q2 3 4 0" fill="none" stroke="${L}" stroke-width="1.6" stroke-linecap="round"/>`,
   // 구역 보스: 대왕 두더지(흙더미 위 회갈색 두더지 · 황금 발톱) · 고목 거인(줄기 몸 · 잎 머리) · 강가 왕집게(조약돌 등딱지 · 오른쪽 큰 집게)
   bigmole: () => `${shadow(26)}
     <path d="M4 57q4-11 28-11t28 11z" fill="#9a7552" ${S}/>
