@@ -135,7 +135,9 @@ export function createRemotePlayers(scene, area = 'village') {
         p.chibi.root.add(p.mount.root);
       }
       if (p.mount) { p.mount.root.visible = onAnoko; if (onAnoko) { p.mountStep = (p.mountStep || 0) + Math.hypot(p.x - ox, p.z - oz) * 2.2; p.mount.animate(p.t, { moving: Math.hypot(p.x - ox, p.z - oz) > 1e-4, step: p.mountStep }); } }
-      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : onAnoko ? anokoLift : drive ? DRIVE_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로, 차에 탔으면 의자 높이로
+      const bob = onAnoko && p.mount ? p.mount.bob * ANOKO_RIDE_SCALE : 0; // 아노코가 튀어 오르는 만큼 탄 사람도 들썩(아노코 발은 땅에)
+      if (onAnoko && p.mount) p.mount.root.position.y = -anokoLift - bob;
+      p.chibi.root.position.set(p.x, floorY(p.x, p.z) + (anim === 'bench' ? SEAT_LIFT : onAnoko ? anokoLift + bob : drive ? DRIVE_LIFT : 0), p.z); // 벤치 · 정자에 앉았으면 자리 높이로, 차에 탔으면 의자 높이로
       p.chibi.root.rotation.y = p.yaw;
       const swing = anim === 'swing' || anim === 'thrust' ? Math.min(1, p.animT / 0.34) : 0; // 휘두르기 진행(내 캐릭터의 SWING_TIME 과 같게)
       showHeld(p);

@@ -281,20 +281,30 @@ export function buildAnoko() {
     const breath = Math.sin(t * (lying ? 1.3 : 1.9));
     chest.scale.setScalar(1 + 0.014 * breath);
     mane.scale.setScalar(1 + 0.012 * Math.sin(t * (lying ? 1.3 : 1.9) - 0.5));
-    trunk.position.y = base.trunkY + gait * Math.abs(Math.sin(ph)) * 0.05;
-    head.rotation.x = base.headTilt + 0.012 * breath + gait * Math.sin(ph * 2) * 0.03;
+    // 달릴 때: 한 걸음에 두 번 몸 전체가 통통 튀어 오르고(가라앉을 때 살짝 납작), 앞뒤로 껑충 기울며 좌우로도 조금 흔들린다
+    const hop = Math.sin(ph) ** 2;
+    trunk.position.y = base.trunkY + gait * hop * 0.2;
+    trunk.rotation.x = gait * Math.sin(ph * 2 + 0.8) * 0.08;
+    trunk.rotation.z = gait * Math.sin(ph) * 0.045;
+    trunk.scale.set(1 + gait * (1 - hop) * 0.03, 1 - gait * (1 - hop) * 0.05, 1 + gait * (1 - hop) * 0.03);
+    head.rotation.x = base.headTilt + 0.012 * breath - gait * Math.sin(ph * 2 + 1.4) * 0.09; // 몸과 엇갈려 끄덕
+    mane.scale.y *= 1 + gait * Math.sin(ph * 2 + 2) * 0.04; // 갈기 털이 출렁
     legs.forEach(({ group, paw, phase }, i) => {
-      const b = base.legs[i], swing = Math.sin(ph + phase) * 0.5 * gait;
+      const b = base.legs[i], swing = Math.sin(ph + phase) * 0.75 * gait;
       group.rotation.x = b.pitch + swing;
       paw.rotation.x = -b.pitch - swing * 0.6;
     });
-    const speed = lying ? 0.7 : 1.2, amp = lying ? 0.07 : 0.12;
+    const speed = lying ? 0.7 : 1.2, amp = (lying ? 0.07 : 0.12) + gait * 0.1;
     tail.forEach((seg, i) => {
-      seg.rotation.y = base.tail[i][1] + Math.sin(t * speed - i * 0.6) * amp;
-      seg.rotation.x = base.tail[i][0] + (i ? gait * Math.sin(ph * 2 - i * 0.5) * 0.03 : 0);
+      seg.rotation.y = base.tail[i][1] + Math.sin(t * speed - i * 0.6) * amp + gait * Math.sin(ph - i * 0.7) * 0.14;
+      seg.rotation.x = base.tail[i][0] + (i ? gait * Math.sin(ph * 2 - i * 0.5) * 0.1 : 0); // 달리면 꼬리가 위아래로 출렁
     });
   }
 
   setPose('stand');
-  return { root, height: HEIGHT, setFace, setPose, animate };
+  return {
+    root, height: HEIGHT, setFace, setPose, animate,
+    /** 달리며 몸통이 튀어 오른 높이(크기 1 기준): 등에 탄 캐릭터도 이만큼 같이 들썩인다. */
+    get bob() { return trunk.position.y - base.trunkY; }
+  };
 }

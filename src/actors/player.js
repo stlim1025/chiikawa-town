@@ -178,7 +178,14 @@ export function createPlayer(scene, chibi, village) {
       model.root.position.set(position.x, groundY(position.x, position.z) + (riding ? (rideKind === 'anoko' ? ANOKO_LIFT : DRIVE_LIFT) : api.lift || 0), position.z); // 다리 위면 판 높이, lift: 통나무에 앉을 때처럼 조금 위로(차에 타면 의자 높이)
       model.root.rotation.y = yaw;
       if (riding && rideKind === 'car' && car) rollCar(car, Math.hypot(position.x - sx, position.z - sz), t);
-      if (riding && rideKind === 'anoko' && mount) { mountStep += Math.hypot(position.x - sx, position.z - sz) * 2.2; mount.animate(t, { moving: Math.hypot(position.x - sx, position.z - sz) > 1e-4, step: mountStep }); } // 아노코: 간 만큼 발을 놀린다
+      if (riding && rideKind === 'anoko' && mount) {
+        // 아노코: 간 만큼 발을 놀리고, 몸통이 튀어 오르는 만큼 등에 탄 나도 같이 들썩인다(아노코 발은 땅에 그대로)
+        mountStep += Math.hypot(position.x - sx, position.z - sz) * 2.2;
+        mount.animate(t, { moving: Math.hypot(position.x - sx, position.z - sz) > 1e-4, step: mountStep });
+        const b = mount.bob * ANOKO_RIDE_SCALE;
+        model.root.position.y += b;
+        mount.root.position.y = -ANOKO_LIFT - b;
+      }
       animateChibi(model, mode, t, { phase, power: api.power, swing: swingT > 0 ? 1 - swingT / api.swingDur : 0, moving, eat: eatT > 0 ? 1 - eatT / eatDur : undefined });
     }
   };
