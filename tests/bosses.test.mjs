@@ -31,8 +31,8 @@ test('구역 보스: 동쪽 들판 · 서쪽 숲 · 남쪽 강가에 한 마리�
   assert.equal(MONSTERS.kingcap.region, 'boss');
 });
 
-test('보스 마당 넷(구역 보스 셋 + 왕버섯 굴): 서로 · 마을과 떨어져 있고, 입구는 길 쪽', () => {
-  assert.deepEqual(Lay.ARENAS.map((A) => A.id).sort(), ['bigcrab', 'bigmole', 'elder', 'kingcap']);
+test('보스 마당 다섯(구역 보스 셋 + 왕버섯 굴 + 아노코의 숲): 서로 · 마을과 떨어져 있고, 입구는 길 쪽', () => {
+  assert.deepEqual(Lay.ARENAS.map((A) => A.id).sort(), ['anoko', 'bigcrab', 'bigmole', 'elder', 'kingcap']);
   const wallR = (A) => A.r + Lay.ARENA_WALL + 0.8;
   for (const A of Lay.ARENAS) {
     assert.ok(Math.hypot(A.x, A.z) - wallR(A) > Lay.VILLAGE_R + 10, `${A.id}: 마을에서 멀리`);
