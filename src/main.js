@@ -99,7 +99,7 @@ import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { weatherOf, WEATHER_DIM, seasonAt, seasonOfMonth } from './core/season.js';
-import { checkAchievements, claimAchievement, setTitle, titleOf, unclaimedCount, achievementOf } from './core/achieve.js';
+import { checkAchievements, claimAchievement, setTitle, titleOf, unclaimedCount, achievementOf, achBannerReady } from './core/achieve.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS, bossEatWait, BOSS_EAT_COOL } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
@@ -7208,13 +7208,14 @@ function boot() {
     else if (!seen('snowman')) { markSeen('snowman'); hud.toast('눈사람은 다섯 개까지 남고, 겨울이 끝나면 모두 녹아요', 4000); }
   }
   // ---------- 도감과 업적(core/achieve.js, 게임 오리지널): 1초마다 이미 있는 기록으로 판단, 이루면 배너, 받기는 마을폰 '업적' 앱 ----------
-  let achT = 0, achInit = false, achSummary = 0;
+  let achT = 0, achInit = false, achSummary = 0, achSince = 99; // achSince: 앞 업적 배너(알림)를 띄운 뒤 흐른 초
   const achQueue = []; // 이뤘는데 아직 배너를 못 띄운 업적(대화 · 이야기 장면 · 첫날 안내가 끝나면 하나씩)
   /** 불러온 저장을 새로 판단한다(이미 이룬 업적은 배너 대신 알림 하나로). beginSession 이 부른다. */
   function resetAchievements() { achInit = false; achSummary = 0; achQueue.length = 0; achT = 0; }
   function updateAchievements(dt) {
     if (!state) return;
     hud.setTitle(titleOf(state)); // 왼쪽 위 칭호 띠(바뀐 글만 다시 쓴다)
+    achSince += dt;
     achT -= dt;
     if (achT > 0) return;
     achT = 1;
@@ -7225,17 +7226,20 @@ function boot() {
       else achSummary += r.newly.length; // 불러오자마자 이미 이룬 것들: 배너가 쏟아지지 않게 알림 하나로
     }
     achInit = true;
-    if (guide.open || cutscene || tutorialActive(state.tutorial) || panels.isOpen()) return;
+    // 대화 · 이야기 장면 · 잠 · 기절 · 시험과 알바 창 · 첫날 안내 · 다른 배너(보스를 쓰러뜨렸다 같은)가 끝나고, 앞 업적 배너와 겹치지 않게 차례로
+    const busy = guide.open || cutscene || questScene || sleeping || fainting || overlay || funBusy() || tutorialActive(state.tutorial) || panels.isOpen();
+    if (!achBannerReady({ busy, bannerOnScreen: hud.bannerBusy(), sinceLast: achSince })) return;
     if (achSummary) {
       hud.toast(`이미 이룬 업적이 ${achSummary}개 있어요! 마을폰 업적 앱에서 받아요`, 4600);
       achSummary = 0;
+      achSince = 0;
     } else if (achQueue.length) {
       const a = achievementOf(achQueue.shift());
-      if (a) { hud.banner('업적을 이뤘어요!', a.name, 3000); sound.play('ready'); }
+      if (a) { hud.banner('업적을 이뤘어요!', a.name, 3000); sound.play('ready'); achSince = 0; }
     }
   }
   let starNotice = 0, shakeT = 0;
-  const STARMAN ={ kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
+  const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
   const meWho = () => (swapOn ? { kind: 'me', ...myBodyTag() } : { kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' }); // 몸이 바뀐 동안 내 이름표는 하치와레
   const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
   const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓

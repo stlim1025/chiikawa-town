@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACH_GROUPS, ACHIEVEMENTS, progressOf, checkAchievements, claimAchievement, unclaimedCount, titlesOf, setTitle, titleOf, addRecord, isValidAchieve, isValidRecords, titleFromLook } from '../src/core/achieve.js';
+import { ACH_GROUPS, ACHIEVEMENTS, progressOf, checkAchievements, claimAchievement, unclaimedCount, titlesOf, setTitle, titleOf, addRecord, isValidAchieve, isValidRecords, titleFromLook, ACH_BANNER_GAP, achBannerReady } from '../src/core/achieve.js';
 import { seasonsSeen } from '../src/core/season.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
@@ -125,6 +125,22 @@ test('업적: 받기는 한 번만, 못 이룬 것은 못 받고, 칭호와 기�
   assert.equal(g.state.home.owned.dexplaque, 1);
   assert.equal(claimAchievement(g.state, 'dexAll').ok, false);
   assert.equal(g.state.home.owned.dexplaque, 1);
+});
+
+test('업적 배너: 다른 일 중이거나 배너가 떠 있거나 앞 배너 뒤 3.4초 안이면 기다린다', () => {
+  assert.equal(ACH_BANNER_GAP, 3.4);
+  assert.equal(achBannerReady({ busy: false, bannerOnScreen: false, sinceLast: 10 }), true);
+  assert.equal(achBannerReady({ busy: true, bannerOnScreen: false, sinceLast: 10 }), false, '대화 · 이야기 장면 · 잠 · 시험 창');
+  assert.equal(achBannerReady({ busy: false, bannerOnScreen: true, sinceLast: 10 }), false, '보스를 쓰러뜨린 배너 같은 다른 배너');
+  assert.equal(achBannerReady({ busy: false, bannerOnScreen: false, sinceLast: 1 }), false, '앞 업적 배너와 겹치지 않게');
+  assert.equal(achBannerReady({ busy: false, bannerOnScreen: false, sinceLast: 3.4 }), true);
+});
+
+test('업적: 날 번호가 소수여도 이룬 날은 정수로 적어 저장 검사를 지난다', () => {
+  const s = { ...addRecord(fresh(), 'leaves', 30), clock: { day: 5.5, t: 0.3 } };
+  const r = checkAchievements(s);
+  assert.deepEqual(r.state.achieve.leaves30, { day: 5 });
+  assert.equal(isValidState(r.state), true);
 });
 
 test('같이 놀기 칭호: 친구가 보낸 모습의 칭호는 글자만, 12자까지', () => {

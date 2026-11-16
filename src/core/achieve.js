@@ -101,10 +101,15 @@ export function checkAchievements(state) {
   const got = achieveOf(state), newly = [];
   for (const a of ACHIEVEMENTS) if (!got[a.id] && progressOf(state, a.id).done) newly.push(a.id);
   if (!newly.length) return { state, newly };
-  const day = state.clock ? state.clock.day : 0, next = { ...got };
+  const day = state.clock ? Math.max(0, Math.floor(state.clock.day)) : 0, next = { ...got }; // 저장 검사는 정수 날만 받는다
   for (const id of newly) next[id] = { day };
   return { state: { ...state, achieve: next }, newly };
 }
+
+/** 업적 배너 사이 간격(초): 배너가 3초 떠 있으니 겹치지 않게 차례로. */
+export const ACH_BANNER_GAP = 3.4;
+/** 업적 배너를 지금 띄워도 되는지: 다른 일(대화 · 이야기 장면 · 잠 · 시험 창 · 첫날 안내) 중도, 다른 배너가 떠 있어도, 앞 업적 배너 뒤 간격 안이어도 기다린다. */
+export const achBannerReady = ({ busy, bannerOnScreen, sinceLast }) => !busy && !bannerOnScreen && sinceLast >= ACH_BANNER_GAP;
 
 /** 이뤘지만 아직 받지 않은 업적 수. */
 export const unclaimedCount = (state) => Object.values(achieveOf(state)).filter((r) => !r.got).length;

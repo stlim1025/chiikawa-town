@@ -362,6 +362,8 @@ export function createHud(ui, input) {
     setPhoneNudge(on) { if (gear.classList.contains('nudge') !== !!on) { gear.classList.toggle('nudge', !!on); gear.setAttribute('aria-label', on ? '마을폰(새 앱이 생겼어요)' : '마을폰(설정)'); } },
     /** 집으로 버튼을 보일지(마을 밖에 있을 때). */
     setRecall(on) { recallBtn.hidden = !on; },
+    /** 가운데 배너(banner)가 떠 있는지(업적 배너가 다른 배너를 덮지 않게 기다린다). */
+    bannerBusy() { return !!ui.querySelector('.hud-banner'); },
     /** 급수 아래 칭호 띠(업적 앱에서 단 칭호, null 이면 숨긴다). */
     setTitle(text) {
       titleEl.hidden = !text;
