@@ -1,6 +1,7 @@
 import { MONSTERS } from './combat.js';
 import { hourOf } from './clock.js';
 import { hasLicense } from './licenses.js';
+import { addRecord } from './records.js';
 
 /**
  * 현상금 몬스터(게임 오리지널): 어떤 날은 구역 하나에 평소 몬스터의 '황금' 대장이 한 마리 나타난다(크고 단단하고 아프게 친다, 머리에 금관).
@@ -78,7 +79,7 @@ export const markBountyDown = (state) => ({ ...state, bounty: { ...bountyRecord(
 export function claimBounty(state) {
   const b = bountyNow(state);
   if (!b || b.status !== 'down') return { ok: false, state, reward: 0 };
-  return { ok: true, reward: b.reward, state: { ...state, money: state.money + b.reward, bounty: { ...bountyRecord(state), paid: true } } };
+  return { ok: true, reward: b.reward, state: addRecord({ ...state, money: state.money + b.reward, bounty: { ...bountyRecord(state), paid: true } }, 'bounty') }; // 업적 '현상금 사냥꾼'
 }
 
 /** 저장된 모양이 맞는지(save.js). */

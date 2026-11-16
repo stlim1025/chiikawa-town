@@ -8,6 +8,7 @@ import { sellPrice } from '../src/core/market.js';
 import { isValidState } from '../src/core/save.js';
 import { LIKES } from '../src/core/gifts.js';
 import { dateOf } from '../src/core/calendar.js';
+import { recordsOf } from '../src/core/records.js';
 
 const START = '2026-10-01';
 const fresh = () => ({ ...createState({ name: '치이', look: {} }), clock: { day: 5, t: 0.3 } });
@@ -94,6 +95,19 @@ test('눈사람 자리: 다른 눈사람과 SNOWMAN_GAP 안이면 세울 수 없
   assert.equal(snowmanRoom(undefined, 0, 0), true);
   assert.equal(snowmanRoom([{ x: 1, z: 0, day: 1, face: 0 }], 0, 0), false);
   assert.equal(snowmanRoom([{ x: 2, z: 0, day: 1, face: 0 }], 0, 0), true);
+});
+
+test('기록: 단풍잎을 주우면 records.leaves 가 늘고 실패한 줍기는 그대로, 눈사람은 녹거나 밀려나도 세운 수를 센다', () => {
+  const r = pickLeaf(fresh(), 3, 5, 'autumn');
+  assert.equal(recordsOf(r.state).leaves, 1);
+  assert.equal(recordsOf(pickLeaf(r.state, 3, 5, 'autumn').state).leaves, 1, '같은 자리 두 번째');
+  assert.equal(recordsOf(pickLeaf(r.state, 4, 5, 'autumn').state).leaves, 2);
+  assert.equal(recordsOf(pickLeaf(r.state, 5, 5, 'winter').state).leaves, 1, '가을이 아니면');
+  let s = fresh();
+  for (let i = 0; i < 6; i++) s = addSnowman(s, { x: i * 3, z: 0, face: 0 }, 60);
+  assert.equal(s.snowmen.length, SNOWMAN_MAX);
+  assert.equal(recordsOf(s).snowmen, 6);
+  assert.equal(recordsOf(meltSnowmen(s, 'spring')).snowmen, 6);
 });
 
 test('같이 놀기 눈사람(sm): 주인이 보낸 것을 손님이 그대로 받고, 이상한 값이면 하나도 그리지 않는다', () => {

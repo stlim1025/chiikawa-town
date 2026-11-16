@@ -1,4 +1,5 @@
 import { registerItems, addItem } from './inventory.js';
+import { addRecord } from './records.js';
 
 /**
  * 계절 놀이(설계서 docs/Seasons-Weather-2026-11-16.html, 게임 오리지널): three 없이 쓰고 테스트한다.
@@ -23,7 +24,7 @@ export function pickLeaf(state, id, day, season) {
   if (l.picked.includes(id)) return { ok: false, state };
   const r = addItem(state, LEAF, 1);
   if (!r.added) return { ok: false, state, full: true };
-  return { ok: true, state: { ...r.state, leaves: { day, picked: [...l.picked, id] } } };
+  return { ok: true, state: addRecord({ ...r.state, leaves: { day, picked: [...l.picked, id] } }, 'leaves') }; // 업적 '단풍잎 서른 장'
 }
 /**
  * 그날의 낙엽 더미 자리: 나무 밑 후보 [{ x, z }] 에서 시작 날짜와 날 번호로 섞어 앞 LEAF_SPOTS 곳 → [{ id: 0.., x, z }].
@@ -44,7 +45,7 @@ export const SNOWMAN_GAP = 1.6;
 export const snowmanRoom = (snowmen, x, z) => !(snowmen || []).some((s) => Math.hypot(s.x - x, s.z - z) < SNOWMAN_GAP);
 /** 눈사람을 세운다(SNOWMAN_MAX 개를 넘으면 가장 오래된 것부터 사라진다). */
 export function addSnowman(state, { x, z, face }, day) {
-  return { ...state, snowmen: [...(state.snowmen || []), { x, z, day, face }].slice(-SNOWMAN_MAX) };
+  return addRecord({ ...state, snowmen: [...(state.snowmen || []), { x, z, day, face }].slice(-SNOWMAN_MAX) }, 'snowmen'); // 업적 '눈사람 장인'은 세운 수를 센다
 }
 /** 같이 놀기(주인): 마을 모습에 실을 눈사람 [[x, z, face]](이름표 'sm'). 없으면 undefined(싣지 않는다). */
 export const snowmenToWire = (list) => (list && list.length ? list.map((s) => [s.x, s.z, s.face]) : undefined);

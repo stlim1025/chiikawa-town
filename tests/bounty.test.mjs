@@ -5,6 +5,7 @@ import { MONSTERS } from '../src/core/combat.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
 import '../src/core/quests.js';
+import { recordsOf } from '../src/core/records.js';
 
 // 이 게임의 하루는 아침 6시에 시작한다: at(day, hour)
 const at = (day, hour) => ({ day, t: (hour - 6) / 24 });
@@ -61,6 +62,9 @@ test('현상금: 쓰러뜨리면 게시판에서 한 번만 받고, 다음 날�
   assert.equal(r.state.money, money + b.reward);
   assert.equal(bountyNow(r.state).status, 'paid');
   assert.equal(claimBounty(r.state).ok, false, '두 번은 못 받는다');
+  assert.equal(recordsOf(s).bounty, 0, '쓰러뜨리기만 하고 받기 전에는 세지 않는다');
+  assert.equal(recordsOf(r.state).bounty, 1, '받으면 업적 기록이 하나 는다');
+  assert.equal(recordsOf(claimBounty(r.state).state).bounty, 1, '두 번째(실패)는 그대로');
   assert.ok(isValidState(r.state));
   assert.ok(isValidBounty(r.state.bounty));
   // 다음 현상금 날은 새로
