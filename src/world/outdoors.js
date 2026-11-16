@@ -19,20 +19,26 @@ export function buildOutdoors(ctx) {
   const outside = (x, z) => Math.hypot(x, z) > VILLAGE_R + 3;
   // 종류 → { geo, color, opts, byZone: Map(묶음 그룹 → 행렬 목록) }
   const batches = new Map();
-  function addInstance(kind, geo, color, opts, x, z, matrix) {
+  /** meta: 인스턴스마다 붙여 둘 것(숲 나무 잎: 계절마다 나무마다 색을 다시 칠할 { x, z, leaf }). */
+  function addInstance(kind, geo, color, opts, x, z, matrix, meta) {
     let b = batches.get(kind);
-    if (!b) batches.set(kind, (b = { geo, color, opts, byZone: new Map() }));
+    if (!b) batches.set(kind, (b = { geo, color, opts, byZone: new Map(), metaByZone: new Map() }));
     const g = zones.groupAt(x, z);
-    if (!b.byZone.has(g)) b.byZone.set(g, []);
+    if (!b.byZone.has(g)) { b.byZone.set(g, []); b.metaByZone.set(g, []); }
     b.byZone.get(g).push(matrix);
+    b.metaByZone.get(g).push(meta);
   }
+  // 숲 잎: 흰 재질 하나에 나무마다 인스턴스 색(계절마다 나무마다 다른 가을 색도 그리기 횟수 그대로 — paintSeason)
+  const leafMat = toonMaterial('#ffffff', { unique: true });
+  // 동쪽 끝 둔덕 재질(둔덕끼리만 — 계절마다 언덕 색으로)
+  const moundMats = [toonMaterial('#aee08f', { unique: true }), toonMaterial('#95d488', { unique: true })];
   /** 숲속 나무 하나(인스턴스): 줄기 + 잎 넷. */
   function forestTree(x, z, s, leaf) {
     const yaw = rand() * 6, c = Math.cos(yaw), sn = Math.sin(yaw);
     addInstance('trunk', GEO.cylinder, '#b88c66', { outline: 0.03 }, x, z, m4(x, 0, z, 0.16 * s, 1.1 * s, 0.16 * s));
     for (const [px, py, pz, r] of TREE_PARTS) {
       const wx = x + (px * c + pz * sn) * s, wz = z + (-px * sn + pz * c) * s;
-      addInstance('leaf' + leaf, GEO.sphereMid, leaf, { outline: 0.04 }, x, z, m4(wx, py * s, wz, r * s, r * 0.92 * s, r * s));
+      addInstance('leaf' + leaf, GEO.sphereMid, leaf, { outline: 0.04, material: leafMat }, x, z, m4(wx, py * s, wz, r * s, r * 0.92 * s, r * s), { x, z, leaf });
     }
     obstacles.push({ x, z, r: 0.6 * s });
   }
@@ -126,7 +132,8 @@ export function buildOutdoors(ctx) {
   for (let z = -WORLD_HALF; z <= WORLD_HALF; z += 9) {
     const x = 74 + rand() * 4, s = 6 + rand() * 3, h = 3 + rand() * 2;
     if (canyonAt(x, z, s + 3)) continue; // 협곡 벽 언덕까지 덮는 큰 둔덕도 뺀다
-    addInstance('mound' + (Math.abs(z) % 18 ? 0 : 1), GEO.sphere, Math.abs(z) % 18 ? '#aee08f' : '#95d488', { outline: 0.06, receive: true }, x, z, m4(x, -0.8, z, s, h, s));
+    const mk = Math.abs(z) % 18 ? 0 : 1;
+    addInstance('mound' + mk, GEO.sphere, null, { outline: 0.06, receive: true, material: moundMats[mk] }, x, z, m4(x, -0.8, z, s, h, s));
     obstacles.push({ x, z, r: s * 0.95 });
   }
   for (let k = 0; k < 3200; k++) {
@@ -193,6 +200,28 @@ export function buildOutdoors(ctx) {
   buildLairs({ zones, obstacles, labels, fader });
 
   // ---------- 모은 인스턴스를 묶음마다 그린다 ----------
-  for (const b of batches.values()) for (const [g, list] of b.byZone) g.add(toonInstances(b.geo, b.color, list, b.opts));
-  return { glow };
+  const leafSets = [], fieldFlowers = []; // 계절 풍경(paintSeason): 숲 잎 인스턴스와 그 나무들 · 들판 꽃
+  const tmpC = new THREE.Color();
+  for (const [kind, b] of batches) for (const [g, list] of b.byZone) {
+    const grp = toonInstances(b.geo, b.color, list, b.opts), metas = b.metaByZone.get(g);
+    g.add(grp);
+    if (kind.startsWith('flower')) fieldFlowers.push(grp);
+    if (metas[0] && grp.children[0]) {
+      const mesh = grp.children[0];
+      metas.forEach((t, i) => mesh.setColorAt(i, tmpC.set(t.leaf))); // 처음은 지금 잎 색(여름) — 첫 그리기 전에 넣어 셰이더가 인스턴스 색을 쓰게
+      leafSets.push({ mesh, metas });
+    }
+  }
+  return {
+    glow,
+    /** 계절 풍경(world/seasonlook.js 의 look): 숲 나무 잎 색(나무마다), 들판 꽃(겨울엔 숨김), 동쪽 끝 둔덕 색(먼 언덕과 같은 색). */
+    paintSeason(look) {
+      for (const { mesh, metas } of leafSets) {
+        metas.forEach((t, i) => mesh.setColorAt(i, tmpC.set(look.leafOf(t.x, t.z, t.leaf))));
+        mesh.instanceColor.needsUpdate = true;
+      }
+      for (const f of fieldFlowers) f.visible = look.flowers;
+      moundMats.forEach((m, i) => m.color.set(look.hills[i]));
+    }
+  };
 }

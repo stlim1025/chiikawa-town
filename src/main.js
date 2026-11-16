@@ -156,6 +156,8 @@ import { createPhotoUi } from './ui/photos.js';
 import { refreshPhotoFrame } from './world/photoframe.js';
 import { createChiiRoom } from './world/chiiroom.js';
 import { createWeather } from './world/weather.js';
+import { createSeasonLook, seasonLookOf } from './world/seasonlook.js';
+import { createSeasonFx } from './world/seasonfx.js';
 import { createBlackStarStory } from './stories/blackstar.js';
 import { loopDue, rewind as loopRewind, markLoop as loopMark, startLoop as loopStart, endLoop as loopEnd, loopGate, loopOf, BLEACH_PRICE } from './core/blackstar.js';
 import { createStarGame } from './ui/stargame.js';
@@ -7037,6 +7039,8 @@ function boot() {
   // ---------- 별똥별이 쏟아지는 밤(core/starfall.js · world/starfall.js): 소원을 빌다가 진짜 별똥별이 떨어져 별똥별맨이 ----------
   const starfall = createStarfall(scene), streaks = createStreaks(ui);
   const weather = createWeather(scene); // 비: 켜면 빗줄기 · 물방울 고리, 하늘 · 빛은 applySky 가 잿빛으로
+  // 계절 풍경(world/seasonlook.js): 나무 · 땅 · 덤불 · 언덕 색, 장식 꽃, 지붕 눈. 계절 입자(world/seasonfx.js): 봄 꽃잎 · 가을 낙엽 · 겨울 발자국
+  const seasonLook = createSeasonLook({ village, home: homeExt }), seasonFx = createSeasonFx(scene);
   const RAIN_TOP = new THREE.Color('#5b6470'), RAIN_HOR = new THREE.Color('#8b939d');
   const CLOUD_TOP = new THREE.Color('#a9b4bf'), CLOUD_HOR = new THREE.Color('#d6dce2'); // 흐린 날: 옅은 회색
   const SNOW_TOP = new THREE.Color('#c4ccd5'), SNOW_HOR = new THREE.Color('#e8ebef'); // 눈 오는 날: 밝은 회색
@@ -7057,6 +7061,8 @@ function boot() {
   function updateDailyWeather(dt, guest) {
     const c = guest && visiting && visiting.clock ? { start: visiting.startDate, day: visiting.clock.day } : state ? { start: state.startDate, day: state.clock.day } : null;
     todaySeason = seasonForce || (c ? seasonAt(c.start || todayISO(), c.day) : seasonOfMonth(new Date().getMonth() + 1));
+    if (seasonLook.apply(todaySeason)) seasonFx.setSnowGround(seasonLookOf(todaySeason).snowGround); // 계절이 바뀔 때만 다시 칠한다
+    seasonFx.setSeason(todaySeason);
     todayWx = wxForce || (c ? weatherOf(c.start, c.day) : 'sunny');
     const story = storyRainOn(guest), rain = story || todayWx === 'rain';
     weather.setRain(rain);
@@ -7995,6 +8001,7 @@ function boot() {
     }
     starfall.update(dt, cam.camera);
     weather.update(dt, focus); // 비(검은 별똥별의 비 오는 아침 등)
+    seasonFx.update(dt, focus, t, cam.camera.position); // 봄 꽃잎 · 가을 낙엽(내 둘레) · 겨울 발자국
     updateAnokoMood(dt, focus);
     gfx.followSun(focus.x, focus.z);
     if (!skipRender && drawNow) {

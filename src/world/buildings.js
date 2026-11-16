@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { GEO } from '../render/toon.js';
+import { GEO, LINE_COLOR } from '../render/toon.js';
 
 /**
  * 마을 건물 모양(가게 · 친구 집마다 따로): 같은 상자 집에 간판만 얹는 대신 벽 · 지붕 · 앞면 생김새부터 다르게 짓는다.
  * 모든 건물은 남쪽(+z, 카메라 쪽)을 보고, 들어가는 곳은 앞면 가운데 근처다. 바닥 넓이는 layout 의 반지름 안.
  * 각 모양은 ctx = { s, part(geo, color, opts), block(x, z, r), glow(mesh), ROOF } 를 받아 그리고 { H: 가장 높은 곳 } 을 돌려준다.
+ * 지붕 조각에는 opts.snow 를 달아 둔다(겨울에 그 위로 눈 덮개가 생긴다 — 파일 끝 '지붕 눈').
  * part 로 만든 조각은 그 건물 전용 재질이라, 내 캐릭터를 가리면 함께 반투명해진다. glow 한 조각(재질)은 밤에 불이 들어온다.
  */
 
@@ -70,7 +71,7 @@ export const DESIGNS = {
     [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => part(GEO.box, wood, { position: [sx * W / 2, H / 2, sz * D / 2], scale: [0.12 * s, H, 0.12 * s], shell: true, outline: 0.015, shadow: false }));
     part(GEO.box, wood, { position: [0, H - 0.06 * s, F + 0.03], scale: [W + 0.1, 0.12 * s, 0.1], shell: true, outline: 0.015, shadow: false });
     // 기와 지붕 + 용마루
-    part(HIP, '#3f4757', { position: [0, H, 0], scale: [W + 0.75, 0.8 * s, D + 0.8], shell: true, outline: 0.03 });
+    part(HIP, '#3f4757', { position: [0, H, 0], scale: [W + 0.75, 0.8 * s, D + 0.8], shell: true, outline: 0.03, snow: true });
     part(GEO.box, '#2e3440', { position: [0, H + 0.8 * s, 0], scale: [(W + 0.75) * 0.52 + 0.1, 0.09 * s, 0.16], shell: true, outline: 0.015 });
     // 앞이 트인 카운터: 어두운 가게 안 · 나무 카운터 · 김 나는 솥 · 그릇
     const ox = W * 0.12, ow = W * 0.6;
@@ -123,7 +124,7 @@ export const DESIGNS = {
     [-1, 1].forEach((sx) => part(GEO.box, '#ffffff', { position: [sx * (W / 2 - 0.04), H / 2, F + 0.02], scale: [0.08, H, 0.04], shell: true, outline: 0.01, shadow: false }));
     // 헛간 지붕(민트) + 앞 박공벽(판자, 지붕 테두리가 보이게 조금 작게) + 둥근 창
     const RW = W + 0.3, RH = 1.15 * s, RF = F + 0.15, k = (W - 0.12) / RW;
-    part(BARN, '#7fcdb2', { position: [0, H, 0], scale: [RW, RH, D + 0.3], shell: true, outline: 0.03 });
+    part(BARN, '#7fcdb2', { position: [0, H, 0], scale: [RW, RH, D + 0.3], shell: true, outline: 0.03, snow: { clip: 0.5, flat: 'z' } });
     part(BARN, plank, { position: [0, H + 0.01, RF + 0.015], scale: [RW * k, RH * k, 0.03], ...NOOUT });
     [-0.3, 0, 0.3].forEach((fx) => part(GEO.box, '#cfa775', { position: [fx * RW * k, H + RH * k * 0.36, RF + 0.035], scale: [0.02, RH * k * 0.7, 0.01], ...NOOUT }));
     glow(part(DISC, '#c6e7f5', { position: [0, H + 0.45 * s, RF + 0.04], scale: [0.19 * s, 0.19 * s, 0.03], ...NOOUT }));
@@ -189,7 +190,7 @@ export const DESIGNS = {
     for (let i = 0; i < 7; i++) part(GEO.box, wood, { position: [-W2 / 2 + 0.15 + i * (W2 - 0.3) / 6, H1 - 0.03, F1 + (F2 - F1) / 2], scale: [0.07, 0.07, F2 - F1 + 0.04], outline: 0.008, shadow: false });
     // 앞으로 박공을 보이는 가파른 지붕 + 박공벽(흰 벽 · 가운데 기둥) + 다락 둥근 창
     const RW = W2 + 0.3, RH = 1.25 * s, RF = oz + (D2 + 0.4) / 2;
-    gable(ctx, '#8a5a3a', 0, H2, oz, RW, RH, D2 + 0.4, { shell: true, outline: 0.03 });
+    gable(ctx, '#8a5a3a', 0, H2, oz, RW, RH, D2 + 0.4, { shell: true, outline: 0.03, snow: { flat: 'x' } });
     const iw = W2 - 0.1, ih = RH * iw / RW;
     gable(ctx, wall2, 0, H2 + 0.01, RF + 0.01, iw, ih, 0.02);
     part(GEO.box, wood, { position: [0, H2 + ih * 0.3, RF + 0.025], scale: [0.06 * s, ih * 0.6, 0.01], ...NOOUT });
@@ -238,7 +239,7 @@ export const DESIGNS = {
     // 외쪽 지붕(앞이 낮다) + 그 밑 옆벽 쐐기 + 골함석 줄
     const RS = 0.8 * s, tilt = Math.atan2(RS, D), L = Math.hypot(D, RS) + 0.5;
     part(WEDGE, '#c9a27a', { position: [0, H, 0], scale: [W, RS, D], shell: true, outline: 0.015 });
-    part(GEO.box, '#6f8fb0', { position: [0, H + RS / 2 + 0.04, 0], rotation: [tilt, 0, 0], scale: [W + 0.4, 0.07, L], shell: true, outline: 0.025 });
+    part(GEO.box, '#6f8fb0', { position: [0, H + RS / 2 + 0.04, 0], rotation: [tilt, 0, 0], scale: [W + 0.4, 0.07, L], shell: true, outline: 0.025, snow: { clip: 0.6, pad: 0.08, shrink: 0.9 } });
     for (let i = 0; i < 9; i++) part(GEO.box, '#8fb0d0', { position: [-W / 2 - 0.1 + (i + 0.5) * (W + 0.2) / 9, H + RS / 2 + 0.085, 0], rotation: [tilt, 0, 0], scale: [0.03, 0.025, L - 0.05], ...NOOUT });
     // 옆 돌 굴뚝 · 화덕 불(밤에 더 밝다) · 연기
     const cx = -W / 2 - 0.1 * s, cz = -0.2 * s, CH = H + RS + 0.6 * s;
@@ -288,7 +289,7 @@ export const DESIGNS = {
     const { s, part, block, glow } = ctx;
     const W = 2.3 * s, D = 1.7 * s, H = 1.5 * s, F = D / 2, lilac = '#c4b4e8';
     part(GEO.box, '#fbfbff', { position: [0, H / 2, 0], scale: [W, H, D], receive: true, shell: true });
-    part(GEO.box, lilac, { position: [0, H + 0.07 * s, 0], scale: [W + 0.25, 0.14 * s, D + 0.25], shell: true, outline: 0.025 });
+    part(GEO.box, lilac, { position: [0, H + 0.07 * s, 0], scale: [W + 0.25, 0.14 * s, D + 0.25], shell: true, outline: 0.025, snow: { clip: 0.6, pad: 0.06, shrink: 0.9 } });
     part(GEO.box, lilac, { position: [0, H - 0.14 * s, F + 0.01], scale: [W, 0.1 * s, 0.02], ...NOOUT });
     part(GEO.box, '#e8e6f2', { position: [0, 0.06 * s, F + 0.02], scale: [W + 0.02, 0.12 * s, 0.04], ...NOOUT });
     // 통유리(밤에 켜진다) + 흰 창살 + 매물 종이 넷
@@ -341,12 +342,12 @@ export const DESIGNS = {
     part(GEO.box, '#fffdf7', { position: [0, H / 2, 0], scale: [W, H, D], receive: true, shell: true });
     part(GEO.box, '#dfe6f0', { position: [0, 0.08 * s, 0], scale: [W + 0.06, 0.16 * s, D + 0.06], shell: true, shadow: false });
     part(GEO.box, '#dfe6f0', { position: [0, H - 0.05 * s, F + 0.01], scale: [W + 0.04, 0.1 * s, 0.03], ...NOOUT });
-    part(HIP, '#7fa7d9', { position: [0, H, 0], scale: [W + 0.4, 0.75 * s, D + 0.4], shell: true, outline: 0.03 });
+    part(HIP, '#7fa7d9', { position: [0, H, 0], scale: [W + 0.4, 0.75 * s, D + 0.4], shell: true, outline: 0.03, snow: true });
     // 시계탑(지붕에서 솟는다) · 시계 · 네모뿔 지붕 · 깃발
     const tz = -0.15 * s, TB = H + 0.25 * s, TH = 1.05 * s, cy = TB + TH * 0.64, cz = tz + 0.37 * s;
     part(GEO.box, '#fffdf7', { position: [0, TB + TH / 2, tz], scale: [0.72 * s, TH, 0.72 * s], shell: true, outline: 0.02 });
     part(GEO.box, '#dfe6f0', { position: [0, TB + TH - 0.04 * s, tz], scale: [0.8 * s, 0.08 * s, 0.8 * s], shell: true, outline: 0.012, shadow: false });
-    part(PYRAMID, '#5f87c0', { position: [0, TB + TH, tz], scale: [1.0 * s, 0.62 * s, 1.0 * s], shell: true, outline: 0.02 });
+    part(PYRAMID, '#5f87c0', { position: [0, TB + TH, tz], scale: [1.0 * s, 0.62 * s, 1.0 * s], shell: true, outline: 0.02, snow: { clip: 0.35 } });
     part(DISC, '#ffffff', { position: [0, cy, cz], scale: [0.23 * s, 0.23 * s, 0.03], outline: 0.012, shadow: false });
     part(TORUS, '#f6c453', { position: [0, cy, cz + 0.01], scale: [0.24 * s, 0.24 * s, 0.1], outline: 0.01, shadow: false });
     part(GEO.box, '#3a3236', { position: [0, cy + 0.07 * s, cz + 0.025], scale: [0.025, 0.15 * s, 0.01], ...NOOUT });
@@ -384,7 +385,7 @@ export const DESIGNS = {
     const R = 1.0 * s, H = 1.1 * s, RR = R * 1.38, RH = 1.05 * s;
     part(GEO.cylinder, '#fff1d0', { position: [0, 0, 0], scale: [R, H, R], receive: true, outline: 0.03 });
     part(GEO.cylinder, '#e8d2a6', { position: [0, 0, 0], scale: [R + 0.02, 0.16 * s, R + 0.02], outline: 0.015, shadow: false });
-    part(GEO.cone, '#e9c46a', { position: [0, H - 0.05, 0], scale: [RR, RH, RR], outline: 0.03 });
+    part(GEO.cone, '#e9c46a', { position: [0, H - 0.05, 0], scale: [RR, RH, RR], outline: 0.03, snow: { clip: 0.4 } });
     [0.28, 0.56].forEach((f) => part(GEO.cylinder, '#d6a94a', { position: [0, H - 0.05 + f * RH, 0], scale: [RR * (1 - f) + 0.012, 0.035, RR * (1 - f) + 0.012], ...NOOUT }));
     part(GEO.sphere, '#d6a94a', { position: [0, H - 0.05 + RH, 0], scale: [0.1, 0.1, 0.1], outline: 0.012, shadow: false });
     part(ARCH, '#c9874a', { position: [-0.12 * s, 0, R - 0.02], scale: [0.48 * s, 0.52 * s, 0.1], shell: true, outline: 0.015, shadow: false });
@@ -418,7 +419,7 @@ export const DESIGNS = {
     }
     // 앞으로 박공을 보이는 지붕 + 통나무 박공벽 + 작은 다락 창
     const RW = W + 0.55, RH = 1.05 * s, RF = (D + 0.5) / 2;
-    gable(ctx, '#6f9a5e', 0, H, 0, RW, RH, D + 0.5, { shell: true, outline: 0.03 });
+    gable(ctx, '#6f9a5e', 0, H, 0, RW, RH, D + 0.5, { shell: true, outline: 0.03, snow: { flat: 'x' } });
     const iw = W - 0.05, ih = RH * iw / RW;
     gable(ctx, '#b98250', 0, H + 0.01, RF + 0.01, iw, ih, 0.02);
     [0.22, 0.45].forEach((f) => part(GEO.box, '#a06d40', { position: [0, H + ih * f, RF + 0.025], scale: [iw * (1 - f) * 0.95, 0.025, 0.01], ...NOOUT }));
@@ -456,7 +457,7 @@ export const DESIGNS = {
     part(GEO.cylinder, '#dcecf8', { position: [0, 0, 0], scale: [R, H, R], receive: true, outline: 0.03 });
     part(GEO.cylinder, '#bcd8ef', { position: [0, 0, 0], scale: [R + 0.03, 0.22 * s, R + 0.03], outline: 0.015, shadow: false });
     part(GEO.cylinder, '#f7c6d8', { position: [0, H * 0.62, 0], scale: [R + 0.02, 0.06 * s, R + 0.02], ...NOOUT });
-    part(GEO.cone, '#9fc6ea', { position: [0, H - 0.05, 0], scale: [RR, RH, RR], outline: 0.03 });
+    part(GEO.cone, '#9fc6ea', { position: [0, H - 0.05, 0], scale: [RR, RH, RR], outline: 0.03, snow: { clip: 0.4 } });
     part(GEO.cylinder, '#f7a8c4', { position: [0, H - 0.05, 0], scale: [RR * 0.97, 0.06 * s, RR * 0.97], outline: 0.012, shadow: false });
     const top = H - 0.05 + RH + 0.1;
     part(GEO.sphere, '#fcd95b', { position: [0, top, 0], scale: [0.15, 0.15, 0.06], outline: 0.015, shadow: false });
@@ -491,8 +492,8 @@ export const DESIGNS = {
     }
     // 기와 지붕: 넓은 우진각 위에 작은 박공 · 용마루 · 들린 끝
     const R0 = B + H;
-    part(HIP, tile, { position: [0, R0, 0], scale: [W + 0.7, 0.55 * s, D + 0.8], shell: true, outline: 0.03 });
-    part(ROOF, tile, { position: [0, R0 + 0.3 * s, 0], scale: [W * 0.62, 0.55 * s, (D + 0.8) * 0.5], shell: true, outline: 0.025 });
+    part(HIP, tile, { position: [0, R0, 0], scale: [W + 0.7, 0.55 * s, D + 0.8], shell: true, outline: 0.03, snow: true });
+    part(ROOF, tile, { position: [0, R0 + 0.3 * s, 0], scale: [W * 0.62, 0.55 * s, (D + 0.8) * 0.5], shell: true, outline: 0.025, snow: { clip: 0.45, flat: 'x' } });
     const RT = R0 + 0.85 * s;
     part(GEO.box, '#2e3440', { position: [0, RT, 0], scale: [W * 0.7, 0.09 * s, 0.14], shell: true, outline: 0.015 });
     [-1, 1].forEach((sx) => part(GEO.cone, '#2e3440', { position: [sx * W * 0.35, RT - 0.03, 0], rotation: [0, 0, -sx * 0.6], scale: [0.08, 0.26 * s, 0.08], outline: 0.012, shadow: false }));
@@ -513,3 +514,101 @@ export const DESIGNS = {
     return { H: RT + 0.2 };
   }
 };
+
+// ---------- 지붕 눈(겨울) ----------
+/**
+ * 지붕에 쌓인 눈: 지붕 조각(part 에 snow 를 준 것)의 위쪽만 잘라 살짝 부풀린 하얀 덮개를 한 채에 한 덩어리로 만든다.
+ * 외곽선도 같은 도형에 담는다(더 부풀려 뒤집은 짙은 껍질 — 앞면만 그리는 재질 하나로 눈과 선을 한 번에 그린다).
+ * 집이 반투명해질 때는 선을 빼고 눈만 그린다(fadeRoofSnow). 덮개는 숨겨 둔 채로 만들어, 겨울에만 보이게 한다(숨긴 동안은 그리지 않는다).
+ * snow 옵션: true 또는 { clip: 조각 높이의 이 비율 위만(0.3), pad: 눈 두께(0.05), flat: 'x' | 'z' 박공처럼 그 축으로는 부풀리지 않는다
+ * (지붕 끝 세모 면은 지붕 색 그대로, 눈은 그 위 한 겹으로 보인다), shrink: 평평한 판 지붕은 옆으로 이만큼 줄여 처마가 남게 }
+ */
+const SNOW_LINE_W = 0.03;
+const snowClipCache = new Map();
+/** 도형에서 높이 비율 clip 위쪽만 잘라 낸 삼각형들(자리 · 법선을 차례로)과 축마다 원점에서 가장 먼 거리. */
+function snowTop(geometry, clip) {
+  const key = geometry.uuid + '|' + clip;
+  if (snowClipCache.has(key)) return snowClipCache.get(key);
+  const P = geometry.attributes.position, N = geometry.attributes.normal, I = geometry.index;
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox, y0 = bb.min.y + clip * (bb.max.y - bb.min.y);
+  const ext = [Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)), Math.max(Math.abs(bb.min.y), Math.abs(bb.max.y)), Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z))];
+  const pos = [], nor = [], count = I ? I.count : P.count;
+  const vert = (i) => { const k = I ? I.getX(i) : i; return [P.getX(k), P.getY(k), P.getZ(k), N.getX(k), N.getY(k), N.getZ(k)]; };
+  const mix = (a, b) => { const t = (y0 - a[1]) / (b[1] - a[1]); return a.map((v, k) => v + (b[k] - v) * t); };
+  for (let t = 0; t < count; t += 3) {
+    const tri = [vert(t), vert(t + 1), vert(t + 2)], poly = [];
+    for (let k = 0; k < 3; k++) { // 높이 y0 아래를 잘라 낸다(세모 → 세모 · 네모)
+      const a = tri[k], b = tri[(k + 1) % 3], ain = a[1] >= y0, bin = b[1] >= y0;
+      if (ain) poly.push(a);
+      if (ain !== bin) poly.push(mix(a, b));
+    }
+    for (let k = 1; k + 1 < poly.length; k++) for (const v of [poly[0], poly[k], poly[k + 1]]) { pos.push(v[0], v[1], v[2]); nor.push(v[3], v[4], v[5]); }
+  }
+  const out = { pos, nor, ext };
+  snowClipCache.set(key, out);
+  return out;
+}
+/** 지붕 조각 mesh(unit 아래 어딘가에 달려 있다)의 눈 덮개 재료: unit 기준 자리 · 도형 · 옵션(opt: part 의 snow 값). */
+export function snowItem(unit, mesh, opt) {
+  const matrix = new THREE.Matrix4();
+  for (let a = mesh; a && a !== unit; a = a.parent) { a.updateMatrix(); matrix.premultiply(a.matrix); }
+  return { geometry: mesh.geometry, matrix, ...(opt === true ? {} : opt) };
+}
+/**
+ * 눈 덮개 재료들([snowItem])을 한 메시로(unit 기준 좌표, 숨긴 채로 돌려준다). material: 그 집 전용 꼭짓점 색 재질
+ * (가릴 때 같이 반투명해지게 집 재질 목록에 넣는다). 재료가 없으면 null. userData.capVerts: 눈 부분 꼭짓점 수(그 뒤는 외곽선).
+ */
+export function roofSnowMesh(items, material) {
+  if (!items || !items.length) return null;
+  const pos = [], nor = [], col = [], line = { pos: [], nor: [], col: [] };
+  const white = new THREE.Color('#ffffff'), ink = new THREE.Color(LINE_COLOR);
+  const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
+  for (const it of items) {
+    const { clip = 0.3, pad = 0.05, flat = null, shrink = null } = it;
+    const top = snowTop(it.geometry, clip);
+    it.matrix.decompose(p, q, s);
+    nm.getNormalMatrix(it.matrix);
+    // 축마다 부풀리는 배율(조각의 원점 기준): 눈은 pad 만큼, 선은 거기에 선 굵기만큼 더
+    const grow = (w) => ['x', 'y', 'z'].map((ax, k) => {
+      const size = Math.abs(s.getComponent(k)) * top.ext[k] || 1;
+      if (ax === flat) return 0.99;
+      if (shrink !== null && ax !== 'y') return shrink + (w - pad) / size;
+      return 1 + w / size;
+    });
+    const f = grow(pad), f2 = grow(pad + SNOW_LINE_W);
+    const tris = top.pos.length / 9;
+    for (let t = 0; t < tris; t++) {
+      for (let k = 0; k < 3; k++) {
+        const j = (t * 3 + k) * 3;
+        v.set(top.pos[j] * f[0], top.pos[j + 1] * f[1], top.pos[j + 2] * f[2]).applyMatrix4(it.matrix);
+        n.set(top.nor[j], top.nor[j + 1], top.nor[j + 2]).applyMatrix3(nm).normalize();
+        pos.push(v.x, v.y, v.z); nor.push(n.x, n.y, n.z); col.push(white.r, white.g, white.b);
+      }
+      for (const k of [0, 2, 1]) { // 외곽선: 더 부풀려 뒤집는다(뒤쪽 면만 보인다)
+        const j = (t * 3 + k) * 3;
+        v.set(top.pos[j] * f2[0], top.pos[j + 1] * f2[1], top.pos[j + 2] * f2[2]).applyMatrix4(it.matrix);
+        n.set(top.nor[j], top.nor[j + 1], top.nor[j + 2]).applyMatrix3(nm).normalize().negate();
+        line.pos.push(v.x, v.y, v.z); line.nor.push(n.x, n.y, n.z); line.col.push(ink.r, ink.g, ink.b);
+      }
+    }
+  }
+  if (!pos.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos.concat(line.pos), 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor.concat(line.nor), 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col.concat(line.col), 3));
+  const mesh = new THREE.Mesh(g, material);
+  mesh.userData.capVerts = pos.length / 3;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.raycast = () => {};
+  mesh.visible = false;
+  return mesh;
+}
+/** 집이 반투명해지는 동안(solid = false)은 눈 덮개의 외곽선을 빼고 눈만 그린다(반투명한 눈 뒤로 짙은 껍질이 비치지 않게). */
+export function fadeRoofSnow(cap, solid) {
+  if (!cap || cap.userData.solid === solid) return;
+  cap.userData.solid = solid;
+  cap.geometry.setDrawRange(0, solid ? Infinity : cap.userData.capVerts);
+}

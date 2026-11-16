@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, GEO } from '../render/toon.js';
 import { mergeUnit } from '../render/batch.js';
+import { snowItem, roofSnowMesh, fadeRoofSnow } from './buildings.js';
 
 /**
  * 내 집 바깥 모습(게임 오리지널): 부동산에서 집을 넓힐수록 더 화려해진다(core/home.js 의 크기 번호).
@@ -9,6 +10,7 @@ import { mergeUnit } from '../render/batch.js';
  *  2 큰 방: 기둥 현관 위 발코니 · 가운데 박공과 둥근 창 · 굴뚝 둘 · 다듬은 나무와 정원 등불이 있는 2층 저택
  * 넓힌 집은 처음 보일 때 짓고(마을 정적 배칭이 끝난 뒤라 따로 합친다), 돔은 숨기고 그 장애물은 끈다.
  * 문 앞(village.spots.home)과 이름표 자리도 그 집에 맞춘다. 내 캐릭터를 가리면 마을 집처럼 반투명해진다.
+ * 겨울에는 넓힌 집 지붕에도 눈이 쌓인다(setRoofSnow — 돔 집의 눈은 마을(village.setRoofSnow)이 맡는다).
  * village: buildVillage 가 돌려준 것(myHome · obstacles · group · addWindow · refreshNav · spots).
  */
 const PYRAMID = new THREE.ConeGeometry(1, 1, 4).translate(0, 0.5, 0).rotateY(Math.PI / 4); // 네모 모임지붕(면이 앞 · 옆을 본다)
@@ -25,10 +27,11 @@ function gableGeo(w, h, d) {
 
 export function createHomeExterior(village) {
   const H = village.myHome;
-  if (!H) return { show: () => false, update() {}, signAt: () => null, tier: () => 0 };
+  if (!H) return { show: () => false, update() {}, signAt: () => null, tier: () => 0, setRoofSnow() {} };
   const { lot } = H, baseDoor = { ...H.door }, baseSign = { ...H.label };
   const built = {};
   let shown = 0;
+  let roofSnow = false; // 겨울 지붕 눈을 보이는 중(나중에 짓는 집도 이 값대로)
 
   /** 한 채: 부품은 집마다 따로 둔 재질로 합친다(가리면 이 집만 반투명해지게). 창유리는 밤에 불이 들어온다. */
   function unit() {
@@ -37,21 +40,25 @@ export function createHomeExterior(village) {
     const vc = toonMaterial('#ffffff', { unique: true, vertexColors: true });
     const glass = toonMaterial('#cfe9f5', { unique: true });
     const gold = toonMaterial('#f2c94c', { unique: true });
-    const parts = [], obs = [];
-    const P = (geo, color, opts = {}) => { const m = toonMesh(geo, color, opts); g.add(m); parts.push(m); return m; };
+    const parts = [], obs = [], snow = []; // snow: 지붕 조각(opts.snow)마다 겨울 눈 덮개 재료
+    const P = (geo, color, opts = {}) => { const m = toonMesh(geo, color, opts); g.add(m); parts.push(m); if (opts.snow) snow.push(snowItem(g, m, opts.snow)); return m; };
     const G = (geo, opts = {}) => { const m = toonMesh(geo, null, { ...opts, material: glass, shadow: false }); g.add(m); parts.push(m); return m; };
     const Au = (geo, opts = {}) => { const m = toonMesh(geo, null, { ...opts, material: gold }); g.add(m); parts.push(m); return m; };
     const block = (lx, lz, hx, hz) => obs.push({ x: lot.x + lx, z: lot.z + lz, box: { hx, hz, yaw: 0 } });
     const round = (lx, lz, r) => obs.push({ x: lot.x + lx, z: lot.z + lz, r });
-    return { g, vc, glass, gold, parts, obs, P, G, Au, block, round };
+    return { g, vc, glass, gold, parts, obs, snow, P, G, Au, block, round };
   }
   function finish(u, door, sign, half) {
     const own = new Set([u.glass, u.gold]);
     const meshes = mergeUnit(u.g, u.parts, (m) => (own.has(m.material) ? { key: m.material.uuid, material: m.material, tint: null } : { key: 'vc', material: u.vc, tint: m.material.color }));
+    // 겨울 지붕 눈: 이 집 전용 재질의 덮개 한 덩어리(가리면 집과 같이 흐려진다). 겨울이 아니면 숨겨 둔다
+    const snowMat = toonMaterial('#ffffff', { unique: true, vertexColors: true });
+    const cap = roofSnowMesh(u.snow, snowMat);
+    if (cap) { cap.visible = roofSnow; u.g.add(cap); }
     village.group.add(u.g);
     for (const o of u.obs) village.obstacles.push(o);
     village.addWindow(u.glass);
-    return { g: u.g, obs: u.obs, door, sign, half, mats: [u.vc, u.glass, u.gold], meshes, fade: 1 };
+    return { g: u.g, obs: u.obs, door, sign, half, mats: cap ? [u.vc, u.glass, u.gold, snowMat] : [u.vc, u.glass, u.gold], meshes, cap, fade: 1 };
   }
   /** 창 하나(벽 앞면 z0 에 붙인다, 바깥이 +z): 흰 틀 · 유리 · 십자 창살, 덧창 색이 있으면 양옆에. */
   function windowAt(u, x, y, z0, w, h, shutter) {
@@ -74,8 +81,8 @@ export function createHomeExterior(village) {
     const gable = gableGeo(W, rise, 0.08);
     P(gable, cream, { position: [0, WH, D / 2 - 0.08], outline: 0.03 });
     P(gable, cream, { position: [0, WH, -D / 2], outline: 0.03 });
-    [1, -1].forEach((sd) => P(GEO.box, roof, { position: [0, WH + rise - (run / 2) * Math.tan(pitch) + 0.06, sd * run / 2], rotation: [sd * pitch, 0, 0], scale: [W + 0.4, 0.12, L], shell: true, outline: 0.035 }));
-    P(GEO.box, '#b24e44', { position: [0, WH + rise + 0.08, 0], scale: [W + 0.44, 0.1, 0.16], shell: true, outline: 0.02 });
+    [1, -1].forEach((sd) => P(GEO.box, roof, { position: [0, WH + rise - (run / 2) * Math.tan(pitch) + 0.06, sd * run / 2], rotation: [sd * pitch, 0, 0], scale: [W + 0.4, 0.12, L], shell: true, outline: 0.035, snow: { clip: 0.6, pad: 0.06, shrink: 0.92 } }));
+    P(GEO.box, '#b24e44', { position: [0, WH + rise + 0.08, 0], scale: [W + 0.44, 0.1, 0.16], shell: true, outline: 0.02, snow: { clip: 0.6, pad: 0.05, shrink: 0.96 } });
     // 굴뚝(뒤 지붕)
     P(GEO.box, brick, { position: [0.75, WH + rise * 0.55 + 0.3, -0.42], scale: [0.32, 0.95, 0.32], shell: true, outline: 0.025 });
     P(GEO.box, '#8a4636', { position: [0.75, WH + rise * 0.55 + 0.8, -0.42], scale: [0.4, 0.08, 0.4], shell: true, outline: 0.02 });
@@ -118,7 +125,7 @@ export function createHomeExterior(village) {
     P(GEO.box, ivory, { position: [0, 0.3 + (F2 - 0.3) / 2, 0], scale: [W, F2 - 0.3, D], shell: true, outline: 0.045, receive: true });
     P(GEO.box, trim, { position: [0, F1, 0], scale: [W + 0.06, 0.08, D + 0.06], outline: false, shadow: false });
     P(GEO.box, trim, { position: [0, F2, 0], scale: [W + 0.24, 0.14, D + 0.24], shell: true, outline: 0.025 });
-    P(PYRAMID, roofC, { position: [0, F2 + 0.07, 0], scale: [(W / 2 + 0.22) / Math.SQRT1_2, 1.15, (D / 2 + 0.22) / Math.SQRT1_2], shell: true, outline: 0.04 });
+    P(PYRAMID, roofC, { position: [0, F2 + 0.07, 0], scale: [(W / 2 + 0.22) / Math.SQRT1_2, 1.15, (D / 2 + 0.22) / Math.SQRT1_2], shell: true, outline: 0.04, snow: { clip: 0.3, pad: 0.06 } });
     Au(GEO.sphere, { position: [0, F2 + 1.28, 0], scale: [0.11, 0.11, 0.11], outline: 0.015 });
     // 굴뚝 둘
     [-1.3, 1.3].forEach((x) => {
@@ -199,6 +206,12 @@ export function createHomeExterior(village) {
     tier: () => shown,
     /** 이름표 자리 { x, y, z }(그 집 앞면 처마 언저리). */
     signAt: () => (shown ? built[shown].sign : baseSign),
+    /** 겨울 지붕 눈을 보이고 감춘다(넓힌 집 둘 다 — 아직 짓지 않은 집은 지을 때 이 값대로). 같은 값으로 다시 불러도 된다. */
+    setRoofSnow(on) {
+      if (!!on === roofSnow) return;
+      roofSnow = !!on;
+      for (const k of [1, 2]) if (built[k] && built[k].cap) built[k].cap.visible = roofSnow;
+    },
     /** 매 프레임: 넓힌 집이 내 캐릭터를 가리면 마을 집처럼 반투명하게. */
     update(dt, focus) {
       const b = shown && built[shown];
@@ -214,6 +227,7 @@ export function createHomeExterior(village) {
         if (m.transparent !== b.fade < 1) { m.transparent = b.fade < 1; m.needsUpdate = true; }
       });
       b.meshes.forEach((m) => { for (const c of m.children) c.visible = b.fade > 0.95; });
+      fadeRoofSnow(b.cap, b.fade > 0.95);
     }
   };
 }

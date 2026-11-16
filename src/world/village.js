@@ -5,7 +5,7 @@ import { createObstacleIndex, slideMove } from '../core/obstacles.js';
 import { WORLD_HALF, WALK_HALF, VILLAGE_R, GATE_HALF, GATES, POND, LOTS, ROADS, ARENAS, ARENA_WALL, roadDist, lairPathDist, shoreDist, doorSpot, lotRadius, lampSpots, bridgeCenterX, lairReach } from '../core/layout.js';
 import { createZones } from './zones.js';
 import { buildOutdoors } from './outdoors.js';
-import { DESIGNS } from './buildings.js';
+import { DESIGNS, snowItem, roofSnowMesh, fadeRoofSnow } from './buildings.js';
 import { batchStatic, mergedGeometry, mergeUnit } from '../render/batch.js';
 
 /** 흙길까지의 거리(음수면 길 위). berries.js 가 쓴다. */
@@ -19,18 +19,20 @@ const C = {
 
 const REGION_C = { forest: new THREE.Color('#86c975'), mountain: new THREE.Color('#c9c1ae'), fields: new THREE.Color('#cdee98'), river: new THREE.Color('#a8e08a') };
 const tint = new THREE.Color();
-function groundColor(x, z, out) {
+/** 땅 색. pal: 계절 땅 색(world/seasonlook.js — THREE.Color 로 바꾼 { grass, grass2, dirt, sand, region }), 없으면 지금 색(여름). */
+function groundColor(x, z, out, pal = null) {
+  const P = pal || C, R = pal ? pal.region : REGION_C;
   const n = Math.sin(x * 1.1 + z * 0.6) * 0.5 + Math.sin(x * 0.35 - z * 0.9) * 0.5;
-  out.copy(C.grass).lerp(C.grass2, 0.5 + n * 0.35);
+  out.copy(P.grass).lerp(P.grass2, 0.5 + n * 0.35);
   // 울타리 밖은 구역 색으로 물든다(대각선 경계에서는 이웃 구역 색이 섞인다)
   const outside = smooth(VILLAGE_R - 2, VILLAGE_R + 10, Math.hypot(x, z));
   if (outside > 0) {
     const k = smooth(-6, 6, Math.abs(x) - Math.abs(z)); // 1: 동서 구역, 0: 남북 구역
-    tint.copy(z < 0 ? REGION_C.mountain : REGION_C.river).lerp(x < 0 ? REGION_C.forest : REGION_C.fields, k);
+    tint.copy(z < 0 ? R.mountain : R.river).lerp(x < 0 ? R.forest : R.fields, k);
     out.lerp(tint, outside * 0.85);
   }
-  out.lerp(C.dirt, smooth(0.3, -0.1, Math.min(roadDist(x, z), lairPathDist(x, z)))); // 두더지 굴밭 협곡 · 입구 밖 흙길도 들판 길처럼
-  out.lerp(C.sand, smooth(1.2, 0.0, shoreDist(x, z)));
+  out.lerp(P.dirt, smooth(0.3, -0.1, Math.min(roadDist(x, z), lairPathDist(x, z)))); // 두더지 굴밭 협곡 · 입구 밖 흙길도 들판 길처럼
+  out.lerp(P.sand, smooth(1.2, 0.0, shoreDist(x, z)));
   return out;
 }
 
@@ -114,6 +116,7 @@ export function buildVillage(scene) {
   const ground = new THREE.Mesh(groundGeo, toonMaterial('#ffffff', { vertexColors: true }));
   ground.receiveShadow = true;
   world.add(ground);
+  const grounds = [ground]; // 계절마다 꼭짓점 색을 다시 칠하는 땅 판(paintSeason) — 정적 배칭에서 뺀다
   // 월드 끝 너머의 보스 마당(동쪽 두더지 굴밭 · 북쪽 왕버섯 굴) 둘레 땅: 같은 색 계산으로 이어 깐다(맵 끝 땅보다 아주 조금 아래 — 겹치는 띠에서 깜빡이지 않게)
   for (const A of ARENAS) {
     let x0, x1, z0, z1;
@@ -130,6 +133,7 @@ export function buildVillage(scene) {
     const far = new THREE.Mesh(geo, ground.material);
     far.receiveShadow = true;
     world.add(far);
+    grounds.push(far);
   }
 
   // 연못과 연잎
@@ -178,6 +182,7 @@ export function buildVillage(scene) {
 
   // 집도 나무처럼, 카메라와 내 캐릭터 사이를 가리면 반투명해진다. 그래서 집마다 재질을 따로 둔다.
   const houses = [];
+  const looseSnow = []; // 겨울 지붕 눈: 집이 아닌 노점 지붕(반투명해지지 않는 것)의 눈 덮개 재료 — 마을에 한 덩어리로
   const windows = []; // 밤에 불이 들어오는 창(집마다 재질)
   /**
    * 가게 · 친구 집: buildings.js 의 모양(design)대로 짓는다. 남쪽(카메라 쪽)을 보고, 조금씩 비뚤게 앉힌다.
@@ -197,12 +202,13 @@ export function buildVillage(scene) {
       if (!mats.has(c)) { const m = toonMaterial(c, { unique: true }); m.transparent = true; mats.set(c, m); }
       return mats.get(c);
     };
-    const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); return m; };
+    const snow = []; // 지붕 조각(opts.snow)마다 겨울 눈 덮개 재료
+    const part = (geo, c, opts) => { const m = place(g, toonMesh(geo, null, { ...opts, material: mat(c) })); meshes.push(m); if (opts && opts.snow) snow.push(snowItem(g, m, opts.snow)); return m; };
     const { H } = design({ s, part, block, glow, ROOF });
     world.add(g);
     obstacles.push({ x, z, r: lotRadius(lot), soft: true });
     solid(g, meshes);
-    houses.push({ x, z, half: 1.32 * s, mats: [...mats.values()], meshes, fade: 1 });
+    houses.push({ x, z, half: 1.32 * s, mats: [...mats.values()], meshes, fade: 1, unit: g, snow });
     return { H };
   }
 
@@ -220,15 +226,17 @@ export function buildVillage(scene) {
     const canopy = [place(g, toonMesh(canopyGeometry(leaf, light), null, { material: mats[0], outline: 0.04 }))];
     parent.add(g);
     obstacles.push({ x, z, r: 0.6 * s });
-    trees.push({ x, z, s, mats, canopy, fade: 1 });
+    trees.push({ x, z, s, mats, canopy, fade: 1, leaf });
   }
 
+  // 덤불 재질: 덤불끼리만 나눠 써서(전용) 계절마다 색을 바꾼다(paintSeason). 진한 덩어리 · 밝은 덩어리
+  const bushMats = [toonMaterial('#8fcd86', { unique: true }), toonMaterial('#9dd394', { unique: true })];
   function bush(x, z, s) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.scale.setScalar(s);
     [[0, 0.28, 0, 0.42], [0.38, 0.22, 0.08, 0.32], [-0.36, 0.2, 0.05, 0.3]].forEach(([px, py, pz, r], i) => {
-      place(g, toonMesh(GEO.sphereMid, i ? '#9dd394' : '#8fcd86', { position: [px, py, pz], scale: [r, r * 0.85, r], outline: 0.03 }));
+      place(g, toonMesh(GEO.sphereMid, null, { material: bushMats[i ? 1 : 0], position: [px, py, pz], scale: [r, r * 0.85, r], outline: 0.03 }));
     });
     world.add(g);
     obstacles.push({ x, z, r: 0.55 * s, soft: true }); // 덤불은 지나갈 수 있다(꽃 · 풀이 그 자리에 나지 않게만)
@@ -277,7 +285,7 @@ export function buildVillage(scene) {
     world.add(g);
     const obs = [{ x, z, r: R * 1.05 }, { x: x + Math.cos(yaw) * bx + Math.sin(yaw) * bz, z: z - Math.sin(yaw) * bx + Math.cos(yaw) * bz, r: rz + 0.12 }]; // 몸통 · 현관 혹(문에 파고들지 않게)
     obs.forEach((o) => obstacles.push(o));
-    houses.push({ x, z, half: R, mats: [...mats.values()], meshes, fade: 1 });
+    houses.push({ x, z, half: R, mats: [...mats.values()], meshes, fade: 1, unit: g, snow: [snowItem(g, meshes[0], { clip: 0.8, pad: 0.07 })] }); // 눈은 돔 꼭대기에 동그랗게
     windows.push(mats.get('#c6e7f5'));
     return { R, group: g, obs };
   }
@@ -290,7 +298,7 @@ export function buildVillage(scene) {
     place(g, toonMesh(GEO.box, wood, { position: [0, 0.75, 0], scale: [1.6, 0.12, 0.8], shell: true }));
     [[-0.7, -0.3], [0.7, -0.3], [-0.7, 0.3], [0.7, 0.3]].forEach(([lx, lz]) => place(g, toonMesh(GEO.box, wood, { position: [lx, 0.37, lz], scale: [0.08, 0.75, 0.08], shell: true })));
     [-0.85, 0.85].forEach((px) => place(g, toonMesh(GEO.box, wood, { position: [px, 1.25, -0.42], scale: [0.07, 1.0, 0.07], shell: true })));
-    place(g, toonMesh(ROOF, '#f7b6cc', { position: [0, 1.72, -0.05], scale: [1.95, 0.42, 1.1], shell: true }));
+    looseSnow.push(snowItem(world, place(g, toonMesh(ROOF, '#f7b6cc', { position: [0, 1.72, -0.05], scale: [1.95, 0.42, 1.1], shell: true })), { flat: 'x' }));
     ['#f7a8c4', '#bfe0f5', '#fff1a8', '#d9ccff', '#ffd6e2'].forEach((c, i) => place(g, toonMesh(GEO.box, c, { position: [-0.6 + i * 0.3, 0.9, 0.05], scale: [0.2, 0.16, 0.09], shell: true, shadow: false })));
     // 판매대 뒤쪽 작업 자리: 바늘꽂이 · 실패 둘 · 접힌 천(포셰트 갑옷 씨가 판매대 뒤에서 바느질한다)
     place(g, toonMesh(GEO.sphere, '#e8667a', { position: [-0.6, 0.87, -0.24], scale: [0.08, 0.06, 0.08], outline: 0.012, shadow: false }));
@@ -465,7 +473,7 @@ export function buildVillage(scene) {
     place(g, toonMesh(GEO.sphere, '#a8743c', { position: [-0.55, 0.93, 0.12], scale: [0.025, 0.025, 0.025], outline: false, shadow: false }));
     // 뒤 기둥 · 빨강 하양 차양
     [-0.72, 0.72].forEach((px) => place(g, toonMesh(GEO.box, '#a8743c', { position: [px, 1.05, -0.35], scale: [0.07, 2.1, 0.07], shell: true })));
-    place(g, toonMesh(ROOF, red, { position: [0, 2.1, -0.15], scale: [1.75, 0.34, 0.8], shell: true }));
+    looseSnow.push(snowItem(world, place(g, toonMesh(ROOF, red, { position: [0, 2.1, -0.15], scale: [1.75, 0.34, 0.8], shell: true })), { flat: 'x' }));
     [-0.6, -0.2, 0.2, 0.6].forEach((px) => place(g, toonMesh(GEO.box, '#fffaf0', { position: [px, 1.92, 0.27], scale: [0.2, 0.22, 0.03], outline: 0.012, shadow: false })));
     world.add(g);
     obstacles.push({ x, z, r: lotRadius(lot), soft: true });
@@ -538,7 +546,7 @@ export function buildVillage(scene) {
     [-0.75, 0, 0.75].forEach((px) => pp(g, GEO.box, '#a77a52', { position: [px, 0.45, 0.36], scale: [0.04, 0.8, 0.02], outline: false, shadow: false }));
     // 뒤 기둥 · 앞 기둥 · 차양 지붕
     [[-1.15, -0.55], [1.15, -0.55], [-1.15, 0.45], [1.15, 0.45]].forEach(([px, pz]) => pp(g, GEO.box, wood, { position: [px, 1.15, pz], scale: [0.09, 2.3, 0.09], shell: true }));
-    pp(g, ROOF, lot.roof || '#e9884f', { position: [0, 2.25, -0.05], scale: [2.75, 0.55, 1.45], shell: true });
+    const snow = [snowItem(g, pp(g, ROOF, lot.roof || '#e9884f', { position: [0, 2.25, -0.05], scale: [2.75, 0.55, 1.45], shell: true }), { flat: 'x' })];
     // 차양 끝 흰 줄무늬(노렌 느낌)
     [-0.9, -0.3, 0.3, 0.9].forEach((px) => pp(g, GEO.box, '#fff3e0', { position: [px, 2.0, 0.66], scale: [0.48, 0.34, 0.03], shell: true, outline: 0.015, shadow: false }));
     // 뒤 선반: 맥주잔 줄 · 맥주통
@@ -576,7 +584,7 @@ export function buildVillage(scene) {
     world.add(g);
     obstacles.push({ x, z: z - 0.05, r: lotRadius(lot), soft: true });
     solid(g, g.children, true);
-    houses.push({ x, z, half: 1.4, mats: [...mats.values()], meshes, fade: 1 });
+    houses.push({ x, z, half: 1.4, mats: [...mats.values()], meshes, fade: 1, unit: g, snow });
     labels.push({ x, y: 3.6, z, text: lot.label });
   }
 
@@ -661,7 +669,8 @@ export function buildVillage(scene) {
       });
     });
     gatePart(GEO.box, '#f5ead2', { position: [0, 2.05, 0], scale: [3.0, 0.48, 0.12], shell: true });
-    gatePart(ROOF, '#f4a091', { position: [0, 2.3, 0], scale: [3.5, 0.36, 0.5], shell: true });
+    gt.unit = g;
+    gt.snow = [snowItem(g, gatePart(ROOF, '#f4a091', { position: [0, 2.3, 0], scale: [3.5, 0.36, 0.5], shell: true }), { flat: 'x', pad: 0.04 })];
     if (painted) {
       // 글씨 판: 마을 밖에서 들어올 때(앞)도, 마을 안에서 나갈 때(뒤)도 읽히게 앞뒤에 한 장씩. 문이 반투명해지면 같이 흐려진다(gt.mats)
       const mat = new THREE.MeshBasicMaterial({ map: signTexture(title, { w: 1024, size: 128, spaced: false }) });
@@ -775,20 +784,23 @@ export function buildVillage(scene) {
     flowerSpots[k % flowerColors.length].push([fx, fz]);
   }
   const m4 = new THREE.Matrix4();
+  const flowerMeshes = []; // 겨울엔 숨긴다(paintSeason)
   flowerColors.forEach((c, i) => {
     const list = flowerSpots[i];
     const petals = new THREE.InstancedMesh(GEO.speck, toonMaterial(c), list.length); // 몇 픽셀짜리 꽃잎: 성긴 구로 충분하다
     list.forEach(([fx, fz], j) => petals.setMatrixAt(j, m4.compose(new THREE.Vector3(fx, 0.07, fz), new THREE.Quaternion(), new THREE.Vector3(0.09, 0.07, 0.09))));
     world.add(petals);
+    flowerMeshes.push(petals);
   });
 
-  // 먼 언덕과 구름
+  // 먼 언덕과 구름(언덕 재질은 언덕끼리만 — 계절마다 색을 바꾼다, paintSeason)
+  const hillMats = [toonMaterial('#aee08f', { unique: true }), toonMaterial('#95d488', { unique: true })];
   for (let h = 0; h < 26; h++) {
     const a = (h / 26) * Math.PI * 2 + rand() * 0.3, d = 104 + rand() * 10, w = 10 + rand() * 5;
     if (Math.cos(a) > 0.6) continue; // 남쪽은 바다: 수평선이 트이게(바다 절벽에서 별 볼 때)
     const hx = Math.sin(a) * d, hz = Math.cos(a) * d, hh = 4 + rand() * 4;
     if (ARENAS.some((A) => Math.hypot(hx - A.x, hz - A.z) < w + 18)) continue; // 월드 끝 너머 보스 마당(왕버섯 굴 · 두더지 굴밭)에 겹치는 언덕은 뺀다(난수는 그대로)
-    world.add(toonMesh(GEO.sphere, h % 2 ? '#aee08f' : '#95d488', { position: [hx, -0.6, hz], scale: [w, hh, w], outline: false, shadow: false }));
+    world.add(toonMesh(GEO.sphere, null, { material: hillMats[h % 2 ? 0 : 1], position: [hx, -0.6, hz], scale: [w, hh, w], outline: false, shadow: false }));
   }
   for (let c = 0; c < 10; c++) {
     const g = new THREE.Group();
@@ -872,7 +884,43 @@ export function buildVillage(scene) {
     o.meshes = mergeUnit(unitOf(o.meshes[0]), o.meshes, (m) => (plain(m.material) ? { key: 'vc', material: vc, tint: m.material.color } : { key: m.material.uuid, material: m.material, tint: null }));
     o.mats = [vc, ...o.mats]; // 가릴 때 함께 반투명해지게(합치지 못하고 남은 부품은 원래 재질 그대로)
   }
-  batchStatic(world, { skip: [...clouds, ...butterflies.map((b) => b.g), raffleDrum] });
+  // 겨울 지붕 눈(setRoofSnow): 집 · 문마다 눈 덮개 한 덩어리(buildings.js roofSnowMesh — 눈과 외곽선을 한 번에 그린다). 숨겨 두어 평소에는 그리지 않고,
+  // 재질을 그 집 재질 목록에 넣어 집이 반투명해질 때 같이 흐려진다. 숨긴 메시는 아래 정적 배칭이 건드리지 않는다
+  const snowCaps = [];
+  let roofSnow = false;
+  for (const o of [...houses, ...gates]) {
+    if (!o.snow || !o.snow.length) continue;
+    const m = toonMaterial('#ffffff', { unique: true, vertexColors: true });
+    o.cap = roofSnowMesh(o.snow, m);
+    o.snow = null;
+    if (!o.cap) continue;
+    o.unit.add(o.cap);
+    o.mats.push(m);
+    snowCaps.push(o.cap);
+  }
+  const looseCap = roofSnowMesh(looseSnow, toonMaterial('#ffffff', { unique: true, vertexColors: true }));
+  if (looseCap) { world.add(looseCap); snowCaps.push(looseCap); }
+  function setRoofSnow(on) {
+    if (!!on === roofSnow) return;
+    roofSnow = !!on;
+    for (const c of snowCaps) c.visible = roofSnow;
+  }
+  batchStatic(world, { skip: [...clouds, ...butterflies.map((b) => b.g), raffleDrum, ...grounds] }); // 땅 판은 계절마다 다시 칠해서 따로 둔다
+
+  // ---------- 계절 풍경(world/seasonlook.js 가 look 을 만들어 paintSeason 으로 칠한다) ----------
+  const groundBase = grounds.map((g) => g.geometry.attributes.color.array.slice()); // 여름(지금) 땅 색 — 여름으로 돌아올 때 계산 없이
+  const seasonPal = (P) => ({ grass: new THREE.Color(P.grass), grass2: new THREE.Color(P.grass2), dirt: new THREE.Color(P.dirt), sand: new THREE.Color(P.sand), region: Object.fromEntries(Object.entries(P.region).map(([k, v]) => [k, new THREE.Color(v)])) });
+  const lightOf = (leaf) => new THREE.Color(leaf).lerp(new THREE.Color('#ffffff'), 0.14).getStyle(); // tree() 와 같은 밝은 잎
+  /** 땅 판 꼭짓점 색을 계절 색으로(pal 이 없으면 여름 색 그대로 되돌린다). */
+  function paintGround(pal) {
+    const P = pal && seasonPal(pal), c = new THREE.Color();
+    grounds.forEach((g, gi) => {
+      const attr = g.geometry.attributes.color, pos = g.geometry.attributes.position;
+      if (!P) attr.array.set(groundBase[gi]);
+      else for (let i = 0; i < pos.count; i++) { groundColor(pos.getX(i), pos.getZ(i), c, P); attr.array[i * 3] = c.r; attr.array[i * 3 + 1] = c.g; attr.array[i * 3 + 2] = c.b; }
+      attr.needsUpdate = true;
+    });
+  }
   for (const m of [...trees, ...houses, ...gates].flatMap((o) => o.mats)) seeThrough(m, false);
 
   return {
@@ -884,6 +932,24 @@ export function buildVillage(scene) {
       const mats = [...trees, ...houses, ...gates].flatMap((o) => o.mats);
       mats.forEach((m) => seeThrough(m, true));
       try { renderer.compile(scene, camera); } finally { mats.forEach((m) => seeThrough(m, false)); } // 숨긴 것(낮의 가로등 빛)까지 다 훑는다
+    },
+    /** 겨울 지붕 눈을 보이고 감춘다(가게 · 친구 집 · 돔 집 · 노점 · 마을 문). 같은 값으로 다시 불러도 아무 일도 하지 않는다. */
+    setRoofSnow,
+    /**
+     * 계절 풍경을 칠한다(world/seasonlook.js seasonLookOf 의 look): 땅 꼭짓점 색, 나무 잎(같은 색 나무끼리 도형을 같이 쓴다),
+     * 덤불 · 먼 언덕 재질 색, 장식 꽃(겨울엔 숨김), 지붕 눈, 울타리 밖 숲 · 들판(outdoors.paintSeason).
+     */
+    paintSeason(look) {
+      paintGround(look.ground);
+      for (const t of trees) {
+        const leaf = look.leafOf(t.x, t.z, t.leaf), geo = canopyGeometry(leaf, lightOf(leaf));
+        for (const m of t.canopy) { m.geometry = geo; for (const o of m.children) o.geometry = geo; }
+      }
+      bushMats.forEach((m, i) => m.color.set(look.bushes[i]));
+      hillMats.forEach((m, i) => m.color.set(look.hills[i]));
+      for (const m of flowerMeshes) m.visible = look.flowers;
+      outdoors.paintSeason(look);
+      setRoofSnow(look.roofSnow);
     },
     /** 그림 간판도 마을 빛(낮 · 밤)에 맞춰 어둡게 한다. */
     tintSigns(color) { for (const m of signs) m.color.copy(color); },
@@ -1010,6 +1076,7 @@ export function buildVillage(scene) {
           if (h.fade > 0.995) h.fade = 1;
           h.mats.forEach((m) => { m.opacity = h.fade; m.depthWrite = h.fade > 0.95; seeThrough(m, h.fade < 1); });
           h.meshes.forEach((m) => { for (const c of m.children) c.visible = h.fade > 0.95; }); // 외곽선(합친 부품은 여럿일 수 있다)
+          fadeRoofSnow(h.cap, h.fade > 0.95);
         }
         // 문: 내 캐릭터가 문 바로 뒤(북쪽)에 있으면 반투명하게
         for (const gt of gates) {
@@ -1019,6 +1086,7 @@ export function buildVillage(scene) {
           if (gt.fade > 0.995) gt.fade = 1;
           gt.mats.forEach((m) => { m.opacity = gt.fade; m.depthWrite = gt.fade > 0.95; seeThrough(m, gt.fade < 1); });
           gt.meshes.forEach((m) => { for (const c of m.children) c.visible = gt.fade > 0.95; });
+          fadeRoofSnow(gt.cap, gt.fade > 0.95);
         }
       }
       for (const b of butterflies) {
