@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아노코와 지내기 설계서</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --text: #1f2328; --text-soft: #5b636c; --text-faint: #9aa1a9;
+    --line: #cfd4da; --line-soft: #e6e9ec; --code-bg: #f0f1f3; --code-text: #24292f;
+    --mark: #b4530a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191d; --text: #e2e5e9; --text-soft: #9aa3ad; --text-faint: #6b7480;
+      --line: #40464e; --line-soft: #2b3037; --code-bg: #262b32; --code-text: #d5d9de;
+      --mark: #e69a55;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 52px 32px 110px; }
+
+  /* 머리 */
+  .masthead { border-top: 3px solid var(--text); padding-top: 14px; margin-bottom: 40px; }
+  .masthead .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--text-soft); font-family: Consolas, "Cascadia Mono", monospace; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; margin: 18px 0 10px; }
+  .standfirst { font-size: 16px; color: var(--text-soft); max-width: 700px; margin: 0; }
+
+  /* 요약띠: 결론 세 가지 */
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); margin-bottom: 60px; }
+  .rule { padding: 18px 22px 20px 0; }
+  .rule + .rule { border-left: 1px solid var(--line-soft); padding-left: 22px; }
+  .rule .k { font-size: 12px; font-weight: 800; color: var(--text-soft); margin-bottom: 6px; }
+  .rule .t { font-size: 16px; font-weight: 800; line-height: 1.45; margin-bottom: 6px; }
+  .rule .d { font-size: 13.5px; color: var(--text-soft); }
+
+  /* 결정 시트: 회의에서 결정받을 안건 */
+  .sheet { margin-bottom: 64px; }
+  .sheet-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  .sheet-title .hint { font-weight: 400; color: var(--text-faint); margin-left: 10px; font-size: 12.5px; }
+  table.sheet-tbl { margin: 0; }
+  .sheet-tbl th { padding: 8px 14px 8px 0; }
+  .sheet-tbl td { padding: 11px 14px 11px 0; }
+  .sheet-tbl tr:last-child td { border-bottom: 2px solid var(--text); }
+  .sheet-tbl .n { color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 0; width: 26px; }
+  .sheet-tbl a { color: inherit; text-decoration: none; font-weight: 700; }
+  .sheet-tbl a:hover { text-decoration: underline; }
+  .sheet-tbl .rec { color: var(--text-soft); }
+  .sheet-tbl .decide { width: 26%; min-width: 150px; border-bottom: 1px solid var(--line); color: var(--text); outline: none; cursor: text; }
+  .sheet-tbl .decide:empty::before { content: "회의에서 기입"; color: var(--text-faint); }
+  .sheet-tbl .decide:focus { border-bottom-color: var(--text); }
+
+  /* 섹션 */
+  section { display: grid; grid-template-columns: 84px 1fr; gap: 0 28px; border-top: 1px solid var(--line); padding: 32px 0 36px; }
+  section .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--line); font-variant-numeric: tabular-nums; }
+  section .body { min-width: 0; }
+  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.015em; margin: 4px 0 14px; line-height: 1.45; }
+  h3 { font-size: 15px; font-weight: 800; margin: 20px 0 6px; }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-faint); }
+  strong { font-weight: 750; }
+  .soft { color: var(--text-soft); font-size: 14px; }
+  .kv { font-weight: 800; font-size: 13px; color: var(--text-soft); margin-right: 6px; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 3px; word-break: break-all; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; line-height: 1.6; background: var(--code-bg); color: var(--code-text); padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 12px; }
+  pre code { background: none; padding: 0; font-size: inherit; word-break: normal; }
+
+  /* 권장: 본문 마지막 줄 */
+  .verdict { margin-top: 16px; display: flex; gap: 12px; }
+  .verdict .k { flex: none; font-weight: 800; font-size: 13px; padding-top: 2px; }
+  .verdict .k::after { content: ""; display: block; width: 100%; height: 2px; background: var(--text); margin-top: 2px; }
+
+  /* 흐름: 순서와 단계 */
+  .timelines { margin: 18px 0 14px; }
+  .tl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+  .tl + .tl { border-top: 1px dashed var(--line-soft); }
+  .tl .lab { flex: none; width: 76px; font-size: 13px; font-weight: 800; }
+  .tl .arrow { color: var(--text-faint); font-size: 12px; }
+  .tl .note { flex-basis: 100%; padding-left: 84px; font-size: 12.5px; color: var(--text-soft); margin-top: -4px; }
+  .step { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 3px 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); white-space: nowrap; }
+  .step.solid { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+  .step.ring { border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+  .legend { font-size: 12.5px; color: var(--text-soft); margin: 10px 0 0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .legend .step { padding: 1px 9px; font-size: 12px; margin-right: 4px; }
+
+  /* 선택지 대조 */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 6px; }
+  .versus.three { grid-template-columns: repeat(3, 1fr); }
+  .versus .opt { padding: 2px 24px 6px 0; }
+  .versus .opt + .opt { border-left: 1px solid var(--line-soft); padding-left: 24px; padding-right: 0; }
+  .versus h3 { font-size: 14px; margin: 0 0 8px; }
+  .versus h3 .tag { font-weight: 400; color: var(--text-soft); font-size: 12.5px; margin-left: 8px; }
+  .versus ul { font-size: 13.5px; color: var(--text-soft); margin: 0; padding-left: 18px; }
+  .versus .pro::marker { content: "+  "; color: var(--text); }
+  .versus .con::marker { content: "−  "; color: var(--text-faint); }
+
+  /* 적용 범위 */
+  .scope { display: flex; gap: 10px; align-items: stretch; margin: 16px 0 8px; flex-wrap: wrap; }
+  .scope .item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 18px 8px; text-align: center; min-width: 96px; }
+  .scope .item .t { font-weight: 800; font-size: 14px; }
+  .scope .item .s { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; }
+  .scope .item.on { background: var(--text); border-color: var(--text); }
+  .scope .item.on .t { color: var(--bg); }
+  .scope .item.on .s { color: var(--bg); opacity: 0.75; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+  th { text-align: left; font-weight: 700; color: var(--text-soft); font-size: 12px; border-top: 2px solid var(--text); border-bottom: 1px solid var(--text); padding: 7px 12px 7px 0; }
+  td { border-bottom: 1px solid var(--line-soft); padding: 9px 12px 9px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 2px solid var(--text); }
+  td.c { text-align: center; white-space: nowrap; font-weight: 800; }
+  td.c.no { color: var(--text-faint); font-weight: 400; }
+  td.c.err { color: var(--mark); }
+  .ex { color: var(--text-soft); font-size: 13px; }
+
+  /* 경우별 설명 */
+  dl { margin: 0; }
+  dt { font-weight: 800; font-size: 13.5px; margin: 14px 0 4px; }
+  dd { margin: 0 0 4px; color: var(--text-soft); font-size: 14px; }
+  dd code { color: var(--code-text); }
+
+  /* 도표 */
+  figure { margin: 16px 0 12px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--text); }
+  figcaption { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+
+  /* 강조: 문서 전체에서 한 지점만 */
+  .mark { color: var(--mark); font-weight: 800; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 8px; padding-top: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-soft); font-size: 12.5px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .page { padding: 36px 18px 70px; }
+    .rules { grid-template-columns: 1fr; }
+    .rule + .rule { border-left: none; border-top: 1px solid var(--line-soft); padding-left: 0; }
+    section { grid-template-columns: 1fr; gap: 6px; }
+    section .num { font-size: 28px; }
+    .tl .note { padding-left: 0; }
+    .versus, .versus.three { grid-template-columns: 1fr; }
+    .versus .opt + .opt { border-left: none; border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-top: 10px; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; }
+    .sheet-tbl .decide:empty::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div class="row">
+    <span>치이카와 마을 생활 · 설계서</span>
+    <span>2026-11-16</span>
+  </div>
+  <h1>아노코와 지내기<br>친해질수록 열리는 다섯 가지</h1>
+  <p class="standfirst">메인 이야기 2장을 끝내면 집 앞에 아노코가 엎드려 쉰다. 지금은 말을 걸어도 탈것을 고르는 일밖에 없다. 이 문서는 아노코와 날마다 어울리며 친해지는 설계를 적는다. 하트가 오를 때마다 새 놀거리와 보상이 하나씩 열린다. 읽는 사람은 열리는 순서와 수치가 의도와 맞는지 확인하면 된다.</p>
+</div>
+
+<div class="rules">
+  <div class="rule">
+    <div class="k">친해지는 방법</div>
+    <div class="t">쓰다듬기, 간식 주기, 같이 달리기</div>
+    <div class="d">하루에 3점까지 쌓인다. 날마다 챙기면 보름쯤 걸려 하트 다섯 개가 된다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">하트마다 열림</div>
+    <div class="t">반겨 주기, 털 빗기, 선물과 경주, 꾸미기, 더 빨리 달리기</div>
+    <div class="d">하트 하나에 하나씩 열려서 다음 하트까지 기다릴 까닭이 생긴다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">따로 저장</div>
+    <div class="t">마을 친구 목록과 떨어진 아노코 몫</div>
+    <div class="d">마을 친구 목록에 넣으면 동네 대화나 선물 취향처럼 아노코에게 맞지 않는 기능까지 딸려 온다.</div>
+  </div>
+</div>
+
+<section id="s1">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>목적과 범위</h2>
+    <p>최종 보스를 쓰러뜨린 뒤에도 아노코와 보낼 이유를 만든다. 사용자는 친해질수록 무언가 열리는 재미를 골랐다. 그래서 반응 연출보다 단계마다 무엇이 열리는지를 먼저 정했다.</p>
+    <div class="scope">
+      <div class="item on"><div class="t">친밀도와 하트</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">집 앞 아노코 대화 메뉴</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">다섯 가지 열림, 경주, 꾸미기</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">저장과 같이 놀기 표시</div><div class="s">이번 범위</div></div>
+      <div class="item"><div class="t">아노코와 같이 토벌</div><div class="s">범위 밖</div></div>
+      <div class="item"><div class="t">마을폰의 아노코 전용 화면</div><div class="s">범위 밖</div></div>
+      <div class="item"><div class="t">계절과 날씨, 도감과 업적</div><div class="s">다음 순서에 따로 설계</div></div>
+    </div>
+    <p><span class="kv">피해야 할 것</span>하루에 몰아서 끝까지 친해지는 것, 열림을 놓쳐서 무엇이 생겼는지 모르는 것, 처음 약속한 탈것 속도(자동차와 비슷한 빠르기)가 하트 다섯 개 전에 바뀌는 것.</p>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>친해지는 방법</h2>
+    <p>집 앞 아노코에게 말을 걸면 메뉴가 뜬다. 행동마다 하루에 한 번씩 점수가 오르고 하루 합계는 3점을 넘지 않는다.</p>
+    <table>
+      <tr><th style="width:110px">행동</th><th style="width:130px">점수</th><th>내용</th></tr>
+      <tr><td>쓰다듬기</td><td>+1</td><td class="ex">하루 한 번. 웃는 얼굴로 꼬리를 흔든다.</td></tr>
+      <tr><td>간식 주기</td><td>+1, 빨간 열매 +2</td><td class="ex">가방의 먹을 것 하나를 준다. 하루 한 번.</td></tr>
+      <tr><td>같이 달리기</td><td>+1</td><td class="ex">아노코를 타고 하루에 300m(아노코 걸음으로 50초쯤) 달리면 오른다. 하루 한 번, 다 채우면 알림이 뜬다.</td></tr>
+    </table>
+    <p>하트 곡선은 마을 친구와 같은 3, 9, 18, 30, 45점이다. 하루 3점이면 15일째에 하트 다섯 개가 된다. 하트가 오르면 마을 친구처럼 하트가 떠오르고 그 하트에서 열린 것을 한 줄로 알린다.</p>
+    <p><span class="kv">내가 정한 값</span>하루 상한은 마을 친구(2점)보다 하나 많은 3점이다. 행동이 셋이라 하루에 다 해 볼 수 있게 했다.</p>
+    <p><span class="kv">내가 정한 값</span>같이 달리기 거리는 내 마을에서 아노코를 타고 실제로 움직인 만큼 센다. 경주 중에 달린 거리도 넣는다. 한 장면에 2m를 넘게 옮겨진 것(집으로 가기, 집 드나들기 같은 순간 이동)은 빼고, 친구 마을에 놀러 간 동안은 세지 않는다. 날이 바뀌면 0부터 다시 센다. 속도와 상관없이 거리만 본다.</p>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>하트마다 열리는 것</h2>
+    <table>
+      <tr><th style="width:70px">하트</th><th style="width:150px">열리는 것</th><th>내용</th></tr>
+      <tr><td>1</td><td>반겨 주기</td><td class="ex">밖에 나갔다 집에 돌아오면 아노코가 일어나 꼬리를 흔들고 통통 뛰며 반긴다. 1분 넘게 떠나 있다가 7m 안으로 들어올 때 한 번.</td></tr>
+      <tr><td>2</td><td>털 빗기</td><td class="ex">메뉴에 털 빗기가 생긴다. 하루 한 번 아노코 솜털 하나를 얻는다. 노동 접수에서 120원에 판다.</td></tr>
+      <tr><td>3</td><td>선물과 경주</td><td class="ex">아노코 인형 가구를 선물로 받는다(가구점에서는 팔지 않는다). 메뉴에 경주가 생긴다.</td></tr>
+      <tr><td>4</td><td>꾸미기</td><td class="ex">메뉴에 꾸미기가 생긴다. 리본 색 여섯 가지와 안장 색 여섯 가지를 고른다(처음에는 없음). 탈 때도 보이고 같이 놀기 친구 화면에도 보인다.</td></tr>
+      <tr><td>5</td><td>더 빨리 달리기</td><td class="ex">아노코를 타면 자동차의 1.15배(초당 6.4m에서 7.4m)로 달린다. 처음 약속한 빠르기는 하트 다섯 개가 되기 전까지 그대로다.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>경주</h2>
+    <p>아노코를 타고 마을을 한 바퀴 도는 시간 재기다. 집 앞 아노코 메뉴에서 시작한다.</p>
+    <div class="timelines">
+      <div class="tl">
+        <span class="lab">코스</span>
+        <span class="step solid">집 앞 출발</span><span class="arrow">→</span>
+        <span class="step">북문</span><span class="arrow">→</span>
+        <span class="step">동문</span><span class="arrow">→</span>
+        <span class="step">남문</span><span class="arrow">→</span>
+        <span class="step">서문</span><span class="arrow">→</span>
+        <span class="step">광장</span><span class="arrow">→</span>
+        <span class="step solid">집 앞 도착</span>
+      </div>
+    </div>
+    <dl>
+      <dt>고리와 시간</dt>
+      <dd>문과 광장에 빛나는 고리가 서고 다음 고리만 밝다. 고리를 지나면 소리가 나고 다음 고리가 밝아진다. 화면 위에 걸린 시간과 지금까지의 가장 빠른 기록이 보인다.</dd>
+      <dt>시작과 끝</dt>
+      <dd>시작하면 저절로 아노코에 탄다. 내리거나 2분이 지나면 경주가 끝나고 기록은 남지 않는다.</dd>
+      <dt>보상</dt>
+      <dd>처음 완주하면 1,000원이다(이때는 기록 보상을 겹쳐 주지 않는다). 그 뒤로는 가장 빠른 기록을 0.5초 넘게 줄이면 300원을 하루 한 번까지 준다. 기록은 저장된다. 하트 다섯 개가 되어 빨라지면 기록이 쉽게 깨지는데, 이것은 다시 달려 볼 까닭으로 둔다.</dd>
+    </dl>
+    <p><span class="kv">내가 정한 값</span>고리는 네 문의 안쪽 2m, 광장 가운데, 집 문 앞에 선다. 고리 반지름은 2.5m다. 이 자리로 한 바퀴를 돌면 대략 200m라 하트 다섯 개 전 속도(초당 6.4m)로 30~40초 걸린다. 2분 제한은 그 세 배쯤이다. 문 사이에는 집과 가게가 있어 길을 고르는 재미가 있다.</p>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>화면과 조작</h2>
+    <dl>
+      <dt>메뉴</dt>
+      <dd>하트에 따라 늘어난다. 쓰다듬기, 간식 주기, 털 빗기(하트 2), 경주(하트 3), 꾸미기(하트 4), 탈것 고르기, 그만두기.</dd>
+      <dt>안내 문장</dt>
+      <dd>메뉴 위 안내 문장에 하트 수를 보인다. 오늘 이미 한 행동은 회색으로 두고 '내일 또'라고 붙인다.</dd>
+      <dt>간식 주기</dt>
+      <dd>가방의 먹을 것 목록이 뜬다. 먹을 것이 없으면 '줄 간식이 없어요'라고 알린다.</dd>
+      <dt>꾸미기</dt>
+      <dd>리본, 안장 순서로 색 이름 목록이 뜬다.</dd>
+      <dt>놀러 간 동안</dt>
+      <dd>다른 사람 마을에 놀러 가 있는 동안에는 집 앞 아노코가 없다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>저장과 같이 놀기</h2>
+    <p><code>state.anokoBond</code> 에 저장한다. <code>greetAt</code>(반겨 준 때)은 저장하지 않는다.</p>
+    <pre><code>state.anokoBond = {
+  pts,                     // 점수
+  day, dayPts,             // 오늘 점수를 쌓은 날, 그날 쌓은 점수
+  pet, feed, run, comb,    // 행동마다 마지막으로 한 날
+  runDist,                 // 오늘 달린 거리
+  raceBest, raceDone,      // 가장 빠른 기록(초), 완주했는지
+  ribbon, saddle           // 색 번호, 없으면 0
+}</code></pre>
+    <p>예전 저장에는 이 칸이 없으니 0에서 시작한다. 2장을 끝내지 않았으면 모든 메뉴가 닫혀 있다.</p>
+    <p>같이 놀기: 탈 때 보내는 소품 꼬리표에서 'ride-anoko' 바로 뒤에 꾸미기 꼬리표 하나를 더 싣는다(예: 'ak-35', 리본 3번과 안장 5번). 서버는 move 칸을 정해 두어 새 칸을 버리지만 소품 꼬리표 칸은 그대로 넘긴다. 받는 쪽은 꼬리표를 영문, 숫자, 밑줄, 붙임표로 된 20자 이하 네 개까지만 받으므로 쌍점 없이 붙임표로 쓰고, 잘리지 않게 앞쪽에 둔다. 예전 판의 친구 화면은 꾸미기 없이 아노코만 보인다.</p>
+    <p>서버에는 이동 속도 제한이 없다. 하트 다섯 개 속도(초당 7.4m)도 친구 화면에서 자동차처럼 따라 그려진다.</p>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>만드는 방식</h2>
+    <div class="versus three">
+      <div class="opt">
+        <h3>A. 아노코 몫을 따로 저장<span class="tag">고른 안</span></h3>
+        <ul>
+          <li class="pro">하트 곡선만 마을 친구 것을 빌린다. 다른 기능과 엮이지 않는다.</li>
+          <li class="con">하트 표시와 오르는 연출을 아노코용으로 한 번 더 이어 붙여야 한다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>B. 마을 친구 목록에 넣기</h3>
+        <ul>
+          <li class="pro">하트와 선물이 바로 돈다.</li>
+          <li class="con">동네 대화, 선물 취향, 하루 일과, 같이 놀기 초대처럼 아노코에게 맞지 않는 기능이 줄줄이 따라와 막아야 할 곳이 많다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>C. 마을폰에 아노코 화면 만들기</h3>
+        <ul>
+          <li class="pro">한눈에 보기 좋다.</li>
+          <li class="con">화면 하나를 새로 그려야 해서 이번에는 집 앞 대화로 충분하다고 보고 뒤로 미룬다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>모델 작업</h2>
+    <p>사용자 지시에 따라 모델과 동작은 fable 5.2로 만든다.</p>
+    <dl>
+      <dt>리본과 안장</dt>
+      <dd>아노코 모델에 리본(목 또는 귀 옆)과 안장(등)을 달고 색을 바꾸는 <code>setDecor(ribbon, saddle)</code> 를 더한다. 탈 때 앉는 자리와 겹치지 않게 안장 높이를 맞춘다.</dd>
+      <dt>반겨 주기 동작</dt>
+      <dd>엎드렸다 일어나 꼬리를 크게 흔들고 두세 번 통통 뛰었다가 다시 엎드린다.</dd>
+      <dt>아노코 인형</dt>
+      <dd>방 안 가구 모델. 하얀 솜털 머리와 주황 뿔, 웃는 얼굴의 작은 앉은 인형.</dd>
+      <dt>아이콘</dt>
+      <dd>가방과 가구점 목록에 쓰는 아노코 솜털, 아노코 인형 그림.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>시험과 확인</h2>
+    <p>three 없이 도는 부분은 core 모듈로 두고 node 테스트로 확인한다. 점수 쌓기와 하루 상한, 하트 계산과 열림, 간식 점수, 경주 기록과 보상, 저장 검사가 여기에 든다.</p>
+    <p>나머지(반겨 주기, 경주 고리, 꾸미기 모습, 속도)는 브라우저에서 확인한다.</p>
+    <p>노션: 돈 버는 방법 페이지(아노코 솜털 120원, 경주 보상)와 선물 페이지(아노코 간식: 빨간 열매를 좋아한다)를 코드 값으로 고친다.</p>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="num">10</div>
+  <div class="body">
+    <h2>정한 값과 확인할 것</h2>
+    <p><span class="kv">내가 정한 값</span>하루 상한 3점, 달리기 300m와 세는 방법, 솜털 120원, 경주 보상(첫 완주 1,000원, 기록을 0.5초 넘게 줄이면 300원을 하루 한 번), 경주 고리 자리와 2분 제한, 반겨 주기 조건(1분 넘게 떠나 있다가 7m 안), 리본과 안장 색 여섯 가지씩, 꾸미기 꼬리표 'ak-35', 하트 5 속도 1.15배.</p>
+    <p><span class="kv">확인 필요</span>경주 코스를 마을 안 네 문과 광장으로 정했다. 마을 밖 길로 더 길게 돌기를 바라면 알려 달라.</p>
+  </div>
+</section>
+
+<footer>
+  <span>아노코와 지내기 설계서 · 2026-11-16</span>
+  <span><a href="Anoko-Final-Boss-2026-11-13.html">최종 보스 아노코 설계서</a></span>
+</footer>
+
+</div>
+</body>
+</html>
