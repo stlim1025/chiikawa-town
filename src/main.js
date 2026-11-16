@@ -55,7 +55,7 @@ import { FURNITURE, HOME_SIZES, WALLPAPERS, FLOORS, homeOf, sizeOf, gridOf, deco
 import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, befriendBy, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
-import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo, MAX_STACK } from './core/inventory.js';
+import { addItem, takeItem, eatItem, submitToJob, countOf, itemInfo, MAX_STACK, bagOf } from './core/inventory.js';
 import { storeItem, takeOut } from './core/storage.js';
 import { greetingFor, chatFor } from './core/dialogue.js';
 import { ACCESSORY_ITEMS, buyAccessory, craftAccessory, wearAccessory, wardrobeOf, SALON_PRICE } from './core/wardrobe.js';
@@ -132,6 +132,8 @@ import { PLAZA, ANOKO_LAIR, doorAngle } from './core/layout.js';
 import { frontGuard, rideKind, anokoPhase, ANOKO_ROAR } from './core/anoko.js';
 import { createAnokoHome } from './world/anokohome.js';
 import { createAnokoMood } from './world/anokomood.js';
+import { RIBBONS, SADDLES, FLUFF, RACE, bondOf, bondHearts, isUnlocked, canAct, pet as petAnoko, feed as feedAnoko, comb as combAnoko, addRun, raceFinish, setDecor as setAnokoDecor, rideBoost, decorTag, decorColors } from './core/anokobond.js';
+import { createAnokoRace } from './world/anokorace.js';
 import { createIdolStage } from './world/idolstage.js';
 import { createIdolStory } from './stories/pajamaidol.js';
 import { createStarDiner, createDinerFront, buildStarTrio } from './world/stardiner.js';
@@ -1016,7 +1018,7 @@ function boot() {
       multi.tick(dt, { x: r2(q.x), z: r2(q.z), yaw: r2(interior.playerYaw), anim: interior.playerMoving ? 'walk' : 'idle', area: 'home' });
     } else {
       const p = player.position, outside = visiting ? mode === 'play' || mode === 'intro' : mode === 'play';
-      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away', h: player.rideKind === 'anoko' ? ['ride-anoko', player.heldTags].filter(Boolean).join(',') : player.heldTags }); // h: 손에 든 무기 · 등불 · 음식(아노코를 탔으면 맨 앞에 'ride-anoko' — net/remote.js)
+      multi.tick(dt, { x: r2(p.x), z: r2(p.z), yaw: r2(player.yaw), anim: player.anim || 'idle', area: outside ? 'village' : 'away', h: player.rideKind === 'anoko' ? ['ride-anoko', decorTag(state), player.heldTags].filter(Boolean).join(',') : player.heldTags }); // h: 손에 든 무기 · 등불 · 음식(아노코를 탔으면 맨 앞에 'ride-anoko' — net/remote.js)
     }
     sendPartyHp(dt); // 같이 토벌 파티원에게 내 기운
     if (multi.status !== 'open' || !multi.count) return;
@@ -2175,30 +2177,187 @@ function boot() {
     const p = player.position, at = village.nearestFree(p.x, p.z, kind === 'anoko' ? 0.6 : CAR_RADIUS);
     if (Math.hypot(at.x - p.x, at.z - p.z) > 1.2) { hud.toast(kind === 'anoko' ? '여기는 아노코를 부를 자리가 없어요' : '여기는 자동차를 꺼낼 자리가 없어요', 2200); return; }
     player.placeAt(at.x, at.z);
-    player.setRiding(true, kind);
+    player.setRiding(true, kind, kind === 'anoko' ? rideBoost(state) : 1); // 아노코와 하트 5면 1.15배(core/anokobond.js)
     sound.play(kind === 'anoko' ? 'heart' : 'honk');
   }
-  /** 집 앞 아노코에게 말을 걸었다: 탈 것을 고른다(state.ride — 자동차가 없으면 아노코만). */
+  /**
+   * 집 앞 아노코에게 말을 걸었다(아노코와 지내기 — core/anokobond.js): 쓰다듬기 · 간식 주기 · 털 빗기(하트 2) · 꾸미기(하트 4) · 탈것 고르기.
+   * 위 문장에 하트, 오늘 이미 한 행동은 뒤에 「(내일 또)」.
+   */
   function talkAnokoHome() {
     cancelPull();
     player.face(anokoHome.spot.x, anokoHome.spot.z);
-    input.setEnabled(false);
     hud.setAction(null);
     sound.play('heart');
+    anokoMenu();
+  }
+  function anokoMenu() {
+    input.setEnabled(false);
+    const day = state.clock.day, h = bondHearts(state);
+    const later = (act) => (canAct(state, act, day) === 'done' ? ' (내일 또)' : '');
+    const items = [['쓰다듬기' + later('pet'), anokoPet], ['간식 주기' + later('feed'), anokoSnack]];
+    if (isUnlocked(state, 'comb')) items.push(['털 빗기' + later('comb'), anokoComb]);
+    if (isUnlocked(state, 'race')) { const best = bondOf(state).raceBest; items.push(['경주' + (best ? ` (가장 빠른 기록 ${fmtRace(best)})` : ''), startAnokoRace]); }
+    if (isUnlocked(state, 'decor')) items.push(['꾸미기', anokoDecor]);
+    items.push(['탈것 고르기', anokoRide], ['그만두기', null]);
+    guide.ask(`(아노코가 꼬리를 살랑살랑 흔든다) ${'♥'.repeat(h)}${'♡'.repeat(5 - h)}`, items.map((it) => it[0]), (i) => {
+      input.setEnabled(true);
+      const fn = items[i] && items[i][1];
+      if (fn) fn();
+    }, NARRATOR);
+  }
+  /** 하트가 새로 열어 준 것(큰 글씨 한 줄). */
+  const ANOKO_UNLOCK = {
+    greet: '집에 돌아오면 아노코가 반겨 줘요', comb: '이제 털을 빗어 줄 수 있어요', race: '아노코 인형을 받았어요! 경주도 할 수 있어요',
+    decor: '이제 리본과 안장으로 꾸며 줄 수 있어요', speed: '이제 아노코를 타면 더 빨리 달려요'
+  };
+  /** 아노코와 친해진 결과: 하트가 떠오르고, 새로 열린 것은 큰 글씨로 하나씩. quiet 가 아니면 그날 상한일 때 알린다. */
+  function anokoBonded(r, quiet = false) {
+    commit(r.state);
+    const at = anokoHome.resting ? anokoHome.spot : player.position;
+    if (r.gained > 0) hud.hearts({ x: at.x, y: 2.2, z: at.z, gained: r.gained, up: r.up, hearts: r.hearts, name: '아노코', tag: '#f4efe4' });
+    else if (!quiet) hud.toast('오늘은 아노코가 충분히 즐거워했어요. 내일 또 놀아 줘요', 2800);
+    r.unlocks.forEach((k, i) => setTimeout(() => hud.banner('아노코와 더 친해졌어요!', ANOKO_UNLOCK[k], 3600), 900 + i * 3800));
+  }
+  function anokoPet() {
+    const r = petAnoko(state, state.clock.day);
+    if (!r.ok) { hud.toast('오늘은 벌써 쓰다듬어 줬어요. 내일 또 해 줘요', 2400); return; }
+    anokoHome.greet();
+    sound.play('heartUp');
+    anokoBonded(r);
+  }
+  /** 간식 주기: 가방의 먹을 것 가운데 하나(빨간 열매를 가장 좋아한다 — ♥). */
+  function anokoSnack() {
+    if (canAct(state, 'feed', state.clock.day) === 'done') { hud.toast('오늘은 벌써 간식을 줬어요. 내일 또 줘요', 2400); return; }
+    const foods = Object.keys(bagOf(state).items).filter((id) => { const f = itemInfo(id); return !!f && f.eat > 0; });
+    if (!foods.length) { hud.toast('줄 간식이 없어요', 2400); return; }
+    input.setEnabled(false);
+    guide.ask('(아노코가 코를 킁킁거린다)', [...foods.map((id) => `${itemInfo(id).name} (${countOf(state, id)}개)${id === 'berry' ? ' ♥' : ''}`), '그만두기'], (i) => {
+      input.setEnabled(true);
+      if (!foods[i]) return;
+      const r = feedAnoko(state, foods[i], state.clock.day);
+      if (!r.ok) { hud.toast('줄 간식이 없어요', 2400); return; }
+      anokoHome.greet();
+      sound.play('eat');
+      anokoBonded(r);
+    }, NARRATOR);
+  }
+  /** 털 빗기(하트 2): 하루 한 번 아노코 솜털. */
+  function anokoComb() {
+    const r = combAnoko(state, state.clock.day);
+    if (!r.ok) { hud.toast(r.reason === 'done' ? '오늘은 벌써 털을 빗어 줬어요. 내일 또 해 줘요' : '가방이 꽉 찼어요', 2400); return; }
+    commit(r.state);
+    sound.play('heart');
+    hud.toast('아노코 솜털을 얻었어요!', 2600, { icon: itemSvg(FLUFF) });
+    hud.bagBump();
+  }
+  /** 꾸미기(하트 4): 리본, 안장 차례로 색을 고른다. */
+  function anokoDecor() {
+    input.setEnabled(false);
+    const names = (list) => ['없음', ...list.map((c) => c.name)];
+    guide.ask('(리본은 어떤 색으로 할까?)', [...names(RIBBONS), '그만두기'], (ri) => {
+      if (ri > RIBBONS.length) { input.setEnabled(true); return; }
+      guide.ask('(안장은 어떤 색으로 할까?)', [...names(SADDLES), '그만두기'], (si) => {
+        input.setEnabled(true);
+        if (si > SADDLES.length) return;
+        commit(setAnokoDecor(state, ri, si));
+        anokoHome.greet();
+        sound.play('heart');
+        hud.toast('아노코를 꾸며 줬어요!', 2400, { icon: monsterSvg('anoko') });
+      }, NARRATOR);
+    }, NARRATOR);
+  }
+  /** 탈것 고르기(state.ride — 자동차가 없으면 아노코만). */
+  function anokoRide() {
+    input.setEnabled(false);
     const opts = ['아노코 타고 다니기', ...(hasTool(state, 'car') ? ['자동차 타고 다니기'] : []), '그만두기'];
-    guide.ask('(아노코가 꼬리를 살랑살랑 흔든다)', opts, (i) => {
+    guide.ask('(무엇을 타고 다닐까?)', opts, (i) => {
       input.setEnabled(true);
       if (opts[i] === '아노코 타고 다니기') { commit({ ...state, ride: 'anoko' }); hud.toast('이제 탈것 버튼(C 키)으로 아노코를 타요', 3000, { icon: monsterSvg('anoko') }); }
       else if (opts[i] === '자동차 타고 다니기') { commit({ ...state, ride: 'car' }); hud.toast('이제 탈것 버튼(C 키)으로 자동차를 타요', 3000); }
     }, NARRATOR);
   }
+  // 아노코 경주(하트 3 — world/anokorace.js · core/anokobond.js 의 RACE): 집 앞 → 북문 → 동문 → 남문 → 서문 → 광장 → 집 앞.
+  // 문 고리는 울타리 안쪽 2m. 내리거나 2분이 지나면(기절 · 집 안 · 놀러 가기도) 끝나고 기록은 남지 않는다
+  let raceT = 0;
+  const fmtRace = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+  function racePoints() {
+    const inner = (g) => { const d = Math.hypot(g.x, g.z) || 1; return { x: g.x - (g.x / d) * 2, z: g.z - (g.z / d) * 2 }; };
+    const h = village.spots.home;
+    return [inner(GATES.north), inner(GATES.east), inner(GATES.south), inner(GATES.west), { x: PLAZA.x, z: PLAZA.z }, { x: h.x, z: h.z }];
+  }
+  function startAnokoRace() {
+    if (!player.riding || player.rideKind !== 'anoko') {
+      if (player.riding) getOffCar(true);
+      const p = player.position, at = village.nearestFree(p.x, p.z, 0.6);
+      player.placeAt(at.x, at.z);
+      player.setRiding(true, 'anoko', rideBoost(state));
+    }
+    raceT = 0;
+    anokoRace.start(racePoints());
+    sound.play('job');
+    hud.toast('출발! 빛나는 고리를 차례로 지나요', 2600, { icon: monsterSvg('anoko') });
+  }
+  function endAnokoRace(msg) {
+    anokoRace.stop();
+    hud.setTimer(null);
+    if (msg) hud.toast(msg, 2800);
+  }
+  function updateAnokoRace(dt) {
+    if (!anokoRace.active) return;
+    if (mode !== 'play' || !state || !player || visiting || fainting || !player.riding || player.rideKind !== 'anoko') { endAnokoRace('아노코에서 내려서 경주가 끝났어요'); return; }
+    raceT += dt;
+    if (raceT > RACE.limit) { endAnokoRace('2분이 지나서 경주가 끝났어요'); return; }
+    const ev = anokoRace.update(dt, player.position);
+    if (ev === 'pass') sound.play('chime');
+    if (ev !== 'finish') {
+      const best = bondOf(state).raceBest;
+      hud.setTimer(`경주 ${anokoRace.index}/${anokoRace.count}  ${fmtRace(raceT)}${best ? `  (가장 빠른 기록 ${fmtRace(best)})` : ''}`);
+      return;
+    }
+    hud.setTimer(null);
+    const sec = Math.round(raceT * 10) / 10, r = raceFinish(state, sec, state.clock.day);
+    commit(r.state);
+    sound.play(r.reward ? 'done' : 'job');
+    hud.banner(r.first ? '경주 완주!' : r.record ? '새 기록!' : '완주!', `${fmtRace(sec)}${r.reward ? `, ${won(r.reward)} 받았어요` : ''}`, 3600, [{ icon: monsterSvg('anoko'), text: '아노코 경주' }]);
+  }
+  // 아노코와 지내기: 반겨 주기(1분 넘게 떠나 있다가 7m 안으로) · 같이 달리기 거리 · 꾸미기 색 · 탈 때 빠르기
+  let anokoAwayAt = null, runPrev = null, runAcc = 0, decoKey = null, decoPlayer = null;
   /** 집 앞 아노코(메인 이야기 2장을 끝내면 — world/anokohome.js): 타고 나가 있지 않은 탈것이 집 앞에 있다. 처음 한 번 안내. */
   function syncAnokoHome() {
-    if (!state || !isDone(state, 'anoko') || visiting) { anokoHome.show({}); return; }
+    if (!state || !isDone(state, 'anoko') || visiting) { anokoHome.show({}); runPrev = null; return; }
     anokoHome.place(village.spots.home);
     const on = player && player.riding ? player.rideKind : null;
     anokoHome.show({ anoko: on !== 'anoko', car: hasTool(state, 'car') && on !== 'car' });
-    if (mode === 'play' && !seen('anokoHome')) { markSeen('anokoHome'); hud.toast('집 앞에서 아노코가 기다려요. 말을 걸면 탈 것을 고를 수 있어요', 4600, { icon: monsterSvg('anoko') }); }
+    if (mode === 'play' && !seen('anokoHome')) { markSeen('anokoHome'); hud.toast('집 앞에서 아노코가 기다려요. 말을 걸면 같이 놀 수 있어요', 4600, { icon: monsterSvg('anoko') }); }
+    if (!player || mode !== 'play') return;
+    // 꾸미기 색: 바뀔 때만(캐릭터를 새로 만들면 다시)
+    const key = decorTag(state) || '';
+    if (key !== decoKey || player !== decoPlayer) {
+      decoKey = key; decoPlayer = player;
+      const c = decorColors(key ? bondOf(state) : null);
+      anokoHome.setDecor(c);
+      player.setMountDecor(c);
+    }
+    if (on === 'anoko') player.setBoost(rideBoost(state)); // 타고 있는 동안 하트 5가 되어도 바로
+    // 반겨 주기(하트 1): 집 앞에서 멀어진 때부터 재다가, 1분 넘게 떠나 있다 돌아오면 한 번
+    const p = player.position, d = Math.hypot(p.x - anokoHome.spot.x, p.z - anokoHome.spot.z), now = performance.now();
+    if (d > 12) { if (anokoAwayAt === null) anokoAwayAt = now; }
+    else if (d < 7) {
+      if (anokoAwayAt !== null && now - anokoAwayAt > 60000 && isUnlocked(state, 'greet') && anokoHome.resting) { anokoHome.greet(); sound.play('heart'); }
+      anokoAwayAt = null;
+    }
+    // 같이 달리기: 아노코를 타고 실제로 움직인 거리(한 장면에 2m 넘게 옮겨진 순간 이동은 뺀다). 10m 마다 모아 적는다
+    if (on !== 'anoko') { runPrev = null; return; }
+    if (runPrev) { const step = Math.hypot(p.x - runPrev.x, p.z - runPrev.z); if (step < 2) runAcc += step; }
+    runPrev = { x: p.x, z: p.z };
+    if (runAcc < 10) return;
+    const day = state.clock.day, before = bondOf(state).run, r = addRun(state, runAcc, day);
+    runAcc = 0;
+    if (before !== day && bondOf(r.state).run === day) {
+      hud.toast('아노코와 300m를 달렸어요!', 2600, { icon: monsterSvg('anoko') });
+      anokoBonded(r, true);
+    } else commit(r.state, false);
   }
   hud.onCar(() => toggleCar(false));
   // 퀘스트 쪽지 압정: 고정하면 접어도 늘 보이고 맨 위로(다시 누르면 풀기). 저장에 남는다
@@ -4794,6 +4953,7 @@ function boot() {
   const odeSpot = createOdeSpot(scene, village);
   // 메인 이야기 2장 보상: 집 앞 아노코(말을 걸면 탈 것 고르기) · 세워 둔 자동차
   const anokoHome = createAnokoHome(scene, village);
+  const anokoRace = createAnokoRace(scene); // 아노코 경주 고리(하트 3)
   let odeStage = null;
   odeStory = createOdeStory({
     getState: () => state, hud, guide, sound, input, minigame, get stage() { return odeStage || (odeStage = createOdeStage()); }, spot: odeSpot, cam, getPlayer: () => player,
@@ -7612,6 +7772,7 @@ function boot() {
     bonbonFront.update(dt, t);
     odeSpot.update(dt, t); // 오데와 함께 감옥: 숲속 빈터에서 버섯을 먹는 오데(이야기가 열린 동안)
     syncAnokoHome(); // 메인 이야기 2장: 집 앞 아노코 · 세워 둔 자동차
+    updateAnokoRace(dt); // 아노코 경주(하트 3)
     anokoHome.update(dt, t);
     // 스위치 동굴: 바위산 북쪽 끝 절벽에 늘 있다. 창살은 이야기 속에서 연 뒤로(이야기를 끝낸 뒤에도) 열린 채. 그사이 풍뎅이가 나를 따라다닌다
     const bstep = visiting ? -1 : beetleStep();

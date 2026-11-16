@@ -9,6 +9,9 @@ import { groundY } from '../core/layout.js';
  * show({ anoko, car }) 로 보인다 · 숨긴다. place(door): 집 문 앞 자리(집을 넓히면 바뀐다)에 맞춰 문 옆 빈자리로 옮긴다.
  * 보이는 동안만 장애물(장애물 칸은 놓은 자리로 정해지니 옮길 때마다 새로 놓고 옛것은 끈다).
  */
+/** 반겨 주기 한 번의 길이(초): actors/anoko.js 의 animate greet(0 → 1). */
+const GREET = 2.4;
+
 export function createAnokoHome(scene, village) {
   const anoko = buildAnoko(), car = buildCar();
   anoko.setPose('lie');
@@ -18,7 +21,7 @@ export function createAnokoHome(scene, village) {
   car.root.visible = false;
   scene.add(anoko.root, car.root);
   const spot = { x: 0, z: 0 }, carSpot = { x: 0, z: 0 };
-  let obA = null, obC = null, doorKey = '', shown = { anoko: false, car: false };
+  let obA = null, obC = null, doorKey = '', shown = { anoko: false, car: false }, greetT = 0; // greetT: 반겨 주기 남은 초
   /** 장애물을 새 자리에 놓는다(옛것은 끈다). */
   const block = (old, x, z, r) => { if (old) old.off = true; const o = { x, z, r, off: true }; village.obstacles.push(o); return o; };
   return {
@@ -56,7 +59,15 @@ export function createAnokoHome(scene, village) {
     },
     /** 아노코가 보이는지(말 걸기 대상). */
     get resting() { return shown.anoko; },
-    /** 숨 쉬기 · 꼬리 살랑. */
-    update(dt, t) { if (shown.anoko) anoko.animate(t, {}); }
+    /** 반겨 주기(아노코와 지내기 하트 1 — core/anokobond.js): 일어나 꼬리를 크게 흔들고 통통 뛴 뒤 다시 엎드린다(GREET 초). 쓰다듬을 때도. */
+    greet() { if (shown.anoko && greetT <= 0) greetT = GREET; },
+    /** 꾸미기 색({ ribbon: '#hex' | null, saddle }). */
+    setDecor(d) { anoko.setDecor(d); },
+    /** 숨 쉬기 · 꼬리 살랑(반겨 주는 동안은 그 동작). */
+    update(dt, t) {
+      if (!shown.anoko) { greetT = 0; return; }
+      anoko.animate(t, greetT > 0 ? { greet: 1 - greetT / GREET } : {});
+      greetT = Math.max(0, greetT - dt);
+    }
   };
 }

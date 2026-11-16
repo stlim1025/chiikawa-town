@@ -22,6 +22,7 @@ export function createPlayer(scene, chibi, village) {
   let actT = 0, actMode = null; // 연출 몸짓(별똥별에 소원 빌기 'pray' 등)
   let riding = false, car = null; // 하늘색 자동차(actors/car.js)에 탔는지 · 차 모형(캐릭터 뿌리에 붙인다 — 깜빡이거나 숨으면 같이)
   let rideKind = 'car', mount = null, mountStep = 0; // 탄 것('car' | 'anoko') · 아노코 모형(처음 탈 때 만든다, 차처럼 캐릭터 뿌리에) · 아노코 걸음 위상
+  let boost = 1, mountDecor = null; // 아노코를 탈 때 빠르기 배율(하트 5 — core/anokobond.js) · 아노코 꾸미기 색({ ribbon, saddle })
   const knock = { x: 0, z: 0 };
   // 먹는 동안은 음식만 든다(무기 · 손전등은 잠깐 넣어 둔다)
   let heldTags = ''; // 지금 보이는 소품 꼬리표(쉼표로) — 같이 놀기에서 다른 사람 화면에도 같게
@@ -74,8 +75,9 @@ export function createPlayer(scene, chibi, village) {
      * 자동차(kind 'car')나 아노코('anoko')에 타거나(on) 내린다. 모형은 처음 탈 때 만든다. 걷기 · 맞기 · 먹기 몸짓은 그만둔다.
      * 아노코는 웃는 얼굴로, 등 위에 올라앉는다(ANOKO_SEAT 만큼 아노코를 내리고 앞으로).
      */
-    setRiding(on, kind = 'car') {
+    setRiding(on, kind = 'car', k = 1) {
       on = !!on;
+      if (on) boost = k;
       if (on === riding && (!on || kind === rideKind)) return;
       riding = on;
       if (on) rideKind = kind;
@@ -86,11 +88,16 @@ export function createPlayer(scene, chibi, village) {
         mount.root.scale.setScalar(ANOKO_RIDE_SCALE);
         mount.root.position.set(0, -ANOKO_LIFT, -ANOKO_SEAT.z * ANOKO_RIDE_SCALE);
         model.root.add(mount.root);
+        if (mountDecor) mount.setDecor(mountDecor);
       }
       if (car) car.root.visible = on && rideKind === 'car';
       if (mount) mount.root.visible = on && rideKind === 'anoko';
       stopEat(); actT = 0; swingT = 0;
     },
+    /** 아노코를 탈 때 빠르기 배율(하트 5면 1.15 — 타고 있는 동안 바뀌어도 바로 따른다). */
+    setBoost(k) { boost = k; },
+    /** 아노코 꾸미기 색({ ribbon: '#hex' | null, saddle }). 아직 안 탔으면 처음 탈 때 입힌다. */
+    setMountDecor(d) { mountDecor = d; if (mount) mount.setDecor(d); },
     /** 손에 드는 불 'lantern' | 'flashlight' | null. 모델을 바꿔도 유지한다. */
     setHeld(tag) { if (held === tag) return; held = tag; showHeld(); },
     /** 오른손 무기 id | null(4단계). */
@@ -122,7 +129,7 @@ export function createPlayer(scene, chibi, village) {
       t += dt;
       let moving = false;
       // 자동차에 타면 두 배 빠르고, 차 크기만큼 넓게 부딪힌다(집 · 나무에 파묻히지 않게)
-      const speed = riding ? CAR_SPEED : SPEED, rad = riding ? (rideKind === 'anoko' ? ANOKO_RADIUS : CAR_RADIUS) : RADIUS, sx = position.x, sz = position.z;
+      const speed = riding ? CAR_SPEED * (rideKind === 'anoko' ? boost : 1) : SPEED, rad = riding ? (rideKind === 'anoko' ? ANOKO_RADIUS : CAR_RADIUS) : RADIUS, sx = position.x, sz = position.z;
       if (api.walkTo) {
         // 연출: 목표까지 충돌 검사 없이 걷는다
         const w = api.walkTo, dx = w.x - position.x, dz = w.z - position.z, d = Math.hypot(dx, dz);

@@ -1,6 +1,7 @@
 import { buildChibi, animateChibi, SEAT_LIFT } from '../actors/models.js';
 import { buildCar, rollCar, DRIVE_LIFT } from '../actors/car.js';
 import { buildAnoko, ANOKO_RIDE_SCALE, ANOKO_SEAT } from '../actors/anoko.js';
+import { parseDecorTag, decorColors } from '../core/anokobond.js';
 import { groundY } from '../core/layout.js';
 
 /**
@@ -90,6 +91,10 @@ export function createRemotePlayers(scene, area = 'village') {
     p.tx = m.x; p.tz = m.z; p.tyaw = m.yaw; p.anim = m.anim; p.area = m.area; p.held = heldOf(m);
     // 탄 것: 소품 꼬리표에 'ride-anoko' 가 있으면 아노코(서버가 move 칸을 정해 두어서 꼬리표 칸에 싣는다 — 모르는 옛 버전은 자동차로 그린다)
     p.rd = p.held.split(',').includes('ride-anoko') ? 'anoko' : null;
+    // 아노코 꾸미기: 'ride-anoko' 바로 뒤의 'ak-리본안장' 꼬리표(core/anokobond.js — 없으면 꾸미지 않은 아노코)
+    const deco = p.rd ? parseDecorTag(p.held.split(',')) : null;
+    p.decoKey = deco ? `${deco.ribbon}${deco.saddle}` : '';
+    p.deco = deco;
   }
   function say(id, text) { const p = list.get(id); if (p) { p.say = text; p.sayT = SAY_SEC; } }
   function emote(id, name) { const p = list.get(id); if (p && ANIMS.has(name)) { p.emote = name; p.emoteT = 2; } }
@@ -134,6 +139,7 @@ export function createRemotePlayers(scene, area = 'village') {
         p.mount.root.position.set(0, -anokoLift, -ANOKO_SEAT.z * ANOKO_RIDE_SCALE);
         p.chibi.root.add(p.mount.root);
       }
+      if (p.mount && p.mountDeco !== p.decoKey) { p.mountDeco = p.decoKey; p.mount.setDecor(decorColors(p.deco)); } // 꾸미기가 바뀔 때만
       if (p.mount) { p.mount.root.visible = onAnoko; if (onAnoko) { p.mountStep = (p.mountStep || 0) + Math.hypot(p.x - ox, p.z - oz) * 2.2; p.mount.animate(p.t, { moving: Math.hypot(p.x - ox, p.z - oz) > 1e-4, step: p.mountStep }); } }
       const bob = onAnoko && p.mount ? p.mount.bob * ANOKO_RIDE_SCALE : 0; // 아노코가 튀어 오르는 만큼 탄 사람도 들썩(아노코 발은 땅에)
       if (onAnoko && p.mount) p.mount.root.position.y = -anokoLift - bob;
