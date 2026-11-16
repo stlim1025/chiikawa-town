@@ -73,7 +73,7 @@ import {
   canSteal, stealAmount, steal, recover, thiefKeeps, markTheft, villagerEnergy, isSleepHour, BED_HOUR, TIRED, NAP_ENERGY, MEAL_ENERGY,
   boardOf, MAX_JOBS_PER_DAY, updateVillager
 } from './core/villagers.js';
-import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, killPoints, PARTY_HEARTS } from './core/hunters.js';
+import { HUNTER_PROFILES, licensed, addKill, canTryExam, tryExam, ranking, engrave as engraveWeapon, engravedOf, ENGRAVE_PRICE, partyCheck, partyLeaveReason, killPoints, PARTY_HEARTS } from './core/hunters.js';
 import { lineOf } from './core/npclines.js';
 import { chooseActivity, freshMind, growNeeds, satisfy, likeOf, PERSONA, wakeHourOf } from './core/brain.js';
 import { liveOffscreen, asleepSpans, mateEats } from './core/offscreen.js';
@@ -5527,9 +5527,10 @@ function boot() {
         } else if (villagerOf(state, kind, day).energy < TIRED) { endBuddy(kind, BUDDY_SAY[kind] ? BUDDY_SAY[kind].stop : null); npcGoHome(n, 'nap', true); }
         continue;
       }
-      if (n.party) { // 같이 토벌 중: 밤이 되거나 지치면 인사하고 집으로
-        if (isSleepHour(hour)) { partyEnd([kind], 'partyNightLeave'); npcGoHome(n, 'sleep', true); }
-        else if (villagerOf(state, kind, day).energy < TIRED) { partyEnd([kind], 'partyTiredLeave'); npcGoHome(n, 'nap', true); }
+      if (n.party) { // 같이 토벌 중: 밤이 되거나 지치면 인사하고 집으로(보스와 싸우는 중이면 끝날 때까지 곁에)
+        const why = partyLeaveReason({ sleepHour: isSleepHour(hour), energy: villagerOf(state, kind, day).energy, bossFight: bossBgmHold > 0 });
+        if (why === 'night') { partyEnd([kind], 'partyNightLeave'); npcGoHome(n, 'sleep', true); }
+        else if (why === 'tired') { partyEnd([kind], 'partyTiredLeave'); npcGoHome(n, 'nap', true); }
         continue;
       }
       if (npcs.busy(n) || n === talking || (tag && tag.n === n) || (theft && theft.n === n)) continue;

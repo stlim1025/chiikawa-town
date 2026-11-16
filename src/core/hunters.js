@@ -79,6 +79,17 @@ export function partyCheck(state, kind, { day, night = false, party = [] } = {})
   return { ok: true, reason: null };
 }
 
+/**
+ * 같이 토벌하던 친구가 지금 헤어질 까닭. → 'night'(잘 시간) · 'tired'(기운이 TIRED 아래) · null(계속 같이)
+ * 보스와 싸우는 중(bossFight)이면 졸려도 지쳐도 끝날 때까지 곁에 남는다.
+ */
+export function partyLeaveReason({ sleepHour = false, energy = 100, bossFight = false } = {}) {
+  if (bossFight) return null;
+  if (sleepHour) return 'night';
+  if (energy < TIRED) return 'tired';
+  return null;
+}
+
 /** 오늘 시험을 볼 수 있는지(자격증이 없고, 오늘 아직 안 봤다). */
 export function canTryExam(state, who, day) {
   if (!HUNTER_PROFILES[who]) return false;

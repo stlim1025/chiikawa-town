@@ -4,6 +4,7 @@ import * as H from '../src/core/hunters.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
 import { MONSTERS } from '../src/core/combat.js';
+import { TIRED } from '../src/core/villagers.js';
 
 const fresh = () => ({ ...createState({ name: '나', look: {} }), tutorial: 'done' });
 
@@ -53,4 +54,13 @@ test('랭커만 무기에 얼굴을 새긴다(돈 · 든 무기 필요, 한 번�
   assert.equal(H.engrave(r.state).reason, 'done');
   assert.ok(isValidState(r.state));
   assert.equal(H.engrave({ ...s, weapon: { owned: ['sword'], held: null } }).reason, 'weapon');
+});
+
+test('같이 토벌하는 친구는 잘 시간이나 지치면 헤어지지만, 보스와 싸우는 중에는 끝날 때까지 남는다', () => {
+  assert.equal(H.partyLeaveReason({ sleepHour: false, energy: 80 }), null);
+  assert.equal(H.partyLeaveReason({ sleepHour: true, energy: 80 }), 'night');
+  assert.equal(H.partyLeaveReason({ sleepHour: false, energy: TIRED - 1 }), 'tired');
+  assert.equal(H.partyLeaveReason({ sleepHour: true, energy: TIRED - 1 }), 'night'); // 밤이면 낮잠 말고 자러 간다
+  assert.equal(H.partyLeaveReason({ sleepHour: true, energy: 80, bossFight: true }), null);
+  assert.equal(H.partyLeaveReason({ sleepHour: false, energy: 0, bossFight: true }), null);
 });
