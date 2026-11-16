@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACH_GROUPS, ACHIEVEMENTS, progressOf, checkAchievements, claimAchievement, unclaimedCount, titlesOf, setTitle, titleOf, addRecord, isValidAchieve, isValidRecords } from '../src/core/achieve.js';
+import { ACH_GROUPS, ACHIEVEMENTS, progressOf, checkAchievements, claimAchievement, unclaimedCount, titlesOf, setTitle, titleOf, addRecord, isValidAchieve, isValidRecords, titleFromLook } from '../src/core/achieve.js';
 import { seasonsSeen } from '../src/core/season.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
@@ -125,6 +125,17 @@ test('업적: 받기는 한 번만, 못 이룬 것은 못 받고, 칭호와 기�
   assert.equal(g.state.home.owned.dexplaque, 1);
   assert.equal(claimAchievement(g.state, 'dexAll').ok, false);
   assert.equal(g.state.home.owned.dexplaque, 1);
+});
+
+test('같이 놀기 칭호: 친구가 보낸 모습의 칭호는 글자만, 12자까지', () => {
+  assert.equal(titleFromLook({ title: '눈사람 장인' }), '눈사람 장인');
+  assert.equal(titleFromLook({ title: '가나다라마바사아자차카타파하' }), '가나다라마바사아자차카타');
+  assert.equal(titleFromLook({ title: 7 }), null);
+  assert.equal(titleFromLook({ title: { x: 1 } }), null);
+  assert.equal(titleFromLook({ title: '   ' }), null);
+  assert.equal(titleFromLook({}), null);
+  assert.equal(titleFromLook(null), null);
+  assert.equal(titleFromLook(undefined), null);
 });
 
 test('업적: 저장 검사는 예전 저장과 새 저장을 받고 이상한 값은 거른다', () => {

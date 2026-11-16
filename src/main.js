@@ -333,7 +333,7 @@ function boot() {
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 저장이 막혀 있으면 이번만 */ } };
   const mpDraft = { code: lsGet(MP_KEY.code) };
   let mySay = null; // 내가 한 한마디 { text, until } — 내 머리 위에도 말풍선
-  const joinInfo = (x, z, yaw) => ({ name: myName(), look: myLook(), x, z, yaw });
+  const joinInfo = (x, z, yaw) => ({ name: myName(), look: mpLook(), x, z, yaw }); // 같이 놀기에는 단 칭호(업적)도 실어 보낸다
   /** 화면에 보일 상태: 친구 마을에 놀러 간 동안은 시계 · 날짜만 주인 마을 것(내 진행은 그대로). */
   const viewState = () => (visiting && visiting.clock ? { ...state, clock: visiting.clock, startDate: visiting.startDate || state.startDate } : state);
   const multiPanel = {
@@ -1148,7 +1148,7 @@ function boot() {
       const msg = r.furniture ? `${josa(FURNITURE[r.furniture].name, '을/를')} 집 상자에 넣었어요` : r.title ? '칭호를 달 수 있어요! 업적 앱 맨 위에서 골라요' : '업적 보상을 받았어요';
       hud.toast(msg, 3600, { chips });
     },
-    setTitle: (id) => { commit(setTitle(state, id)); hud.setTitle(titleOf(state)); },
+    setTitle: (id) => { commit(setTitle(state, id)); hud.setTitle(titleOf(state)); multi.look(mpLook()); }, // 같이 놀기 친구 화면의 내 칭호도 바로
     // 낚시 도감(core/fishing.js): 잡아 본 물고기 가짓수 보상 받기
     claimFishDex: (n) => {
       const r = claimDex(state, n);
@@ -1930,7 +1930,9 @@ function boot() {
   let swapOn = false, homeGuest = false, swapForce = null; // homeGuest: 몸이 바뀐 동안 내 집에 손님으로 들어왔다(우사기가 든 내 몸의 집 — 잠 · 상자 · 꾸미기는 못 한다)
   // label: 같이 놀기 친구 화면의 내 머리 위 이름(몸이 바뀐 동안은 하치와레 — net/remote.js)
   const myLook = () => (swapOn ? { npc: MY_BODY, label: myBodyTag().name } : realLook());
-  const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(myLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
+  const refreshLook = () => { player.setModel(buildChibi(myLook())); multi.look(mpLook()); }; // 같이 놀기: 같은 마을 사람들에게도 바로
+  /** 같이 놀기로 보내는 모습: 단 칭호(core/achieve.js)가 있으면 title 을 붙인다(저장의 캐릭터 모습에는 넣지 않는다). */
+  const mpLook = () => { const t = state ? titleOf(state) : null; return t ? { ...myLook(), title: t } : myLook(); };
   setLineNames(bodyNames); // 친구들끼리의 짝 수다 · 내 일 이야기 대본에 박힌 이름도 몸이 바뀐 동안은 몸의 이름으로(바뀌지 않았으면 그대로)
   /**
    * 몸이 바뀐 채인지 살펴 바뀌었을 때만 갈아 끼운다(매 프레임): 나는 하치와레 몸, 친구들은 몸대로(core/swap.js 의 SWAP_BODY — 우사기는 내 몸),

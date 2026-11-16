@@ -139,6 +139,12 @@ export function titleOf(state) {
   return a && a.title && achieveOf(state)[id] && achieveOf(state)[id].got ? a.title : null;
 }
 
+/** 같이 놀기: 친구가 보낸 모습(look)의 칭호(서버가 그대로 전한 값이라 글자만, 12자까지) | null. */
+export function titleFromLook(look) {
+  const t = look && typeof look.title === 'string' ? look.title.trim() : '';
+  return t ? t.slice(0, 12) : null;
+}
+
 const day = (v) => Number.isInteger(v) && v >= 0;
 /** 저장 검사: 아는 업적만, 이룬 날은 음이 아닌 정수, got 은 true 만. */
 export function isValidAchieve(a) {

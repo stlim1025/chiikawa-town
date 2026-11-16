@@ -2,6 +2,7 @@ import { buildChibi, animateChibi, SEAT_LIFT } from '../actors/models.js';
 import { buildCar, rollCar, DRIVE_LIFT } from '../actors/car.js';
 import { buildAnoko, ANOKO_RIDE_SCALE, ANOKO_SEAT } from '../actors/anoko.js';
 import { parseDecorTag, decorColors } from '../core/anokobond.js';
+import { titleFromLook } from '../core/achieve.js';
 import { groundY } from '../core/layout.js';
 
 /**
@@ -30,7 +31,7 @@ const FOLLOW = 16;
  */
 const heldOf = (m) => (m && typeof m.h === 'string' ? m.h.split(',').filter((t) => /^[a-zA-Z0-9_-]{1,20}$/.test(t)).slice(0, 4).join(',') : '');
 /** 모습 비교용 글자(같은 모습이면 다시 만들지 않는다). */
-const lookKey = (look) => { try { return JSON.stringify(look || {}); } catch { return ''; } };
+const lookKey = (look) => { try { return JSON.stringify({ ...(look || {}), title: undefined }); } catch { return ''; } }; // 칭호(업적)는 모습이 아니라 빼고 비교한다
 /** 모습에 실려 온 머리 위 이름(몸이 바뀌었다 — 바뀐 동안은 하치와레). 없으면 null(들어올 때의 이름). */
 const lookLabel = (look) => (look && typeof look.label === 'string' && look.label ? look.label.slice(0, 8) : null);
 /** 손에 든 등불(빛을 비춘다): 'lantern' | 'flashlight' | null. */
@@ -49,11 +50,12 @@ export function createRemotePlayers(scene, area = 'village') {
     try { chibi = buildChibi(p.look || {}); } catch { chibi = buildChibi({}); } // 모르는 모습이면 기본 모습
     scene.add(chibi.root);
     const m = p.move || {}, x = m.x || 0, z = m.z || 0, yaw = m.yaw || 0;
-    list.set(p.id, { id: p.id, name: p.name, label: lookLabel(p.look), chibi, lookKey: lookKey(p.look), x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', held: heldOf(m), shownHeld: null, t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
+    list.set(p.id, { id: p.id, name: p.name, label: lookLabel(p.look), title: titleFromLook(p.look), chibi, lookKey: lookKey(p.look), x, z, yaw, tx: x, tz: z, tyaw: yaw, vx: 0, vz: 0, at: 0, anim: m.anim || 'idle', area: m.area || 'village', held: heldOf(m), shownHeld: null, t: Math.random() * 10, phase: 0, say: '', sayT: 0, emote: null, emoteT: 0 });
   }
   /** 모습이 바뀌었다(옷 · 변신 · 포셰트): 캐릭터를 다시 만든다(같은 모습이면 그대로). */
   function setLook(id, look) {
     const p = list.get(id), key = lookKey(look);
+    if (p) p.title = titleFromLook(look); // 칭호만 바뀌었으면 캐릭터는 그대로 두고 칭호 이름표만
     if (!p || key === p.lookKey) return;
     let chibi;
     try { chibi = buildChibi(look || {}); } catch { return; } // 모르는 모습이면 지금 모습 그대로
@@ -158,7 +160,8 @@ export function createRemotePlayers(scene, area = 'village') {
       if (!p.chibi.root.visible) continue;
       const top = p.chibi.height;
       out.push({ id: 'mp-n-' + p.id, x: p.x, y: top + 0.2, z: p.z, text: p.label || p.name, kind: 'mp-name' });
-      if (p.sayT > 0) out.push({ id: 'mp-s-' + p.id, x: p.x, y: top + 0.75, z: p.z, text: p.say, kind: 'bubble' });
+      if (p.title) out.push({ id: 'mp-t-' + p.id, x: p.x, y: top + 0.5, z: p.z, text: p.title, kind: 'mp-title' }); // 단 칭호(업적)는 이름 바로 위
+      if (p.sayT > 0) out.push({ id: 'mp-s-' + p.id, x: p.x, y: top + (p.title ? 1.0 : 0.75), z: p.z, text: p.say, kind: 'bubble' });
     }
     return out;
   }
