@@ -55,6 +55,20 @@ test('낚시 도감: 빈 깡통은 빼고, 가짓수마다 한 번씩 보상, �
   assert.equal(isValidState({ ...fresh(), fishPrize: 'x' }), false);
 });
 
+test('낚시 도감: 미꾸라지가 더해져도 13종 보상은 그대로, 14종(모든 물고기) 1,000원', () => {
+  assert.equal(DEX_FISH.length, 14);
+  assert.deepEqual(DEX_PRIZES.map((p) => [p.n, p.money]), [[4, 300], [8, 800], [13, 3000], [14, 1000]]);
+  let s = fresh();
+  for (const id of DEX_FISH.filter((id) => id !== 'loach')) s = logFish(s, id, 10).state;
+  assert.ok(canClaimDex(s, 13) && !canClaimDex(s, 14), '예전 13종을 다 잡으면 13종 보상');
+  const old = { ...s, fishPrize: [4, 8, 13] };
+  assert.ok(isValidFishPrize([4, 8, 13]) && isValidState(old), '13종 보상을 받은 예전 저장');
+  s = logFish(old, 'loach', 15).state;
+  const r = claimDex(s, 14);
+  assert.ok(r.ok && r.money === 1000 && r.state.money === s.money + 1000);
+  assert.ok(isValidFishPrize([4, 8, 13, 14]) && isValidState(r.state));
+});
+
 test('낚시 일감: 낚싯대가 있어야 보이고, 그 물고기를 세며, 급수 배율 없이 일감 값이 매입가보다 낫다', () => {
   const fishJobs = Object.values(JOB_TYPES).filter(isFishJob);
   assert.equal(fishJobs.length, 3);

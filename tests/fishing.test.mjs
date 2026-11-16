@@ -32,6 +32,22 @@ test('낚시: 물 · 시각마다 잡히는 물고기가 다르다', () => {
   }
 });
 
+test('미꾸라지: 비 오는 날만 시냇물과 연못에서, 중간 크기 10~20cm, 80원', () => {
+  const L = FISH.loach;
+  assert.ok(L && L.name === '미꾸라지' && L.rain === true);
+  assert.deepEqual([...L.waters].sort(), ['pond', 'river']);
+  assert.equal(L.size, 1);
+  assert.deepEqual(L.cm, [10, 20]);
+  assert.equal(sellPrice('loach'), 80);
+  for (const h of [8, 13, 21, 3]) {
+    assert.ok(!fishFor('river', h).includes('loach') && !fishFor('pond', h, 'sunny').includes('loach') && !fishFor('river', h, 'snow').includes('loach'), '비가 아니면 없다');
+    assert.ok(fishFor('river', h, 'rain').includes('loach') && fishFor('pond', h, 'rain').includes('loach'), '비 오는 날 시냇물과 연못');
+    assert.ok(!fishFor('lake', h, 'rain').includes('loach') && !fishFor('sea', h, 'rain').includes('loach'));
+  }
+  for (let i = 0; i < 200; i++) assert.notEqual(pickFish('river', 12, () => i / 200, 'cloudy'), 'loach');
+  assert.ok(Array.from({ length: 200 }, (_, i) => pickFish('pond', 12, () => i / 200, 'rain')).includes('loach'), '비 오는 날엔 물 수 있다');
+});
+
 test('낚시: 물고기는 가방 물건이고 팔 수 있다, 큰 고기일수록 누를 틈이 짧고 끌어올리기가 어렵다', () => {
   for (const [id, f] of Object.entries(FISH)) {
     assert.equal(itemInfo(id).name, f.name);

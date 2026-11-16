@@ -24,6 +24,7 @@ export const FISH = {
   puffer: { name: '복어', sell: 120, waters: ['sea'], weight: 2, size: 1, cm: [12, 28], color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
   seabream: { name: '도미', sell: 180, waters: ['sea'], weight: 1.5, size: 2, cm: [30, 55], color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
   octopus: { name: '문어', sell: 270, waters: ['sea'], weight: 0.6, size: 2, night: true, cm: [40, 90], color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
+  loach: { name: '미꾸라지', sell: 80, waters: ['river', 'pond'], weight: 2.5, size: 1, rain: true, cm: [10, 20], color: '#8a7a55', note: '비 오는 날에만 진흙에서 나와 시냇물과 연못을 미끄럽게 돌아다닌다.' }, // 계절과 날씨(게임 오리지널)
   can: { name: '빈 깡통', sell: 3, waters: ['pond', 'river', 'lake', 'sea'], weight: 0.8, size: 0, junk: true, color: '#b9bec6', note: '누가 버렸담. 물이 깨끗해졌다.' }
 };
 registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { name: f.name, kind: 'fish', sell: f.sell, note: f.note }])));
@@ -56,7 +57,8 @@ export function grillFish(s, max = GRILL_MAX) {
 /** 낚시 도감에 올리는 물고기(빈 깡통은 빼고). */
 export const DEX_FISH = Object.keys(FISH).filter((id) => !FISH[id].junk);
 /** 도감 보상: 잡아 본 물고기가 n 가지가 되면 받는다(마을폰 '낚시 도감'에서 받기). */
-export const DEX_PRIZES = [{ n: 4, money: 300 }, { n: 8, money: 800 }, { n: DEX_FISH.length, money: 3000 }];
+// 13종은 미꾸라지(비 오는 날)가 오기 전의 '모든 물고기' 보상 — 그 보상을 받은 예전 저장도 그대로 받는다
+export const DEX_PRIZES = [{ n: 4, money: 300 }, { n: 8, money: 800 }, { n: 13, money: 3000 }, { n: DEX_FISH.length, money: 1000 }];
 /** 잡아 본 물고기 가짓수. */
 export const dexCount = (s) => DEX_FISH.filter((id) => fishLogOf(s)[id]).length;
 /** 받은 도감 보상(n 목록). */
@@ -104,16 +106,16 @@ export function waterAt(x, z) {
 }
 
 const isNight = (hour) => hour >= 19 || hour < 5;
-/** 그 물 · 그 시각에 잡힐 수 있는 물고기 id 들. */
-export function fishFor(water, hour) {
+/** 그 물 · 그 시각 · 그날 날씨(core/season.js weatherOf)에 잡힐 수 있는 물고기 id 들. rain 물고기는 비 오는 날만. */
+export function fishFor(water, hour, weather) {
   return Object.keys(FISH).filter((id) => {
     const f = FISH[id];
-    return f.waters.includes(water) && !(f.night && !isNight(hour)) && !(f.day && isNight(hour));
+    return f.waters.includes(water) && !(f.night && !isNight(hour)) && !(f.day && isNight(hour)) && !(f.rain && weather !== 'rain');
   });
 }
-/** 그 물 · 그 시각에 무엇이 물지(잘 잡히는 정도로 고른다). random: 0..1 함수. */
-export function pickFish(water, hour, random = Math.random) {
-  const ids = fishFor(water, hour);
+/** 그 물 · 그 시각 · 그날 날씨에 무엇이 물지(잘 잡히는 정도로 고른다). random: 0..1 함수. */
+export function pickFish(water, hour, random = Math.random, weather) {
+  const ids = fishFor(water, hour, weather);
   const total = ids.reduce((a, id) => a + FISH[id].weight, 0);
   let r = random() * total;
   for (const id of ids) { r -= FISH[id].weight; if (r < 0) return id; }
