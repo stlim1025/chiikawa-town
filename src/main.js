@@ -3136,7 +3136,7 @@ function boot() {
   function updateExamPill() {
     const examWeeds = state.exam && !state.exam.done ? examKinds(state.exam) : [];
     weeds.setHint(examWeeds);
-    if (state.exam && !hunterExam && !tag && !downed) {
+    if (state.exam && !hunterExam && !tag && !downed && !anokoRace.active) { // 아노코 경주 중에는 경주 시간을 보인다
       const need = state.exam.need || 5, got = Math.min(state.exam.streak, need);
       // 세로 휴대폰은 좁아서 풀은 그림만 · 숫자(●○ 와 같은 뜻)는 뺀다(narrow)
       hud.setTimer(['승급 시험', ...examWeeds.map((k) => ({ icon: itemSvg(k), text: WEED_KINDS[k].name, narrow: 'icon' })), { text: '●'.repeat(got) + '○'.repeat(need - got) }, { text: `${got} / ${need}`, narrow: 'hide' }]);
