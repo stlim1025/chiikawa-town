@@ -30,6 +30,7 @@ import { WEAPONS, WEAPON_ORDER, MONSTERS, MONSTER_ORDER, MONSTER_REGIONS, DROPS,
 import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack, activeQuests } from '../core/quests.js';
+import { ACH_GROUPS, ACHIEVEMENTS, progressOf as achProgress, titlesOf } from '../core/achieve.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
@@ -60,6 +61,8 @@ const APP_ICON = {
   multi: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="13" cy="14" r="6" fill="#fff"/><circle cx="27" cy="14" r="6" fill="#fff"/><path d="M5 33q1-11 8-11t8 11zM19 33q1-11 8-11t8 11z" fill="#fff"/><path d="M17 27h6" stroke="#5aa98c" stroke-width="2.6" stroke-linecap="round"/></svg>',
   // 몬스터 도감: 뿔 달린 동그란 몬스터 얼굴
   fishdex: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M29 21l7-6v12z" fill="#fff"/><ellipse cx="18" cy="21" rx="13" ry="8" fill="#fff"/><circle cx="11" cy="19" r="2.2" fill="#4f86b8"/><path d="M20 14q3 7 0 14" fill="none" stroke="#4f86b8" stroke-width="2" stroke-linecap="round"/></svg>',
+  // 업적: 리본 달린 메달
+  achieve: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 5h6l3 10h-6zM27 5h-6l-3 10h6z" fill="#fff" opacity=".85"/><circle cx="20" cy="24" r="10" fill="#fff"/><path d="M20 17.5l2 4.2 4.6.6-3.3 3.2.8 4.6-4.1-2.2-4.1 2.2.8-4.6-3.3-3.2 4.6-.6z" fill="#e0a830"/></svg>',
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 /** 몬스터가 사는 곳(안내서 · 도감). */
@@ -216,7 +219,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'fishdex', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'achieve', 'fishdex', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
   // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
   const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
@@ -1417,6 +1420,35 @@ export function createPanels(ui, handlers) {
       }
       return out;
     },
+    // 마을폰 '업적' 앱(core/achieve.js, 게임 오리지널): 맨 위 칭호 달기, 묶음마다 업적(할 일 · 보상 · 진행 또는 받기)
+    achieve(s) {
+      const rec = s.achieve || {}, titles = titlesOf(s), mine = s.title || null;
+      const out = [appBar('업적', `${Object.keys(rec).length} / ${ACHIEVEMENTS.length}`)];
+      out.push(h('div', { class: 'ach-titles' }, h('b', {}, '칭호 달기'),
+        titles.length
+          ? h('div', { class: 'ach-title-row' },
+            h('button', { class: `btn${mine ? '' : ' primary'}`, type: 'button', onClick: after(() => handlers.setTitle?.(null)) }, '달지 않기'),
+            ...titles.map((t) => h('button', { class: `btn${mine === t.id ? ' primary' : ''}`, type: 'button', onClick: after(() => handlers.setTitle?.(t.id)) }, t.title)))
+          : h('span', { class: 'dp-note' }, '칭호가 있는 업적을 받으면 달 수 있어요')));
+      for (const g of ACH_GROUPS) {
+        out.push(h('div', { class: 'weed-grade' }, h('b', {}, g.name)));
+        out.push(h('div', { class: 'dex-prizes' }, ...ACHIEVEMENTS.filter((a) => a.group === g.id).map((a) => {
+          const r = rec[a.id], got = !!(r && r.got), ready = !!r && !got, p = achProgress(s, a.id);
+          return h('div', { class: `dex-prize ach${got ? ' done' : ready ? ' ready' : ''}` },
+            h('div', { class: 'ach-main' },
+              h('b', {}, a.name),
+              h('small', {}, a.goal),
+              h('div', { class: 'ach-reward' },
+                a.money ? h('span', { class: 'dp-money' }, svgSpan('coin', COIN), won(a.money)) : null,
+                a.title ? chip(null, 'muted', `칭호 ${a.title}`) : null,
+                a.furniture ? chip(null, 'muted', FURNITURE[a.furniture].name) : null)),
+            got ? h('span', { class: 'dp-note' }, '받았어요')
+              : ready ? h('button', { class: 'btn primary', type: 'button', onClick: after(() => handlers.claimAchievement?.(a.id)) }, '받기')
+                : h('span', { class: 'dp-note' }, `${p.have} / ${p.need}`));
+        })));
+      }
+      return out;
+    },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
     weeds(s) {
       const log = s.weedLog || {}, grade = s.license.grade;
@@ -1476,6 +1508,7 @@ export function createPanels(ui, handlers) {
           app('friends', APP_ICON.friends, '친구', () => show('friends')),
           app('multi', APP_ICON.multi, '같이 놀기', () => show('multi')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
+          app('achieve', APP_ICON.achieve, '업적', () => show('achieve')),
           hasTool(s, 'rod') || Object.keys(fishLogOf(s)).length ? app('fishdex', APP_ICON.fishdex, '낚시 도감', () => show('fishdex')) : null,
           handlers.searchApp?.() ? app('search', APP_ICON.search, '검색', () => show('search')) : null,
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,

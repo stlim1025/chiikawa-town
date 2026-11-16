@@ -99,6 +99,7 @@ import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
 import { weatherOf, WEATHER_DIM, seasonAt, seasonOfMonth } from './core/season.js';
+import { checkAchievements, claimAchievement, setTitle, titleOf, unclaimedCount, achievementOf } from './core/achieve.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS, bossEatWait, BOSS_EAT_COOL } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
@@ -1112,7 +1113,7 @@ function boot() {
     // 모금함 창: 친구 마을에 놀러 간 동안은 그 마을 모금(worksPanelState)과 주인 이름
     worksState: () => worksPanelState(),
     worksHost: () => (visiting && !visiting.arriving ? multi.hostName || '친구' : null),
-    appNudge: () => appNudge,
+    appNudge: () => appNudge || (state && unclaimedCount(state) > 0 ? 'achieve' : null), // 받을 업적 보상이 있으면 업적 앱이 빛난다
     appSeen: (kind) => { if (kind === appNudge) appNudge = null; },
     // 사이드스토리 '검은 별똥별': 없애는 법을 찾을 차례에만 마을폰 '검색' 앱 · 산소 표백제를 가져갈 차례에만 도구점에서 판다
     searchApp: () => { const st = state && stepOf(state, 'blackStar'); return !!st && st.type === 'search' && loopGate(state, st); },
@@ -1134,6 +1135,20 @@ function boot() {
       player.cheerTime = 1.0;
       hud.toast('현상금을 받았어요!', 3200, { chips: [{ icon: 'coin', text: won(r.reward) }] });
     },
+    // 업적(core/achieve.js): 보상 받기(돈 · 칭호 · 기념 가구는 집 상자로) · 칭호 달기
+    claimAchievement: (id) => {
+      const r = claimAchievement(state, id);
+      if (!r.ok) return;
+      commit(r.state);
+      sound.play('coin');
+      player.cheerTime = 1.0;
+      const chips = [];
+      if (r.money) chips.push({ icon: 'coin', text: won(r.money) });
+      if (r.title) chips.push({ text: `칭호 ${r.title}` });
+      const msg = r.furniture ? `${josa(FURNITURE[r.furniture].name, '을/를')} 집 상자에 넣었어요` : r.title ? '칭호를 달 수 있어요! 업적 앱 맨 위에서 골라요' : '업적 보상을 받았어요';
+      hud.toast(msg, 3600, { chips });
+    },
+    setTitle: (id) => { commit(setTitle(state, id)); hud.setTitle(titleOf(state)); },
     // 낚시 도감(core/fishing.js): 잡아 본 물고기 가짓수 보상 받기
     claimFishDex: (n) => {
       const r = claimDex(state, n);
@@ -7190,8 +7205,35 @@ function boot() {
     if (full) hud.toast('눈사람은 다섯 개까지 남아요. 가장 오래된 눈사람이 녹았어요', 3600);
     else if (!seen('snowman')) { markSeen('snowman'); hud.toast('눈사람은 다섯 개까지 남고, 겨울이 끝나면 모두 녹아요', 4000); }
   }
+  // ---------- 도감과 업적(core/achieve.js, 게임 오리지널): 1초마다 이미 있는 기록으로 판단, 이루면 배너, 받기는 마을폰 '업적' 앱 ----------
+  let achT = 0, achInit = false, achSummary = 0;
+  const achQueue = []; // 이뤘는데 아직 배너를 못 띄운 업적(대화 · 이야기 장면 · 첫날 안내가 끝나면 하나씩)
+  /** 불러온 저장을 새로 판단한다(이미 이룬 업적은 배너 대신 알림 하나로). beginSession 이 부른다. */
+  function resetAchievements() { achInit = false; achSummary = 0; achQueue.length = 0; achT = 0; }
+  function updateAchievements(dt) {
+    if (!state) return;
+    hud.setTitle(titleOf(state)); // 왼쪽 위 칭호 띠(바뀐 글만 다시 쓴다)
+    achT -= dt;
+    if (achT > 0) return;
+    achT = 1;
+    const r = checkAchievements(state);
+    if (r.newly.length) {
+      commit(r.state);
+      if (achInit) achQueue.push(...r.newly);
+      else achSummary += r.newly.length; // 불러오자마자 이미 이룬 것들: 배너가 쏟아지지 않게 알림 하나로
+    }
+    achInit = true;
+    if (guide.open || cutscene || tutorialActive(state.tutorial) || panels.isOpen()) return;
+    if (achSummary) {
+      hud.toast(`이미 이룬 업적이 ${achSummary}개 있어요! 마을폰 업적 앱에서 받아요`, 4600);
+      achSummary = 0;
+    } else if (achQueue.length) {
+      const a = achievementOf(achQueue.shift());
+      if (a) { hud.banner('업적을 이뤘어요!', a.name, 3000); sound.play('ready'); }
+    }
+  }
   let starNotice = 0, shakeT = 0;
-  const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
+  const STARMAN ={ kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
   const meWho = () => (swapOn ? { kind: 'me', ...myBodyTag() } : { kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' }); // 몸이 바뀐 동안 내 이름표는 하치와레
   const WISH_GAG = { rich: `(발밑에 ${WISH_MONEY}원이 떨어져 있다…)`, full: '(왠지 배가 조금 부른 것 같다…)', friends: '(친구들이랑 조금 더 가까워진 것 같다…)', luck: '(주머니에 추첨권이 한 장 들어 있다…)' };
   const STAR_REACT = { chiikawa: 'shy', hachiware: 'hop', usagi: 'hop', kurimanju: 'look', rakko: 'think', momonga: 'hop' }; // 별똥별맨을 보고 놀라는 몸짓
@@ -7459,6 +7501,7 @@ function boot() {
 
   /** 새 캐릭터는 마을 입구에서 걸어 들어오고(입장 연출), 이어하기는 저장된 자리에서 바로 시작한다. */
   function beginSession(next, fresh) {
+    resetAchievements(); // 불러온 저장의 업적을 새로 판단(이미 이룬 것은 알림 하나로)
     lastRegion = null; // 다시 시작해도 구역 알림이 잘못 뜨지 않게
     readySeen.clear(); readyInit = false; // 불러온 저장에 이미 다 모인 부탁은 '다 모았어요!' 를 다시 띄우지 않게
     // 예전 저장에는 시작 날짜가 없다: 지금 날이 오늘이 되도록 거꾸로 맞춘다
@@ -7887,6 +7930,7 @@ function boot() {
       npcs.update(dt, t, player.position);
       guestMonsters(dt);
       updateDailyWeather(dt, false); // 집 안에서도 빗소리
+      updateAchievements(dt); // 업적(집 안에서도)
       interior.resize(aspect);
       // 집 안을 걷는다(꾸미기 · 창 · 잠자기 중에는 멈춘다). 침대 · 옷장 · 문 앞이면 행동 안내
       const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay && !guide.open;
@@ -7919,6 +7963,7 @@ function boot() {
       hud.setAction(homeTarget ? homeTarget.label : null);
       hud.render(viewState());
       updateDailyWeather(dt, true); // 주인 마을 빗소리
+      updateAchievements(dt);
       interior.update(dt, t);
       homeRemotes.update(dt, true); // 집 안에 같이 있는 주인 · 다른 손님
       setCelLight(INDOOR_LIGHT);
@@ -8094,7 +8139,7 @@ function boot() {
     // 하늘색 자동차: 걸어야 할 때(이야기 · 다른 장면 · 쓰러짐 · 앉아 쉬기 …)는 저절로 내리고, 버튼은 차가 있을 때만(타고 있으면 눌린 모양)
     if (player && player.riding && !carStay()) getOffCar(true);
     hud.setCar(mode === 'play' && state && rideKind(state) ? (player && player.riding ? 'on' : 'off') : null, (state && rideKind(state)) || 'car'); // 탈것 버튼: 고른 탈것(자동차 · 아노코) 그림
-    hud.setPhoneNudge(!!appNudge || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
+    hud.setPhoneNudge(!!appNudge || (!!state && unclaimedCount(state) > 0) || (!!state && state.tutorial === 'phone')); // 새로 생긴 앱(지도)을 열 때까지 · 첫날 안내에서 마을폰을 열어 볼 때 마을폰 버튼이 빛난다
     if (mode !== 'play') streaks.setActive(false);
     // 이야기 장면(잠옷 밤나들이 · 별똥별 소원 · 얼굴 클로즈업): 화면 글을 거의 다 숨기고 대화 상자는 작게 맨 아래로(index.html .cutscene)
     const cut = mode === 'play' && (pajama.active || housewarm.cutscene || stickParty.cutscene || !!starShow || !!closeup || blackStar.cutscene || cameraStory.cutscene);
@@ -8102,6 +8147,7 @@ function boot() {
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     updateDailyWeather(dt, guestView); // 그날 날씨(비 · 눈 · 흐림)를 먼저 건다
     updateSeasonPlay(dt, guestView); // 낙엽 더미 · 눈사람 · 발자국 · 우산
+    if (mode === 'play') updateAchievements(dt); // 업적(손님도 내 저장으로)
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
     if (mode === 'play') {
       if (starShow) starCamera(dt);

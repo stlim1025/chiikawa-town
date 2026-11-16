@@ -1406,6 +1406,18 @@ button.phone-tour:active { transform: translateY(2px); }
 .dex-prize .dp-note { color: var(--ink-soft); font-size: 14px; }
 .dex-prize.ready { background: var(--butter); }
 .dex-prize.done { opacity: 0.6; }
+/* 마을폰 업적 앱(core/achieve.js): 앱 아이콘, 칭호 달기 줄, 업적 카드(이름 · 할 일 · 보상 · 진행 또는 받기) */
+.app.achieve .app-ico { background: #e8a93c; }
+.ach-titles { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; padding: 10px 12px; border-radius: 14px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.ach-title-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ach-title-row .btn { padding: 4px 12px; font-size: 14px; }
+.dex-prize.ach .ach-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dex-prize.ach small { color: var(--ink-soft); font-size: 13px; }
+.dex-prize.ach .ach-reward { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dex-prize.ach .ach-reward .dp-money { flex: 0 0 auto; }
+.dex-prize.ach > .dp-note, .dex-prize.ach > .btn { flex: 0 0 auto; }
+/* 왼쪽 위 칭호 띠(업적 앱에서 단 칭호) */
+.hud-title { padding: 1px 12px 3px; border-radius: 999px; background: #fff2c2; box-shadow: 0 2px 0 #e2c162; color: #6a4a10; font-size: 15px; rotate: 2deg; }
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */
 .app.friends .app-ico { background: #ee7489; }
 .app.multi .app-ico { background: #5aa98c; }
@@ -1836,6 +1848,7 @@ html.standalone, html.standalone body { height: 100vh; }
   .hud-pill .ico { font-size: 20px; }
   .hud-money { font-size: 19px; }
   .hud-grade { padding: 0 10px 2px; font-size: 14px; }
+  .hud-title { padding: 0 10px 2px; font-size: 13px; }
   .hud-buff { font-size: 13px; }
   .hud-energy { font-size: 15px; }
   .hud-energy .ico { font-size: 17px; }
@@ -2070,6 +2083,7 @@ html.standalone, html.standalone body { height: 100vh; }
   .hud-pill .ico { font-size: 17px; }
   .hud-money { font-size: 16px; }
   .hud-grade { padding: 0 8px 1px; font-size: 12px; }
+  .hud-title { padding: 0 8px 1px; font-size: 11px; }
   .hud-energy { font-size: 13px; }
   .hud-energy .ico { font-size: 15px; }
   .hud-bar { width: 64px; height: 8px; }

@@ -52,6 +52,7 @@ export function createHud(ui, input) {
   const status = el('div', 'hud-status');
   status.innerHTML = `<div class="hud-pill hud-money">${COIN}<span class="mv"></span></div>
     <div class="hud-grade"></div>
+    <div class="hud-title" hidden></div>
     <div class="hud-pill hud-energy" aria-label="기운">${HEART}<div class="hud-bar"><i></i></div><span class="sv"></span></div>
     <div class="hud-buff" hidden>💪 공격 +1</div>`;
   // 같이 토벌 중인 친구들 얼굴(돈 · 기운 아래)
@@ -281,6 +282,7 @@ export function createHud(ui, input) {
   const bar = q(status, '.hud-bar');
   const dateEl = q(clock, '.dl'), skyEl = q(clock, '.sk'), hmEl = q(clock, '.hm'), apEl = q(clock, '.ap');
   let wx = 'sunny'; // 그날 날씨(setWeather)
+  const titleEl = q(status, '.hud-title'); // 단 칭호(core/achieve.js, setTitle)
 
   // ---------- 큰 소식 카드(notice): 차례로 하나씩 ----------
   const noticeQueue = [];
@@ -360,6 +362,11 @@ export function createHud(ui, input) {
     setPhoneNudge(on) { if (gear.classList.contains('nudge') !== !!on) { gear.classList.toggle('nudge', !!on); gear.setAttribute('aria-label', on ? '마을폰(새 앱이 생겼어요)' : '마을폰(설정)'); } },
     /** 집으로 버튼을 보일지(마을 밖에 있을 때). */
     setRecall(on) { recallBtn.hidden = !on; },
+    /** 급수 아래 칭호 띠(업적 앱에서 단 칭호, null 이면 숨긴다). */
+    setTitle(text) {
+      titleEl.hidden = !text;
+      setText('title', titleEl, text || '');
+    },
     /** 날짜 옆 그림의 그날 날씨: 'sunny' · 'cloudy' · 'rain' · 'snow'. */
     setWeather(kind) { wx = SKY_ICON[kind] ? kind : 'sunny'; },
     /** 등불 버튼 모양. mode 가 null 이면 버튼을 숨긴다(불이 하나도 없을 때). */
