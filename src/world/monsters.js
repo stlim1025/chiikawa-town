@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { part, mergeParts } from '../render/merge.js';
-import { MONSTERS, inSwing, GAS_ATTACK } from '../core/combat.js';
+import { MONSTERS, inSwing, GAS_ATTACK, winterSpawns } from '../core/combat.js';
 import { ANOKO_ATK, ANOKO_TURN, ANOKO_RAGE_AT, ANOKO_ROAR, anokoPhase, frontGuard, inSweep } from '../core/anoko.js';
 import { buildAnoko } from '../actors/anoko.js';
 import { regionAt, shoreDist, groundY, VILLAGE_R, CAVE, arenaAt, canyonAt, ARENA_WALL } from '../core/layout.js';
@@ -546,6 +546,26 @@ const BUILD = {
     face(g, { y: 0.5, z: 0.44, dx: 0.065, r: 0.035, brow: 0.5, browY: 0.06, browLen: 0.05 });
     part(g, GEO.dot, '#c98a8a', { position: [0, 0.4, 0.43], scale: [0.04, 0.025, 0.015], flat: true });
     return { height: 1.05 };
+  },
+  // 눈뭉치(겨울에만 나온다): 동그란 하얀 눈 덩어리에 까만 눈 · 분홍 볼, 나뭇가지 팔 둘, 정수리에 눈 한 줌. 데굴 돌멩이처럼 굴러온다
+  snowball(g) {
+    part(g, GEO.sphere, '#f7fbff', { position: [0, 0.4, 0], scale: [0.43, 0.4, 0.42] });
+    part(g, GEO.sphere, '#e6eff8', { position: [-0.17, 0.2, -0.16], scale: [0.22, 0.15, 0.22] });
+    part(g, GEO.sphere, '#eef5fb', { position: [0.2, 0.56, -0.16], scale: [0.18, 0.15, 0.18] });
+    // 정수리의 눈 한 줌
+    part(g, GEO.sphere, '#ffffff', { position: [0.03, 0.8, -0.02], scale: [0.13, 0.085, 0.12] });
+    part(g, GEO.sphere, '#ffffff', { position: [-0.07, 0.86, 0.0], scale: [0.07, 0.06, 0.07] });
+    // 발치에 떨어진 눈 부스러기
+    [[0.3, 0.05, 0.16, 0.07], [-0.33, 0.045, 0.06, 0.06]].forEach(([x, y, z, r]) => part(g, GEO.sphere, '#eef5fb', { position: [x, y, z], scale: [r, r * 0.75, r] }));
+    // 나뭇가지 팔: 옆으로 비스듬히 뻗은 가지 끝에 잔가지 하나
+    [-1, 1].forEach((sd) => {
+      part(g, GEO.cylinder, '#8a5a3a', { position: [sd * 0.36, 0.42, 0.02], rotation: [0, 0, -sd * 1.1], scale: [0.022, 0.3, 0.022] });
+      part(g, GEO.cylinder, '#8a5a3a', { position: [sd * 0.54, 0.51, 0.02], rotation: [0, 0, -sd * 0.25], scale: [0.016, 0.12, 0.016] });
+    });
+    face(g, { y: 0.44, z: 0.4, dx: 0.12, r: 0.04, brow: 0.45, browY: 0.07, browLen: 0.065 });
+    [-1, 1].forEach((sd) => part(g, GEO.dot, BLUSH, { position: [sd * 0.22, 0.35, 0.36], rotation: [0, sd * 0.55, 0], scale: [0.05, 0.03, 0.012], flat: true }));
+    part(g, GEO.dot, EYE, { position: [0, 0.33, 0.412], scale: [0.035, 0.02, 0.01], flat: true });
+    return { height: 1.0 };
   }
 };
 
@@ -748,10 +768,11 @@ export function createMonsters(scene, village, random = Math.random) {
     return m;
   }
 
-  function spawn(species, avoid) {
-    const S = SPAWN[species], spot = spotFor(S.area, MONSTERS[species].size, avoid);
+  /** area: 생길 구역(없으면 SPAWN 의 구역). 겨울 눈뭉치처럼 여러 구역에 나오는 종류는 구역을 적어 둔다(zone). */
+  function spawn(species, avoid, area) {
+    const zone = area || SPAWN[species].area, spot = spotFor(zone, MONSTERS[species].size, avoid);
     if (!spot) return null;
-    const m = add(species, spot.x, spot.z);
+    const m = add(species, spot.x, spot.z, area ? { zone } : {});
     m.born = 0.01; // 톡 솟아나며 생긴다
     m.mesh.root.scale.setScalar(0.01);
     return m;
@@ -1428,8 +1449,8 @@ export function createMonsters(scene, village, random = Math.random) {
     } else if (sp === 'crab') {
       ry = Math.sin(ph * (moving ? 16 : 1.5)) * (moving ? 0.3 : 0.1);
       y += moving ? Math.abs(Math.sin(ph * 16)) * 0.03 : 0;
-    } else if (sp === 'pebble' || sp === 'ram') {
-      rx = moving ? Math.sin(ph * 9) * (sp === 'pebble' ? 0.18 : 0.05) : 0;
+    } else if (sp === 'pebble' || sp === 'snowball' || sp === 'ram') {
+      rx = moving ? Math.sin(ph * 9) * (sp === 'ram' ? 0.05 : 0.18) : 0; // 돌멩이 · 눈뭉치는 뒤뚱뒤뚱 구르듯
       y += moving ? Math.abs(Math.sin(ph * 9)) * 0.06 : 0;
     } else if (sp === 'turtle') {
       rz = Math.sin(ph * (moving ? 5 : 1.2)) * 0.04;
@@ -1969,7 +1990,7 @@ export function createMonsters(scene, village, random = Math.random) {
     /** 날아가는 탄 수(테스트). */
     shots: () => shots.length,
     /**
-     * ctx: { player: { x, z }, active: 나를 노려도 되는지(창 · 대화 · 잠 중이면 false), night: 0..1,
+     * ctx: { player: { x, z }, active: 나를 노려도 되는지(창 · 대화 · 잠 중이면 false), night: 0..1, season: 'winter' 면 눈뭉치가 더 나온다(아니면 녹는다),
      *        onHit(m, { dmg, x, z }): 공격이 닿았을 때, onAggro(m): 나를 알아챘을 때, onWind(m): 공격 예고를 시작할 때,
      *        onImpact(m, x, z): 땅을 쿵 칠 때 }
      */
@@ -2006,9 +2027,11 @@ export function createMonsters(scene, village, random = Math.random) {
         }
         // 날이 밝으면 나방은 하늘로 날아가 사라진다
         if (m.species === 'moth' && nightK < 0.3 && !m.leaving && (m.state === 'wander' || dp > 10)) { m.leaving = true; hideTele(m); }
+        // 겨울이 끝나면 눈뭉치는 그 자리에서 녹아 사라진다(싸우는 중이면 싸움이 끝난 뒤)
+        if (m.M.winter && ctx.season !== 'winter' && !m.leaving && (m.state === 'wander' || dp > 10)) { m.leaving = true; m.melt = true; hideTele(m); }
         if (m.leaving) {
           m.leaveT = (m.leaveT || 0) + dt;
-          root.position.y = m.leaveT * 2.2;
+          root.position.y = m.melt ? 0 : m.leaveT * 2.2;
           root.scale.setScalar(Math.max(0.01, 1 - m.leaveT / 1.6) * (m.big || 1));
           if (m.leaveT > 1.6) removeAt(i);
           continue;
@@ -2204,6 +2227,13 @@ export function createMonsters(scene, village, random = Math.random) {
           if (species === 'moth' && nightK < 0.55) continue;
           const have = list.filter((m) => m.species === species && !m.dead && !m.leaving).length;
           for (let k = have; k < S.n; k++) spawn(species, p);
+        }
+        // 겨울: 기존 몬스터에 더해 들판과 숲에 눈뭉치(core/combat.js winterSpawns)
+        const want = {};
+        for (const w of winterSpawns(ctx.season)) want[w.region] = (want[w.region] || 0) + 1;
+        for (const [zone, n] of Object.entries(want)) {
+          const have = list.filter((m) => m.species === 'snowball' && m.zone === zone && !m.dead && !m.leaving).length;
+          for (let k = have; k < n; k++) spawn('snowball', p, zone);
         }
       }
     }

@@ -46,6 +46,8 @@ export const MONSTERS = {
   // 줄무늬 가스벌레: 원작 애니에 나오는 생물(사용자가 보낸 장면) — 이름 · 능력치 · 전리품은 게임에서 정했다. dmg 는 가스 안에서 한 번(GAS_ATTACK.tick 초마다) 깎이는 양
   gasbug: { name: '줄무늬 가스벌레', region: 'mountain', hp: 5, dmg: 5, speed: 1.8, aggro: 7, drop: 'antennaball', size: 0.48, attack: 'gas', atk: '더듬이 독가스', note: '초록 줄무늬 껍데기를 쓴 벌레. 멈춰 서서 더듬이 끝 방울로 독가스를 뿜는다. 가스 안에 있으면 기운이 조금씩 준다.' },
   moth: { name: '그림자 나방', region: 'night', hp: 4, dmg: 9, speed: 2.9, aggro: 8, drop: 'moondust', size: 0.45, night: true, attack: 'dive', atk: '내리꽂기', note: '밤에만 날아다닌다. 높이 떴다가 일직선으로 내리꽂는다.' },
+  // 계절과 날씨(게임 오리지널): 겨울에만 들판과 숲에 더 나온다(WINTER_SPAWN). 공격은 데굴 돌멩이처럼 예고 뒤 일직선으로 굴러온다
+  snowball: { name: '눈뭉치', region: 'winter', hp: 5, dmg: 9, speed: 2.2, aggro: 7, drop: 'icecrystal', size: 0.46, winter: true, attack: 'roll', atk: '굴러와 부딪치기', note: '겨울에만 들판과 숲에 나타나는 눈덩이. 몸을 웅크렸다가 일직선으로 데굴데굴 굴러와 부딪친다. 겨울이 끝나면 녹아 사라진다.' },
   kingcap: { name: '바위산 왕버섯', short: '왕버섯', region: 'boss', hp: 108, dmg: 16, speed: 1.6, aggro: 9, drop: 'kingcap', size: 1.2, boss: true, attack: 'boss', atk: '내려찍기, 뛰어 덮치기, 포자 비, 부하 부르기', note: '바위산 깊은 곳에 사는 커다란 버섯. 이야기 속 마지막 상대.' },
   // 최종 보스 아노코(메인 이야기 2장 — core/anoko.js): 숲에 사는 것은 원작을 따르고, 능력치 · 공격 · 앞쪽 솜털 방패는 게임에서 정했다. 쓰러뜨리면 전리품 대신 집 앞에서 탈것이 된다
   anoko: { name: '아노코', short: '아노코', region: 'boss', hp: 220, dmg: 18, speed: 1.8, aggro: 9, size: 1.4, boss: true, attack: 'boss', atk: '앞발 할퀴기, 꼬리 휩쓸기, 뛰어 덮치기, 솜털 뭉치 날리기, 부하 부르기', note: '서쪽 숲 너머에 사는 커다란 솜털 짐승. 앞에서 치면 솜털에 막혀 잘 안 들어가니 친구와 같이 옆이나 뒤를 노리자.' },
@@ -57,7 +59,11 @@ export const MONSTERS = {
   dummy: { name: '연습용 허수아비', region: 'exam', hp: 3, dmg: 0, speed: 0, aggro: 0, drop: null, size: 0.35, attack: null, note: '토벌 실기용 허수아비.' }
 };
 /** 도감 · 안내서 순서(구역별로 셋씩, 그 구역 보스가 끝에). */
-export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'gasbug', 'moth', 'kingcap', 'anoko'];
+export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 'shroom', 'stump', 'elder', 'slime', 'frog', 'crab', 'bigcrab', 'turtle', 'pebble', 'ram', 'gasbug', 'moth', 'snowball', 'kingcap', 'anoko'];
+/** 겨울(core/season.js)에만 기존 몬스터에 더해 나오는 눈뭉치: 구역마다 per 마리. 겨울이 끝나면 떠난다(world/monsters.js). */
+export const WINTER_SPAWN = { species: 'snowball', regions: ['fields', 'forest'], per: 3 };
+/** 그 계절에 더 나오는 몬스터 [{ species, region }](겨울이 아니면 빈 목록). */
+export const winterSpawns = (season) => (season === 'winter' ? WINTER_SPAWN.regions.flatMap((region) => Array.from({ length: WINTER_SPAWN.per }, () => ({ species: WINTER_SPAWN.species, region }))) : []);
 /**
  * 더듬이 독가스(줄무늬 가스벌레, world/monsters.js 의 ATK.gas): 멈춰 서서 wind 초 동안 더듬이를 떨며 내 자리에 빨간 원(반지름 radius)이 차오르고,
  * lock 비율이 지나면 자리를 굳힌다(그 뒤로 피할 수 있다). 다 차면 더듬이 끝에서 가스가 뿜어져 그 자리에 life 초 머문다.
@@ -67,7 +73,7 @@ export const MONSTER_ORDER = ['fluff', 'hopper', 'mole', 'bigmole', 'beetle', 's
 // tick 은 맞은 뒤 무적 시간(PLAYER_IFRAME 1.0)보다 조금 길게: 같으면 두 번째 틱이 무적에 막혀 한 번씩 빠졌다
 export const GAS_ATTACK = { range: 4.2, reach: 3.2, wind: 0.9, lock: 0.3, radius: 1.4, life: 2.5, tick: 1.1, puff: 0.45, cool: 3.0, rec: 0.8 };
 /** 구역 순서(안내서 묶음). */
-export const MONSTER_REGIONS = ['fields', 'forest', 'river', 'mountain', 'night', 'boss'];
+export const MONSTER_REGIONS = ['fields', 'forest', 'river', 'mountain', 'night', 'winter', 'boss'];
 /** 전리품: 가방(core/inventory.js 의 registerItems)과 노동 접수 매입가. */
 export const DROPS = {
   fluffdown: { name: '보송 솜털', kind: 'drop', price: 30, note: '풀뭉치에게서 떨어진 보송보송한 솜털.' },
@@ -87,7 +93,8 @@ export const DROPS = {
   kingcap: { name: '왕버섯 갓', kind: 'drop', price: 1000, note: '바위산 왕버섯의 커다란 갓 조각. 귀한 물건이다.' },
   goldclaw: { name: '황금 발톱', kind: 'drop', price: 600, note: '대왕 두더지의 커다란 황금빛 발톱. 귀한 물건이다.' },
   bigacorn: { name: '고목 왕도토리', kind: 'drop', price: 600, note: '고목 거인이 떨어뜨린 주먹만 한 도토리. 귀한 물건이다.' },
-  bigclaw: { name: '왕집게발', kind: 'drop', price: 600, note: '강가 왕집게의 단단한 집게발. 귀한 물건이다.' }
+  bigclaw: { name: '왕집게발', kind: 'drop', price: 600, note: '강가 왕집게의 단단한 집게발. 귀한 물건이다.' },
+  icecrystal: { name: '얼음 결정', kind: 'drop', price: 60, note: '눈뭉치 속에서 나온 반짝이는 얼음 결정. 손에 쥐어도 잘 녹지 않는다.' }
 };
 registerItems(DROPS);
 /** 맞은 뒤 다시 맞지 않는 시간(초) · 밀려나는 거리. */
@@ -165,7 +172,7 @@ export function huntQuiz(n, random = Math.random) {
   const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const pick = (list) => list[Math.floor(random() * list.length) % list.length];
   const q = (type, text, right, wrong, mon = null) => { const choices = shuffle([right, ...wrong.slice(0, 3)]); return { type, mon, q: text, choices, answer: choices.indexOf(right) }; };
-  const REGION = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '밤에 마을 밖 어디든' };
+  const REGION = { fields: '동쪽 들판', forest: '서쪽 숲', river: '남쪽 강가', mountain: '북쪽 바위산', night: '밤에 마을 밖 어디든', winter: '겨울에 들판과 숲' };
   const field = MONSTER_ORDER.filter((k) => !MONSTERS[k].boss);
   const M = (k) => MONSTERS[k], name = (k) => M(k).name, drop = (k) => DROPS[M(k).drop];
   const pips = (k) => Math.min(5, Math.ceil(M(k).hp / 3)); // 안내서의 단단함(방패 다섯 칸)과 같은 셈
@@ -177,7 +184,7 @@ export function huntQuiz(n, random = Math.random) {
   const texts = (list, f, right) => { const seen = new Set([right]); return list.map(f).filter((t) => !seen.has(t) && seen.add(t)); };
   const groups = Object.keys(REGION).filter((r) => field.filter((k) => M(k).region === r).length >= 3);
   const KINDS = {
-    region: () => { const k = pick(field), r = REGION[M(k).region]; return q('region', `${josa(name(k), '은/는')} ${M(k).night ? '언제 어디에' : '어디에'} 나타날까?`, r, shuffle(Object.values(REGION).filter((x) => x !== r)), k); },
+    region: () => { const k = pick(field), r = REGION[M(k).region]; return q('region', `${josa(name(k), '은/는')} ${M(k).night || M(k).winter ? '언제 어디에' : '어디에'} 나타날까?`, r, shuffle(Object.values(REGION).filter((x) => x !== r)), k); },
     drop: () => { const k = pick(field); return q('drop', `${josa(name(k), '을/를')} 잡으면 얻는 전리품은?`, drop(k).name, texts(lookalikes(k), (o) => drop(o).name, drop(k).name), k); },
     dropOf: () => { const k = pick(field); return q('dropOf', `${quoted(drop(k).name, '을/를')} 떨어뜨리는 몬스터는?`, name(k), texts(lookalikes(k), name, name(k)), k); },
     atk: () => { const k = pick(field); return q('atk', `${josa(name(k), '은/는')} 어떻게 공격할까?`, M(k).atk, texts(lookalikes(k), (o) => M(o).atk, M(k).atk), k); },
@@ -189,7 +196,7 @@ export function huntQuiz(n, random = Math.random) {
       return q('tough', '다음 중 가장 단단한(방패가 많은) 몬스터는?', name(k), shuffle(field.filter((o) => pips(o) < pips(k))).map(name), k);
     },
     odd: () => {
-      const r = pick(groups), k = pick(field.filter((o) => M(o).region !== r && !M(o).night)); // 밤 나방은 어디든 나오니 정답이 될 수 없다
+      const r = pick(groups), k = pick(field.filter((o) => M(o).region !== r && !M(o).night && !M(o).winter)); // 밤 나방은 어디든, 눈뭉치는 겨울 들판과 숲에도 나오니 정답이 될 수 없다
       return q('odd', `${REGION[r]}에 살지 않는 몬스터는?`, name(k), shuffle(field.filter((o) => M(o).region === r)).map(name), k);
     }
   };

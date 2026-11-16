@@ -120,6 +120,14 @@ const MON = {
     <path d="M23 29q-10-6-12 4q0 8 8 6q4-2 2-6M41 29q10-6 12 4q0 8-8 6q-4-2-2-6" fill="none" stroke="#d9b98a" stroke-width="4.4" stroke-linecap="round"/>
     <ellipse cx="32" cy="27" rx="7" ry="3.6" fill="#fff" ${S} stroke-width="1.6"/>
     ${eyes(32, 36, 4.5, 2, 0.6)}<ellipse cx="32" cy="43" rx="2.4" ry="1.4" fill="#c98a8a"/>`,
+  // 눈뭉치: 하얀 눈 덩어리 · 정수리의 눈 한 줌 · 나뭇가지 팔 · 분홍 볼
+  snowball: () => `${shadow(20)}
+    <path d="M13 38L3 31M7 34L2 37M51 38L61 31M57 34L62 37" fill="none" stroke="${L}" stroke-width="5.2" stroke-linecap="round"/>
+    <path d="M13 38L3 31M7 34L2 37M51 38L61 31M57 34L62 37" fill="none" stroke="#a06a42" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M23 21q-1-10 8-11q4-4 8 0q5 3 3 11z" fill="#ffffff" ${S}/>
+    <circle cx="32" cy="37" r="20" fill="#f7fbff" ${S}/>
+    <path d="M17 47q5 7 14 8" fill="none" stroke="#d6e4f2" stroke-width="3" stroke-linecap="round"/><ellipse cx="44" cy="25" rx="4" ry="2.2" fill="#fff" transform="rotate(35 44 25)"/>
+    ${eyes(32, 36, 7, 2.6, 0.6)}<ellipse cx="20.5" cy="43" rx="3.2" ry="1.8" fill="#ff9fb4"/><ellipse cx="43.5" cy="43" rx="3.2" ry="1.8" fill="#ff9fb4"/><ellipse cx="32" cy="45.5" rx="2.4" ry="1.6" fill="#2b2224"/>`,
   kingcap: () => `${shadow(22)}
     <path d="M18 56q-4-14 2-26h24q6 12 2 26z" fill="#f3e6cf" ${S}/>
     <ellipse cx="13" cy="42" rx="4" ry="6" fill="#f3e6cf" ${S}/><ellipse cx="51" cy="42" rx="4" ry="6" fill="#f3e6cf" ${S}/>
@@ -195,6 +203,8 @@ const DROP = {
   kingcap: `${shadow(20)}<path d="M6 44Q6 14 32 12t26 32q-26 8-52 0z" fill="#c0473c" ${S}/><path d="M8 44q24 6 48 0v4q-24 6-48 0z" fill="#efd9b5" ${S}/><ellipse cx="32" cy="20" rx="6" ry="3" fill="#fff3dc"/><ellipse cx="18" cy="30" rx="4.6" ry="2.4" fill="#fff3dc"/><ellipse cx="45" cy="28" rx="5" ry="2.6" fill="#fff3dc"/><path d="M14 22q6-8 14-9" fill="none" stroke="#e8786c" stroke-width="2.4" stroke-linecap="round"/>`,
   goldclaw: `${shadow(14)}<path d="M22 54q-4-24 6-40q8-10 14-8q-10 10-8 24t0 24z" fill="#f3d27a" ${S}/><path d="M27 42q4-1 7 0M26 31q4-1 7 0M29 21q3-1 6 1" fill="none" stroke="#d9a93a" stroke-width="2" stroke-linecap="round"/><path d="M36 10q4-2 6-1" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M48 14l1.2 2.6 2.6 1.2-2.6 1.2L48 22l-1.2-2.8-2.6-1.2 2.6-1.2z" fill="#ffd94a"/>`,
   bigacorn: `${shadow(16)}<path d="M18 30q0 22 14 26q14-4 14-26z" fill="#b5793e" ${S}/><path d="M24 36q2 8 6 12" stroke="#d9a066" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M13 31q2-15 19-15t19 15q-19 6-38 0z" fill="#7a5136" ${S}/><path d="M20 24l3 3M28 21l2 3M36 21l-2 3M44 24l-3 3" stroke="#5a3b28" stroke-width="1.8" stroke-linecap="round"/><path d="M32 16v-7" stroke="${L}" stroke-width="3" stroke-linecap="round"/>`,
+  // 얼음 결정(눈뭉치): 연한 하늘색 육각 기둥 결정 셋
+  icecrystal: `${shadow(16)}<path d="M46 30l7 6-2 15-6 3-5-4z" fill="#e3f6ff" ${S} stroke-width="2"/><path d="M18 32l-7 6 2 13 6 3 5-4z" fill="#e3f6ff" ${S} stroke-width="2"/><path d="M32 7l11 12-3 31-8 6-8-6-3-31z" fill="#c6eaff" ${S}/><path d="M32 7v49M21 19l11 6 11-6" fill="none" stroke="#86c4ea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M26.5 25l1.5 20" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><path d="M52 12v7M48.5 15.5h7M10 18v5M7.5 20.5h5" stroke="#9ad4f5" stroke-width="2" stroke-linecap="round"/>`,
   bigclaw: `${shadow(18)}<path d="M10 46q-2-22 18-27q-4 8 2 12q10-8 22-3q-5 18-25 23q-12 3-17-5z" fill="#f08a5d" ${S}/><path d="M18 40q4-8 10-9" fill="none" stroke="#f6c2a8" stroke-width="3" stroke-linecap="round"/><path d="M36 34q6-4 12-3" fill="none" stroke="#e0764a" stroke-width="2" stroke-linecap="round"/>`
 };
 export const dropSvg = (id) => `<svg viewBox="0 0 64 64" aria-hidden="true">${DROP[id] || ''}</svg>`;

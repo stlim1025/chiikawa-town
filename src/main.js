@@ -98,7 +98,7 @@ import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, s
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
-import { weatherOf, WEATHER_DIM } from './core/season.js';
+import { weatherOf, WEATHER_DIM, seasonAt, seasonOfMonth } from './core/season.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS, bossEatWait, BOSS_EAT_COOL } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
@@ -814,7 +814,7 @@ function boot() {
   function guestMonsters(dt) {
     if (multi.status !== 'open' || !multi.count) return;
     const allies = guestAllies();
-    if (allies.length) monsters.update(dt, t, { player: player.position, active: false, night: nightNow, onHit: onMonsterHit, allies, onAllyHit });
+    if (allies.length) monsters.update(dt, t, { player: player.position, active: false, night: nightNow, season: todaySeason, onHit: onMonsterHit, allies, onAllyHit });
   }
   /** 가까운 다른 사람: 쓰러져 있으면 깨우기, 아니면 말 걸기(같이 토벌 파티) 대상(findTarget · findGuestTarget). */
   function playerOptions(p, options) {
@@ -7044,6 +7044,7 @@ function boot() {
   const wxTop = new THREE.Color(), wxHor = new THREE.Color();
   // ---------- 그날 날씨(core/season.js): 아침 6시(날 번호가 바뀔 때) 시작 날짜와 날 번호로 정해진다 ----------
   let storyRain = false, todayWx = 'sunny', cloudK = 0, wxForce = null; // wxForce: 디버그(__town.wx)로 잠시 바꾼 날씨
+  let todaySeason = seasonOfMonth(new Date().getMonth() + 1), seasonForce = null; // 오늘 계절(게임 달력, 손님은 주인 마을) · seasonForce: 디버그(__town.season)
   /** 이야기가 부르는 비('검은 별똥별', '하치와레의 카메라'): 켜 있는 동안은 그날 날씨보다 이야기가 이긴다. */
   function setStoryRain(on) { storyRain = !!on; }
   const storyRainOn = (guest) => storyRain && !guest; // 이야기 비는 같이 놀기 손님에게 가지 않는다
@@ -7055,6 +7056,7 @@ function boot() {
    */
   function updateDailyWeather(dt, guest) {
     const c = guest && visiting && visiting.clock ? { start: visiting.startDate, day: visiting.clock.day } : state ? { start: state.startDate, day: state.clock.day } : null;
+    todaySeason = seasonForce || (c ? seasonAt(c.start || todayISO(), c.day) : seasonOfMonth(new Date().getMonth() + 1));
     todayWx = wxForce || (c ? weatherOf(c.start, c.day) : 'sunny');
     const story = storyRainOn(guest), rain = story || todayWx === 'rain';
     weather.setRain(rain);
@@ -7496,6 +7498,7 @@ function boot() {
       solids: () => village.obstacles.list.filter((o) => !o.soft).map((o) => ({ x: o.x, z: o.z, r: o.r, box: o.box ? { hx: o.box.hx, hz: o.box.hz } : null })),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
       // 날씨 확인: 그날 날씨를 잠시 바꾸고(null 이면 달력대로) 지금 값을 돌려준다
+      season: (s) => { if (s !== undefined) seasonForce = s; return todaySeason; }, // 계절 확인: 잠시 바꾸고(null 이면 달력대로) 지금 계절
       wx: (kind) => { if (kind !== undefined) wxForce = kind; return { today: todayWx, story: storyRain, rain: weather.rain, snow: weather.snow, cloud: cloudK, night: nightNow, sun: sun.intensity, hemi: hemi.intensity }; },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),
@@ -7840,7 +7843,7 @@ function boot() {
       monsters.guestStep(dt, t, { onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); }, onRoar: onAnokoRoar });
     } else {
       monsters.update(dt, t, {
-        player: focus, active: hunting, night: nightNow, onHit: onMonsterHit, onAggro, allies: [...(hunting ? partyAllies() : []), ...(state && !visiting ? guestAllies() : [])], onAllyHit,
+        player: focus, active: hunting, night: nightNow, season: todaySeason, onHit: onMonsterHit, onAggro, allies: [...(hunting ? partyAllies() : []), ...(state && !visiting ? guestAllies() : [])], onAllyHit,
         // 공격 예고 · 땅 울림 소리(가까이 있을 때만)
         onWind: (m) => { if (Math.hypot(m.x - focus.x, m.z - focus.z) < 11) sound.play('warn'); },
         onImpact: (m, x, z) => { if (Math.hypot(x - focus.x, z - focus.z) < 12) sound.play('thud'); },
