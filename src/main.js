@@ -158,6 +158,9 @@ import { createChiiRoom } from './world/chiiroom.js';
 import { createWeather } from './world/weather.js';
 import { createSeasonLook, seasonLookOf } from './world/seasonlook.js';
 import { createSeasonFx } from './world/seasonfx.js';
+import { createLeafPiles } from './world/leafpiles.js';
+import { createSnowmen } from './world/snowmen.js';
+import { LEAF, leavesOf, pickLeaf, addSnowman, meltSnowmen, leafSpotsFor, snowmanRoom, SNOWMAN_FACES, SNOWMAN_MAX, snowmenToWire, snowmenFromWire } from './core/seasonplay.js';
 import { createBlackStarStory } from './stories/blackstar.js';
 import { loopDue, rewind as loopRewind, markLoop as loopMark, startLoop as loopStart, endLoop as loopEnd, loopGate, loopOf, BLEACH_PRICE } from './core/blackstar.js';
 import { createStarGame } from './ui/stargame.js';
@@ -464,7 +467,7 @@ function boot() {
     } else hud.setVisitors(null);
   }
   /**
-   * 손님: 주인이 보낸 마을 모습 { c: [날, 시각], d: 주인의 시작 날짜, n: 마을 친구들, w: 풀, b: 열매 덤불 }.
+   * 손님: 주인이 보낸 마을 모습 { c: [날, 시각], d: 주인의 시작 날짜, n: 마을 친구들, w: 풀, b: 열매 덤불, sm: 눈사람 }.
    * 서버가 그대로 전한 것이라 하나씩 확인해서 쓴다. 풀 · 덤불은 커튼이 다 내려온 뒤에 바꾼다.
    */
   function takeWorld(w) {
@@ -473,6 +476,7 @@ function boot() {
     if (typeof w.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.d)) visiting.startDate = w.d;
     if (Array.isArray(w.n)) visiting.npcs = w.n.filter((s) => Array.isArray(s) && typeof s[0] === 'string').slice(0, 40);
     if (Array.isArray(w.sb)) visiting.built = [!!w.sb[0], !!w.sb[1]]; // 주인 마을에 선 이야기 건물(별 세 개 · 게임센터)
+    visiting.snowmen = snowmenFromWire(w.sm); // 주인 마을 눈사람 [[x, z, face]](없으면 다 녹았거나 세운 적 없다)
     // 몸이 바뀌었다(주인의 사이드스토리): 주인 마을 친구들도 바뀐 몸 · 이름표로(sw 가 없으면 원래대로)
     const sw = w.sw && typeof w.sw === 'object' && w.sw.me && typeof w.sw.me === 'object' ? { me: w.sw.me, name: String(w.sw.name || multi.hostName || '친구').slice(0, 8) } : null;
     visiting.swap = sw;
@@ -1033,6 +1037,7 @@ function boot() {
     worldT = afield.length ? 0.1 : 0.2;
     const w = { c: [state.clock.day, +state.clock.t.toFixed(5)], d: state.startDate, n: npcs.snapshot(), m: afield.length ? monsters.snapshot(afield) : [] };
     if (swapOn) w.sw = { me: realLook(), name: myName() }; // 몸이 바뀌었다: 손님 화면에서도 친구들이 바뀐 몸으로(내 원래 모습은 우사기가 든 내 몸)
+    w.sm = snowmenToWire(state.snowmen); // 겨울 눈사람(손님은 보기만) — 이름표 'g' 와 겹치지 않게 'sm'
     if (afield.length) { const fx = monsters.fxSnapshot(afield); w.s = fx.shots; w.r = fx.rain; w.g = fx.gas; }
     const now = performance.now();
     while (hostNews.length && hostNews[0].until < now) hostNews.shift();
@@ -3227,6 +3232,7 @@ function boot() {
     if (mode === 'arcade') return; // 몸이 바뀌었다 게임센터: 대사 · 고르기 창, 릴 멈추기는 놀이 화면이 스스로 받는다
     if (mode === 'diner') { if (starDiner && !guide.open) starDiner.press(down); return; } // 별 세 개 레스토랑: 누르는 동안 다음 쇠고랑을 꾹
     if (mode === 'chiiroom') return; // 검은 별똥별 방: 연타는 놀이 화면이 스스로 받는다
+    if (mode === 'play' && snowRoll) return; // 눈사람 연타는 놀이 화면이 스스로 받는다(자기 버튼 · 스페이스)
     if (mode === 'play' && down && usagiClub && usagiClub.active && !guide.open && !panels.isOpen()) { usagiClub.press(); return; }
     if (mode === 'play' && down && hachiPit && hachiPit.active && !guide.open && !panels.isOpen()) { hachiPit.press(); return; } // 밧줄 당기기(영차!)
     if (!state || mode !== 'play' || guide.open || sleeping || sticker || funBusy()) return;
@@ -3250,6 +3256,8 @@ function boot() {
     else if (target.type === 'fish') beginFish(target.spot);
     else if (target.type === 'noRod') hud.toast('낚싯대가 있어야 낚시할 수 있어요', 3200, { chips: [{ icon: ICO.pin, text: `도구점 ${won(TOOLS.rod.price)}` }] });
     else if (target.type === 'flower') pickPlazaFlower(target.i);
+    else if (target.type === 'leaf') pickLeafPile(target.id);
+    else if (target.type === 'snowman') startSnowman(target);
     else if (target.type === 'rest') startRest(target.seat);
     else if (target.type === 'bell') ringClockBell();
     else if (target.type === 'friendHome') knockHome(target.kind);
@@ -6868,6 +6876,7 @@ function boot() {
     if (!starShow && canWish(state)) options.push({ d: 30, t: { type: 'wish', label: '별똥별에 소원 빌기' } });
     if (!resting) fishOption(p, options); // 물가: 낚싯대 펼치기(바로 앞이 물이면 둘레 풀보다 먼저, 벤치에 앉아 있을 때는 일어나서)
     workTargets(p, options); // 마을 가꾸기 시설: 꽃 따기 · 앉아서 쉬기 · 종 치기
+    seasonTargets(p, options); // 가을 단풍잎 줍기 · 겨울 눈사람 만들기
     playerOptions(p, options); // 같이 놀기: 쓰러진 친구 깨우기 · 말 걸기
     options.sort((a, b) => a.d - b.d);
     return options.length ? options[0].t : null;
@@ -7071,6 +7080,111 @@ function boot() {
     sound.rain(rain && mode !== 'title'); // 같은 값이면 아무 일도 하지 않는다(타이틀에서는 소리를 만들지 않는다 — 누르기 전엔 소리를 낼 수 없다)
     hud.setWeather(story ? 'rain' : todayWx);
   }
+
+  // ---------- 계절 놀이(core/seasonplay.js, 게임 오리지널): 가을 단풍잎 줍기 · 겨울 눈사람 · 눈밭 발자국 · 비 오는 날 친구들 우산 ----------
+  const leafPiles = createLeafPiles(scene), snowmen = createSnowmen(scene);
+  let leafKey = '', leafList = []; // 그날 낙엽 더미 자리(날이 바뀌면 다시 고른다)
+  /** 오늘 낙엽 더미 12곳 [{ id, x, z }]: 마을과 길가 나무 밑 후보에서 날짜로 고른다(core/seasonplay.js leafSpotsFor). */
+  function todayLeafSpots() {
+    const key = state.startDate + '#' + state.clock.day;
+    if (key !== leafKey) { leafKey = key; leafList = leafSpotsFor(village.leafPileSpots(), state.startDate, state.clock.day); }
+    return leafList;
+  }
+  let snowRoll = null; // 눈사람 만드는 중(연타 놀이): { x, z }
+  // 눈사람을 세우면 근처 친구가 한마디(게임 오리지널 대사)
+  const SNOWMAN_SAY = {
+    chiikawa: '와아…! 눈사람이다…! (반짝반짝)', hachiware: '우와~ 잘 만들었다! 나도 하나 만들어 볼까~', usagi: '야하! (눈사람 머리에 나뭇가지를 꽂는다)',
+    kurimanju: '하아~ 눈사람 옆에서 한 잔 하면 좋겠네~', rakko: '…훌륭한 균형이다. 수련의 성과가 보이는군.', momonga: '흥! 내가 만들면 더 귀여울걸!'
+  };
+  /** 눈밭 발자국(겨울): 나와 같이 놀기 친구가 0.5m 걸을 때마다 왼발 · 오른발을 번갈아 찍는다(world/seasonfx.js addPrint). */
+  const printWalk = new Map();
+  function stepPrint(id, x, z, yaw) {
+    const w = printWalk.get(id);
+    if (!w) { printWalk.set(id, { x, z, acc: 0, side: 1 }); return; }
+    const dx = x - w.x, dz = z - w.z, d = Math.hypot(dx, dz);
+    w.x = x; w.z = z;
+    if (d > 2) { w.acc = 0; return; } // 순간 이동(집에서 나오기 · 텔레포트)
+    w.acc += d;
+    if (w.acc < 0.5) return;
+    w.acc = 0;
+    w.side = -w.side;
+    if (roadDist(x, z) < 0.15) return; // 흙길에는 자국이 남지 않는다
+    const a = yaw ?? Math.atan2(dx, dz);
+    seasonFx.addPrint(x + Math.cos(a) * 0.09 * w.side, z - Math.sin(a) * 0.09 * w.side, a);
+  }
+  /** 계절 놀이 한 프레임(마을 밖 장면): 낙엽 더미 · 눈사람(손님은 주인 마을 눈사람) · 겨울 끝 녹기 · 우산 · 발자국 · 눈사람 연타 놀이. */
+  function updateSeasonPlay(dt, guest) {
+    const play = !!state && mode === 'play';
+    const autumn = play && !guest && todaySeason === 'autumn'; // 낙엽 더미는 주인 몫(손님 화면에는 그리지 않는다)
+    leafPiles.sync(autumn ? todayLeafSpots() : [], autumn ? leavesOf(state, state.clock.day).picked : []);
+    leafPiles.update(dt, t);
+    snowmen.sync(guest ? (visiting && visiting.snowmen) || [] : state ? state.snowmen || [] : []);
+    snowmen.update(dt);
+    if (play && !guest && todaySeason !== 'winter' && state.snowmen && state.snowmen.length) commit(meltSnowmen(state, todaySeason)); // 겨울이 끝나면 모두 녹는다
+    npcs.setRain(todayWx === 'rain' && !storyRainOn(guest)); // 비 오는 날 집 밖 친구들은 우산(이야기가 부른 비 장면은 그대로)
+    if (play && todaySeason === 'winter') {
+      if (player && !player.riding) stepPrint('me', player.position.x, player.position.z, player.yaw);
+      for (const o of remotes.players()) if (o.area === 'village') stepPrint(o.id, o.x, o.z);
+    } else printWalk.clear();
+    if (snowRoll) {
+      if (!play || guest || panels.isOpen() || fainting) cancelSnowman();
+      else minigame.update(dt);
+    }
+  }
+  /** 가을 · 겨울에 고를 수 있는 일: 낙엽 더미 '단풍잎 줍기', 마을 안 눈 덮인 땅 '눈사람 만들기'(다른 대상이 가까우면 그쪽이 먼저). */
+  function seasonTargets(p, options) {
+    if (visiting || resting || player.riding || snowRoll) return;
+    if (todaySeason === 'autumn') {
+      const pile = leafPiles.nearest(p.x, p.z, 1.3);
+      if (pile) options.push({ d: Math.hypot(pile.x - p.x, pile.z - p.z) - 0.4, t: { type: 'leaf', id: pile.id, x: pile.x, z: pile.z, label: '단풍잎 줍기' } });
+    }
+    if (todaySeason === 'winter') {
+      const x = p.x + Math.sin(player.yaw) * 0.9, z = p.z + Math.cos(player.yaw) * 0.9;
+      if (Math.hypot(x, z) < VILLAGE_R - 1.5 && roadDist(x, z) > 0.8 && village.isFree(x, z, 0.7, true) && snowmanRoom(state.snowmen, x, z)) options.push({ d: 1.5, t: { type: 'snowman', x, z, label: '눈사람 만들기' } });
+    }
+  }
+  function pickLeafPile(id) {
+    const r = pickLeaf(state, id, state.clock.day, todaySeason);
+    if (!r.ok) { hud.toast(r.full ? '가방이 꽉 찼어요' : '여기는 오늘 벌써 주웠어요', 2000); return; }
+    commit(r.state);
+    sound.play('snap');
+    hud.bagBump();
+    const s = todayLeafSpots().find((q) => q.id === id);
+    if (s) hud.floatText({ x: s.x, y: 0.8, z: s.z, text: '단풍잎', kind: 'mini', icon: itemSvg(LEAF) });
+    if (!seen('mapleleaf')) { markSeen('mapleleaf'); hud.toast('가을에는 나무 밑 낙엽 더미에서 단풍잎을 주울 수 있어요. 노동 접수에서 팔거나 치이카와에게 선물해 봐요', 4600); }
+  }
+  /** 눈사람 만들기: 그 자리를 보고 서서 연타로 눈덩이를 굴린다(실패는 없다). 다 차면 그 자리에 눈사람. */
+  function startSnowman(tg) {
+    if (snowRoll) return;
+    snowRoll = { x: tg.x, z: tg.z };
+    player.face(tg.x, tg.z);
+    player.busy = true;
+    minigame.mash({ label: '눈덩이를 굴려 눈사람을 만들어요!', button: '굴려!', gain: 0.1, decay: 0.1, onPress: () => { sound.play('click'); }, onDone: finishSnowman });
+  }
+  function cancelSnowman() {
+    snowRoll = null;
+    player.busy = false;
+    minigame.stop();
+  }
+  function finishSnowman() {
+    const r = snowRoll;
+    snowRoll = null;
+    player.busy = false;
+    if (!r || !state || mode !== 'play' || visiting || !snowmanRoom(state.snowmen, r.x, r.z)) return;
+    const full = (state.snowmen || []).length >= SNOWMAN_MAX;
+    commit(addSnowman(state, { x: +r.x.toFixed(2), z: +r.z.toFixed(2), face: Math.floor(Math.random() * SNOWMAN_FACES) }, state.clock.day));
+    sound.play('ready');
+    hud.floatText({ x: r.x, y: 1.9, z: r.z, text: '눈사람 완성!', kind: 'mini' });
+    let near = null, nd = 8; // 근처 친구가 한마디
+    for (const n of npcs.list) {
+      if (n.away || n.bubble || n === talking) continue;
+      const d = Math.hypot(n.x - r.x, n.z - r.z);
+      if (d < nd) { nd = d; near = n; }
+    }
+    if (near) npcs.say(near, SNOWMAN_SAY[near.kind] || '와~ 눈사람이다!');
+    if (full) hud.toast('눈사람은 다섯 개까지 남아요. 가장 오래된 눈사람이 녹았어요', 3600);
+    else if (!seen('snowman')) { markSeen('snowman'); hud.toast('눈사람은 다섯 개까지 남고, 겨울이 끝나면 모두 녹아요', 4000); }
+  }
   let starNotice = 0, shakeT = 0;
   const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
   const meWho = () => (swapOn ? { kind: 'me', ...myBodyTag() } : { kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' }); // 몸이 바뀐 동안 내 이름표는 하치와레
@@ -7256,6 +7370,8 @@ function boot() {
     if (tg.type === 'hostHome') { const s = village.spots.home; return { x: s.x, z: s.z, r: 0.6, y: 1.4, id: 'phostHome' }; }
     if (tg.type === 'fish' || tg.type === 'noRod') return { x: player.position.x, z: player.position.z, r: 0.5, y: 1.45, id: 'fish', noRing: true }; // 낚시: 물가에 서면 내 머리 위에 안내만(물 위 고리는 없다)
     if (tg.type === 'flower') return { x: tg.x, z: tg.z, r: 1.0, y: 0.95, id: 'flw' + tg.i }; // 마을 가꾸기: 광장 꽃밭
+    if (tg.type === 'leaf') return { x: tg.x, z: tg.z, r: 0.8, y: 0.9, id: 'leaf' + tg.id }; // 가을 낙엽 더미
+    if (tg.type === 'snowman') return { x: tg.x, z: tg.z, r: 0.6, y: 1.1, id: 'snowman' }; // 겨울 눈사람 세울 자리
     if (tg.type === 'rest') return { x: tg.seat.x, z: tg.seat.z, r: 0.75, y: 1.3, id: 'rest' + tg.seat.x.toFixed(1) + tg.seat.z.toFixed(1) }; // 벤치 · 정자 앉는 자리
     if (tg.type === 'bell') return { x: tg.x, z: tg.z, r: 0.6, y: 1.7, id: 'bell' }; // 시계탑 앞
     const s = village.spots[tg.type];
@@ -7505,6 +7621,8 @@ function boot() {
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
       // 날씨 확인: 그날 날씨를 잠시 바꾸고(null 이면 달력대로) 지금 값을 돌려준다
       season: (s) => { if (s !== undefined) seasonForce = s; return todaySeason; }, // 계절 확인: 잠시 바꾸고(null 이면 달력대로) 지금 계절
+      leafSpots: () => (state ? todayLeafSpots() : []), // 오늘 낙엽 더미 자리
+      snowRoll: () => snowRoll, // 눈사람 만드는 중
       wx: (kind) => { if (kind !== undefined) wxForce = kind; return { today: todayWx, story: storyRain, rain: weather.rain, snow: weather.snow, cloud: cloudK, night: nightNow, sun: sun.intensity, hemi: hemi.intensity }; },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),
@@ -7978,6 +8096,7 @@ function boot() {
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
     updateDailyWeather(dt, guestView); // 그날 날씨(비 · 눈 · 흐림)를 먼저 건다
+    updateSeasonPlay(dt, guestView); // 낙엽 더미 · 눈사람 · 발자국 · 우산
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
     if (mode === 'play') {
       if (starShow) starCamera(dt);

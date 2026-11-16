@@ -124,6 +124,7 @@ export function createNpcs(scene, village, weeds, berries) {
   }
 
   let lastPlayer = { x: 0, z: 0 };
+  let rain = false; // 비가 오는 중(setRain): 밖에 있는 친구들이 우산을 쓴다
   let puppeting = false; // 같이 놀기: 친구 마을에 놀러 가 주인 마을 친구들의 모습을 따라 보여 주는 중(puppet)
   /** (x, z) 로 가면 내 캐릭터에게 밀려날 만큼 더 다가가는지(그쪽으로 걸으면 밀려서 제자리걸음이 된다). */
   const intoPlayer = (n, x, z) => {
@@ -236,12 +237,17 @@ export function createNpcs(scene, village, weeds, berries) {
     while (d < -Math.PI) d += Math.PI * 2;
     n.yaw += Math.max(-dt * rate, Math.min(dt * rate, d));
   }
-  /** 지금 몸짓에 맞는 소품만 보인다(바뀔 때만 손댄다). 등에 멘 칼('sheathed')은 칼을 뽑아 들 때만 숨는다. */
-  function showProp(n, want) {
-    if (n.prop === want) return;
+  /**
+   * 지금 몸짓에 맞는 소품만 보인다(바뀔 때만 손댄다). 등에 멘 칼('sheathed')은 칼을 뽑아 들 때만 숨는다.
+   * 우산('umbrella')은 비 오는 동안(setRain) 다른 소품과 따로, 같이 보인다. 차를 탄 동안(mode 'drive')만 접는다(지붕을 뚫고 나온다).
+   */
+  function showProp(n, want, mode) {
+    const umb = rain && mode !== 'drive';
+    if (n.prop === want && n.umb === umb) return;
     n.prop = want;
+    n.umb = umb;
     for (const tag in n.chibi.props) {
-      const on = tag === 'sheathed' ? want !== 'sword' : tag === want;
+      const on = tag === 'sheathed' ? want !== 'sword' : tag === 'umbrella' ? umb : tag === want;
       n.chibi.props[tag].forEach((m) => { m.visible = on; });
     }
   }
@@ -602,6 +608,11 @@ export function createNpcs(scene, village, weeds, berries) {
       n.state = 'idle';
       n.timer = on ? 99 : 0.5;
     },
+    /**
+     * 비가 오면(on) 밖에 있는 친구들이 우산을 쓴다: 하던 일의 소품은 그대로 들고 우산만 더 보인다. 그치면 접는다.
+     * 값만 적어 두고 다음 update · puppet 의 showProp 이 바뀐 친구만 손대므로 매 프레임 불러도 된다. 집 안(away)에 있는 친구는 몸째 숨어 있다.
+     */
+    setRain(on) { rain = !!on; },
     /** 같이 토벌 중인 친구 kind 목록. */
     partyKinds() { return list.filter((n) => n.party).map((n) => n.kind); },
     update(dt, t, player) {
@@ -757,7 +768,7 @@ export function createNpcs(scene, village, weeds, berries) {
         n.chibi.root.position.set(n.x, groundY(n.x, n.z) - (n.sink || 0) + (n.driving ? DRIVE_LIFT : 0), n.z); // sink: 구덩이에 빠져 머리만(하치와레가 구덩이에!)
         if (n.faceYaw != null) n.yaw = n.faceYaw; // 연출: 정해진 쪽(카메라)을 본다(우는 얼굴 클로즈업)
         n.chibi.root.rotation.y = n.yaw;
-        showProp(n, propFor(n.kind, mode)); // 맥주 · 책 · 빗자루 · 라멘 그릇처럼 그 몸짓에 드는 물건
+        showProp(n, propFor(n.kind, mode), mode); // 맥주 · 책 · 빗자루 · 라멘 그릇처럼 그 몸짓에 드는 물건
         n.mode = mode; // 같이 놀기: 놀러 온 친구에게 보낼 지금 몸짓
         animateChibi(n.chibi, mode, t, { phase: n.phase, power });
       }
@@ -802,7 +813,7 @@ export function createNpcs(scene, village, weeds, berries) {
         if (n.car) { n.car.root.visible = drive; if (drive) rollCar(n.car, Math.hypot(P.x - ox, P.z - oz), t); }
         n.chibi.root.position.set(P.x, groundY(P.x, P.z) + (drive ? DRIVE_LIFT : 0), P.z);
         n.chibi.root.rotation.y = P.yaw;
-        showProp(n, propFor(n.kind, mode));
+        showProp(n, propFor(n.kind, mode), mode);
         animateChibi(n.chibi, mode, t, { phase: P.phase, power: mode === 'pull' ? 0.6 : 0 });
       }
     },

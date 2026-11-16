@@ -269,6 +269,7 @@ function geometryFor(m) {
     case 'bugMask': return bugGeometry('bugMask', BUG_MASK);
     case 'stripe': return stripeGeometry();
     default:
+      if (m.startsWith('umb:')) return umbrellaGeometry(m.slice(4)); // 우산 지붕(색마다 하나)
       if (m.startsWith('pat:')) { const [, kind, tone, base, accent] = m.split(':'), [field, paint] = lookPattern(kind, tone, accent); return paintedSphere(m, field, paint, base); }
       return lookGeometry(m); // 내 캐릭터 꾸미기 도형(호 · 반달 · 머리카락 · 수염 껍질), 모르면 오류
   }
@@ -843,11 +844,65 @@ const EAT_PROP = { slurp: 'f-ramen' };
 /** 그 친구가 그 몸짓을 할 때 드는 소품 꼬리표(없으면 null). */
 export const propFor = (kind, mode) => (PROP_FOR[kind] || {})[mode] || EAT_PROP[mode] || null;
 
-/** 그 친구가 쓰는 소품 부품에 꼬리표(tag)를 달아 덧붙인다(buildFromDef 가 숨겨 둔다). */
+/** 비 오는 날 우산 색(친구마다 하나, 목록에 없는 친구는 연한 크림색). */
+const UMBRELLA_COLORS = { chiikawa: '#f7a9c0', hachiware: '#a9d2f3', usagi: '#f8d968', momonga: '#c9b6ee', kurimanju: '#d2864a', rakko: '#2f6f73' };
+const UMBRELLA_PLAIN = '#f1ead9';
+const umbrellaGeoCache = new Map();
+/**
+ * 우산 지붕(여덟 폭): 테두리 반지름 1 · 높이 1, 테두리 가운데가 원점. 폭 가운데는 테두리가 살짝 들려 물결지고,
+ * 폭마다 제 색과 흰색을 섞은 연한 색을 번갈아 칠한다(꼭짓점 색 — 재질은 하얀색 하나를 나눠 쓴다).
+ */
+function umbrellaGeometry(color) {
+  if (umbrellaGeoCache.has(color)) return umbrellaGeoCache.get(color);
+  const SPAN = 1.15, PANELS = 8;
+  const src = new THREE.SphereGeometry(1, PANELS * 2, 4, 0, Math.PI * 2, 0, SPAN);
+  const p = src.attributes.position, y0 = Math.cos(SPAN), rr = Math.sin(SPAN);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = (1 - y) / (1 - y0); // 0 꼭대기 → 1 테두리
+    const mid = 0.5 - 0.5 * Math.cos(Math.atan2(z, x) * PANELS); // 0 살(폭 사이) → 1 폭 가운데
+    const f = (1 - 0.07 * k * mid) / rr;
+    p.setXYZ(i, x * f, (y - y0) / (1 - y0) + 0.16 * k * k * mid, z * f);
+  }
+  src.computeVertexNormals();
+  const g = src.toNonIndexed();
+  src.dispose();
+  const q = g.attributes.position, colors = new Float32Array(q.count * 3);
+  const main = new THREE.Color(color), light = new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.55);
+  for (let t = 0; t < q.count; t += 3) {
+    const cx = q.getX(t) + q.getX(t + 1) + q.getX(t + 2), cz = q.getZ(t) + q.getZ(t + 1) + q.getZ(t + 2);
+    const panel = Math.floor(((Math.atan2(cz, cx) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2 / PANELS) + 0.5) % PANELS;
+    const c = panel % 2 ? light : main;
+    for (let v = 0; v < 3; v++) colors.set([c.r, c.g, c.b], (t + v) * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  umbrellaGeoCache.set(color, g);
+  return g;
+}
+/**
+ * 우산(꼬리표 'umbrella', 비 오는 날 npcs.setRain): 몸 마디 밑 제 마디('umb')에 붙어 팔과 따로 논다(책처럼 몸을 따라간다). 왼쪽 옆구리에서 비스듬히 올라간 가는 대,
+ * 머리 위를 덮는 둥근 지붕, 꼭대기 꼭지. 오른손에 드는 다른 소품과 겹치지 않게 왼쪽에 든다. 키 · 몸 둘레에 맞춰 크기를 잡는다.
+ */
+function umbrellaParts(kind, def) {
+  const H = def.height, R = def.radius, k = Math.max(1, R / 0.45);
+  const base = [-(R - 0.02), H * 0.33, 0.1], top = [-0.15 * k, H + 0.12, 0.02]; // 대 아래 끝(손 옆) · 지붕 테두리 가운데
+  const dx = top[0] - base[0], dy = top[1] - base[1], tilt = Math.atan2(dx, dy), len = Math.hypot(dx, dy);
+  const rz = -tilt, up = [dx / len, dy / len]; // 대가 뻗는 방향(지붕도 같이 기운다)
+  const cw = 0.62 * k, ch = 0.25 * k;
+  def.pivots = { ...def.pivots, umb: base }; // 우산만의 마디(대 아래 끝): 몸 마디 밑에 따로 두어, 몸통 크기를 재는 곳(잠옷 · 포셰트)이 우산을 몸으로 잘못 보지 않는다
+  return [
+    { m: 'umb:' + (UMBRELLA_COLORS[kind] || UMBRELLA_PLAIN), c: '#ffffff', vc: true, p: top, r: [0, 0, rz], s: [cw, ch, cw], n: 'umb', par: 'body', ds: true },
+    { m: 'cylinder', c: '#7a5a44', p: base, r: [0, 0, rz], s: [0.016, len + ch + 0.05, 0.016], n: 'umb', par: 'body', o: false },
+    { m: 'dot', c: '#7a5a44', p: [base[0] - up[0] * 0.02, base[1] - up[1] * 0.02, base[2]], s: [0.032, 0.032, 0.032], n: 'umb', par: 'body', o: false }
+  ];
+}
+
+/** 그 친구가 쓰는 소품 부품에 꼬리표(tag)를 달아 덧붙인다(buildFromDef 가 숨겨 둔다). 우산은 누구나 하나씩. */
 function withProps(kind, def) {
   new Set([...Object.values(PROP_FOR[kind] || {}), ...Object.values(EAT_PROP)]).forEach((tag) => {
     (PROP_PARTS[tag] ? PROP_PARTS[tag](def) : foodParts(def, tag)).forEach((pt) => def.parts.push({ ...pt, tag }));
   });
+  umbrellaParts(kind, def).forEach((pt) => def.parts.push({ ...pt, tag: 'umbrella' }));
   return def;
 }
 
@@ -1294,7 +1349,7 @@ function buildFromDef(def) {
     const pv = pivotOf(def, pt.n, pt.p);
     const patterned = PAINTED_PARTS.has(pt.m) || pt.m.startsWith('pat:');
     // 2D 손그림처럼: 단색 칠(얼굴 부품은 그늘도 없이) + 붓펜 같은 외곽선
-    const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned, doubleSide: !!pt.ds, flat: pt.o === false });
+    const material = celMaterial(patterned ? '#ffffff' : pt.c, { vertexColors: patterned || !!pt.vc, doubleSide: !!pt.ds, flat: pt.o === false }); // vc: 도형에 칠한 꼭짓점 색을 쓴다(우산 지붕)
     const size = Math.max(Math.abs(pt.s[0]), Math.abs(pt.s[1]), Math.abs(pt.s[2]));
     const mesh = new THREE.Mesh(partGeometry(pt.m, size), material);
     mesh.position.set(pt.p[0] - pv[0], pt.p[1] - pv[1], pt.p[2] - pv[2]);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { seasonOfMonth, seasonAt, WEATHER_P, WEATHER_DIM, weatherOf } from '../src/core/season.js';
-import { LEAF, LEAF_SPOTS, leavesOf, pickLeaf, SNOWMAN_MAX, SNOWMAN_FACES, addSnowman, meltSnowmen, isValidLeaves, isValidSnowmen } from '../src/core/seasonplay.js';
+import { LEAF, LEAF_SPOTS, leavesOf, pickLeaf, SNOWMAN_MAX, SNOWMAN_FACES, addSnowman, meltSnowmen, isValidLeaves, isValidSnowmen, leafSpotsFor, SNOWMAN_GAP, snowmanRoom, snowmenToWire, snowmenFromWire } from '../src/core/seasonplay.js';
 import { createState } from '../src/core/state.js';
 import { bagOf } from '../src/core/inventory.js';
 import { sellPrice } from '../src/core/market.js';
@@ -73,6 +73,41 @@ test('눈사람: 다섯 개까지(여섯 번째에 가장 오래된 것), 겨울
   assert.equal(s.snowmen[4].day, 65);
   assert.equal(meltSnowmen(s, 'winter').snowmen.length, 5);
   assert.deepEqual(meltSnowmen(s, 'spring').snowmen, []);
+});
+
+test('낙엽 더미 자리: 나무 밑 후보에서 날짜로 정한 12곳(같은 날은 같고, 다른 날은 다르다)', () => {
+  const cands = Array.from({ length: 40 }, (_, i) => ({ x: i, z: -i }));
+  const a = leafSpotsFor(cands, START, 70), b = leafSpotsFor(cands, START, 70), c = leafSpotsFor(cands, START, 71);
+  assert.equal(a.length, LEAF_SPOTS);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(a.map((s) => s.x), c.map((s) => s.x));
+  assert.deepEqual(a.map((s) => s.id), [...Array(LEAF_SPOTS).keys()]);
+  assert.ok(a.every((s) => cands.some((q) => q.x === s.x && q.z === s.z)));
+  assert.equal(new Set(a.map((s) => s.x)).size, LEAF_SPOTS);
+  assert.equal(leafSpotsFor(cands.slice(0, 5), START, 70).length, 5, '후보가 모자라면 있는 만큼');
+  assert.deepEqual(leafSpotsFor([], START, 70), []);
+});
+
+test('눈사람 자리: 다른 눈사람과 SNOWMAN_GAP 안이면 세울 수 없다', () => {
+  assert.equal(SNOWMAN_GAP, 1.6);
+  assert.equal(snowmanRoom([], 0, 0), true);
+  assert.equal(snowmanRoom(undefined, 0, 0), true);
+  assert.equal(snowmanRoom([{ x: 1, z: 0, day: 1, face: 0 }], 0, 0), false);
+  assert.equal(snowmanRoom([{ x: 2, z: 0, day: 1, face: 0 }], 0, 0), true);
+});
+
+test('같이 놀기 눈사람(sm): 주인이 보낸 것을 손님이 그대로 받고, 이상한 값이면 하나도 그리지 않는다', () => {
+  const list = [{ x: 1.5, z: -2, day: 60, face: 2 }, { x: -3, z: 4.25, day: 61, face: 0 }];
+  const wire = snowmenToWire(list);
+  assert.deepEqual(wire, [[1.5, -2, 2], [-3, 4.25, 0]]);
+  assert.deepEqual(snowmenFromWire(JSON.parse(JSON.stringify(wire))).map((s) => [s.x, s.z, s.face]), [[1.5, -2, 2], [-3, 4.25, 0]]);
+  assert.deepEqual(snowmenFromWire(undefined), [], '보낸 것이 없으면 눈사람도 없다');
+  assert.deepEqual(snowmenFromWire('x'), []);
+  assert.deepEqual(snowmenFromWire([[1, 2, 7]]), [], '없는 얼굴');
+  assert.deepEqual(snowmenFromWire([[1, 'a', 0]]), []);
+  assert.equal(snowmenFromWire(Array.from({ length: 9 }, (_, i) => [i, 0, 0])).length, SNOWMAN_MAX, '다섯 개까지만');
+  assert.equal(snowmenToWire(undefined), undefined, '눈사람이 없으면 보내지 않는다');
+  assert.equal(snowmenToWire([]), undefined);
 });
 
 test('계절 놀이: 예전 저장(칸 없음)과 새 저장을 받고, 이상한 값은 거른다', () => {

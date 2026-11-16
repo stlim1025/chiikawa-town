@@ -147,7 +147,13 @@ Object.assign(EXTRA, {
   tissue: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="22" ry="4" fill="#e6d8b8"/>
     <path d="M10 30h44v22H10z" fill="#cfe7ff" ${S}/><path d="M24 30q8-4 16 0" fill="none" ${S}/>
     <circle cx="18" cy="42" r="3" fill="#ffd6e2"/><circle cx="32" cy="45" r="3" fill="#fff1a8"/><circle cx="46" cy="41" r="3" fill="#ffd6e2"/>
-    <path d="M26 31q-6-12 4-17q2 6 6 2q8 4 2 15z" fill="#fff" ${S}/></svg>`
+    <path d="M26 31q-6-12 4-17q2 6 6 2q8 4 2 15z" fill="#fff" ${S}/></svg>`,
+  // 단풍잎(가을 낙엽 더미에서 줍는다): 주황빛 붉은 잎에 잎맥, 갈색 잎자루
+  mapleleaf: `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="16" ry="3.5" fill="#e6d8b8"/><g transform="rotate(-12 32 32)">
+    <path d="M32 44v12" stroke="${L}" stroke-width="5.4" stroke-linecap="round"/><path d="M32 44v12" stroke="#b5622e" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M32 5l4.5 10 5.5-3-1 11 11-6-2.5 10 8.5 2-8 8 2 6-12-1 1 6-9-2-9 2 1-6-12 1 2-6-8-8 8.5-2-2.5-10 11 6-1-11 5.5 3z" fill="#e8622c" ${S}/>
+    <path d="M32 46V17M32 37l13-9M32 37l-13-9M32 43l10-2M32 43l-10-2" fill="none" stroke="#b5411c" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M26 22l2.5 6" stroke="#f7a05e" stroke-width="2.4" stroke-linecap="round"/></g></svg>`
 });
 /** 추첨권: 주황 표에 별. */
 export const TICKET_SVG = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 11h30v5a4 4 0 0 0 0 8v5H5v-5a4 4 0 0 0 0-8z" fill="#ffb36b" stroke="#5a4431" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 12v16" stroke="#5a4431" stroke-width="1.6" stroke-dasharray="2.4 2.4"/><path d="M25 14.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="#fff6c8" stroke="#5a4431" stroke-width="1.4" stroke-linejoin="round"/></svg>`;

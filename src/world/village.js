@@ -900,6 +900,7 @@ export function buildVillage(scene) {
   }
   const looseCap = roofSnowMesh(looseSnow, toonMaterial('#ffffff', { unique: true, vertexColors: true }));
   if (looseCap) { world.add(looseCap); snowCaps.push(looseCap); }
+  let treeSpotList = null; // leafPileSpots
   function setRoofSnow(on) {
     if (!!on === roofSnow) return;
     roofSnow = !!on;
@@ -935,6 +936,14 @@ export function buildVillage(scene) {
     },
     /** 겨울 지붕 눈을 보이고 감춘다(가게 · 친구 집 · 돔 집 · 노점 · 마을 문). 같은 값으로 다시 불러도 아무 일도 하지 않는다. */
     setRoofSnow,
+    /**
+     * 가을 낙엽 더미를 둘 나무 밑 자리 [{ x, z }](core/seasonplay.js leafSpotsFor 가 날마다 12곳을 고른다): 마을과 길가 나무
+     * (울타리에서 24m 안의 반투명해지는 나무)의 카메라 쪽(남쪽) 잎 그늘 끝, 걸어서 닿는 빈 땅만. 처음 부를 때 한 번 정한다.
+     */
+    leafPileSpots() {
+      if (!treeSpotList) treeSpotList = trees.filter((t) => Math.hypot(t.x, t.z) < VILLAGE_R + 24).map((t) => ({ x: +(t.x + 0.25 * t.s).toFixed(2), z: +(t.z + 1.05 * t.s).toFixed(2) })).filter((p) => isFree(p.x, p.z, 0.35, true));
+      return treeSpotList;
+    },
     /**
      * 계절 풍경을 칠한다(world/seasonlook.js seasonLookOf 의 look): 땅 꼭짓점 색, 나무 잎(같은 색 나무끼리 도형을 같이 쓴다),
      * 덤불 · 먼 언덕 재질 색, 장식 꽃(겨울엔 숨김), 지붕 눈, 울타리 밖 숲 · 들판(outdoors.paintSeason).

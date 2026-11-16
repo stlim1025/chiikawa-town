@@ -25,9 +25,34 @@ export function pickLeaf(state, id, day, season) {
   if (!r.added) return { ok: false, state, full: true };
   return { ok: true, state: { ...r.state, leaves: { day, picked: [...l.picked, id] } } };
 }
+/**
+ * 그날의 낙엽 더미 자리: 나무 밑 후보 [{ x, z }] 에서 시작 날짜와 날 번호로 섞어 앞 LEAF_SPOTS 곳 → [{ id: 0.., x, z }].
+ * 같은 날은 늘 같은 자리(저장할 것이 없다), 날이 바뀌면 다른 나무 밑.
+ */
+export function leafSpotsFor(candidates, startISO, day) {
+  let h = 0x811c9dc5;
+  const key = `${startISO}#${day}#leaf`;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  const next = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return (h >>> 0) / 4294967296; }; // xorshift
+  const list = (candidates || []).slice();
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(next() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  return list.slice(0, LEAF_SPOTS).map((c, id) => ({ id, x: c.x, z: c.z }));
+}
+/** 눈사람끼리 이만큼은 떨어져 세운다. */
+export const SNOWMAN_GAP = 1.6;
+/** (x, z) 에 눈사람을 세울 틈이 있는지(다른 눈사람과 SNOWMAN_GAP 안이면 안 된다). */
+export const snowmanRoom = (snowmen, x, z) => !(snowmen || []).some((s) => Math.hypot(s.x - x, s.z - z) < SNOWMAN_GAP);
 /** 눈사람을 세운다(SNOWMAN_MAX 개를 넘으면 가장 오래된 것부터 사라진다). */
 export function addSnowman(state, { x, z, face }, day) {
   return { ...state, snowmen: [...(state.snowmen || []), { x, z, day, face }].slice(-SNOWMAN_MAX) };
+}
+/** 같이 놀기(주인): 마을 모습에 실을 눈사람 [[x, z, face]](이름표 'sm'). 없으면 undefined(싣지 않는다). */
+export const snowmenToWire = (list) => (list && list.length ? list.map((s) => [s.x, s.z, s.face]) : undefined);
+/** 같이 놀기(손님): 주인이 보낸 'sm' 을 눈사람 목록으로. 서버가 그대로 전한 것이라 하나라도 이상하면 아무것도 그리지 않는다. */
+export function snowmenFromWire(sm) {
+  if (!Array.isArray(sm)) return [];
+  const list = sm.slice(0, SNOWMAN_MAX).map((s) => (Array.isArray(s) ? { x: s[0], z: s[1], day: 0, face: s[2] } : null));
+  return isValidSnowmen(list) ? list : [];
 }
 /** 겨울이 아니면 눈사람이 모두 녹는다. */
 export function meltSnowmen(state, season) {
