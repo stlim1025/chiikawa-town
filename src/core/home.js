@@ -117,6 +117,7 @@ export const FURNITURE = {
   shelf: { id: 'shelf', name: '책장', price: 180, cat: 'store' },
   stove: { id: 'stove', name: '작은 난로', price: 260, cat: 'kitchen' },
   doll: { id: 'doll', name: '먼작귀 인형', price: 220, cat: 'deco' },
+  anokodoll: { id: 'anokodoll', name: '아노코 인형', price: 300, cat: 'deco', gift: true }, // 집 앞 아노코와 하트 3(core/anokobond.js) — 가구점에서는 팔지 않는다
   // 침대와 소파
   futon: { id: 'futon', name: '이불 깔개', price: 500, cat: 'rest' },
   sofa: { id: 'sofa', name: '분홍 소파', price: 1200, cat: 'rest' },

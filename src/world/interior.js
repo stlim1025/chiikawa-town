@@ -99,6 +99,36 @@ export function furnitureModel(id) {
       g.add(doll.root);
       break;
     }
+    case 'anokodoll': {
+      // 아노코 인형(아노코와 친해지면 받는다): 앉아 있는 작은 봉제 인형. 흰 털 머리와 갈기, 주황 뿔, 감은 웃는 눈, 베이지 몸, 끝이 흰 초록 꼬리
+      const WHITE = '#fbfaf5', BEIGE = '#eadbc6', HORN = '#f2a46a', INK = '#2b2224';
+      m(GEO.sphere, BEIGE, { position: [0, 0.15, -0.02], scale: [0.17, 0.16, 0.16], outline: 0.02 }); // 몸
+      [-1, 1].forEach((sd) => {
+        m(GEO.sphere, BEIGE, { position: [sd * 0.11, 0.05, 0.12], scale: [0.065, 0.05, 0.085], outline: 0.015 }); // 앞으로 뻗은 뒷발
+        m(GEO.dot, HORN, { position: [sd * 0.11, 0.045, 0.2], scale: [0.03, 0.02, 0.02], outline: false }); // 발톱
+        m(GEO.sphere, WHITE, { position: [sd * 0.1, 0.17, 0.13], scale: [0.05, 0.06, 0.05], outline: 0.015 }); // 가슴 앞에 모은 앞발
+      });
+      // 꼬리: 엉덩이 뒤에서 옆으로 말려 나온다
+      m(GEO.sphere, '#7aa66e', { position: [0.07, 0.07, -0.17], scale: [0.1, 0.055, 0.06], rotation: [0, 0.5, 0], outline: 0.015 });
+      m(GEO.sphere, '#7aa66e', { position: [0.19, 0.06, -0.18], scale: [0.075, 0.045, 0.05], rotation: [0, -0.3, 0], outline: 0.015 });
+      m(GEO.sphere, WHITE, { position: [0.27, 0.06, -0.14], scale: [0.04, 0.035, 0.04], outline: 0.012 });
+      // 머리: 흰 공 둘레에 털 뭉치 갈기(정수리는 비운다), 처진 귀, 이마의 뿔
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 + 0.3;
+        if (Math.sin(a) > 0.8) continue;
+        m(GEO.sphere, WHITE, { position: [Math.cos(a) * 0.2, 0.38 + Math.sin(a) * 0.17, 0], scale: [0.08, 0.08, 0.08], outline: 0.015 });
+      }
+      m(GEO.sphere, WHITE, { position: [0, 0.38, 0.04], scale: [0.22, 0.2, 0.2], outline: 0.02 });
+      [-1, 1].forEach((sd) => m(GEO.sphere, WHITE, { position: [sd * 0.17, 0.54, 0.02], scale: [0.07, 0.04, 0.045], rotation: [0, 0, -sd * 0.38], outline: 0.012 }));
+      m(GEO.cone, HORN, { position: [0, 0.53, 0.13], scale: [0.03, 0.085, 0.03], rotation: [0.55, 0, 0], outline: 0.01 });
+      // 얼굴: 위로 휜 감은 눈(짧은 선 둘을 ㅅ 모양으로), 분홍 볼, 작은 입
+      [-1, 1].forEach((sd) => {
+        [-1, 1].forEach((k) => m(GEO.dot, INK, { position: [sd * 0.085 + k * 0.014, 0.392, 0.226], scale: [0.02, 0.006, 0.008], rotation: [0, sd * 0.35, -k * 0.5], outline: false }));
+        m(GEO.dot, '#f5a3b5', { position: [sd * 0.14, 0.345, 0.193], scale: [0.032, 0.018, 0.01], rotation: [0, sd * 0.65, 0], outline: false });
+      });
+      m(GEO.dot, INK, { position: [0, 0.345, 0.238], scale: [0.016, 0.009, 0.008], outline: false });
+      break;
+    }
     // ---------- 늘린 가구(게임 오리지널, core/home.js) ----------
     // 침대와 소파
     case 'futon':

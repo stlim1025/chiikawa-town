@@ -53,7 +53,7 @@ export function inSweep(yaw, mx, mz, px, pz, radius, me = 0.32) {
 }
 
 /** 아노코를 얻었는지: 메인 이야기 2장(퀘스트 anoko)을 끝냈다(quests.js 를 불러오지 않는다 — combat.js 와 서로 부르는 고리를 피한다). */
-const tamed = (state) => !!(state.quests && state.quests.anoko && state.quests.anoko.done);
+export const tamed = (state) => !!(state.quests && state.quests.anoko && state.quests.anoko.done);
 
 /**
  * 탈것 버튼(C 키)이 탈 것: 아노코를 얻었으면 집 앞에서 자동차를 골랐고 자동차가 있을 때만 자동차, 그 밖에는 아노코.
