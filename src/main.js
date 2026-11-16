@@ -7057,6 +7057,7 @@ function boot() {
   const wxTop = new THREE.Color(), wxHor = new THREE.Color();
   // ---------- 그날 날씨(core/season.js): 아침 6시(날 번호가 바뀔 때) 시작 날짜와 날 번호로 정해진다 ----------
   let storyRain = false, todayWx = 'sunny', cloudK = 0, wxForce = null; // wxForce: 디버그(__town.wx)로 잠시 바꾼 날씨
+  let storyK = 0; // 이야기 비 어둑함(0 ~ 1, 켜고 끌 때 천천히 — 밝기가 한 번에 튀지 않게)
   let todaySeason = seasonOfMonth(new Date().getMonth() + 1), seasonForce = null; // 오늘 계절(게임 달력, 손님은 주인 마을) · seasonForce: 디버그(__town.season)
   /** 이야기가 부르는 비('검은 별똥별', '하치와레의 카메라'): 켜 있는 동안은 그날 날씨보다 이야기가 이긴다. */
   function setStoryRain(on) { storyRain = !!on; }
@@ -7077,6 +7078,7 @@ function boot() {
     weather.setRain(rain);
     weather.setSnow(todayWx === 'snow' && !story);
     cloudK += ((todayWx === 'cloudy' && !story ? 1 : 0) - cloudK) * Math.min(1, dt * 1.2);
+    storyK += ((story ? 1 : 0) - storyK) * Math.min(1, dt * 1.2);
     sound.rain(rain && mode !== 'title'); // 같은 값이면 아무 일도 하지 않는다(타이틀에서는 소리를 만들지 않는다 — 누르기 전엔 소리를 낼 수 없다)
     hud.setWeather(story ? 'rain' : todayWx);
   }
@@ -7127,7 +7129,9 @@ function boot() {
       for (const o of remotes.players()) if (o.area === 'village') stepPrint(o.id, o.x, o.z);
     } else printWalk.clear();
     if (snowRoll) {
-      if (!play || guest || panels.isOpen() || fainting) cancelSnowman();
+      // 그만두기: 움직이면(잘못 눌렀을 때), 창 · 대화 · 이야기 장면 · 잠 · 쓰러짐이 끼어들면, 다른 장면이 놀이 화면을 가져가면
+      const v = input.vector();
+      if (!play || guest || panels.isOpen() || guide.open || fainting || downed || sleeping || funBusy() || !minigame.ownedBy(snowRoll.token) || Math.hypot(v.x, v.y) > 0.5) cancelSnowman();
       else minigame.update(dt);
     }
   }
@@ -7140,7 +7144,8 @@ function boot() {
     }
     if (todaySeason === 'winter') {
       const x = p.x + Math.sin(player.yaw) * 0.9, z = p.z + Math.cos(player.yaw) * 0.9;
-      if (Math.hypot(x, z) < VILLAGE_R - 1.5 && roadDist(x, z) > 0.8 && village.isFree(x, z, 0.7, true) && snowmanRoom(state.snowmen, x, z)) options.push({ d: 1.5, t: { type: 'snowman', x, z, label: '눈사람 만들기' } });
+      // 우선순위는 친구 말 걸기(1.6m 안)보다 뒤: 친구 곁에서 누르면 말 걸기가 먼저
+      if (Math.hypot(x, z) < VILLAGE_R - 1.5 && roadDist(x, z) > 0.8 && village.isFree(x, z, 0.7, true) && snowmanRoom(state.snowmen, x, z)) options.push({ d: 1.65, t: { type: 'snowman', x, z, label: '눈사람 만들기' } });
     }
   }
   function pickLeafPile(id) {
@@ -7156,15 +7161,15 @@ function boot() {
   /** 눈사람 만들기: 그 자리를 보고 서서 연타로 눈덩이를 굴린다(실패는 없다). 다 차면 그 자리에 눈사람. */
   function startSnowman(tg) {
     if (snowRoll) return;
-    snowRoll = { x: tg.x, z: tg.z };
+    snowRoll = { x: tg.x, z: tg.z, token: {} }; // token: 이 놀이 화면이 눈사람 연타인지(다른 장면의 놀이를 멈추지 않게)
     player.face(tg.x, tg.z);
     player.busy = true;
-    minigame.mash({ label: '눈덩이를 굴려 눈사람을 만들어요!', button: '굴려!', gain: 0.1, decay: 0.1, onPress: () => { sound.play('click'); }, onDone: finishSnowman });
+    minigame.mash({ label: '눈덩이를 굴려 눈사람을 만들어요! 움직이면 그만둬요', button: '굴려!', gain: 0.1, decay: 0.1, token: snowRoll.token, onPress: () => { sound.play('click'); }, onDone: finishSnowman });
   }
   function cancelSnowman() {
+    if (snowRoll && minigame.ownedBy(snowRoll.token)) minigame.stop();
     snowRoll = null;
-    player.busy = false;
-    minigame.stop();
+    if (!downed) player.busy = false; // 쓰러져 기다리는 중이면 그쪽이 멈춰 둔다
   }
   function finishSnowman() {
     const r = snowRoll;
@@ -7423,7 +7428,7 @@ function boot() {
     if (mood > 0.001) { skyTop.lerp(DUSK_TOP, dusk * 0.75).lerp(STORM_TOP, storm * 0.85); skyHorizon.lerp(DUSK_HOR, dusk * 0.75).lerp(STORM_HOR, storm * 0.85); }
     gfx.setSky(skyTop, skyHorizon);
     // 해가 약해지는 정도(core/season.js WEATHER_DIM): 흐림 15%, 비 35%, 눈 20%. 이야기가 부른 비는 예전처럼 더 어둑하게(65%)
-    const rainDim = storyRain && !visiting ? 0.65 : WEATHER_DIM.rain;
+    const rainDim = WEATHER_DIM.rain + (0.65 - WEATHER_DIM.rain) * storyK;
     const wxDim = Math.max(WEATHER_DIM.cloudy * cloud, rainDim * wet, WEATHER_DIM.snow * snowy);
     sun.intensity = sunClock * (1 - wxDim) * (1 - 0.12 * dusk - 0.35 * storm);
     hemi.intensity = hemiClock * (1 - 0.45 * wxDim) * (1 - 0.25 * storm);
@@ -7623,7 +7628,7 @@ function boot() {
       season: (s) => { if (s !== undefined) seasonForce = s; return todaySeason; }, // 계절 확인: 잠시 바꾸고(null 이면 달력대로) 지금 계절
       leafSpots: () => (state ? todayLeafSpots() : []), // 오늘 낙엽 더미 자리
       snowRoll: () => snowRoll, // 눈사람 만드는 중
-      wx: (kind) => { if (kind !== undefined) wxForce = kind; return { today: todayWx, story: storyRain, rain: weather.rain, snow: weather.snow, cloud: cloudK, night: nightNow, sun: sun.intensity, hemi: hemi.intensity }; },
+      wx: (kind, story) => { if (kind !== undefined) wxForce = kind; if (story !== undefined) setStoryRain(story); return { today: todayWx, story: storyRain, rain: weather.rain, snow: weather.snow, cloud: cloudK, night: nightNow, sun: sun.intensity, hemi: hemi.intensity }; }, // story: 이야기 비 켜고 끄기(밝기 확인용)
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),
       mode: () => mode,

@@ -118,6 +118,8 @@ export function createMinigame(ui) {
       draw();
     },
     stop() { run = null; root.hidden = true; },
+    /** 지금 놀이가 token 으로 시작한 것인지(mash 등에 token 을 넘긴 쪽만 — 다른 장면의 놀이를 잘못 멈추지 않게). */
+    ownedBy(token) { return !!run && !!token && run.cb.token === token; },
     /** 버튼만 놀이: 채운 칸 수 · 끝내기(사라지며 onDone). */
     setHits(n) { if (run && run.kind === 'press') { run.hits = n; draw(); } },
     done() { if (run) end(); },
