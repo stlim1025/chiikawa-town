@@ -5747,10 +5747,14 @@ function boot() {
     full: ['partyFull', () => npcs.partyKinds().map((k) => ({ icon: faceIcon(k), text: nameOf(k) }))],
     busy: ['partyBusy', () => []]
   };
-  /** '같이 토벌 가자!': 데려갈 수 있으면 따라나서고, 아니면 그 친구 말투로 왜 안 되는지(꼬리표로 조건). */
+  /**
+   * '같이 토벌 가자!': 데려갈 수 있으면 따라나서고, 아니면 그 친구 말투로 왜 안 되는지(꼬리표로 조건).
+   * 일감 · 산책처럼 하던 일정이 있어도 따라나선다(받아 둔 일감은 게시판에 돌려놓는다 — dropJob). 낮에는 친구들이 거의 늘 무언가 하고 있어서
+   * 일정이 있으면 거절하던 때는 우사기처럼 부지런한 친구를 거의 못 데려갔다. 내 일상 부탁에 같이 다니거나 나를 안내하는 중일 때만 '바빠'.
+   */
   function askParty(n) {
     const kind = n.kind, day = state.clock.day;
-    const c = (n.plan && n.plan.length) || tutorialActive(state.tutorial) ? { ok: false, reason: 'busy' }
+    const c = buddies.has(kind) || n.lead || tutorialActive(state.tutorial) ? { ok: false, reason: 'busy' }
       : partyCheck(state, kind, { day, night: isSleepHour(hourOf(state.clock)), party: npcs.partyKinds() });
     if (!c.ok) {
       const [key, chips] = PARTY_NO[c.reason] || PARTY_NO.busy;
@@ -5758,7 +5762,7 @@ function boot() {
       sayAs(n, [list.length ? { text: lineOf(kind, key), chips: list } : lineOf(kind, key)], endTalk);
       return;
     }
-    sayAs(n, [{ text: lineOf(kind, 'partyJoin'), chips: [{ icon: ICO.star, text: '토벌 점수는 나눠 가져요' }] }], () => { endTalk(); startParty(n); });
+    sayAs(n, [{ text: lineOf(kind, 'partyJoin'), chips: [{ icon: ICO.star, text: '토벌 점수는 나눠 가져요' }] }], () => { endTalk(); dropJob(n); startParty(n); });
   }
   // 같이 토벌하는 친구의 체력: 몬스터가 친구를 노려 맞히면 줄고, 다 떨어지면 그 자리에 기절한다. 다가가서 깨우면 조금만 찬 채로 일어난다
   const ALLY_HP = 40, WAKE_HP = 12;
