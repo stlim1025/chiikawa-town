@@ -98,6 +98,7 @@ import { FISH, FISH_STAMINA, BITE_WAIT, waterAt, pickFish, rulesOf, startReel, s
 import { createFishGame } from './ui/fishgame.js';
 import { createPlayerLights } from './actors/lights.js';
 import { todayISO, dateLabel, weekdayOf, dateOf } from './core/calendar.js';
+import { weatherOf, WEATHER_DIM } from './core/season.js';
 import { WEAPONS, MONSTERS, heldWeapon, buyWeapon, holdWeapon, faint, recordHunt, sellDrops, huntQuiz, PLAYER_IFRAME, PLAYER_KNOCK, FAINT_HOURS, bossEatWait, BOSS_EAT_COOL } from './core/combat.js';
 import { LAIR_BOSSES, BOSS_LAIRS, KING_LAIR, bossHome, bossSeen, markBossSeen, markBossDown } from './core/bosses.js';
 import { bountyNow, markBountyDown, claimBounty, ELITE } from './core/bounty.js';
@@ -1763,8 +1764,7 @@ function boot() {
       swapPayback = null;
       cameraStory.reset();
       loopRewinding = false;
-      weather.setRain(false);
-      sound.rain(false);
+      setStoryRain(false); // 그날 날씨로 돌아온다(updateDailyWeather)
       hud.setQuests([]);
       save();
       guide.setGoal(null);
@@ -2783,7 +2783,7 @@ function boot() {
         if (f.t >= f.biteAt) {
           f.phase = 'bite';
           f.t = 0;
-          f.fish = pickFish(f.water, hourOf(state.clock));
+          f.fish = pickFish(f.water, hourOf(state.clock), Math.random, wxNow());
           sound.play('splash');
           splash(s, 0.7);
           hud.floatText({ x: s.x, y: 0.8, z: s.z, text: '!', kind: 'tip' });
@@ -4913,7 +4913,7 @@ function boot() {
     startLoop: () => commit(loopStart(state)), markLoop: () => commit(loopMark(state)), endLoop: () => commit(loopEnd(state)),
     rewindNow: () => { commit(loopRewind(loopMark(state))); afterLoopRewind(); }, // 장면 끝의 되감기: 본 장면을 적어 두고 같은 날 아침으로
     nudgeSearch: () => { appNudge = 'search'; },
-    setRain: (on) => { weather.setRain(on); sound.rain(on); }
+    setRain: (on) => setStoryRain(on)
   });
   // 사이드스토리 '위스키 봉봉'(stories/bonbon.js): 서쪽 숲길 옆 초콜릿 덩굴(이야기를 받은 동안만) · 숲속 빈터 장면(처음 들어갈 때 만든다)
   const bonbonFront = createBonbonFront(scene, village);
@@ -5107,7 +5107,7 @@ function boot() {
   cameraStory = createCameraStory({
     npcs, village, hud, guide, sound, input, staged, who: (kind) => whoOf({ kind }), narrator: NARRATOR, me: () => meWho(), fill: (lines) => lines.map(fillName),
     getPlayer: () => player, cam, photo: photoUi, capture: capturePhoto,
-    setRain: (on) => { weather.setRain(on); sound.rain(on); },
+    setRain: (on) => setStoryRain(on),
     // 비 피할 곳: 지금 자리에서 가장 가까운 마을 안 큰 나무 밑(가게 처마는 셋이 들어가기엔 좁다). 줄기 남쪽(카메라 쪽) 잎 그늘에
     // 치이카와 · 하치와레 · 우사기, 나는 그 오른쪽 앞(카메라는 내 뒤에서 보니 셋 중 누구의 바로 앞에도 서지 않게)
     shelter: () => {
@@ -6261,7 +6261,7 @@ function boot() {
    * keep 이면 친구 가방에 넣는다(가득 차면 놓아준다 — 좋아하지 않는 물고기는 일하고 돌아와 판다). → 낚은 id
    */
   function npcLandFish(n, water, keep, want = null) {
-    const id = want || pickFish(water, hourOf(state.clock)), F = FISH[id], p = player.position;
+    const id = want || pickFish(water, hourOf(state.clock), Math.random, wxNow()), F = FISH[id], p = player.position;
     if (Math.hypot(n.x - p.x, n.z - p.z) < 26) hud.floatText({ x: n.x, y: n.chibi.height + 0.55, z: n.z, text: F.name, kind: 'mini', icon: itemSvg(id) });
     if (Math.random() < 0.5) npcs.say(n, F.junk ? '…깡통이다' : lineOf(n.kind, 'fish'));
     if (keep && !F.junk) commit(addToPantry(state, n.kind, id, 1).state, false);
@@ -7038,6 +7038,31 @@ function boot() {
   const starfall = createStarfall(scene), streaks = createStreaks(ui);
   const weather = createWeather(scene); // 비: 켜면 빗줄기 · 물방울 고리, 하늘 · 빛은 applySky 가 잿빛으로
   const RAIN_TOP = new THREE.Color('#5b6470'), RAIN_HOR = new THREE.Color('#8b939d');
+  const CLOUD_TOP = new THREE.Color('#a9b4bf'), CLOUD_HOR = new THREE.Color('#d6dce2'); // 흐린 날: 옅은 회색
+  const SNOW_TOP = new THREE.Color('#c4ccd5'), SNOW_HOR = new THREE.Color('#e8ebef'); // 눈 오는 날: 밝은 회색
+  const CEL_WET = new THREE.Color('#d2d7de'); // 날씨로 어두운 날 캐릭터 빛(밤의 푸른빛과는 따로)
+  const wxTop = new THREE.Color(), wxHor = new THREE.Color();
+  // ---------- 그날 날씨(core/season.js): 아침 6시(날 번호가 바뀔 때) 시작 날짜와 날 번호로 정해진다 ----------
+  let storyRain = false, todayWx = 'sunny', cloudK = 0, wxForce = null; // wxForce: 디버그(__town.wx)로 잠시 바꾼 날씨
+  /** 이야기가 부르는 비('검은 별똥별', '하치와레의 카메라'): 켜 있는 동안은 그날 날씨보다 이야기가 이긴다. */
+  function setStoryRain(on) { storyRain = !!on; }
+  const storyRainOn = (guest) => storyRain && !guest; // 이야기 비는 같이 놀기 손님에게 가지 않는다
+  /** 지금 날씨(낚시 등): 이야기가 부른 비도 비다. */
+  const wxNow = () => (storyRainOn(!!visiting) ? 'rain' : todayWx);
+  /**
+   * 그날 날씨를 비 · 눈 · 흐림 세기와 빗소리, 날짜 옆 그림에 건다(밤 판단과는 따로 — applySky).
+   * 손님은 주인 마을의 시작 날짜와 날 번호로 같은 날씨를 본다. 집 안에서도 빗소리는 들린다.
+   */
+  function updateDailyWeather(dt, guest) {
+    const c = guest && visiting && visiting.clock ? { start: visiting.startDate, day: visiting.clock.day } : state ? { start: state.startDate, day: state.clock.day } : null;
+    todayWx = wxForce || (c ? weatherOf(c.start, c.day) : 'sunny');
+    const story = storyRainOn(guest), rain = story || todayWx === 'rain';
+    weather.setRain(rain);
+    weather.setSnow(todayWx === 'snow' && !story);
+    cloudK += ((todayWx === 'cloudy' && !story ? 1 : 0) - cloudK) * Math.min(1, dt * 1.2);
+    sound.rain(rain && mode !== 'title'); // 같은 값이면 아무 일도 하지 않는다(타이틀에서는 소리를 만들지 않는다 — 누르기 전엔 소리를 낼 수 없다)
+    hud.setWeather(story ? 'rain' : todayWx);
+  }
   let starNotice = 0, shakeT = 0;
   const STARMAN = { kind: 'star', name: '별똥별맨', tag: '#fff3a0', ink: '#7a5a12' };
   const meWho = () => (swapOn ? { kind: 'me', ...myBodyTag() } : { kind: 'me', name: myName(), tag: '#ffffff', ink: '#5a4a3a' }); // 몸이 바뀐 동안 내 이름표는 하치와레
@@ -7261,15 +7286,23 @@ function boot() {
     const a = SKY[i], b = SKY[i + 1], k = Math.min(1, Math.max(0, (h - a.h) / (b.h - a.h)));
     skyTop.copy(a.topC).lerp(b.topC, k);
     skyHorizon.copy(a.horC).lerp(b.horC, k);
-    const wet = weather.rain; // 비가 오면 하늘은 잿빛, 해와 빛은 어둑하게
-    if (wet > 0.001) { skyTop.lerp(RAIN_TOP, wet * 0.85); skyHorizon.lerp(RAIN_HOR, wet * 0.85); }
+    const sunClock = a.sun + (b.sun - a.sun) * k, hemiClock = a.hemi + (b.hemi - a.hemi) * k;
+    // 밤 판단(가로등 · 창문 · 밤 나방 · 캐릭터 푸른빛)은 시계로만: 비 · 눈 · 흐림 · 아노코 마당 분위기로 어두워져도 낮은 낮이다
+    const day = Math.min(1, Math.max(0, (sunClock + hemiClock - 0.95) / 2.25));
+    // 날씨: 흐리면 옅은 회색, 비는 잿빛, 눈은 밝은 회색(밤에는 그만큼 어둡게 — 밤하늘이 밝아지지 않게)
+    const wet = weather.rain, snowy = weather.snow, cloud = cloudK, lit0 = 0.25 + 0.75 * day;
+    const sky = (top, hor, w) => { if (w > 0.001) { skyTop.lerp(wxTop.copy(top).multiplyScalar(lit0), w); skyHorizon.lerp(wxHor.copy(hor).multiplyScalar(lit0), w); } };
+    sky(CLOUD_TOP, CLOUD_HOR, cloud * 0.6);
+    sky(SNOW_TOP, SNOW_HOR, snowy * 0.7);
+    sky(RAIN_TOP, RAIN_HOR, wet * 0.85);
     const mood = anokoMood.level, dusk = Math.min(1, mood), storm = Math.max(0, mood - 1); // 아노코 마당: 노을빛 → 어둑한 눈보라
     if (mood > 0.001) { skyTop.lerp(DUSK_TOP, dusk * 0.75).lerp(STORM_TOP, storm * 0.85); skyHorizon.lerp(DUSK_HOR, dusk * 0.75).lerp(STORM_HOR, storm * 0.85); }
     gfx.setSky(skyTop, skyHorizon);
-    sun.intensity = (a.sun + (b.sun - a.sun) * k) * (1 - 0.65 * wet) * (1 - 0.12 * dusk - 0.35 * storm);
-    hemi.intensity = (a.hemi + (b.hemi - a.hemi) * k) * (1 - 0.3 * wet) * (1 - 0.25 * storm);
-    // 캐릭터는 명암 대신 빛 색만 따른다: 밤에는 푸르스름하게(마을보다는 밝게 두어 잘 보이게)
-    const day = Math.min(1, Math.max(0, (sun.intensity + hemi.intensity - 0.95) / 2.25));
+    // 해가 약해지는 정도(core/season.js WEATHER_DIM): 흐림 15%, 비 35%, 눈 20%. 이야기가 부른 비는 예전처럼 더 어둑하게(65%)
+    const rainDim = storyRain && !visiting ? 0.65 : WEATHER_DIM.rain;
+    const wxDim = Math.max(WEATHER_DIM.cloudy * cloud, rainDim * wet, WEATHER_DIM.snow * snowy);
+    sun.intensity = sunClock * (1 - wxDim) * (1 - 0.12 * dusk - 0.35 * storm);
+    hemi.intensity = hemiClock * (1 - 0.45 * wxDim) * (1 - 0.25 * storm);
     // 마을 밖의 밤은 훨씬 어둡다: 울타리에서 멀어질수록 밤의 빛을 더 줄인다(불을 들면 캐릭터는 조금 밝게)
     const night = Math.min(1, Math.max(0, (0.6 - day) / 0.4));
     const p = player && mode !== 'title' ? player.position : { x: 0, z: 0 };
@@ -7279,7 +7312,9 @@ function boot() {
     hemi.intensity *= dim;
     nightNow = night;
     const lit = state && lightOf(state) !== 'off' ? 0.3 * night : 0;
+    // 캐릭터는 명암 대신 빛 색만 따른다: 밤에는 푸르스름하게(마을보다는 밝게 두어 잘 보이게), 날씨로 어두운 낮에는 살짝 잿빛
     celTint.copy(CEL_NIGHT).lerp(CEL_DAY, Math.min(1, day * dim + lit));
+    if (wxDim > 0.001) celTint.lerp(CEL_WET, wxDim * day);
     if (mood > 0.001) celTint.lerp(CEL_DUSK, dusk * 0.5).lerp(CEL_STORM, storm * 0.55);
     setCelLight(celTint);
     village.tintSigns(celTint);
@@ -7460,6 +7495,8 @@ function boot() {
       path: (x0, z0, x1, z1) => village.findPath({ x: x0, z: z0 }, { x: x1, z: z1 }), // 친구 길찾기 확인용
       solids: () => village.obstacles.list.filter((o) => !o.soft).map((o) => ({ x: o.x, z: o.z, r: o.r, box: o.box ? { hx: o.box.hx, hz: o.box.hz } : null })),
       patch: (p) => { state = { ...state, ...p }; if (p.tutorial) { guide.setGoal(null); npcs.setFollow('hachiware', tutorialActive(p.tutorial)); } },
+      // 날씨 확인: 그날 날씨를 잠시 바꾸고(null 이면 달력대로) 지금 값을 돌려준다
+      wx: (kind) => { if (kind !== undefined) wxForce = kind; return { today: todayWx, story: storyRain, rain: weather.rain, snow: weather.snow, cloud: cloudK, night: nightNow, sun: sun.intensity, hemi: hemi.intensity }; },
       berries: () => berries.list.map((b) => ({ x: b.x, z: b.z, ready: b.ready })),
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),
       mode: () => mode,
@@ -7717,6 +7754,7 @@ function boot() {
       berries.update(dt);
       npcs.update(dt, t, player.position);
       guestMonsters(dt);
+      updateDailyWeather(dt, false); // 집 안에서도 빗소리
       interior.resize(aspect);
       // 집 안을 걷는다(꾸미기 · 창 · 잠자기 중에는 멈춘다). 침대 · 옷장 · 문 앞이면 행동 안내
       const free = !homeUI.decorating && !panels.isOpen() && !sleeping && !overlay && !guide.open;
@@ -7748,6 +7786,7 @@ function boot() {
       interior.setCue(homeTarget, t);
       hud.setAction(homeTarget ? homeTarget.label : null);
       hud.render(viewState());
+      updateDailyWeather(dt, true); // 주인 마을 빗소리
       interior.update(dt, t);
       homeRemotes.update(dt, true); // 집 안에 같이 있는 주인 · 다른 손님
       setCelLight(INDOOR_LIGHT);
@@ -7929,6 +7968,7 @@ function boot() {
     const cut = mode === 'play' && (pajama.active || housewarm.cutscene || stickParty.cutscene || !!starShow || !!closeup || blackStar.cutscene || cameraStory.cutscene);
     if (cut !== cutscene) { cutscene = cut; document.body.classList.toggle('cutscene', cut); }
     // 하늘: 놀러 간 동안은 주인 마을 시간, 별똥별맨 미리 보기 동안은 하늘만 밤
+    updateDailyWeather(dt, guestView); // 그날 날씨(비 · 눈 · 흐림)를 먼저 건다
     applySky(guestView && visiting.clock ? visiting.clock : starShow && starShow.preview ? { day: state.clock.day, t: (21 - 6) / 24 } : state ? state.clock : { day: 1, t: 0.15 });
     if (mode === 'play') {
       if (starShow) starCamera(dt);

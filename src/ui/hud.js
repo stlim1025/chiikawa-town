@@ -15,6 +15,10 @@ const SKY_ICON = {
   night: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5a8.6 8.6 0 1 0 5 13.2A7 7 0 0 1 15.5 3.5z" fill="#fff0a6"/></svg>'
 };
 SKY_ICON.day = SKY_ICON.morning;
+// 그날 날씨(core/season.js): 맑으면 위 해 · 노을 · 달 그대로, 흐림 · 비 · 눈은 이 그림
+SKY_ICON.cloudy = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.2a4.3 4.3 0 0 0 .6-8.56A5.6 5.6 0 0 0 7.1 9.1 4.7 4.7 0 0 0 7 18.5z" fill="#eef2f6" stroke="#9aa7b4" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+SKY_ICON.rain = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 14.2h9.6a3.6 3.6 0 0 0 .5-7.17A4.8 4.8 0 0 0 8.2 6.4a3.9 3.9 0 0 0-1 7.8z" fill="#dfe6ee" stroke="#8796a6" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.8 17.2l-1 2.6M12.6 17.2l-1 2.6M16.4 17.2l-1 2.6" stroke="#6fb2ec" stroke-width="2" stroke-linecap="round"/></svg>';
+SKY_ICON.snow = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><g stroke="#a9dcf7" stroke-width="2" stroke-linecap="round" fill="none"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M9.6 4.6 12 6.4l2.4-1.8M9.6 19.4 12 17.6l2.4 1.8M4.4 10.6l2.2-.9.4-2.4M19.6 13.4l-2.2.9-.4 2.4M4.4 13.4l2.2.9.4 2.4M19.6 10.6l-2.2-.9-.4-2.4"/></g></svg>';
 // 새 일감 쪽지 그림(게시판에 꽂힌 메모 + 압정)
 const NOTE = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="9" width="32" height="34" rx="5" fill="#fffaeb" stroke="#5a4431" stroke-width="2.6"/><path d="M15 21h18M15 28h18M15 35h11" stroke="#d6c08e" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="9" r="5" fill="#f2768f" stroke="#5a4431" stroke-width="2.4"/><circle cx="22.4" cy="7.6" r="1.4" fill="#fff"/></svg>';
 // 등불 버튼 그림(가방 · 마을폰처럼 색을 칠한 그림): 꺼진 랜턴(빈 유리 · 초) · 켠 랜턴(노란 유리 · 주황 불꽃) · 손전등(빛줄기)
@@ -276,6 +280,7 @@ export function createHud(ui, input) {
   const buffEl = q(status, '.hud-buff');
   const bar = q(status, '.hud-bar');
   const dateEl = q(clock, '.dl'), skyEl = q(clock, '.sk'), hmEl = q(clock, '.hm'), apEl = q(clock, '.ap');
+  let wx = 'sunny'; // 그날 날씨(setWeather)
 
   // ---------- 큰 소식 카드(notice): 차례로 하나씩 ----------
   const noticeQueue = [];
@@ -355,6 +360,8 @@ export function createHud(ui, input) {
     setPhoneNudge(on) { if (gear.classList.contains('nudge') !== !!on) { gear.classList.toggle('nudge', !!on); gear.setAttribute('aria-label', on ? '마을폰(새 앱이 생겼어요)' : '마을폰(설정)'); } },
     /** 집으로 버튼을 보일지(마을 밖에 있을 때). */
     setRecall(on) { recallBtn.hidden = !on; },
+    /** 날짜 옆 그림의 그날 날씨: 'sunny' · 'cloudy' · 'rain' · 'snow'. */
+    setWeather(kind) { wx = SKY_ICON[kind] ? kind : 'sunny'; },
     /** 등불 버튼 모양. mode 가 null 이면 버튼을 숨긴다(불이 하나도 없을 때). */
     setLight(mode) {
       lightBtn.hidden = mode == null;
@@ -401,7 +408,7 @@ export function createHud(ui, input) {
       if (shown.day !== start + '|' + state.clock.day) { shown.day = start + '|' + state.clock.day; setText('date', dateEl, dateLabel(start, state.clock.day)); }
       setText('hm', hmEl, `${h24 % 12 || 12}:${String(minutes % 60).padStart(2, '0')}`);
       setText('ap', apEl, h24 < 12 ? '오전' : '오후');
-      const phase = phaseOf(state.clock);
+      const phase = wx === 'sunny' ? phaseOf(state.clock) : wx; // 맑은 날은 해 · 노을 · 달, 아니면 그날 날씨 그림
       if (shown.phase !== phase) { shown.phase = phase; skyEl.innerHTML = SKY_ICON[phase]; }
     },
     /**
