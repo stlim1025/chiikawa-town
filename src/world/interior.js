@@ -12,10 +12,96 @@ const WALKABLE = new Set(['rug', 'cushion', 'squarerug']);
 /** 칸 (cx, cz) 의 바닥 가운데(size: 집 크기 번호, 처음 방이 0). */
 export const cellCenter = (cx, cz, size = 0) => homeCellCenter(size, cx, cz);
 
+const PIC_GEO = new THREE.PlaneGeometry(1, 1);
+let friendTex = null;
+/**
+ * 우정 사진 액자(업적 기념 가구 friendframe)의 사진: 파스텔 하늘과 풀밭 앞에 여섯 친구(치이카와, 하치와레, 우사기, 쿠리만쥬, 랏코, 모몽가)가
+ * 나란히 웃고 있는 그림. 처음 부를 때 한 번 그리고, 액자가 몇 개든 같이 쓴다.
+ */
+function friendPhotoTexture() {
+  if (friendTex) return friendTex;
+  const W = 240, H = 160, LINE = '#5a4a44', INK = '#2b2224';
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const c = cv.getContext('2d');
+  const ell = (x, y, rx, ry, fill, stroke = true) => {
+    c.beginPath();
+    c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    c.fillStyle = fill;
+    c.fill();
+    if (stroke) c.stroke();
+  };
+  // 머리 동그라미 안쪽에만 칠한다(머리 위 무늬)
+  const inHead = (x, y, r, paint) => {
+    c.save();
+    c.beginPath();
+    c.arc(x, y, r - 1, 0, Math.PI * 2);
+    c.clip();
+    paint();
+    c.restore();
+  };
+  // 하늘, 구름, 풀밭
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#bfe3f7');
+  sky.addColorStop(0.7, '#fde8ef');
+  c.fillStyle = sky;
+  c.fillRect(0, 0, W, H);
+  [[52, 34, 22], [170, 26, 26], [204, 48, 14]].forEach(([x, y, r]) => { ell(x, y, r, r * 0.45, '#ffffff', false); ell(x + r * 0.4, y - r * 0.25, r * 0.55, r * 0.4, '#ffffff', false); });
+  ell(W / 2, H + 46, W * 0.8, 92, '#b7e3a4', false);
+  c.strokeStyle = LINE;
+  c.lineWidth = 2;
+  c.lineJoin = 'round';
+  // 친구 여섯: 몸 색, 머리 반지름, 귀와 무늬
+  const friends = [
+    { body: '#ffffff', r: 17, ears: (x, y) => [-1, 1].forEach((s) => ell(x + s * 12, y - 13, 5, 5, '#ffffff')), cheek: true },
+    {
+      body: '#ffffff', r: 17,
+      ears: (x, y) => [-1, 1].forEach((s) => { c.beginPath(); c.moveTo(x + s * 5, y - 14); c.lineTo(x + s * 13, y - 25); c.lineTo(x + s * 16, y - 8); c.closePath(); c.fillStyle = '#7f9bc4'; c.fill(); c.stroke(); }),
+      top: (x, y, r) => inHead(x, y, r, () => [-1, 1].forEach((s) => ell(x + s * 11, y - 12, 10, 11, '#7f9bc4', false))) // 가운데가 갈라진 앞머리 무늬
+    },
+    { body: '#f6e39a', r: 17, ears: (x, y) => [-1, 1].forEach((s) => ell(x + s * 7, y - 25, 4.5, 14, '#f6e39a')) },
+    {
+      body: '#e8c492', r: 17, ears: (x, y) => [-1, 1].forEach((s) => ell(x + s * 12, y - 13, 4.5, 4.5, '#b9824f')),
+      top: (x, y, r) => inHead(x, y, r, () => ell(x, y - 17, 20, 11, '#b9824f', false)) // 밤만쥬처럼 짙은 윗머리
+    },
+    {
+      body: '#a9785a', r: 17, ears: (x, y) => [-1, 1].forEach((s) => ell(x + s * 15, y - 8, 4, 4, '#a9785a')),
+      top: (x, y) => { ell(x, y + 3, 12, 10, '#f0dcc0', false); ell(x, y + 1, 2.6, 1.8, INK, false); } // 밝은 얼굴과 까만 코
+    },
+    {
+      body: '#ffffff', r: 14, ears: (x, y) => [-1, 1].forEach((s) => ell(x + s * 11, y - 9, 5.5, 5, '#b9cdeb')),
+      top: (x, y, r) => inHead(x, y, r, () => ell(x, y - 14, 17, 9, '#b9cdeb', false)), cheek: true
+    }
+  ];
+  friends.forEach((f, i) => {
+    const r = f.r, x = 30 + i * 36, y = 89 + (17 - r); // 작은 친구도 발 높이는 같게
+    ell(x, y + r + 12, r * 0.72, 15, f.body); // 몸(풀밭에 서 있다)
+    f.ears(x, y);
+    ell(x, y, r, r * 0.94, f.body);
+    if (f.top) f.top(x, y, r);
+    c.beginPath(); // 머리 테두리를 무늬 위에 다시 긋는다
+    c.ellipse(x, y, r, r * 0.94, 0, 0, Math.PI * 2);
+    c.stroke();
+    [-1, 1].forEach((s) => {
+      ell(x + s * r * 0.38, y + 1, 2, 2.4, INK, false);
+      if (f.cheek) ell(x + s * r * 0.62, y + 6, 3.4, 2.2, '#f8b4c4', false);
+    });
+    c.beginPath(); // 웃는 입
+    c.arc(x, y + 5, 3.2, 0.15 * Math.PI, 0.85 * Math.PI);
+    c.stroke();
+  });
+  friendTex = new THREE.CanvasTexture(cv);
+  friendTex.colorSpace = THREE.SRGBColorSpace;
+  return friendTex;
+}
+
 /** 가구 모델. 한 칸(약 1 x 1) 안에 들어가는 크기. 가구점 썸네일(world/thumbs.js)도 이걸로 그린다. */
 export function furnitureModel(id) {
   const g = new THREE.Group();
   const m = (geo, c, o = {}) => { const mesh = toonMesh(geo, c, { shadow: false, ...o }); g.add(mesh); return mesh; };
+  // 기울인 묶음(책, 방패, 액자) 안에 넣는 조각: 외곽선은 달라고 할 때만
+  const sub = (par, geo, c, o = {}) => { const mesh = toonMesh(geo, c, { shadow: false, outline: false, ...o }); par.add(mesh); return mesh; };
   switch (id) {
     case 'bed':
       m(GEO.box, '#d8b48c', { position: [0, 0.18, 0.05], scale: [0.9, 0.36, 0.95], shell: true });
@@ -127,6 +213,134 @@ export function furnitureModel(id) {
         m(GEO.dot, '#f5a3b5', { position: [sd * 0.14, 0.345, 0.193], scale: [0.032, 0.018, 0.01], rotation: [0, sd * 0.65, 0], outline: false });
       });
       m(GEO.dot, INK, { position: [0, 0.345, 0.238], scale: [0.016, 0.009, 0.008], outline: false });
+      break;
+    }
+    // ---------- 업적 기념 가구(도감과 업적 보상, 가구점에서는 팔지 않는다) ----------
+    case 'dexplaque': {
+      // 반짝 도감 상패: 나무 받침 위 독서대에 펼쳐 세운 그림책(마을 도감). 왼쪽 장에 물고기와 풀잎, 오른쪽 장에 복슬복슬한 몬스터, 책 위에 금빛 별
+      const INK = '#2b2224', GOLD = '#fcd95b';
+      m(GEO.box, '#8a5a34', { position: [0, 0.07, 0], scale: [0.64, 0.14, 0.42], shell: true, outline: 0.02 });
+      m(GEO.box, GOLD, { position: [0, 0.07, 0.212], scale: [0.3, 0.06, 0.01], outline: false }); // 금빛 이름판
+      m(GEO.box, '#a77d5a', { position: [0, 0.27, 0], scale: [0.1, 0.26, 0.1], shell: true, outline: 0.012 }); // 기둥
+      m(GEO.box, '#a77d5a', { position: [0, 0.3, 0.07], scale: [0.5, 0.04, 0.16], shell: true, outline: 0.012 }); // 책을 받치는 턱
+      const bk = new THREE.Group(); // 책: 위쪽이 뒤로 넘어가게 눕혀 비스듬히 위에서도 장이 보인다
+      bk.position.set(0, 0.53, 0);
+      bk.rotation.set(-0.5, 0, 0, 'YXZ');
+      g.add(bk);
+      sub(bk, GEO.box, '#b5524a', { scale: [0.68, 0.46, 0.035], shell: true, outline: 0.015 }); // 표지
+      sub(bk, GEO.box, '#d9c9a8', { position: [0, 0, 0.02], scale: [0.012, 0.4, 0.012] }); // 책등 골
+      sub(bk, GEO.box, '#e0524f', { position: [0.04, -0.25, 0.012], scale: [0.035, 0.1, 0.01] }); // 가름끈
+      const spark = (par, x, y) => sub(par, GEO.box, GOLD, { position: [x, y, 0.02], scale: [0.024, 0.024, 0.005], rotation: [0, 0, Math.PI / 4] }); // 반짝이(마름모)
+      // 장 둘: 바깥쪽 가장자리가 살짝 들린다
+      const [left, right] = [-1, 1].map((sd) => {
+        const pg = new THREE.Group();
+        pg.position.set(sd * 0.165, 0, 0.03);
+        pg.rotation.y = -sd * 0.1;
+        bk.add(pg);
+        sub(pg, GEO.box, '#fff8e6', { scale: [0.31, 0.4, 0.025], shell: true, outline: 0.008 });
+        return pg;
+      });
+      // 왼쪽 장 위: 물고기(책등 쪽을 본다)
+      sub(left, GEO.sphere, '#6fb7e8', { position: [0, 0.085, 0.02], scale: [0.07, 0.04, 0.01], outline: 0.008 });
+      sub(left, GEO.cone, '#6fb7e8', { position: [-0.11, 0.085, 0.02], scale: [0.035, 0.05, 0.008], rotation: [0, 0, -Math.PI / 2] });
+      sub(left, GEO.dot, INK, { position: [0.035, 0.092, 0.031], scale: [0.008, 0.008, 0.004] });
+      spark(left, 0.1, 0.15);
+      // 왼쪽 장 아래: 풀잎 줄기
+      sub(left, GEO.box, '#5fae6a', { position: [0, -0.1, 0.02], scale: [0.012, 0.13, 0.006] });
+      [-1, 1].forEach((sd) => sub(left, GEO.sphere, '#7cc46a', { position: [sd * 0.032, -0.085, 0.022], scale: [0.035, 0.016, 0.006], rotation: [0, 0, sd * 0.6] }));
+      sub(left, GEO.sphere, '#7cc46a', { position: [0, -0.025, 0.022], scale: [0.016, 0.03, 0.006] });
+      spark(left, -0.1, -0.05);
+      // 오른쪽 장: 복슬복슬한 동그란 몬스터와 설명 글줄
+      sub(right, GEO.sphere, '#c9a4f0', { position: [0, 0.03, 0.02], scale: [0.085, 0.08, 0.012], outline: 0.008 });
+      [[-0.045, 0.1], [0, 0.118], [0.045, 0.1]].forEach(([x, y]) => sub(right, GEO.dot, '#c9a4f0', { position: [x, y, 0.02], scale: [0.026, 0.026, 0.008] }));
+      [-1, 1].forEach((sd) => {
+        sub(right, GEO.dot, INK, { position: [sd * 0.03, 0.045, 0.033], scale: [0.01, 0.012, 0.004] });
+        sub(right, GEO.dot, '#f5a3b5', { position: [sd * 0.055, 0.02, 0.032], scale: [0.014, 0.009, 0.004] });
+      });
+      sub(right, GEO.dot, INK, { position: [0, 0.018, 0.033], scale: [0.012, 0.006, 0.004] });
+      [-0.12, -0.15].forEach((y, i) => sub(right, GEO.box, '#d9c9a8', { position: [i ? -0.03 : 0, y, 0.014], scale: [i ? 0.16 : 0.22, 0.012, 0.004] }));
+      spark(right, 0.11, 0.14);
+      // 책 위의 금빛 별
+      sub(bk, GEO.sphere, GOLD, { position: [0, 0.31, 0], scale: [0.05, 0.05, 0.025], outline: 0.01 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        sub(bk, GEO.cone, GOLD, { position: [Math.sin(a) * 0.03, 0.31 + Math.cos(a) * 0.03, 0], scale: [0.03, 0.07, 0.02], rotation: [0, 0, -a], outline: 0.008 });
+      }
+      break;
+    }
+    case 'bossshield': {
+      // 다섯 보스 기념 방패: 낮은 받침에 세운 둥근 나무 방패(쇠 테두리, 가운데 금빛 돌기). 다섯 보스 얼굴이 고리 모양으로 둘러 있다
+      // 위에서 시계 방향으로 두더지(금빛 발톱), 나무 거인(잎 머리), 강 게(집게발), 버섯 왕(보라 갓과 왕관), 아노코(흰 털과 주황 뿔)
+      const INK = '#2b2224', GOLD = '#fcd95b', WHITE = '#fbfaf5';
+      m(GEO.box, '#8a5a34', { position: [0, 0.06, 0], scale: [0.56, 0.12, 0.3], shell: true, outline: 0.02 });
+      [-1, 1].forEach((sd) => m(GEO.box, '#a77d5a', { position: [sd * 0.2, 0.17, 0.02], scale: [0.06, 0.12, 0.14], shell: true, outline: 0.012 })); // 방패를 끼우는 턱
+      const sh = new THREE.Group();
+      sh.position.set(0, 0.54, 0);
+      sh.rotation.set(-0.16, 0, 0, 'YXZ');
+      g.add(sh);
+      sub(sh, GEO.cylinder, '#7d8791', { position: [0, 0, -0.03], scale: [0.4, 0.05, 0.4], rotation: [Math.PI / 2, 0, 0], outline: 0.02 }); // 쇠 테두리
+      sub(sh, GEO.cylinder, '#c98f5a', { position: [0, 0, 0], scale: [0.35, 0.03, 0.35], rotation: [Math.PI / 2, 0, 0] }); // 나무 판
+      [-0.12, 0.12].forEach((x) => sub(sh, GEO.box, '#a8703c', { position: [x, 0, 0.031], scale: [0.012, 0.62, 0.004] })); // 널 이음매
+      sub(sh, GEO.sphere, GOLD, { position: [0, 0, 0.035], scale: [0.075, 0.075, 0.04], outline: 0.01 }); // 가운데 돌기
+      const face = (i, build) => {
+        const f = new THREE.Group(), a = Math.PI / 2 - (i / 5) * Math.PI * 2;
+        f.position.set(Math.cos(a) * 0.215, Math.sin(a) * 0.215, 0.042);
+        sh.add(f);
+        build((geo, c, o) => sub(f, geo, c, o));
+      };
+      const eyes = (p, dx, y, c = INK, r = 0.012) => [-1, 1].forEach((sd) => p(GEO.dot, c, { position: [sd * dx, y, 0.019], scale: [r, r, 0.006] }));
+      face(0, (p) => { // 큰 두더지: 갈색 얼굴, 분홍 코, 양옆에 치켜든 금빛 발톱
+        p(GEO.sphere, '#8a6a58', { scale: [0.085, 0.08, 0.018], outline: 0.01 });
+        p(GEO.dot, '#f3d9c4', { position: [0, -0.02, 0.014], scale: [0.04, 0.03, 0.008] });
+        p(GEO.dot, '#f08aa0', { position: [0, -0.012, 0.021], scale: [0.016, 0.012, 0.006] });
+        eyes(p, 0.035, 0.025);
+        [-1, 1].forEach((sd) => [0, 1].forEach((k) => p(GEO.cone, GOLD, { position: [sd * (0.072 + k * 0.022), -0.075 + k * 0.012, 0.012], scale: [0.012, 0.045, 0.008], rotation: [0, 0, -sd * 0.3] })));
+      });
+      face(1, (p) => { // 나무 거인: 나무껍질 얼굴, 잎 머리, 노랗게 빛나는 눈, 옹이 입
+        p(GEO.sphere, '#8a6a48', { scale: [0.075, 0.085, 0.018], outline: 0.01 });
+        [[-0.05, 0.062], [0.05, 0.062], [0, 0.085]].forEach(([x, y]) => p(GEO.dot, '#5fae6a', { position: [x, y, 0.012], scale: [0.045, 0.035, 0.012] }));
+        eyes(p, 0.03, 0.008, '#ffe36e', 0.014);
+        p(GEO.dot, '#3a2a20', { position: [0, -0.04, 0.018], scale: [0.02, 0.014, 0.006] });
+      });
+      face(2, (p) => { // 큰 강 게: 주황빨강 등딱지, 위로 솟은 눈, 양옆 집게발
+        p(GEO.sphere, '#e8643c', { scale: [0.09, 0.065, 0.018], outline: 0.01 });
+        [-1, 1].forEach((sd) => {
+          p(GEO.sphere, '#e8643c', { position: [sd * 0.1, 0.045, 0.006], scale: [0.036, 0.03, 0.012], outline: 0.008 });
+          p(GEO.dot, WHITE, { position: [sd * 0.032, 0.066, 0.012], scale: [0.02, 0.02, 0.008] });
+          p(GEO.dot, INK, { position: [sd * 0.032, 0.066, 0.02], scale: [0.009, 0.009, 0.004] });
+        });
+        p(GEO.dot, INK, { position: [0, -0.012, 0.019], scale: [0.02, 0.006, 0.005] });
+      });
+      face(3, (p) => { // 버섯 왕: 크림색 얼굴에 커다란 보라 갓, 흰 점, 작은 금빛 왕관
+        p(GEO.sphere, '#fff4de', { position: [0, -0.025, 0], scale: [0.06, 0.06, 0.018], outline: 0.01 });
+        p(GEO.sphere, '#9a6ad0', { position: [0, 0.035, 0.006], scale: [0.1, 0.06, 0.02], outline: 0.01 });
+        [[-0.05, 0.04], [0.045, 0.048]].forEach(([x, y]) => p(GEO.dot, WHITE, { position: [x, y, 0.025], scale: [0.016, 0.012, 0.005] }));
+        p(GEO.cone, GOLD, { position: [0, 0.085, 0.006], scale: [0.026, 0.04, 0.01] });
+        eyes(p, 0.025, -0.025);
+      });
+      face(4, (p) => { // 아노코: 흰 털 얼굴 둘레에 털 뭉치, 주황 뿔 둘
+        [0.2, 1.1, 2.04, 2.94].forEach((t) => p(GEO.dot, WHITE, { position: [Math.cos(t + Math.PI) * 0.072, Math.sin(t + Math.PI) * 0.068, -0.004], scale: [0.03, 0.03, 0.012], outline: 0.008 }));
+        p(GEO.sphere, WHITE, { scale: [0.075, 0.07, 0.018], outline: 0.01 });
+        [-1, 1].forEach((sd) => p(GEO.cone, '#f2a46a', { position: [sd * 0.035, 0.052, 0.008], scale: [0.016, 0.05, 0.01], rotation: [0, 0, -sd * 0.25] }));
+        eyes(p, 0.03, 0.005);
+        p(GEO.dot, INK, { position: [0, -0.02, 0.019], scale: [0.012, 0.006, 0.004] });
+      });
+      break;
+    }
+    case 'friendframe': {
+      // 우정 사진 액자: 나무 이젤에 올린 커다란 액자. 사진(그림 한 장, friendPhotoTexture)에는 여섯 친구가 나란히 웃고 있다
+      [-1, 1].forEach((sd) => m(GEO.box, '#a77d5a', { position: [sd * 0.3, 0.45, -0.04], scale: [0.045, 0.9, 0.045], rotation: [-0.14, 0, sd * 0.08], outline: 0.01 }));
+      m(GEO.box, '#a77d5a', { position: [0, 0.42, -0.2], scale: [0.045, 0.86, 0.045], rotation: [0.32, 0, 0], outline: 0.01 }); // 뒤 다리
+      m(GEO.box, '#8a5a34', { position: [0, 0.33, 0.05], scale: [0.8, 0.04, 0.14], shell: true, outline: 0.012 }); // 액자를 올리는 턱
+      const fr = new THREE.Group();
+      fr.position.set(0, 0.67, 0.02);
+      fr.rotation.set(-0.14, 0, 0, 'YXZ');
+      g.add(fr);
+      sub(fr, GEO.box, '#c98f5a', { scale: [0.9, 0.62, 0.06], shell: true, outline: 0.02 });
+      sub(fr, PIC_GEO, '#ffffff', { material: new THREE.MeshBasicMaterial({ map: friendPhotoTexture() }), position: [0, 0, 0.032], scale: [0.78, 0.5, 1] });
+      // 액자 위 분홍 리본
+      [-1, 1].forEach((sd) => sub(fr, GEO.sphere, '#ff9fbd', { position: [sd * 0.05, 0.33, 0.01], scale: [0.05, 0.035, 0.025], rotation: [0, 0, sd * 0.3], outline: 0.01 }));
+      sub(fr, GEO.dot, '#e5788f', { position: [0, 0.33, 0.02], scale: [0.022, 0.022, 0.02] });
       break;
     }
     // ---------- 늘린 가구(게임 오리지널, core/home.js) ----------
