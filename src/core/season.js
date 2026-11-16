@@ -12,6 +12,16 @@ export const seasonOfMonth = (m) => (m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <
 /** 시작 날짜 startISO 로 day 번째 날의 계절. */
 export const seasonAt = (startISO, day) => seasonOfMonth(dateOf(startISO, day).m);
 
+/** 1일째부터 day 까지 마을에서 지나온 계절(나온 차례대로, 겹치지 않게) — 업적 '사계절 주민'(core/achieve.js). */
+export function seasonsSeen(startISO, day) {
+  const seen = [];
+  for (let d = 1; d <= day && seen.length < SEASONS.length; d++) {
+    const s = seasonAt(startISO, d);
+    if (!seen.includes(s)) seen.push(s);
+  }
+  return seen;
+}
+
 /** 계절마다 날씨 확률(합 1). 겨울엔 비 대신 눈. */
 export const WEATHER_P = {
   spring: { sunny: 0.55, cloudy: 0.2, rain: 0.25 },

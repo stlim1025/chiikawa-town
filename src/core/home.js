@@ -118,6 +118,10 @@ export const FURNITURE = {
   stove: { id: 'stove', name: '작은 난로', price: 260, cat: 'kitchen' },
   doll: { id: 'doll', name: '먼작귀 인형', price: 220, cat: 'deco' },
   anokodoll: { id: 'anokodoll', name: '아노코 인형', price: 300, cat: 'deco', gift: true }, // 집 앞 아노코와 하트 3(core/anokobond.js) — 가구점에서는 팔지 않는다
+  // 업적 기념 가구(core/achieve.js, 게임 오리지널): 가장 큰 업적 셋을 받으면 집 상자에 하나씩 — 가구점에서는 팔지 않는다
+  dexplaque: { id: 'dexplaque', name: '반짝 도감 상패', price: 0, cat: 'deco', gift: true }, // 마을 도감 박사(도감 셋 완성)
+  bossshield: { id: 'bossshield', name: '다섯 보스 기념 방패', price: 0, cat: 'deco', gift: true }, // 마을의 수호자(보스 다섯)
+  friendframe: { id: 'friendframe', name: '우정 사진 액자', price: 0, cat: 'deco', gift: true }, // 모두의 친구(여섯 친구 하트 5)
   // 침대와 소파
   futon: { id: 'futon', name: '이불 깔개', price: 500, cat: 'rest' },
   sofa: { id: 'sofa', name: '분홍 소파', price: 1200, cat: 'rest' },

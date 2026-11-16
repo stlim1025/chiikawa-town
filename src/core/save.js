@@ -14,6 +14,7 @@ import { isValidBag } from './inventory.js';
 import { isValidStorage } from './storage.js';
 import { isValidGlowfluff } from './glowfluff.js';
 import { isValidLeaves, isValidSnowmen } from './seasonplay.js';
+import { isValidAchieve, isValidRecords, isValidTitle } from './achieve.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep, STORY_BOSSES_AT } from './quests.js';
@@ -68,6 +69,9 @@ export function isValidState(s) {
   if (s.glowfluff !== undefined && !isValidGlowfluff(s.glowfluff)) return false; // 이번 밤에 뗀 반짝 털뭉치
   if (s.leaves !== undefined && !isValidLeaves(s.leaves)) return false; // 오늘 주운 낙엽 더미(가을)
   if (s.snowmen !== undefined && !isValidSnowmen(s.snowmen)) return false; // 세운 눈사람(겨울)
+  if (s.achieve !== undefined && !isValidAchieve(s.achieve)) return false; // 이룬 업적(이룬 날 · 받았는지)
+  if (s.records !== undefined && !isValidRecords(s.records)) return false; // 새로 세는 기록(눈사람 · 단풍잎 · 현상금)
+  if (!isValidTitle(s)) return false; // 단 칭호는 받은 업적의 칭호만
   if (s.wardrobe !== undefined && !isValidWardrobe(s.wardrobe)) return false; // 꾸미기 소품
   if (s.weapon !== undefined && !isValidWeapon(s.weapon)) return false; // 무기(4단계)
   if (s.hunted !== undefined && !isValidHunted(s.hunted)) return false; // 잡은 몬스터 수
