@@ -7633,7 +7633,7 @@ function boot() {
       cellAt: (fx, fy) => interior.cellAt(fx * 2 - 1, -(fy * 2 - 1)),
       mode: () => mode,
       // 같이 놀기 확인용: 연결 상태와 놀러 간 마을에서 받은 것
-      mp: () => ({ status: multi.status, role: multi.role, players: multi.players.map((p) => p.name), visiting: visiting && { code: visiting.code, npcs: visiting.npcs.length, weeds: visiting.weeds ? visiting.weeds.length : null, clock: visiting.clock, arriving: visiting.arriving } }),
+      mp: () => ({ status: multi.status, role: multi.role, players: multi.players.map((p) => p.name), visiting: visiting && { code: visiting.code, npcs: visiting.npcs.length, weeds: visiting.weeds ? visiting.weeds.length : null, clock: visiting.clock, arriving: visiting.arriving, snowmen: (visiting.snowmen || []).length } }),
       remotes: () => remotes, // 같이 놀기 확인용: 다른 사람 캐릭터(든 것 · 등불 · 모습)
       story: () => (usagiClub ? usagiClub.phase : null),
       staged: () => [...staged],
