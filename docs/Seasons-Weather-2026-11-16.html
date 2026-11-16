@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계절과 날씨 설계서</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --text: #1f2328; --text-soft: #5b636c; --text-faint: #9aa1a9;
+    --line: #cfd4da; --line-soft: #e6e9ec; --code-bg: #f0f1f3; --code-text: #24292f;
+    --mark: #b4530a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191d; --text: #e2e5e9; --text-soft: #9aa3ad; --text-faint: #6b7480;
+      --line: #40464e; --line-soft: #2b3037; --code-bg: #262b32; --code-text: #d5d9de;
+      --mark: #e69a55;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 52px 32px 110px; }
+
+  /* 머리 */
+  .masthead { border-top: 3px solid var(--text); padding-top: 14px; margin-bottom: 40px; }
+  .masthead .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--text-soft); font-family: Consolas, "Cascadia Mono", monospace; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; margin: 18px 0 10px; }
+  .standfirst { font-size: 16px; color: var(--text-soft); max-width: 700px; margin: 0; }
+
+  /* 요약띠: 결론 세 가지 */
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); margin-bottom: 60px; }
+  .rule { padding: 18px 22px 20px 0; }
+  .rule + .rule { border-left: 1px solid var(--line-soft); padding-left: 22px; }
+  .rule .k { font-size: 12px; font-weight: 800; color: var(--text-soft); margin-bottom: 6px; }
+  .rule .t { font-size: 16px; font-weight: 800; line-height: 1.45; margin-bottom: 6px; }
+  .rule .d { font-size: 13.5px; color: var(--text-soft); }
+
+  /* 결정 시트: 회의에서 결정받을 안건 */
+  .sheet { margin-bottom: 64px; }
+  .sheet-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  .sheet-title .hint { font-weight: 400; color: var(--text-faint); margin-left: 10px; font-size: 12.5px; }
+  table.sheet-tbl { margin: 0; }
+  .sheet-tbl th { padding: 8px 14px 8px 0; }
+  .sheet-tbl td { padding: 11px 14px 11px 0; }
+  .sheet-tbl tr:last-child td { border-bottom: 2px solid var(--text); }
+  .sheet-tbl .n { color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 0; width: 26px; }
+  .sheet-tbl a { color: inherit; text-decoration: none; font-weight: 700; }
+  .sheet-tbl a:hover { text-decoration: underline; }
+  .sheet-tbl .rec { color: var(--text-soft); }
+  .sheet-tbl .decide { width: 26%; min-width: 150px; border-bottom: 1px solid var(--line); color: var(--text); outline: none; cursor: text; }
+  .sheet-tbl .decide:empty::before { content: "회의에서 기입"; color: var(--text-faint); }
+  .sheet-tbl .decide:focus { border-bottom-color: var(--text); }
+
+  /* 섹션 */
+  section { display: grid; grid-template-columns: 84px 1fr; gap: 0 28px; border-top: 1px solid var(--line); padding: 32px 0 36px; }
+  section .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--line); font-variant-numeric: tabular-nums; }
+  section .body { min-width: 0; }
+  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.015em; margin: 4px 0 14px; line-height: 1.45; }
+  h3 { font-size: 15px; font-weight: 800; margin: 20px 0 6px; }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-faint); }
+  strong { font-weight: 750; }
+  .soft { color: var(--text-soft); font-size: 14px; }
+  .kv { font-weight: 800; font-size: 13px; color: var(--text-soft); margin-right: 6px; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 3px; word-break: break-all; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; line-height: 1.6; background: var(--code-bg); color: var(--code-text); padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 12px; }
+  pre code { background: none; padding: 0; font-size: inherit; word-break: normal; }
+
+  /* 권장: 본문 마지막 줄 */
+  .verdict { margin-top: 16px; display: flex; gap: 12px; }
+  .verdict .k { flex: none; font-weight: 800; font-size: 13px; padding-top: 2px; }
+  .verdict .k::after { content: ""; display: block; width: 100%; height: 2px; background: var(--text); margin-top: 2px; }
+
+  /* 흐름: 순서와 단계 */
+  .timelines { margin: 18px 0 14px; }
+  .tl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+  .tl + .tl { border-top: 1px dashed var(--line-soft); }
+  .tl .lab { flex: none; width: 76px; font-size: 13px; font-weight: 800; }
+  .tl .arrow { color: var(--text-faint); font-size: 12px; }
+  .tl .note { flex-basis: 100%; padding-left: 84px; font-size: 12.5px; color: var(--text-soft); margin-top: -4px; }
+  .step { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 3px 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); white-space: nowrap; }
+  .step.solid { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+  .step.ring { border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+  .legend { font-size: 12.5px; color: var(--text-soft); margin: 10px 0 0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .legend .step { padding: 1px 9px; font-size: 12px; margin-right: 4px; }
+
+  /* 선택지 대조 */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 6px; }
+  .versus.three { grid-template-columns: repeat(3, 1fr); }
+  .versus .opt { padding: 2px 24px 6px 0; }
+  .versus .opt + .opt { border-left: 1px solid var(--line-soft); padding-left: 24px; padding-right: 0; }
+  .versus h3 { font-size: 14px; margin: 0 0 8px; }
+  .versus h3 .tag { font-weight: 400; color: var(--text-soft); font-size: 12.5px; margin-left: 8px; }
+  .versus ul { font-size: 13.5px; color: var(--text-soft); margin: 0; padding-left: 18px; }
+  .versus .pro::marker { content: "+  "; color: var(--text); }
+  .versus .con::marker { content: "−  "; color: var(--text-faint); }
+
+  /* 적용 범위 */
+  .scope { display: flex; gap: 10px; align-items: stretch; margin: 16px 0 8px; flex-wrap: wrap; }
+  .scope .item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 18px 8px; text-align: center; min-width: 96px; }
+  .scope .item .t { font-weight: 800; font-size: 14px; }
+  .scope .item .s { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; }
+  .scope .item.on { background: var(--text); border-color: var(--text); }
+  .scope .item.on .t { color: var(--bg); }
+  .scope .item.on .s { color: var(--bg); opacity: 0.75; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+  th { text-align: left; font-weight: 700; color: var(--text-soft); font-size: 12px; border-top: 2px solid var(--text); border-bottom: 1px solid var(--text); padding: 7px 12px 7px 0; }
+  td { border-bottom: 1px solid var(--line-soft); padding: 9px 12px 9px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 2px solid var(--text); }
+  td.c { text-align: center; white-space: nowrap; font-weight: 800; }
+  td.c.no { color: var(--text-faint); font-weight: 400; }
+  td.c.err { color: var(--mark); }
+  .ex { color: var(--text-soft); font-size: 13px; }
+
+  /* 경우별 설명 */
+  dl { margin: 0; }
+  dt { font-weight: 800; font-size: 13.5px; margin: 14px 0 4px; }
+  dd { margin: 0 0 4px; color: var(--text-soft); font-size: 14px; }
+  dd code { color: var(--code-text); }
+
+  /* 도표 */
+  figure { margin: 16px 0 12px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--text); }
+  figcaption { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+
+  /* 강조: 문서 전체에서 한 지점만 */
+  .mark { color: var(--mark); font-weight: 800; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 8px; padding-top: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-soft); font-size: 12.5px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .page { padding: 36px 18px 70px; }
+    .rules { grid-template-columns: 1fr; }
+    .rule + .rule { border-left: none; border-top: 1px solid var(--line-soft); padding-left: 0; }
+    section { grid-template-columns: 1fr; gap: 6px; }
+    section .num { font-size: 28px; }
+    .tl .note { padding-left: 0; }
+    .versus, .versus.three { grid-template-columns: 1fr; }
+    .versus .opt + .opt { border-left: none; border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-top: 10px; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; }
+    .sheet-tbl .decide:empty::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div class="row">
+    <span>치이카와 마을 생활 · 설계서</span>
+    <span>2026-11-16</span>
+  </div>
+  <h1>계절과 날씨<br>달력을 따라 바뀌는 네 계절과 그날의 날씨</h1>
+  <p class="standfirst">게임 달력은 하루마다 한 장씩 넘어가지만 마을은 늘 같은 초록이고 비는 이야기 장면에서만 온다. 이 문서는 달력을 따라 계절이 바뀌고 아침마다 그날 날씨가 정해지는 설계를 적는다. 계절마다 풍경, 할 일, 만나는 생물이 조금씩 달라진다. 읽는 사람은 계절별 모습과 놀이, 수치가 의도와 맞는지 확인하면 된다.</p>
+</div>
+
+<div class="rules">
+  <div class="rule">
+    <div class="k">달력을 따른다</div>
+    <div class="t">9~11월 가을, 12~2월 겨울, 3~5월 봄, 6~8월 여름</div>
+    <div class="d">새 게임은 10월 1일에 시작해서 62일째(12월 1일)에 처음 눈을 본다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">날씨는 아침 6시에</div>
+    <div class="t">맑음, 흐림, 비, 겨울에는 눈</div>
+    <div class="d">날짜로 정해지는 값이라 저장할 것이 없고 같이 놀기 손님도 주인 마을과 같은 날씨를 본다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">계절마다 할 일</div>
+    <div class="t">가을 단풍잎 줍기, 겨울 눈사람과 발자국</div>
+    <div class="d">비 오는 날에만 잡히는 물고기와 겨울에만 나오는 몬스터가 하나씩 생긴다.</div>
+  </div>
+</div>
+
+<section id="s1">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>목적과 범위</h2>
+    <p>매일 들어오는 마을이 날마다, 철마다 달라 보이게 해서 다시 올 이유를 만든다. 사용자는 앞서 고른 제안(풍경, 날씨, 계절 놀이, 계절 생물)을 그대로 진행하라고 했다.</p>
+    <div class="scope">
+      <div class="item on"><div class="t">계절과 날씨 판단</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">나무, 땅, 지붕 색과 하늘, 입자</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">친구들의 우산, 날씨 표시</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">단풍잎, 눈사람, 발자국</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">비 오는 날 물고기, 겨울 몬스터</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">같이 놀기 손님 화면</div><div class="s">이번 범위</div></div>
+      <div class="item"><div class="t">계절 행사(크리스마스, 새해)</div><div class="s">범위 밖</div></div>
+      <div class="item"><div class="t">계절 옷, 계절 풀과 작물</div><div class="s">범위 밖</div></div>
+      <div class="item"><div class="t">도감과 업적</div><div class="s">다음 순서에 따로 설계</div></div>
+    </div>
+    <p><span class="kv">피해야 할 것</span>비 오는 낮이 밤처럼 처리되는 것(지금 코드는 그렇다), 휴대폰에서 눈이나 낙엽 때문에 느려지는 것, 새 물고기 때문에 예전 저장이 손상으로 판정되는 것.</p>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>계절과 날씨 정하기</h2>
+    <p>계절은 그날 날짜의 달로 정한다. 날짜는 저장된 시작 날짜와 오늘 날 번호로 이미 구한다. 날씨는 날 번호와 시작 날짜로 만든 고정된 난수로 정한다. 같은 날은 언제 다시 불러도 같은 날씨다.</p>
+    <table>
+      <tr><th style="width:90px">계절</th><th>맑음</th><th>흐림</th><th>비</th><th>눈</th></tr>
+      <tr><td>봄</td><td>55%</td><td>20%</td><td>25%</td><td class="c no">—</td></tr>
+      <tr><td>여름</td><td>55%</td><td>15%</td><td>30%(소나기)</td><td class="c no">—</td></tr>
+      <tr><td>가을</td><td>60%</td><td>25%</td><td>15%</td><td class="c no">—</td></tr>
+      <tr><td>겨울</td><td>45%</td><td>25%</td><td class="c no">—</td><td>30%</td></tr>
+    </table>
+    <p class="soft">회색 줄표는 그 계절에 없는 날씨다. 겨울에는 비가 오지 않고 다른 계절에는 눈이 오지 않는다.</p>
+    <p>새 게임의 1일째와 2일째는 늘 맑음이다. 첫날 안내를 맑은 날에 하려는 것이다.</p>
+    <p>사이드스토리 '검은 별똥별'처럼 이야기가 비를 부르는 동안은 이야기 쪽이 이긴다. 이야기가 끝나면 그날 날씨로 돌아온다.</p>
+    <p><span class="kv">내가 정한 값</span>계절별 확률과 1~2일째 맑음.</p>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>날씨가 바꾸는 것</h2>
+    <dl>
+      <dt>흐림</dt>
+      <dd>하늘이 옅은 회색이 되고 해가 조금(15%) 약해진다.</dd>
+      <dt>비</dt>
+      <dd>지금 쓰는 빗줄기와 빗소리를 쓴다. 하늘은 잿빛, 해는 35%가 약해진다. 집 밖에 나와 있는 친구들은 우산을 쓴다(마을 안 길과 광장도 포함). 비 오는 날만 잡히는 물고기가 나온다.</dd>
+      <dt>눈</dt>
+      <dd>하얀 눈송이가 천천히 내린다. 하늘은 밝은 회색, 해는 20% 약해진다.</dd>
+      <dt>밤과 따로</dt>
+      <dd>지금은 비가 오면 빛이 어두워져서 게임이 밤으로 판단한다. 낮인데도 가로등과 창문에 불이 켜지고 밤 나방이 나오고 캐릭터가 푸르스름해진다. 날씨로 어두워지는 정도를 밤 판단과 따로 두어 비 오는 낮은 그냥 흐린 낮으로 보이게 한다.</dd>
+      <dt>날씨 표시</dt>
+      <dd>화면 위 날짜 옆에 날씨 그림(해, 구름, 비, 눈)을 작게 보인다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>계절이 바꾸는 풍경</h2>
+    <table>
+      <tr><th style="width:90px">계절</th><th>모습</th></tr>
+      <tr><td>봄</td><td class="ex">나뭇잎이 연한 연두색이 되고 분홍 꽃나무 둘레에 꽃잎이 날린다. 꽃이 가장 많다.</td></tr>
+      <tr><td>여름</td><td class="ex">나뭇잎이 진한 초록이 된다.</td></tr>
+      <tr><td>가을</td><td class="ex">나뭇잎이 주황, 빨강, 노랑으로 나무마다 섞여 물든다. 분홍 꽃나무는 붉게 물든다. 땅이 조금 누렇게 바뀌고 내 둘레에 낙엽이 날린다.</td></tr>
+      <tr><td>겨울</td><td class="ex">땅이 하얗게 덮인다(길은 흐린 흙빛으로 남는다). 나무 위와 집 지붕에 눈이 쌓이고 꽃은 보이지 않는다. 눈이 오지 않는 날에도 눈은 쌓인 채로 있다.</td></tr>
+    </table>
+    <p>계절은 날이 바뀌는 아침 6시나 게임을 불러올 때 바뀐다.</p>
+    <p>겨울에 숨기는 것은 땅에 핀 장식 꽃뿐이다. 마을 가꾸기 「광장 꽃밭」의 꽃 따기는 겨울에도 그대로다.</p>
+    <p><span class="kv">만드는 방법</span>마을 나무 잎은 색마다 하나씩 모아 둔 도형의 색 값을 바꿔 칠한다. 숲 나무는 계절용 재질 하나를 따로 두고 색만 바꾼다. 땅은 한데 굳혀 둔 묶음에서 빼내 계절이 바뀔 때 색 값을 다시 칠한다. 덤불은 다시 칠할 수 있는 재질로 바꾼다. 꽃은 겨울에 숨긴다.</p>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>계절 놀이</h2>
+    <dl>
+      <dt>단풍잎 줍기(가을)</dt>
+      <dd>날마다 마을과 길가 나무 밑 12곳에 낙엽 더미가 생긴다. 다가가 줍기를 누르면 단풍잎 하나를 얻는다. 노동 접수에서 20원에 팔고 치이카와가 좋아하는 선물이다. 주운 자리는 다음 날 다시 생긴다.</dd>
+      <dt>눈사람 만들기(겨울)</dt>
+      <dd>마을 안 길과 건물이 아닌 눈 덮인 땅에서 「눈사람 만들기」가 뜬다. 짧은 연타 놀이로 눈덩이를 굴려 그 자리에 눈사람을 세운다. 얼굴은 세 가지 가운데 하나다. 눈사람은 다섯 개까지 남고 여섯 번째를 세우면 가장 오래된 것이 사라진다. 겨울이 끝나는 날 모두 녹는다. 근처 친구가 한마디 거든다.</dd>
+      <dt>발자국(겨울)</dt>
+      <dd>눈 위를 걸으면 내 발자국이 남았다가 20초에 걸쳐 흐려진다. 같이 놀기 친구의 발자국도 남는다. 한 번에 60개까지다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>계절 생물</h2>
+    <table>
+      <tr><th style="width:150px">생물</th><th style="width:120px">때</th><th>내용</th></tr>
+      <tr><td>미꾸라지(물고기)</td><td>비 오는 날만</td><td class="ex">시냇물과 연못, 중간 크기, 10~20cm, 보통 크기 80원. 낚시 도감에는 「비 오는 날만」으로 보인다. 게임 오리지널 설정.</td></tr>
+      <tr><td>눈뭉치(몬스터)</td><td>겨울만</td><td class="ex">들판과 숲에 나온다. 동그란 눈덩이에 작은 눈과 나뭇가지 팔. 굴러와 부딪치는 공격(일직선, 예고 있음). 체력 5, 기운 −9, 전리품 「얼음 결정」 60원. 몬스터 도감에 나온다. 게임 오리지널. 기존 몬스터는 그대로 두고, 겨울에만 들판과 숲에 세 마리씩 더 나온다. 겨울이 끝나면 남은 눈뭉치는 사라진다.</td></tr>
+    </table>
+    <p><span class="kv">낚시 도감 보상</span>지금은 「모든 물고기」 보상의 기준이 물고기 수(13)라서 물고기가 늘면 이미 받은 저장이 손상으로 판정된다. 기존 보상(4종 300원, 8종 800원, 13종 3,000원)은 그대로 두고, 14종을 모두 잡으면 1,000원을 더 주는 칸을 새로 둔다. 저장 검사는 13과 14를 모두 받는다.</p>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>같이 놀기</h2>
+    <p>손님은 주인 마을의 시작 날짜와 날 번호를 이미 받는다. 계절과 날씨는 그 값으로 구하므로 따로 보낼 것이 없다.</p>
+    <p>눈사람은 주인 마을 모습에 실어 보낸다(새 이름표 'sm'). 지금 마을 모습에서 이름표 'g' 를 두 데이터가 함께 쓰는 문제가 있어 새 칸은 겹치지 않게 둔다(그 문제는 따로 고친다).</p>
+    <p>이야기가 부른 비는 손님에게 가지 않는다(지금도 그렇다).</p>
+    <p>손님은 주인 마을의 눈사람을 보기만 하고 만들지는 못한다. 낙엽 더미는 주인 몫이라 손님 화면에는 그리지 않는다. 눈사람과 단풍잎은 각자 자기 마을에서 만들고 줍는다.</p>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>만드는 방식</h2>
+    <div class="versus three">
+      <div class="opt">
+        <h3>A. 날짜로 정하는 날씨<span class="tag">고른 안</span></h3>
+        <ul>
+          <li class="pro">날 번호로 정하므로 저장할 것이 없고 손님도 같은 날씨를 본다.</li>
+          <li class="con">날씨를 바꾸는 장치(우천 취소 같은)는 만들 수 없다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>B. 아침마다 굴려서 저장</h3>
+        <ul>
+          <li class="pro">날씨를 다른 일로 바꿀 수 있다.</li>
+          <li class="con">저장 칸과 같이 놀기 동기화가 늘어난다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>C. 실제 날짜를 따르는 계절</h3>
+        <ul>
+          <li class="pro">창밖과 같은 계절을 본다.</li>
+          <li class="con">사용자가 게임 달력을 따르는 쪽을 골라서 쓰지 않는다.</li>
+        </ul>
+      </div>
+    </div>
+    <p>색 바꾸기도 세 가지를 견주었다. 계절이 바뀔 때 색 값을 다시 칠하는 쪽(고른 안)은 그리기 횟수가 늘지 않는다. 계절마다 모형을 따로 두는 쪽은 메모리가 네 배로 든다. 재질 색을 곱하는 쪽은 초록을 주황으로 바꿀 수 없다.</p>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>모델 작업</h2>
+    <p>사용자 지시에 따라 모델은 fable 5.2로 만든다.</p>
+    <dl>
+      <dt>우산</dt>
+      <dd>마을 친구 모두가 들 수 있는 우산 소품(몸에 붙여 팔 흔들림과 상관없게). 친구마다 색 하나.</dd>
+      <dt>눈사람</dt>
+      <dd>눈덩이 둘, 얼굴 세 가지, 나뭇가지 팔.</dd>
+      <dt>몬스터와 아이콘</dt>
+      <dd>눈뭉치 몬스터, 얼음 결정과 단풍잎 아이콘, 낙엽 더미.</dd>
+      <dt>지붕 눈</dt>
+      <dd>집 지붕 부품에 눈을 얹는 방법(지붕 표시를 단 부품 위에 하얀 덮개).</dd>
+      <dt>입자</dt>
+      <dd>눈송이, 낙엽, 꽃잎 입자 모양.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="num">10</div>
+  <div class="body">
+    <h2>시험과 확인</h2>
+    <p>three 없이 도는 부분은 core 모듈로 두고 node 테스트로 확인한다. 달에서 계절, 날씨가 같은 날 늘 같은지, 계절별 확률(1,000일을 돌려 ±5% 안), 겨울에 비가 없고 다른 계절에 눈이 없는지, 1~2일째 맑음, 비 오는 날 물고기, 도감 보상 옮기기와 저장 검사, 낙엽 줍기의 하루 초기화, 눈사람 다섯 개 제한과 겨울 끝 녹기, 겨울 몬스터가 나오는 조건이 여기에 든다.</p>
+    <p>나머지(색, 입자, 우산, 발자국, 지붕 눈, 속도)는 브라우저에서 계절과 날씨를 바꿔 가며 확인한다. 휴대폰 크기 화면에서 프레임도 본다.</p>
+    <p>노션: 돈 버는 방법(단풍잎 20원, 얼음 결정 60원, 미꾸라지 80원, 낚시 도감 보상), 선물(치이카와가 단풍잎을 좋아함) 페이지를 코드 값으로 고친다.</p>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="num">11</div>
+  <div class="body">
+    <h2>정한 값과 확인할 것</h2>
+    <p><span class="kv">내가 정한 값</span>계절별 날씨 확률, 1~2일째 맑음, 흐림과 비와 눈의 어두워지는 정도, 낙엽 12곳과 단풍잎 20원, 치이카와가 단풍잎을 좋아함, 눈사람 다섯 개, 발자국 60개와 20초, 미꾸라지(시냇물과 연못, 80원), 눈뭉치(체력 5, 기운 −9, 얼음 결정 60원), 14종 도감 보상 1,000원, 손님은 눈사람을 보기만 하고 낙엽은 주인 몫, 우산은 집 밖의 친구 모두, 눈뭉치는 기존 몬스터에 더해 들판과 숲에 세 마리씩, 겨울에 숨기는 것은 장식 꽃뿐(광장 꽃밭은 그대로), 우산은 친구들만(내 캐릭터는 왼손에 등불을 들어서 이번에는 넣지 않는다).</p>
+    <p><span class="kv">확인 필요</span>내 캐릭터도 비 오는 날 우산을 쓰기를 바라면 알려 달라. 등불과 같은 손이라 둘 중 하나를 고르는 방식이 된다.</p>
+  </div>
+</section>
+
+<footer>
+  <span>계절과 날씨 설계서 · 2026-11-16</span>
+  <span><a href="Anoko-Bond-2026-11-16.html">아노코와 지내기 설계서</a></span>
+</footer>
+
+</div>
+</body>
+</html>
