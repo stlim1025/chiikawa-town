@@ -39,7 +39,7 @@ const kills = (s) => MONSTER_ORDER.reduce((n, k) => n + (huntedOf(s)[k] || 0), 0
 const lairDown = (s) => LAIR.filter((k) => bossesOf(s)[k] && bossesOf(s)[k].down != null).length;
 const anokoDown = (s) => tamed(s) || (huntedOf(s).anoko || 0) > 0;
 const REQUESTS = Object.keys(QUESTS).filter((id) => !QUESTS[id].story && !QUESTS[id].side && !QUESTS[id].daily); // 친구 부탁
-const SIDES = Object.keys(QUESTS).filter((id) => QUESTS[id].side);
+const SIDES = Object.keys(QUESTS).filter((id) => QUESTS[id].side && !QUESTS[id].daily); // 이야기 15편(되풀이하는 「우사기랑 클럽」은 빼고)
 const count = (list, f) => list.filter(f).length;
 
 /**

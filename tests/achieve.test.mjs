@@ -9,6 +9,7 @@ import { MONSTER_ORDER } from '../src/core/combat.js';
 import { WEED_ORDER } from '../src/core/weeding.js';
 import { DEX_FISH } from '../src/core/fishing.js';
 import { HEART_AT } from '../src/core/friends.js';
+import { QUESTS } from '../src/core/quests.js';
 
 const fresh = () => ({ ...createState({ name: '치이', look: {} }), clock: { day: 5, t: 0.3 } });
 const done = (s, id) => progressOf(s, id).done;
@@ -31,6 +32,19 @@ test('업적: 32개, 여섯 묶음, 돈 31,700원, 칭호 13개, 기념 가구 �
   assert.deepEqual([FURNITURE.dexplaque.name, FURNITURE.bossshield.name, FURNITURE.friendframe.name], ['반짝 도감 상패', '다섯 보스 기념 방패', '우정 사진 액자']);
   for (const a of ACHIEVEMENTS) for (const t of [a.name, a.goal, a.title || '']) assert.ok(!t.includes('·'), `${a.id}: ${t}`);
   assert.equal(ACHIEVEMENTS.find((a) => a.id === 'dexFishAll').money, 0, '낚시 도감 보상은 따로');
+});
+
+test('업적: 이야기 수집가는 되풀이 이야기(우사기랑 클럽)를 빼고 사이드스토리 15편을 센다', () => {
+  const s = fresh();
+  const stories = Object.keys(QUESTS).filter((id) => QUESTS[id].side && !QUESTS[id].daily);
+  assert.equal(stories.length, 15);
+  assert.ok(QUESTS.clubNight.side && QUESTS.clubNight.daily && !stories.includes('clubNight'));
+  assert.equal(ACHIEVEMENTS.find((a) => a.id === 'sides').goal, '사이드스토리 15편을 모두 끝낸다');
+  const all15 = { ...s, quests: Object.fromEntries(stories.map((id) => [id, { step: 1, base: 0, done: 3 }])) };
+  assert.deepEqual(progressOf(all15, 'sides'), { have: 15, need: 15, done: true });
+  // 우사기랑 클럽에 다시 가는 중(되풀이라 완료 표시가 지워진다)에도 진행도는 그대로
+  const again = { ...all15, quests: { ...all15.quests, clubNight: { step: 0, base: 0 } } };
+  assert.deepEqual(progressOf(again, 'sides'), { have: 15, need: 15, done: true });
 });
 
 test('업적: 새 게임은 아무것도 이루지 않았다', () => {
