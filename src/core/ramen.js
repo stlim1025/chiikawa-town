@@ -69,6 +69,34 @@ export function shiftPay(shift) {
   return SHIFT_BASE + shift.earned;
 }
 
+/**
+ * 알바 손님 흐름(초). 처음 ARRIVE_FIRST 시각에 오고, 그다음은 ARRIVE_GAP 사이 아무 때나 한 명씩 온다.
+ * 자리가 다 차 있으면 FULL_RETRY 초 뒤에 다시 보고, 끝나기 LAST_CALL 초 전부터는 받지 않는다.
+ */
+// 2026-11-17 에 6~10초 간격(처음 한 명, 꽉 차면 6~10초 뒤)에서 당겼다: 보통 사람이 90초 가운데 15초쯤, 익숙한 사람은 34초쯤 손님 없이 기다려
+// 「손님이 너무 적다」는 말을 들었다. 대신 손님이 더 오래 기다려 줘서(customerWait) 느린 사람도 거의 놓치지 않는다.
+export const ARRIVE_FIRST = [0.6, 2.5];
+export const ARRIVE_GAP = [3.5, 5.5];
+export const FULL_RETRY = 1.5;
+export const LAST_CALL = 10;
+/** 손님이 올 차례(t 초)에: 지금 받을지(spawn)와 다음에 볼 시각(next). arrived: 지금까지 온 손님 수, full: 자리가 다 찼는지. */
+export function arrivalTick(t, { arrived, full, duration }, random = Math.random) {
+  if (t >= duration - LAST_CALL) return { spawn: false, next: Infinity };
+  if (full) return { spawn: false, next: t + FULL_RETRY };
+  const n = arrived + 1; // 이번 손님까지 센 수
+  return { spawn: true, next: n < ARRIVE_FIRST.length ? ARRIVE_FIRST[n] : t + ARRIVE_GAP[0] + random() * (ARRIVE_GAP[1] - ARRIVE_GAP[0]) };
+}
+/** 손님이 기다려 주는 시간(초): 손님을 많이 받을수록 조금씩 급해진다. */
+export function customerWait(served) {
+  return Math.max(28, 42 - served * 0.6); // 2026-11-17 에 34초(-0.8, 최소 22초)에서 늘렸다
+}
+/** 저절로 고를 손님: 가장 오래 기다린 손님의 자리 번호(아무도 없으면 -1). */
+export function oldestSeat(seats) {
+  let best = -1;
+  seats.forEach((c, i) => { if (c && (best < 0 || c.arrived < seats[best].arrived)) best = i; });
+  return best;
+}
+
 const pickOne = (list, random) => list[Math.floor(random() * list.length) % list.length];
 function shuffle(list, random) {
   const a = [...list];

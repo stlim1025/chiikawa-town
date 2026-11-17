@@ -1,4 +1,4 @@
-import { INGREDIENTS, RECIPES, emptyBowl, addToBowl, bowlMatches, potState, servePay, BOIL, SOGGY_AFTER } from '../core/ramen.js';
+import { INGREDIENTS, RECIPES, emptyBowl, addToBowl, bowlMatches, potState, servePay, BOIL, SOGGY_AFTER, ARRIVE_FIRST, arrivalTick, customerWait, oldestSeat } from '../core/ramen.js';
 import { charSvg } from './art.js';
 import { bowlSvg, soupPotArt, noodleArt, panArt, boilerArt, TRASH_ART, ingIcon } from './ramenart.js';
 
@@ -95,7 +95,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
 
   const seats = [null, null, null];
   let sel = 0, bowl = emptyBowl(), pot = null, served = 0, earned = 0, missed = 0, wrong = 0, examLeft = EXAM_COUNT;
-  let alive = true, timer = 0, nextSpawn = 0.6, sayT = 0, potDrawn = ''; // 손님 · 냄비는 0.05초마다(화면이 안 그려지는 동안에도 시간대로 흐른다)
+  let alive = true, timer = 0, nextSpawn = ARRIVE_FIRST[0], arrivals = 0, sayT = 0, potDrawn = ''; // 손님 · 냄비는 0.05초마다(화면이 안 그려지는 동안에도 시간대로 흐른다)
   const t0 = performance.now(), now = () => (performance.now() - t0) / 1000;
   const recipeIds = Object.keys(RECIPES);
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
@@ -141,7 +141,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     const free = seats.map((c, i) => (c ? -1 : i)).filter((i) => i >= 0);
     if (!free.length) return;
     const i = exam ? 1 : pick(free);
-    const wait = exam ? 45 : Math.max(22, 34 - served * 0.8); // 손님을 많이 받을수록 조금씩 급해진다
+    const wait = exam ? 45 : customerWait(served); // 손님을 많이 받을수록 조금씩 급해진다
     seats[i] = { kind: pick(FACES), order: pick(recipeIds), arrived: now(), wait, patience: 1 };
     if (!seats[sel]) sel = i;
     renderSeats(i);
@@ -149,7 +149,7 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
   }
   function leave(i) {
     seats[i] = null;
-    if (i === sel) { const other = seats.findIndex(Boolean); sel = other >= 0 ? other : sel; }
+    if (i === sel) { const other = oldestSeat(seats); sel = other >= 0 ? other : sel; } // 다음은 가장 오래 기다린 손님
     renderSeats();
   }
 
@@ -216,7 +216,11 @@ export function openRamenShop(ui, { mode = 'work', duration = 90, onEnd, sound }
     // 손님 오기
     if (t >= nextSpawn) {
       if (exam) { if (!seats.some(Boolean) && examLeft > 0) { examLeft--; spawn(); } nextSpawn = Infinity; }
-      else { if (t < duration - 10) spawn(); nextSpawn = t + 6 + Math.random() * 4; }
+      else {
+        const a = arrivalTick(t, { arrived: arrivals, full: seats.every(Boolean), duration });
+        if (a.spawn) { arrivals++; spawn(); }
+        nextSpawn = a.next;
+      }
     }
     // 인내심
     rail.querySelectorAll('.kx-ticket[data-seat]').forEach((el) => {
