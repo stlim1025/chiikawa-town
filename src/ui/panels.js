@@ -31,6 +31,8 @@ import { bossSeen } from '../core/bosses.js';
 import { monsterSvg, dropSvg, weaponSvg } from './monsterart.js';
 import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActive, pickTrack, activeQuests } from '../core/quests.js';
 import { ACH_GROUPS, ACHIEVEMENTS, progressOf as achProgress, titlesOf } from '../core/achieve.js';
+import { achTier, medalSvg, groupIconSvg, TROPHY_SVG } from './achart.js';
+import { dateOf } from '../core/calendar.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
@@ -1420,10 +1422,20 @@ export function createPanels(ui, handlers) {
       }
       return out;
     },
-    // 마을폰 '업적' 앱(core/achieve.js, 게임 오리지널): 맨 위 칭호 달기, 묶음마다 업적(할 일 · 보상 · 진행 또는 받기)
+    // 마을폰 '업적' 앱(core/achieve.js, 게임 오리지널): 맨 위 트로피 카드(이룬 수 · 막대 · 받을 보상), 칭호 달기,
+    // 묶음마다 제목(아이콘 · 이룬 수)과 메달 카드(잠김: 회색 메달 · 진행 막대 / 받을 차례: 빛나는 카드 · 받기 / 받음: 달성 도장 · 이룬 날)
     achieve(s) {
       const rec = s.achieve || {}, titles = titlesOf(s), mine = s.title || null;
-      const out = [appBar('업적', `${Object.keys(rec).length} / ${ACHIEVEMENTS.length}`)];
+      const doneN = ACHIEVEMENTS.filter((a) => rec[a.id]).length, waiting = ACHIEVEMENTS.filter((a) => rec[a.id] && !rec[a.id].got).length;
+      const bar = (f) => h('div', { class: 'ach-bar', 'aria-hidden': 'true' }, h('i', { style: `width: ${Math.round(Math.max(0, Math.min(1, f)) * 100)}%` }));
+      const dayText = (day) => { if (!(day >= 1) || !s.startDate) return ''; const { m, d } = dateOf(s.startDate, day); return `${m}월 ${d}일`; };
+      const out = [appBar('업적', `${doneN} / ${ACHIEVEMENTS.length}`)];
+      out.push(h('div', { class: 'ach-hero' },
+        svgSpan('ach-trophy', TROPHY_SVG),
+        h('div', { class: 'ach-hero-main' },
+          h('div', { class: 'ach-hero-n' }, h('b', {}, String(doneN)), ` / ${ACHIEVEMENTS.length} 달성`),
+          bar(doneN / ACHIEVEMENTS.length),
+          h('small', {}, waiting ? `받을 보상이 ${waiting}개 기다려요` : doneN === ACHIEVEMENTS.length ? '모든 업적을 이뤘어요!' : '하나씩 이뤄 가요'))));
       out.push(h('div', { class: 'ach-titles' }, h('b', {}, '칭호 달기'),
         titles.length
           ? h('div', { class: 'ach-title-row' },
@@ -1431,20 +1443,25 @@ export function createPanels(ui, handlers) {
             ...titles.map((t) => h('button', { class: `btn${mine === t.id ? ' primary' : ''}`, type: 'button', onClick: after(() => handlers.setTitle?.(t.id)) }, t.title)))
           : h('span', { class: 'dp-note' }, '칭호가 있는 업적을 받으면 달 수 있어요')));
       for (const g of ACH_GROUPS) {
-        out.push(h('div', { class: 'weed-grade' }, h('b', {}, g.name)));
-        out.push(h('div', { class: 'dex-prizes' }, ...ACHIEVEMENTS.filter((a) => a.group === g.id).map((a) => {
+        const list = ACHIEVEMENTS.filter((a) => a.group === g.id);
+        out.push(h('div', { class: 'ach-group' }, svgSpan('ach-gico', groupIconSvg(g.id)), h('b', {}, g.name),
+          h('span', {}, `${list.filter((a) => rec[a.id]).length} / ${list.length}`)));
+        out.push(h('div', { class: 'ach-list' }, ...list.map((a) => {
           const r = rec[a.id], got = !!(r && r.got), ready = !!r && !got, p = achProgress(s, a.id);
-          return h('div', { class: `dex-prize ach${got ? ' done' : ready ? ' ready' : ''}` },
+          const st = got ? 'got' : ready ? 'ready' : 'locked';
+          return h('div', { class: `ach-card ${st}` },
+            svgSpan('ach-medal', medalSvg(g.id, achTier(a), st !== 'locked')),
             h('div', { class: 'ach-main' },
               h('b', {}, a.name),
               h('small', {}, a.goal),
+              st === 'locked' && p.need > 1 ? h('div', { class: 'ach-prog' }, bar(p.have / p.need), h('span', {}, `${p.have} / ${p.need}`)) : null,
               h('div', { class: 'ach-reward' },
                 a.money ? h('span', { class: 'dp-money' }, svgSpan('coin', COIN), won(a.money)) : null,
                 a.title ? chip(null, 'muted', `칭호 ${a.title}`) : null,
                 a.furniture ? chip(null, 'muted', FURNITURE[a.furniture].name) : null)),
-            got ? h('span', { class: 'dp-note' }, '받았어요')
-              : ready ? h('button', { class: 'btn primary', type: 'button', onClick: after(() => handlers.claimAchievement?.(a.id)) }, '받기')
-                : h('span', { class: 'dp-note' }, `${p.have} / ${p.need}`));
+            got ? h('span', { class: 'ach-stamp' }, h('b', {}, '달성'), dayText(r.day) ? h('small', {}, dayText(r.day)) : null)
+              : ready ? h('button', { class: 'btn primary ach-claim', type: 'button', onClick: after(() => handlers.claimAchievement?.(a.id)) }, '받기')
+                : null);
         })));
       }
       return out;

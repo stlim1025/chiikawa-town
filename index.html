@@ -1406,16 +1406,46 @@ button.phone-tour:active { transform: translateY(2px); }
 .dex-prize .dp-note { color: var(--ink-soft); font-size: 14px; }
 .dex-prize.ready { background: var(--butter); }
 .dex-prize.done { opacity: 0.6; }
-/* 마을폰 업적 앱(core/achieve.js): 앱 아이콘, 칭호 달기 줄, 업적 카드(이름 · 할 일 · 보상 · 진행 또는 받기) */
+/* 마을폰 업적 앱(core/achieve.js, 그림은 ui/achart.js): 앱 아이콘, 트로피 카드, 칭호 달기 줄, 묶음 제목, 메달 카드(잠김 · 받을 차례 · 받음) */
 .app.achieve .app-ico { background: #e8a93c; }
+.ach-hero { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; padding: 12px 14px; border-radius: 16px; background: linear-gradient(135deg, #fff4c9, #ffdf86); box-shadow: 0 3px 0 #e2b84f; }
+.ach-hero .ach-trophy { flex: 0 0 auto; display: inline-flex; width: 58px; height: 58px; filter: drop-shadow(0 2px 0 rgba(150, 100, 20, 0.25)); }
+.ach-hero .ach-trophy svg, .ach-card .ach-medal svg, .ach-group .ach-gico svg { width: 100%; height: 100%; }
+.ach-hero-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ach-hero-n { color: #6a4a10; font-size: 15px; }
+.ach-hero-n b { margin-right: 2px; font-size: 26px; }
+.ach-hero small { color: #8a6420; font-size: 13px; }
+.ach-bar { height: 8px; border-radius: 999px; background: rgba(120, 88, 48, 0.15); overflow: hidden; }
+.ach-bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f0b52f, #f8d96c); }
+.ach-hero .ach-bar { height: 12px; background: rgba(255, 255, 255, 0.75); }
 .ach-titles { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; padding: 10px 12px; border-radius: 14px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
 .ach-title-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .ach-title-row .btn { padding: 4px 12px; font-size: 14px; }
-.dex-prize.ach .ach-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dex-prize.ach small { color: var(--ink-soft); font-size: 13px; }
-.dex-prize.ach .ach-reward { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dex-prize.ach .ach-reward .dp-money { flex: 0 0 auto; }
-.dex-prize.ach > .dp-note, .dex-prize.ach > .btn { flex: 0 0 auto; }
+.ach-group { display: flex; align-items: center; gap: 8px; margin: 12px 2px 6px; }
+.ach-group .ach-gico { flex: 0 0 auto; display: inline-flex; width: 26px; height: 26px; }
+.ach-group b { font-size: 17px; }
+.ach-group > span:last-child { margin-left: auto; color: var(--ink-soft); font-size: 14px; }
+.ach-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.ach-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 16px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.ach-card .ach-medal { flex: 0 0 auto; display: inline-flex; width: 42px; height: 49px; }
+.ach-card .ach-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ach-card small { color: var(--ink-soft); font-size: 13px; }
+.ach-card .ach-reward { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ach-card .dp-money { display: inline-flex; align-items: center; gap: 4px; }
+.ach-card .dp-money .coin { display: inline-flex; width: 18px; height: 18px; }
+.ach-prog { display: flex; align-items: center; gap: 8px; }
+.ach-prog .ach-bar { flex: 1 1 auto; }
+.ach-prog span { flex: 0 0 auto; color: var(--ink-soft); font-size: 13px; }
+.ach-card.locked { background: var(--paper-2); box-shadow: 0 2px 0 rgba(120, 88, 48, 0.14); }
+.ach-card.locked b { color: var(--ink-soft); }
+.ach-card.ready { background: linear-gradient(135deg, #fff7d4, #ffe38c); box-shadow: 0 2px 0 #e2b84f, inset 0 0 0 2px #f2c64a; }
+.ach-card.ready .ach-medal { animation: ach-bob 1.6s ease-in-out infinite; transform-origin: 50% 0; }
+@keyframes ach-bob { 50% { transform: rotate(-7deg) translateY(-1px); } }
+.ach-card .ach-claim { flex: 0 0 auto; }
+.ach-stamp { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding: 3px 8px 4px; border: 2px solid #d9a23a; border-radius: 10px; color: #b07a16; line-height: 1.15; rotate: -8deg; }
+.ach-stamp b { font-size: 15px; letter-spacing: 2px; }
+.ach-stamp small { color: #b07a16; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .ach-card.ready .ach-medal { animation: none; } }
 /* 왼쪽 위 칭호 띠(업적 앱에서 단 칭호) */
 .hud-title { padding: 1px 12px 3px; border-radius: 999px; background: #fff2c2; box-shadow: 0 2px 0 #e2c162; color: #6a4a10; font-size: 15px; rotate: 2deg; }
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */
