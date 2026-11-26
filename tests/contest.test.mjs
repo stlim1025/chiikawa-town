@@ -229,3 +229,20 @@ test('리뷰 고침: 손님 판은 주인 시각 16.9시에 끝나 5시 정리 �
   assert.equal(C.guestRoundOver(16.8), false);
   assert.equal(C.guestRoundOver(17.5), true);
 });
+
+test('미룬 항목: 손님 물고기 크기는 가장 큰 물고기보다 클 수 없다', () => {
+  assert.ok(C.MAX_FISH_CM >= 90 && C.MAX_FISH_CM < 200);
+  assert.ok(C.guestScoreOk('fish', 5, C.MAX_FISH_CM));
+  assert.ok(!C.guestScoreOk('fish', 5, 99999));
+  assert.ok(!C.guestScoreOk('fish', 5, C.MAX_FISH_CM + 1));
+});
+
+test('미룬 항목: 종목을 모르는 깨진 기록은 기록 칸도 비운다(상품 받기에서 오류가 나지 않게)', () => {
+  const c = C.cleanContest({ day: 3, kind: 'ramen', best: { s: 4, t: 1 }, rank: 2, first: true, got: false, wins: { fish: 1, weed: 0 } });
+  assert.equal(c.kind, null);
+  assert.equal(c.best, null);
+  assert.equal(c.rank, null);
+  assert.equal(c.first, false);
+  assert.deepEqual(c.wins, { fish: 1, weed: 0 }, '우승 수는 남긴다');
+  assert.equal(C.claimContestPrize({ ...fresh(), contest: c }).reason, 'none');
+});

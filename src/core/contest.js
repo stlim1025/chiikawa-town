@@ -233,11 +233,13 @@ export function guestPrize(state, kind, rank) {
   return { state: s, money, trophy };
 }
 
+/** 가장 큰 물고기 크기(cm): 손님이 보낸 같을 때 가르는 값의 상한. */
+export const MAX_FISH_CM = Math.max(...Object.values(FISH).map((f) => (f.cm ? f.cm[1] : 0)));
 /** 손님이 보낸 점수가 3분 한 판에서 나올 수 있는지. */
 export function guestScoreOk(kind, s, t) {
   if (!Object.hasOwn(SCORE_CAP, kind) || !Number.isInteger(s) || s < 0 || s > SCORE_CAP[kind]) return false;
   if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) return false;
-  return kind !== 'weed' || (Number.isInteger(t) && t <= s / 2);
+  return kind === 'weed' ? Number.isInteger(t) && t <= s / 2 : t <= MAX_FISH_CM;
 }
 
 /** 저장된 대회 기록을 정리한다(모르는 칸 · 잘못된 값은 버리고 기본값으로 — 저장을 거부하지 않는다). */
@@ -248,14 +250,15 @@ export function cleanContest(c) {
   const npc = {};
   if (c.npc && typeof c.npc === 'object') for (const k of CONTEST_FRIENDS) { const r = rec(c.npc[k]); if (r) npc[k] = r; }
   const w = c.wins && typeof c.wins === 'object' ? c.wins : {};
+  const known = Object.hasOwn(CONTESTS, c.kind); // 종목을 모르면 그날 기록도 버린다(상품 받기에서 이름을 찾다 오류가 나지 않게)
   return {
     day: Number.isInteger(c.day) && c.day >= 0 ? c.day : e.day,
     kind: Object.hasOwn(CONTESTS, c.kind) ? c.kind : null,
-    best: rec(c.best),
+    best: known ? rec(c.best) : null,
     rounds: int0(c.rounds),
     npc,
-    rank: Number.isInteger(c.rank) && c.rank >= 1 ? c.rank : null,
-    first: c.first === true,
+    rank: known && Number.isInteger(c.rank) && c.rank >= 1 ? c.rank : null,
+    first: known && c.first === true,
     got: c.got === true,
     wins: { fish: int0(w.fish), weed: int0(w.weed) }
   };

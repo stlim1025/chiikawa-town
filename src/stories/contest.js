@@ -37,6 +37,8 @@ export function createContestCeremony(ctx) {
     const meSpot = myIdx >= 0 ? front(myIdx) : village.nearestFree(spots[0].x - 1.6, spots[0].z + 2.0, 0.3);
     P().setPosition(meSpot.x, meSpot.z);
     P().face(spots[0].x, myIdx >= 0 ? spots[0].z + 10 : spots[0].z);
+    // 불려 오지 않은 캐릭터(갑옷 씨 등)가 단상 자리에 서 있으면 앞으로 비켜 세운다(단상 장애물 안에 묻히지 않게)
+    for (const o of npcs.list) if (Math.abs(o.x - spots[0].x) < 1.9 && Math.abs(o.z - spots[0].z) < 0.95) { const p = village.nearestFree(o.x, spots[0].z + 1.7, 0.4); o.x = p.x; o.z = p.z; }
     ctx.props.setPodium(true); // 자리를 잡은 뒤에 놓는다(단상 자리에 서 있다가 갇히지 않게)
     const came = [], watchers = info.guests.filter((k) => !info.top.some((e) => e.who === k));
     info.guests.forEach((k, i) => {

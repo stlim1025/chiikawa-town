@@ -523,7 +523,7 @@ function boot() {
       const ct = w.ct && typeof w.ct === 'object' && Object.hasOwn(CONTESTS, w.ct.k) && Array.isArray(w.ct.b) ? w.ct : null;
       visiting.contest = ct ? { k: ct.k, d: Math.floor(Number(ct.d)) || 0, o: !!ct.o, b: ct.b.slice(0, 12)
         .filter((r) => Array.isArray(r) && typeof r[0] === 'string' && Number.isFinite(r[1]) && Number.isFinite(r[2]))
-        .map((r) => [r[0].slice(0, 12), Math.max(0, Math.floor(r[1])), Math.max(0, r[2]), ['me', 'npc', 'guest', 'yet'].includes(r[3]) ? r[3] : 'npc', Number.isInteger(r[4]) ? r[4] : 0]) } : null;
+        .map((r) => [r[0].slice(0, 12), Math.max(0, Math.floor(r[1])), Math.max(0, r[2]), ['me', 'npc', 'guest', 'yet'].includes(r[3]) ? r[3] : 'npc', Number.isInteger(r[4]) ? r[4] : 0, typeof r[5] === 'string' ? r[5].slice(0, 64) : '']) } : null;
     }
     if (Array.isArray(w.h)) {
       const house = parseHouse(w.h, w.hl), key = JSON.stringify([house.size, house.wall, house.floor, house.placed]);
@@ -575,10 +575,15 @@ function boot() {
     }
     if (a.t === 'contest') {
       // 손님의 마을 대회 한 판(core/contest.js): 오늘 종목이고 3분 한 판에서 나올 수 있는 점수일 때만, 그 손님 가장 좋은 기록을 순위판에
-      const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null, rec = contestOf(state);
-      if (!kind || a.k !== kind || rec.rank != null || rec.got || !guestScoreOk(kind, a.s, a.b)) return;
-      const r = { name: (multi.nameOf(id) || '친구').slice(0, 12), s: a.s, t: a.b }, old = contestGuests.get(id);
-      if (!old || better(r, old)) contestGuests.set(id, r);
+      const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
+      if (!kind || a.k !== kind || !guestScoreOk(kind, a.s, a.b)) return;
+      // 주인이 오늘 아직 바깥에 안 나왔으면 그날 기록부터 연다(지난 대회 등수 때문에 거절되거나 나중에 지워지지 않게)
+      if (contestOf(state).day !== state.clock.day || contestOf(state).kind !== kind) { contestGuests.clear(); commit(beginContestDay(state, state.clock.day, kind)); }
+      const rec = contestOf(state);
+      if (rec.rank != null || rec.got) return;
+      // 손님은 이름으로 묶는다(다시 접속해 연결 id 가 바뀌어도 한 줄). 상품은 가장 최근 연결로
+      const name = (multi.nameOf(id) || '친구').slice(0, 12), r = { id, name, s: a.s, t: a.b }, old = contestGuests.get(name);
+      contestGuests.set(name, !old || better(r, old) ? r : { ...old, id });
       return;
     }
     weedsT = 0; // 바뀐 풀 · 덤불 · 바닥 물건 · 모금은 다음 마을 모습으로 바로
@@ -3372,8 +3377,9 @@ function boot() {
   let housewarm = null, stickParty = null, confetti = null, festival = null; // 마을 이벤트(집들이 · 막대 과자 데이 — 아래에서 만든다)
   let contestProps = null, contestCeremony = null; // 마을 대회 접수 탁자 · 시상식 단상(world/contestprops.js) · 시상식 장면(stories/contest.js) — 아래에서 만든다
   let contestRound = null; // 마을 대회 한 판 { kind, s, t, clean, left, guest }(core/contest.js)
-  const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 연결 id → { name, s, t }
+  const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 이름 → { id: 가장 최근 연결 id, name, s, t }
   const contestUi = { eveDay: 0, morningDay: 0 }; // 전날 저녁 알림 · 당일 아침 배너를 띄운 날
+  const contestPrizeGot = new Set(); // 손님: 받은 주인 마을 대회 상품(주인 · 날 · 종목 — 두 번 오면 한 번만)
   const contestNpc = new Map(); // 대회에 나간 친구 kind → { day, until: 끝날 시각 }(중간에 끊겨도 이 시각이 지나면 기록을 올린다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
@@ -3991,7 +3997,7 @@ function boot() {
     hud.banner('마을이 달라졌어요!', `${josa(due.map((id) => WORKS[id].name).join(', '), '이/가')} 생겼어요`, 4200);
   }
   /** 마을 대회 손님 기록(순위판 · 등수에 넣는다). */
-  const contestGuestList = () => [...contestGuests].map(([id, g]) => ({ who: 'mp:' + id, name: g.name, s: g.s, t: g.t }));
+  const contestGuestList = () => [...contestGuests.values()].map((g) => ({ who: 'mp:' + g.id, name: g.name, s: g.s, t: g.t }));
   /** 마을 대회가 끝났다: 등수를 정하고 1등을 마을 소식으로. */
   function settleContestDay() {
     const before = contestOf(state);
@@ -4001,7 +4007,7 @@ function boot() {
     const board = rankBoard([...entries, ...contestGuestList()]), top = board[0];
     if (top && top.s > 0 && !top.who.startsWith('mp:')) happen({ type: 'contestWin', who: top.who, item: CONTESTS[c.kind].banner });
     // 같이 놀기 손님: 아직 내 마을에 있으면 등수를 보낸다(상품은 손님 저장에 — 돌아간 손님은 기록만 남는다)
-    for (const e of board) if (e.who.startsWith('mp:') && multi.players.some((p) => 'mp:' + p.id === e.who)) multi.direct(e.who.slice(3), { t: 'prize', k: c.kind, rank: e.rank });
+    for (const e of board) if (e.who.startsWith('mp:') && multi.players.some((p) => 'mp:' + p.id === e.who)) multi.direct(e.who.slice(3), { t: 'prize', k: c.kind, rank: e.rank, d: c.day });
     return c;
   }
   /**
@@ -4029,7 +4035,8 @@ function boot() {
     if (rec.day !== day || rec.kind !== kind) { contestGuests.clear(); commit(beginContestDay(state, day, kind)); }
     if (contestUi.morningDay !== day && hour >= 6 && hour < CLOSE_HOUR && mode === 'play' && !sleeping && !fainting && !questScene) {
       contestUi.morningDay = day;
-      hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
+      if (isStickFest(state)) hud.toast(`오늘은 ${CONTESTS[kind].banner}도 열려요! 오전 9시부터 노동 갑옷 씨에게`, 4200); // 막대 과자 데이 배너와 겹치지 않게
+      else hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
     }
     // 대회에 나갔다가 이야기 장면 등으로 끊긴 친구: 끝날 시각이 지나면(또는 마감이면) 기록을 대신 올려 준다
     for (const [k, g] of contestNpc) if (g.day === day && !contestOf(state).npc[k] && (hour >= g.until + 0.5 || hour >= CLOSE_HOUR)) postNpcRecord(k);
@@ -4047,12 +4054,15 @@ function boot() {
     const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
     if (!kind) return null;
     const b = contestBoard();
-    const rows = b.today ? b.rows.slice(0, 12).map((r) => [String(r.name || '').slice(0, 12), r.yet ? 0 : r.s, r.yet ? 0 : r.t, r.yet ? 'yet' : r.me ? 'me' : r.guest ? 'guest' : 'npc', r.yet ? 0 : r.rank]) : [];
+    const rows = b.today ? b.rows.slice(0, 12).map((r) => [String(r.name || '').slice(0, 12), r.yet ? 0 : r.s, r.yet ? 0 : r.t, r.yet ? 'yet' : r.me ? 'me' : r.guest ? 'guest' : 'npc', r.yet ? 0 : r.rank, r.guest ? String(r.who).slice(3) : '']) : []; // 마지막: 손님 연결 id(손님이 제 줄을 알아본다)
     return { k: kind, d: state.clock.day, o: contestPhase(hourOf(state.clock), false) === 'open' ? 1 : 0, b: rows };
   }
   /** 손님: 주인 마을 대회 등수를 받았다 → 상품은 내 저장에(core/contest.js 의 guestPrize). */
   function takeContestPrize(a) {
     if (!Object.hasOwn(CONTESTS, a.k) || !Number.isInteger(a.rank) || a.rank < 1) return;
+    const key = `${multi.room}|${a.d}|${a.k}`; // 같은 주인 마을 같은 대회 날은 한 번만
+    if (contestPrizeGot.has(key)) return;
+    contestPrizeGot.add(key);
     const r = guestPrize(state, a.k, a.rank);
     if (!r.money) return;
     commit(r.state);
@@ -4068,7 +4078,7 @@ function boot() {
       const v = visiting.contest;
       if (!v) return { kind: null, today: false, next: null, wins: rec.wins };
       return { kind: v.k, today: true, phase: v.o ? 'open' : 'ceremony', host: multi.hostName || '친구', wins: rec.wins,
-        rows: v.b.map(([name, s, t, type, rank]) => ({ name, s, t, rank, me: type === 'guest' && name === myName(), yet: type === 'yet' })) };
+        rows: v.b.map(([name, s, t, type, rank, gid]) => ({ name, s, t, rank, me: type === 'guest' && !!gid && gid === multi.you, yet: type === 'yet' })) };
     }
     const today = contestKindHere();
     if (today && rec.day === state.clock.day) {
@@ -4139,7 +4149,11 @@ function boot() {
     if (fishing) cancelFish(); // 끝난 뒤에 낚인 물고기가 가방으로 가지 않게
     if (pulling) cancelPull();
     const unit = r.kind === 'fish' ? '마리' : '점';
-    if (r.guest) { if (multi.status === 'visiting') multi.act({ t: 'contest', k: r.kind, s: r.s, b: r.t }); hud.banner(`${r.s}${unit}!`, `${multi.hostName || '친구'}네 순위판에 올렸어요`, 3000); return; } // b: 같을 때 가르는 값(t 는 메시지 종류)
+    if (r.guest) { // b: 같을 때 가르는 값(t 는 메시지 종류)
+      if (multi.status === 'visiting') { multi.act({ t: 'contest', k: r.kind, s: r.s, b: r.t }); hud.banner(`${r.s}${unit}!`, `${multi.hostName || '친구'}네 순위판에 올렸어요`, 3000); }
+      else hud.toast('친구 마을과 연결이 끊겨 기록을 보내지 못했어요', 3200);
+      return;
+    }
     const prev = contestOf(state).best;
     commit(recordRound(state, r));
     hud.banner(`${r.s}${unit}!`, better(r, prev) ? '오늘 가장 좋은 기록' : `오늘 가장 좋은 기록 ${prev.s}${unit}`, 3000);
