@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마을 대회 설계서</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --text: #1f2328; --text-soft: #5b636c; --text-faint: #9aa1a9;
+    --line: #cfd4da; --line-soft: #e6e9ec; --code-bg: #f0f1f3; --code-text: #24292f;
+    --mark: #b4530a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191d; --text: #e2e5e9; --text-soft: #9aa3ad; --text-faint: #6b7480;
+      --line: #40464e; --line-soft: #2b3037; --code-bg: #262b32; --code-text: #d5d9de;
+      --mark: #e69a55;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 52px 32px 110px; }
+
+  /* 머리 */
+  .masthead { border-top: 3px solid var(--text); padding-top: 14px; margin-bottom: 40px; }
+  .masthead .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--text-soft); font-family: Consolas, "Cascadia Mono", monospace; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; margin: 18px 0 10px; }
+  .standfirst { font-size: 16px; color: var(--text-soft); max-width: 700px; margin: 0; }
+
+  /* 요약띠: 결론 세 가지 */
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); margin-bottom: 60px; }
+  .rule { padding: 18px 22px 20px 0; }
+  .rule + .rule { border-left: 1px solid var(--line-soft); padding-left: 22px; }
+  .rule .k { font-size: 12px; font-weight: 800; color: var(--text-soft); margin-bottom: 6px; }
+  .rule .t { font-size: 16px; font-weight: 800; line-height: 1.45; margin-bottom: 6px; }
+  .rule .d { font-size: 13.5px; color: var(--text-soft); }
+
+  /* 결정 시트: 회의에서 결정받을 안건 */
+  .sheet { margin-bottom: 64px; }
+  .sheet-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  .sheet-title .hint { font-weight: 400; color: var(--text-faint); margin-left: 10px; font-size: 12.5px; }
+  table.sheet-tbl { margin: 0; }
+  .sheet-tbl th { padding: 8px 14px 8px 0; }
+  .sheet-tbl td { padding: 11px 14px 11px 0; }
+  .sheet-tbl tr:last-child td { border-bottom: 2px solid var(--text); }
+  .sheet-tbl .n { color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 0; width: 26px; }
+  .sheet-tbl a { color: inherit; text-decoration: none; font-weight: 700; }
+  .sheet-tbl a:hover { text-decoration: underline; }
+  .sheet-tbl .rec { color: var(--text-soft); }
+  .sheet-tbl .decide { width: 26%; min-width: 150px; border-bottom: 1px solid var(--line); color: var(--text); outline: none; cursor: text; }
+  .sheet-tbl .decide:empty::before { content: "회의에서 기입"; color: var(--text-faint); }
+  .sheet-tbl .decide:focus { border-bottom-color: var(--text); }
+
+  /* 섹션 */
+  section { display: grid; grid-template-columns: 84px 1fr; gap: 0 28px; border-top: 1px solid var(--line); padding: 32px 0 36px; }
+  section .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--line); font-variant-numeric: tabular-nums; }
+  section .body { min-width: 0; }
+  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.015em; margin: 4px 0 14px; line-height: 1.45; }
+  h3 { font-size: 15px; font-weight: 800; margin: 20px 0 6px; }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-faint); }
+  strong { font-weight: 750; }
+  .soft { color: var(--text-soft); font-size: 14px; }
+  .kv { font-weight: 800; font-size: 13px; color: var(--text-soft); margin-right: 6px; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.88em; background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 3px; word-break: break-all; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; line-height: 1.6; background: var(--code-bg); color: var(--code-text); padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 12px; }
+  pre code { background: none; padding: 0; font-size: inherit; word-break: normal; }
+
+  /* 권장: 본문 마지막 줄 */
+  .verdict { margin-top: 16px; display: flex; gap: 12px; }
+  .verdict .k { flex: none; font-weight: 800; font-size: 13px; padding-top: 2px; }
+  .verdict .k::after { content: ""; display: block; width: 100%; height: 2px; background: var(--text); margin-top: 2px; }
+
+  /* 흐름: 순서와 단계 */
+  .timelines { margin: 18px 0 14px; }
+  .tl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+  .tl + .tl { border-top: 1px dashed var(--line-soft); }
+  .tl .lab { flex: none; width: 76px; font-size: 13px; font-weight: 800; }
+  .tl .arrow { color: var(--text-faint); font-size: 12px; }
+  .tl .note { flex-basis: 100%; padding-left: 84px; font-size: 12.5px; color: var(--text-soft); margin-top: -4px; }
+  .step { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 3px 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); white-space: nowrap; }
+  .step.solid { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+  .step.ring { border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+  .legend { font-size: 12.5px; color: var(--text-soft); margin: 10px 0 0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .legend .step { padding: 1px 9px; font-size: 12px; margin-right: 4px; }
+
+  /* 선택지 대조 */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 6px; }
+  .versus.three { grid-template-columns: repeat(3, 1fr); }
+  .versus .opt { padding: 2px 24px 6px 0; }
+  .versus .opt + .opt { border-left: 1px solid var(--line-soft); padding-left: 24px; padding-right: 0; }
+  .versus h3 { font-size: 14px; margin: 0 0 8px; }
+  .versus h3 .tag { font-weight: 400; color: var(--text-soft); font-size: 12.5px; margin-left: 8px; }
+  .versus ul { font-size: 13.5px; color: var(--text-soft); margin: 0; padding-left: 18px; }
+  .versus .pro::marker { content: "+  "; color: var(--text); }
+  .versus .con::marker { content: "−  "; color: var(--text-faint); }
+
+  /* 적용 범위 */
+  .scope { display: flex; gap: 10px; align-items: stretch; margin: 16px 0 8px; flex-wrap: wrap; }
+  .scope .item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 18px 8px; text-align: center; min-width: 96px; }
+  .scope .item .t { font-weight: 800; font-size: 14px; }
+  .scope .item .s { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; }
+  .scope .item.on { background: var(--text); border-color: var(--text); }
+  .scope .item.on .t { color: var(--bg); }
+  .scope .item.on .s { color: var(--bg); opacity: 0.75; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+  th { text-align: left; font-weight: 700; color: var(--text-soft); font-size: 12px; border-top: 2px solid var(--text); border-bottom: 1px solid var(--text); padding: 7px 12px 7px 0; }
+  td { border-bottom: 1px solid var(--line-soft); padding: 9px 12px 9px 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 2px solid var(--text); }
+  td.c { text-align: center; white-space: nowrap; font-weight: 800; }
+  td.c.no { color: var(--text-faint); font-weight: 400; }
+  td.c.err { color: var(--mark); }
+  .ex { color: var(--text-soft); font-size: 13px; }
+
+  /* 경우별 설명 */
+  dl { margin: 0; }
+  dt { font-weight: 800; font-size: 13.5px; margin: 14px 0 4px; }
+  dd { margin: 0 0 4px; color: var(--text-soft); font-size: 14px; }
+  dd code { color: var(--code-text); }
+
+  /* 도표 */
+  figure { margin: 16px 0 12px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--text); }
+  figcaption { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+
+  /* 강조: 문서 전체에서 한 지점만 */
+  .mark { color: var(--mark); font-weight: 800; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 8px; padding-top: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-soft); font-size: 12.5px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .page { padding: 36px 18px 70px; }
+    .rules { grid-template-columns: 1fr; }
+    .rule + .rule { border-left: none; border-top: 1px solid var(--line-soft); padding-left: 0; }
+    section { grid-template-columns: 1fr; gap: 6px; }
+    section .num { font-size: 28px; }
+    .tl .note { padding-left: 0; }
+    .versus, .versus.three { grid-template-columns: 1fr; }
+    .versus .opt + .opt { border-left: none; border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-top: 10px; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; }
+    .sheet-tbl .decide:empty::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div class="row">
+    <span>치이카와 마을 생활 · 설계서</span>
+    <span>2026-11-26</span>
+  </div>
+  <h1>마을 대회<br>요일마다 열리는 낚시 대회와 풀 뽑기 시합</h1>
+  <p class="standfirst">마을에는 친구들과 함께하는 일이 많지만 다 같이 모여 겨루는 날은 없다. 이 문서는 정해진 요일마다 열리는 마을 대회를 설계한다. 토요일에는 낚시 대회, 수요일에는 풀 뽑기 시합이 열리고 마을 친구 여섯과 같이 놀기로 놀러 온 사람이 함께 겨룬다. 읽는 사람은 대회 날 흐름, 한 판 규칙, 상품 값이 의도와 맞는지 확인하면 된다.</p>
+</div>
+
+<div class="rules">
+  <div class="rule">
+    <div class="k">정해진 날에만 열린다</div>
+    <div class="t">토요일 낚시 대회, 수요일 풀 뽑기 시합</div>
+    <div class="d">오전 9시부터 오후 5시까지 접수하고 오후 5시에 광장에서 시상식을 연다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">한 판은 3분, 가장 좋은 기록이 남는다</div>
+    <div class="t">몇 번이든 다시 한다</div>
+    <div class="d">내 한 판 동안은 마을 시계가 멈춘다.</div>
+  </div>
+  <div class="rule">
+    <div class="k">친구들도 겨룬다</div>
+    <div class="t">마을 친구 여섯과 같이 놀기 손님</div>
+    <div class="d">친구마다 솜씨가 달라 대회마다 1등이 바뀔 수 있다.</div>
+  </div>
+</div>
+
+<section id="s1">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>목적과 범위</h2>
+    <p>처음에만 신기한 놀이가 아니라 기다려지는 마을 행사를 만든다. 사용자는 언제든 여는 대회는 처음 몇 번만 하고 말 것 같다며 정해진 대회 날을 골랐다. 혼자 하는 사람도 즐길 수 있게 마을 친구들이 함께 참가한다. 같이 놀기로 놀러 온 사람이 있으면 그 사람도 같은 순위판에서 겨룬다.</p>
+    <div class="scope">
+      <div class="item on"><div class="t">낚시 대회와 풀 뽑기 시합</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">대회 날 광장 장식과 접수</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">친구들의 참가와 순위판</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">시상식과 상품, 트로피 가구 둘, 업적 둘</div><div class="s">이번 범위</div></div>
+      <div class="item on"><div class="t">같이 놀기 손님의 참가</div><div class="s">이번 범위</div></div>
+      <div class="item"><div class="t">다른 종목(토벌 대회, 라멘 대회)</div><div class="s">범위 밖</div></div>
+      <div class="item"><div class="t">마을끼리 견주는 순위</div><div class="s">범위 밖</div></div>
+    </div>
+    <p><span class="kv">피해야 할 것</span>늘 친구가 이기거나 늘 내가 이겨서 결과가 뻔한 것, 대회 한 판 때문에 하루가 다 지나가는 것, 손님이 보낸 기록 때문에 주인 마을 순위판이 망가지는 것, 막대 과자 데이와 겹쳐 광장 장식이 깨지는 것.</p>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>고른 방식</h2>
+    <p>세 방식을 견주었다.</p>
+    <div class="versus three">
+      <div class="opt">
+        <h3>언제든 접수</h3>
+        <ul>
+          <li class="pro">아무 때나 대회를 열어서 혼자서도 언제든 된다.</li>
+          <li class="con">사용자 말대로 처음 몇 번만 신기하고 행사 느낌이 없다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>정해진 대회 날<span class="tag">고른 안</span></h3>
+        <ul>
+          <li class="pro">요일마다 대회 날이 와서 행사 분위기와 기다리는 재미가 있다.</li>
+          <li class="con">그날을 놓치면 일주일(실제로 한 시간 반쯤)을 기다린다.</li>
+        </ul>
+      </div>
+      <div class="opt">
+        <h3>기록 겨루기</h3>
+        <ul>
+          <li class="pro">친구들이 세운 마을 기록판의 기록을 깨는 방식이라 가장 간단하다.</li>
+          <li class="con">함께 겨루는 느낌이 없다.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="verdict">사용자가 정해진 대회 날을 골랐다. 게임 한 주는 실제로 한 시간 반쯤이라 대회는 실제로 40분 남짓마다 한 번 열린다.</div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>대회 날 흐름</h2>
+    <div class="timelines">
+      <div class="tl">
+        <span class="lab">대회 날</span>
+        <span class="step">전날 저녁 6시 소식</span><span class="arrow">→</span>
+        <span class="step">아침 6시 장식</span><span class="arrow">→</span>
+        <span class="step solid">오전 9시 ~ 오후 5시 접수</span><span class="arrow">→</span>
+        <span class="step solid">오후 5시 시상식</span><span class="arrow">→</span>
+        <span class="step">자정에 장식 걷기</span>
+      </div>
+    </div>
+    <dl>
+      <dt>전날 저녁 6시</dt>
+      <dd>「내일은 마을 낚시 대회!」 소식이 뜬다(집세 날 전날 알림과 같은 방식). 손님 화면에도 마을 소식으로 간다.</dd>
+      <dt>당일 아침 6시</dt>
+      <dd>광장 둘레에 깃발 줄과 대회 현수막이 걸린다. 막대 과자 데이 장식을 다시 쓰고 현수막 글만 「마을 낚시 대회」나 「마을 풀 뽑기 시합」으로 바꾼다. 게시판 옆에는 「대회 접수」 탁자가 놓이고 처음 아침에 배너가 한 번 뜬다.</dd>
+      <dt>오전 9시 ~ 오후 5시</dt>
+      <dd>노동 갑옷 씨에게 말을 걸면 「대회 나가기」, 「순위판 보기」가 뜬다. 친구들은 낮 동안 하나둘 참가한다.</dd>
+      <dt>오후 5시</dt>
+      <dd>접수를 닫고 광장에서 시상식을 연다.</dd>
+      <dt>시상식 뒤</dt>
+      <dd>장식은 그날 밤 자정에 걷는다. 받지 못한 상품은 다음 대회 날 아침까지 노동 갑옷 씨에게 받는다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>한 판 규칙</h2>
+    <table>
+      <tr><th style="width:110px">종목</th><th>점수</th><th style="width:170px">같을 때</th><th style="width:180px">빌려주는 것</th></tr>
+      <tr><td>낚시 대회</td><td>3분 동안 낚은 물고기 수(빈 깡통은 빼고)</td><td>가장 큰 물고기(cm)가 큰 쪽</td><td>낚싯대가 없으면 대회 낚싯대(그 판에만)</td></tr>
+      <tr><td>풀 뽑기 시합</td><td>3분 동안 뽑은 풀 점수: 깔끔하게 뽑으면 2점, 끊기면 1점(독풀이 끊겨도 1점)</td><td>깔끔하게 뽑은 수가 많은 쪽</td><td>없음(내 급수로 뽑을 수 있는 풀만)</td></tr>
+    </table>
+    <dl>
+      <dt>어디서나</dt>
+      <dd>낚시는 연못, 시냇물, 호수, 바다 어느 물에서나 하고 풀은 마을과 바깥 어디서나 뽑는다. 3분 안에 갈 수 있는 곳이 곧 전략이 된다.</dd>
+      <dt>기운</dt>
+      <dd>한 판에 들어갈 때 기운 10을 쓴다. 판 안에서 던지기와 당기기는 기운을 쓰지 않는다. 평소처럼 쓰면 3분 낚시에 기운이 100 가까이 들어 한 판도 버티지 못한다. 기운이 10보다 적으면 들어가지 못한다.</dd>
+      <dt>시계</dt>
+      <dd>내 한 판 동안은 마을 시계가 멈춘다. 실제 3분이 게임 안 6시간이라 그대로 두면 한 판 만에 오후가 끝난다. 시계가 멈춘 동안 친구들은 하던 일을 그대로 이어 가고 해는 움직이지 않는다. 사용자가 이 방식을 골랐다(다른 안은 한 판을 90초로 줄이고 하루 두세 판).</dd>
+      <dt>잡은 것</dt>
+      <dd>판 안에서 낚은 물고기와 뽑은 풀은 세기만 하고 놓아준다. 가방, 일감, 팔기로 가지 않는다. 판 안에서는 기운이 들지 않고 시계도 멈추므로 가방에 넣으면 판을 되풀이해 물고기를 공짜로 모을 수 있다(호수나 바다에서는 한 판에 1,000원어치쯤). 낚시 도감과 풀 도감 기록은 평소처럼 남아서 처음 본 종류는 도감에 오른다. 사용자가 이 방식을 골랐다.</dd>
+      <dt>다시 하기</dt>
+      <dd>몇 번이든 다시 한다. 순위판에는 그날 가장 좋은 기록 하나만 오른다.</dd>
+      <dt>화면</dt>
+      <dd>화면 위에 남은 시간, 이번 판 점수, 그날 가장 좋은 기록이 뜬다. 낚을 때마다 「+1」, 풀을 뽑을 때마다 「+2」나 「+1」이 뜬다.</dd>
+      <dt>끝나는 때</dt>
+      <dd>3분이 지나거나, 노동 갑옷 씨에게 「그만하기」를 하거나, 몬스터에게 쓰러지거나, 이야기 장면이나 잠이 시작되면 끝난다. 끝날 때까지의 점수를 기록으로 친다.</dd>
+      <dt>풀 뽑기 날의 풀</dt>
+      <dd>그날은 마을과 들판의 풀이 더 빨리 다시 자란다(평소 20초마다 한 포기에서 6초마다, 자리마다 상한 1.5배). 친구들까지 뽑으면 금세 풀이 바닥나기 때문이다. 다음 날 아침에 평소대로 돌아간다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>친구들의 참가</h2>
+    <dl>
+      <dt>누가</dt>
+      <dd>치이카와, 하치와레, 우사기, 쿠리만쥬, 랏코, 모몽가 여섯. 갑옷 씨들은 진행만 한다.</dd>
+      <dt>언제</dt>
+      <dd>친구마다 그날 오전 9시 ~ 오후 4시 사이에 한 번 참가한다(그날 날짜로 정해지는 때). 그때 깨어 있고 다른 일(부탁 장면, 토벌 파티, 시험)에 묶여 있지 않아야 한다. 못 하면 그날 기록이 없다.</dd>
+      <dt>보이는 모습</dt>
+      <dd>낚시 대회면 대회 낚싯대를 들고 가까운 물가로 가서 실제로 낚시하고 풀 뽑기 시합이면 풀밭에서 풀을 뽑는다. 이미 있는 친구 낚시(<code>npcFishHobby</code>)와 풀 일감 걸음을 다시 쓴다. 참가하는 동안 머리 위에 「대회 중」이 뜬다.</dd>
+      <dt>기록</dt>
+      <dd>보이는 낚시 결과와 상관없이, 친구마다 솜씨표에서 기록을 뽑아 참가가 끝날 때 순위판에 올린다. 같이 놀기 손님 화면에서도 같은 기록이 보여야 하므로 주인 쪽에서 한 번만 뽑는다.</dd>
+      <dt>솜씨</dt>
+      <dd>처음 값이고 조정은 만드는 사람이 시뮬레이션으로 한다. 낚시는 랏코와 쿠리만쥬가 상, 하치와레와 우사기가 중(우사기는 들쭉날쭉), 치이카와와 모몽가가 하. 풀은 랏코와 우사기가 상, 쿠리만쥬와 하치와레가 중, 치이카와와 모몽가가 하.</dd>
+      <dt>풀 솜씨와 내 급수</dt>
+      <dd>풀 솜씨는 내 제초 급수에 맞춰 오른다. 급수가 높을수록 낮은 급수 풀의 초록 칸이 넓어져서(최대 1.6배) 친구 솜씨가 고정이면 급수 높은 사람이 늘 이긴다. 낚시에는 급수가 없어 친구 솜씨가 고정이다.</dd>
+      <dt>맞추는 기준</dt>
+      <dd>한 판 점수로 잰다. 반응이 0.2초 늦는 보통 사람 모델(기운은 넉넉하고 풀은 그 사람 급수로)로 3분 한 판을 시뮬레이션해서 한 판만 한 보통 사람이 대회 절반쯤에서 3등 안에 들고 1등은 다섯 번에 한 번쯤 하게 맞춘다. 여러 판을 하면 그날 가장 좋은 기록이 오르니 많이 할수록 1등에 가까워진다. 익숙한 사람은 한 판으로도 1등이 잦다. 친구 1등은 랏코에 몰리지 않게 한다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>순위판과 시상식</h2>
+    <dl>
+      <dt>순위판</dt>
+      <dd>노동 갑옷 씨의 「순위판 보기」와 마을폰에서 본다. 이름, 점수, 같을 때 가르는 값(가장 큰 물고기 cm나 깔끔하게 뽑은 수)을 보이고 아직 참가하지 않은 친구는 「아직」으로 둔다.</dd>
+      <dt>시상식(오후 5시)</dt>
+      <dd>내가 마을 안에 있고 잠, 기절, 이야기 장면, 친구 집 안이 아니면 광장에서 시상식 장면을 본다. 친구들이 광장으로 모이고(막대 과자 파티처럼 불러 모은다) 1~3등이 단상에 선다. 종이꽃가루가 터지고 배너로 1~3등과 내 등수를 알린다.</dd>
+      <dt>시상식을 놓치면</dt>
+      <dd>장면 없이 결과만 정하고 다음에 노동 갑옷 씨에게 말을 걸 때 결과와 상품을 받는다. 이야기 장면이나 잠 때문에 5시를 넘기면 그것이 끝난 뒤 바로 연다(그날 밤 9시까지).</dd>
+      <dt>단상</dt>
+      <dd>시상식 동안만 광장 가운데에 나타나는 세 칸 단상. 모델은 fable이 만든다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>상품과 기록</h2>
+    <table>
+      <tr><th style="width:90px">등수</th><th>상품</th></tr>
+      <tr><td>1등</td><td>1,000원, 그 종목에서 처음 1등이면 트로피 가구(낚시 대회 트로피, 풀 뽑기 시합 트로피)</td></tr>
+      <tr><td>2등</td><td>600원</td></tr>
+      <tr><td>3등</td><td>400원</td></tr>
+      <tr><td>참가</td><td>150원(한 판이라도 했으면)</td></tr>
+    </table>
+    <p>상품은 대회 날마다 한 번이다. 몇 판을 해도 그날 등수로 한 번 받는다.</p>
+    <p>업적 둘을 더한다. 「낚시 대회 우승」(낚시 대회에서 1등 한다, 칭호 「낚시 대회 우승자」)과 「풀 뽑기 시합 우승」(풀 뽑기 시합에서 1등 한다, 칭호 「풀 뽑기 시합 우승자」)이다. 돈은 붙이지 않는다. 묶음은 생활이고 업적은 34개, 칭호는 15개가 된다.</p>
+    <p>트로피 가구 둘은 업적 기념 가구처럼 가게에서 팔지 않고 집 상자로 간다. 모델은 fable이 만든다.</p>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>같이 놀기</h2>
+    <dl>
+      <dt>참가</dt>
+      <dd>손님은 놀러 간 마을의 대회에 참가한다. 손님 쪽은 놀러 가 있는 동안 자기 마을 시계가 멈춰 있으니 대회 날과 시각은 주인 마을 것을 따른다.</dd>
+      <dt>손님의 한 판</dt>
+      <dd>손님이 노동 갑옷 씨에게 말을 걸어 판을 시작하고 낚시나 풀 뽑기는 지금처럼 손님 쪽에서 한다. 판이 끝나면 점수를 주인에게 보낸다(<code>multi.act</code>, <code>t: 'contest'</code>). 주인은 점수가 그 종목에서 나올 수 있는 범위인지 확인하고(3분 동안 낚시 40마리, 풀 120점 넘는 값은 버린다) 순위판에 넣는다.</dd>
+      <dt>손님의 시계</dt>
+      <dd>주인 시계는 손님의 판 때문에 멈추지 않는다. 손님이 판을 하는 동안 오후 5시가 되면 그 판은 그 자리에서 끝나고 그때까지 점수를 보낸다. 손님은 오후 4시 30분이 넘으면 새 판을 시작하지 못한다.</dd>
+      <dt>순위판 나누기</dt>
+      <dd>주인은 순위판을 마을 모습(<code>sendWorld</code>)의 새 키 <code>'ct'</code>로 1초마다 보낸다. 손님 이름은 같이 놀기 이름을 쓴다.</dd>
+      <dt>시상식</dt>
+      <dd>주인 쪽 시상식 때 손님에게 등수를 보낸다(<code>multi.direct</code>, <code>t: 'prize'</code>). 상품과 업적은 손님 자기 저장에 들어간다. 손님이 시상식 전에 돌아가면 그 손님 기록은 순위판에 남지만 상품은 없다.</dd>
+      <dt>주인이 놀러 가 있으면</dt>
+      <dd>주인이 대회 날인데 친구 마을에 놀러 가 있으면 주인 마을 대회는 그동안 멈춰 있다(주인 시계가 멈추므로).</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>겹치는 날과 예외</h2>
+    <dl>
+      <dt>막대 과자 데이</dt>
+      <dd>11월 11일(수)은 막대 과자 데이 파티 날이고 풀 뽑기 시합 날이다. 광장 장식은 막대 과자 데이가 먼저이고 대회는 그대로 연다. 오후 5시 시상식 뒤 저녁 6시부터 파티가 이어진다. 앞으로 다른 해에도 겹치면 같은 규칙이다.</dd>
+      <dt>튜토리얼</dt>
+      <dd>첫날 안내가 끝나고 3일째부터 대회가 열린다.</dd>
+      <dt>날씨</dt>
+      <dd>비나 눈이 와도 대회는 열린다. 비 오는 날 낚시 대회면 미꾸라지도 낚인다.</dd>
+      <dt>몸이 바뀌었다(사이드스토리) 동안</dt>
+      <dd>대회는 열리지만 나는 참가하지 못한다(친구 지갑과 가방을 들고 있어서). 친구 기록만 오른다.</dd>
+      <dt>대회 날 몬스터</dt>
+      <dd>바깥 몬스터는 평소대로다. 바깥 물가에서 낚시하다 쓰러지면 그 판이 끝난다.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="num">10</div>
+  <div class="body">
+    <h2>저장</h2>
+<pre>state.contest = {
+  day: 마지막 대회 날 번호, kind: 'fish' | 'weed',
+  best: { s: 점수, t: 같을 때 가르는 값 } | null, rounds: 그날 한 판 수,
+  npc: { 친구 kind: { s, t } }, rank: 정해진 등수 | null, got: 상품을 받았는지,
+  wins: { fish: 1등 한 수, weed: 1등 한 수 }
+}</pre>
+    <dl>
+      <dt>새 대회 날</dt>
+      <dd>다음 대회 날 아침에 day, kind, best, rounds, npc, rank, got을 새로 쓰고 wins는 그대로 둔다. 받지 못한 상품은 그때 사라진다.</dd>
+      <dt>저장 검사</dt>
+      <dd>save.js의 <code>isValidState</code>에 <code>isValidContest</code> 한 줄을 더한다. 모르는 kind, 음수나 소수 점수, 모르는 친구 kind가 있으면 저장을 거부하지 않고 그 칸만 버린다(업적 때처럼 통째로 거부하면 다음에 값을 바꿀 때 예전 저장이 깨진다).</dd>
+      <dt>손님 기록</dt>
+      <dd>손님 이름과 점수는 저장하지 않는다(그날 순위판에만 둔다).</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="num">11</div>
+  <div class="body">
+    <h2>시험과 확인</h2>
+    <dl>
+      <dt>node 테스트</dt>
+      <dd>대회 날 계산(토요일 낚시, 수요일 풀, 3일째 전에는 없음, 막대 과자 데이와 겹치는 날), 점수 규칙(깡통 빼기, 같을 때 가르기, 깔끔 2점과 끊김 1점), 등수와 상품(한 번만, 참가상), 친구 기록 뽑기가 날짜로 늘 같다는 것, 저장 검사, 업적 34개와 칭호 15개, 손님 점수 범위 확인.</dd>
+      <dt>시뮬레이션 테스트</dt>
+      <dd>0.2초 늦는 보통 사람과 익숙한 사람의 3분 낚시, 풀 뽑기 점수와 친구 솜씨표를 맞춰 5절의 기준(보통 사람 3등 안 절반쯤, 1등 다섯에 하나쯤)을 고정한다.</dd>
+      <dt>브라우저</dt>
+      <dd>대회 날 장식과 접수, 한 판(시계 멈춤, 기운 10, 빌린 낚싯대, 점수 표시), 친구 참가 모습, 순위판, 시상식 장면, 놓친 상품 받기, 막대 과자 데이와 겹친 날, 손님 참가(시험 서버 5299에서만).</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="num">12</div>
+  <div class="body">
+    <h2>정한 값과 확인할 것</h2>
+    <table>
+      <tr><th style="width:250px">항목</th><th>정한 것과 근거</th></tr>
+      <tr><td>대회 요일, 접수 시각, 한 판 3분</td><td>토요일 낚시, 수요일 풀, 오전 9시 ~ 오후 5시, 3분. 사용자가 승인한 짧은 설계 그대로.</td></tr>
+      <tr><td>내 한 판 동안 시계 멈춤</td><td>짧은 설계에는 없던 것. 실제 3분이 게임 안 6시간이라 사용자에게 물었고 사용자가 멈추는 쪽을 골랐다.</td></tr>
+      <tr><td>판 안에서 잡은 것</td><td>세기만 하고 놓아주고 도감 기록은 남긴다. 빌더 확인에서 나온 질문을 사용자에게 물었고 사용자가 골랐다.</td></tr>
+      <tr><td>순위 기준과 친구 풀 솜씨</td><td>순위 기준은 한 판 점수, 친구 풀 솜씨는 내 제초 급수에 맞춰 오른다. 정한 값.</td></tr>
+      <tr><td>접수 자리</td><td>짧은 설계의 「광장 접수 탁자」 대신 노동 갑옷 씨가 서 있는 게시판 옆. 게시판이 광장 바로 바깥이라 그 자리에 탁자를 둔다.</td></tr>
+      <tr><td>게시판 공지</td><td>짧은 설계에는 「게시판에도 붙는다」고 했지만 게시판에 글을 붙이는 기능이 없어 전날 저녁 소식과 당일 아침 배너로 바꿨다.</td></tr>
+      <tr><td>기운</td><td>한 판에 10, 판 안에서는 기운을 쓰지 않는다. 정한 값.</td></tr>
+      <tr><td>풀 뽑기 날의 풀</td><td>6초마다 다시 자라고 상한 1.5배. 정한 값.</td></tr>
+      <tr><td>상품 값</td><td>1,000원, 600원, 400원, 참가 150원. 짧은 설계 그대로.</td></tr>
+      <tr><td>업적 둘</td><td>돈 없이 칭호만, 묶음은 생활. 정한 값.</td></tr>
+      <tr><td>손님 판의 마감과 점수 상한</td><td>오후 4시 30분 이후 새 판 금지, 5시에 끊김, 낚시 40과 풀 120 넘는 점수는 버림. 정한 값.</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <span>마을 대회 설계서 · 2026-11-26</span>
+  <span><a href="Dex-Achievements-2026-11-16.html">도감과 업적 설계서</a></span>
+</footer>
+
+</div>
+</body>
+</html>
