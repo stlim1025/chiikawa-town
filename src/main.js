@@ -128,8 +128,9 @@ import { createHousewarm } from './stories/housewarm.js';
 import { createStickParty } from './stories/stickday.js';
 import { createFestival } from './world/festival.js';
 import { createContestProps } from './world/contestprops.js';
+import { createContestCeremony } from './stories/contest.js';
 import { CONTESTS, CLOSE_HOUR, OPEN_HOUR, NPC_LAST_START, NPC_PLAY_HOURS, CONTEST_FRIENDS, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
-  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour } from './core/contest.js';
+  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize } from './core/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -1112,6 +1113,7 @@ function boot() {
   // ---------- 창 ----------
   let appNudge = null; // 새로 생긴 마을폰 앱(지도를 막 샀으면 'map'): 그 앱을 열 때까지 마을폰 버튼 · 앱 아이콘이 빛난다
   const panels = createPanels(ui, {
+    contestBoard: () => contestBoard(), // 마을폰 대회 앱(core/contest.js)
     getState: () => state,
     // 모금함 창: 친구 마을에 놀러 간 동안은 그 마을 모금(worksPanelState)과 주인 이름
     worksState: () => worksPanelState(),
@@ -1775,6 +1777,7 @@ function boot() {
       pajama.reset();
       housewarm.reset();
       stickParty.reset();
+      contestCeremony.reset();
       confetti.clear();
       islandTrip.reset();
       idolStory.reset();
@@ -3350,7 +3353,7 @@ function boot() {
   let islandTrip = null; // 사이드스토리 '수상한 섬 합숙'(stories/island.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let housewarm = null, stickParty = null, confetti = null, festival = null; // 마을 이벤트(집들이 · 막대 과자 데이 — 아래에서 만든다)
-  let contestProps = null; // 마을 대회 접수 탁자 · 시상식 단상(world/contestprops.js — 아래에서 만든다)
+  let contestProps = null, contestCeremony = null; // 마을 대회 접수 탁자 · 시상식 단상(world/contestprops.js) · 시상식 장면(stories/contest.js) — 아래에서 만든다
   let contestRound = null; // 마을 대회 한 판 { kind, s, t, clean, left, guest }(core/contest.js)
   const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 연결 id → { name, s, t }
   const contestUi = { eveDay: 0, morningDay: 0 }; // 전날 저녁 알림 · 당일 아침 배너를 띄운 날
@@ -3366,7 +3369,7 @@ function boot() {
   let blackStar = null; // 사이드스토리 '검은 별똥별'(stories/blackstar.js — 아래에서 만든다)
   let cameraStory = null; // 사이드스토리 '하치와레의 카메라'(stories/camera.js — 아래에서 만든다)
   const staged = new Set(); // 연출에 붙잡혀 있는 친구들(일과 · 잠자러 가기를 잠시 미룬다)
-  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (housewarm && housewarm.active) || (stickParty && stickParty.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active) || (nantokaStory && nantokaStory.active));
+  const funBusy = () => !!(talking || tag || dance || overlay || starShow || (usagiClub && usagiClub.active) || (hachiPit && hachiPit.active) || (pajama && pajama.active) || (housewarm && housewarm.active) || (stickParty && stickParty.active) || (contestCeremony && contestCeremony.active) || (idolStory && idolStory.active) || (islandTrip && islandTrip.active) || (starDiner && starDiner.active) || (blackStar && blackStar.active) || (bonbonStory && bonbonStory.active) || (cameraStory && cameraStory.active) || (switchStory && switchStory.active) || (odeStory && odeStory.active) || (swapStory && swapStory.active) || (nantokaStory && nantokaStory.active));
   // 줄마다 말하는 사람이 다를 수 있다({ who: 친구 kind | 이름표, text }): 친구 kind 면 그 친구 이름표로
   const fillName = (line) => (typeof line === 'string' ? line.replaceAll('{name}', state.profile.name)
     : { ...line, text: fillName(line.text), ...(typeof line.who === 'string' ? { who: whoOf({ kind: line.who }) } : {}) });
@@ -3466,7 +3469,8 @@ function boot() {
     if (n.kind === 'kurimanju' && mode !== 'visit') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : lessonQuest ? ['lesson', '강의 들으러 왔어'] : ['study', '술 공부하고 싶어']);
     if (n.kind === 'pochette') opts.push(['shop', '포셰트 구경할래']);
     // 노동 갑옷 씨: 마을 대회 접수(core/contest.js) — 대회 날이면 맨 위에
-    if (n.kind === 'labor' && mode === 'play' && contestKindHere()) opts.unshift(contestRound ? ['cquit', '대회 그만할래요'] : ['cjoin', `${CONTESTS[contestKindHere()].name} 나갈래요`]);
+    if (n.kind === 'labor' && mode === 'play' && contestKindHere()) opts.unshift(contestRound ? ['cquit', '대회 그만할래요'] : ['cjoin', `${CONTESTS[contestKindHere()].name} 나갈래요`], ['cboard', '순위판 보여 주세요']);
+    if (n.kind === 'labor' && !visiting && contestOf(state).rank != null && !contestOf(state).got) opts.unshift(['cprize', '대회 상품 받으러 왔어요']);
     // 지갑이 있는 친구: 하트를 꽉 채우면 돈을 빌릴 수 있고, 빌렸으면 갚는다. 쫓겨났으면 밤에 하룻밤 재워 달라고 한다.
     if (VILLAGERS[n.kind]) {
       const debt = debtOf(state, n.kind);
@@ -3495,6 +3499,8 @@ function boot() {
       else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`「${QUESTS[id].title}」`, goalLine(id), n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
       else if (k === 'cjoin') contestJoin(n);
+      else if (k === 'cboard') { endTalk(); panels.openContest(); }
+      else if (k === 'cprize') sayAs(n, ['기다렸다. 대회 상품이다!'], () => { endTalk(); claimContest(); });
       else if (k === 'cquit') sayAs(n, ['수고했다. 기록은 남겨 두마.'], () => { endTalk(); finishRound('quit'); });
       else if (k === 'chat') {
         // 오늘 있었던 일 · 들은 소문 · 내 큰일 이야기가 있으면 먼저(한 번 한 이야기는 다시 안 한다)
@@ -4008,9 +4014,55 @@ function boot() {
     const phase = contestPhase(hour, !!(contestRound && !contestRound.guest));
     const now = contestOf(state);
     if ((phase === 'ceremony' || phase === 'closed') && now.rank == null && !now.got) {
+      // 한 판이라도 했으면 광장 시상식(마을 안에서 다른 일이 없을 때 — 막히면 9시까지 기다린다), 아니면 조용히 정리
+      if (phase === 'ceremony' && now.best) { if (canCeremony()) startCeremony(); return; }
       const c = settleContestDay();
       if (c.best) hud.toast(`${CONTESTS[kind].name} 결과는 노동 갑옷 씨에게 들어요`, 3200);
     }
+  }
+  /** 마을폰 대회 앱 · 순위판: 오늘 대회면 순위(나 · 친구 · 손님, 아직 안 한 친구는 끝에), 아니면 다음 대회 날. */
+  function contestBoard() {
+    const rec = contestOf(state);
+    if (visiting) {
+      const v = visiting.contest;
+      if (!v) return { kind: null, today: false, next: null, wins: rec.wins };
+      return { kind: v.k, today: true, phase: v.o ? 'open' : 'ceremony', host: multi.hostName || '친구', wins: rec.wins,
+        rows: v.b.map(([name, s, t, type, rank]) => ({ name, s, t, rank, me: type === 'guest' && name === myName(), yet: type === 'yet' })) };
+    }
+    const today = contestKindHere();
+    if (today && rec.day === state.clock.day) {
+      const entries = [...(rec.best ? [{ who: 'me', name: myName(), me: true, ...rec.best }] : []), ...Object.entries(rec.npc).map(([k, r]) => ({ who: k, name: FRIENDS[k].name, ...r })), ...contestGuestList().map((g) => ({ ...g, guest: true }))];
+      const yet = CONTEST_FRIENDS.filter((k) => !rec.npc[k]).map((k) => ({ who: k, name: FRIENDS[k].name, yet: true }));
+      return { kind: today, today: true, phase: contestPhase(hourOf(state.clock), !!contestRound), rows: [...rankBoard(entries), ...yet], wins: rec.wins };
+    }
+    let d = state.clock.day + 1;
+    while (!contestKindOn(state.startDate, d) && d < state.clock.day + 8) d++;
+    return { kind: null, today: false, next: { kind: contestKindOn(state.startDate, d), date: dateLabel(state.startDate, d) }, wins: rec.wins };
+  }
+  /** 시상식 장면을 열 수 있는지: 내 마을 바깥(play) 마을 안에서 잠 · 기절 · 이야기 · 창 · 대화가 없을 때. */
+  const canCeremony = () => mode === 'play' && !visiting && !sleeping && !fainting && !downed && !questScene && !funBusy() && !panels.isOpen() && !guide.open
+    && Math.hypot(player.position.x, player.position.z) < VILLAGE_R;
+  /** 오후 5시 광장 시상식: 등수를 정하고 장면을 연 뒤 상품을 받는다. */
+  function startCeremony() {
+    cancelPull();
+    if (fishing) cancelFish();
+    const before = contestOf(state);
+    const c = settleContestDay();
+    const named = (e) => ({ ...e, name: e.who === 'me' ? myName() : FRIENDS[e.who] ? FRIENDS[e.who].name : e.name || '친구' });
+    const top = rankBoard([{ who: 'me', ...before.best }, ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r })), ...contestGuestList()])
+      .filter((e) => e.rank <= 3).slice(0, 3).map(named);
+    contestCeremony.play({ kind: c.kind, top, me: { rank: c.rank, s: before.best.s }, guests: CONTEST_FRIENDS.filter((k) => npcs.byKind(k)) }, () => claimContest());
+  }
+  /** 대회 상품 받기(시상식 뒤 바로, 놓쳤으면 노동 갑옷 씨에게). */
+  function claimContest() {
+    const c = contestOf(state), r = claimContestPrize(state);
+    if (!r.ok) return false;
+    commit(r.state);
+    const chips = [{ icon: 'coin', text: `+${won(r.money)}` }];
+    if (r.trophy) chips.push({ text: FURNITURE[r.trophy].name });
+    hud.questDone({ title: c.rank <= 3 ? `${CONTESTS[c.kind].name} ${c.rank}등!` : `${CONTESTS[c.kind].name} 참가상`, sub: r.trophy ? '트로피는 집 상자에 넣었어요' : '', chips, ms: 4800 });
+    sound.play('coin');
+    return true;
   }
   /** 지금 있는 마을의 오늘 대회 종목(내 마을: 튜토리얼 뒤 그날 종목, 친구 마을: 주인이 보낸 것). */
   function contestKindHere() {
@@ -5030,6 +5082,7 @@ function boot() {
   };
   housewarm = createHousewarm(eventCtx);
   stickParty = createStickParty(eventCtx);
+  contestCeremony = createContestCeremony({ ...eventCtx, props: contestProps });
   usagiClub = createUsagiClub({
     getState: () => state, commit: (s) => commit(s), npcs, get player() { return player; }, cam, village, input, hud, guide, sound, club, rhythm, burrows, staged,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
@@ -8231,6 +8284,7 @@ function boot() {
       pajama.update(dt);
       housewarm.update(dt);
       stickParty.update(dt);
+      contestCeremony.update(dt);
       confetti.update(dt);
       cameraStory.update(dt);
       idolStory.update(dt);
@@ -8336,7 +8390,7 @@ function boot() {
       if (starShow) starCamera(dt);
       else if (closeup) closeupCamera(dt);
       else {
-        const pp = pajama.camPose(dt) || housewarm.camPose(dt) || stickParty.camPose(dt) || cameraStory.camPose() || roarCamPose(dt); // 이야기 카메라(별 보기 · 뷰파인더 · 아노코 포효)
+        const pp = pajama.camPose(dt) || housewarm.camPose(dt) || stickParty.camPose(dt) || contestCeremony.camPose(dt) || cameraStory.camPose() || roarCamPose(dt); // 이야기 카메라(별 보기 · 뷰파인더 · 아노코 포효)
         if (pp) { cam.set(pp.pos, pp.look); storyCam = true; }
         else {
           // 이야기 카메라가 끝나면 따라가기 카메라를 바로 내 자리에 붙인다(연출 전 자리 — 마을 — 에서 날아오지 않게)

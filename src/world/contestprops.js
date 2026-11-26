@@ -15,7 +15,8 @@ const WOOD = '#c49a6c', DARK_WOOD = '#8a5a34', CREAM = '#fff6e0', RED = '#e0524f
 // 접수대: 게시판(노동 접수) 동쪽 옆. 서쪽에는 일감 걸이가 서 있다
 const DESK_SIDE = 2.1, DESK_HX = 0.66, DESK_HZ = 0.36;
 // 시상대: 광장 한가운데(시계탑 자리)에서 남쪽으로. 앞면이 남쪽(카메라 쪽)을 본다
-const POD = { x: PLAZA.x, z: PLAZA.z + 3.6, w: 0.9, d: 0.8, cap: 0.06 };
+// 광장 동쪽(시계탑 오른쪽): 남쪽에 두면 남쪽 길목 현수막이 카메라 앞을 가려 단상이 안 보였다
+const POD = { x: PLAZA.x + 3.4, z: PLAZA.z - 0.3, w: 0.9, d: 0.8, cap: 0.06 };
 // 1등(가운데), 2등(화면 왼쪽 = 서쪽), 3등(오른쪽) 순서
 const STEPS = [
   { dx: 0, h: 0.6, top: '#fcd95b', n: '1' },

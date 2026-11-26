@@ -1446,6 +1446,18 @@ button.phone-tour:active { transform: translateY(2px); }
 .ach-stamp b { font-size: 15px; letter-spacing: 2px; }
 .ach-stamp small { color: #b07a16; font-size: 11px; }
 @media (prefers-reduced-motion: reduce) { .ach-card.ready .ach-medal { animation: none; } }
+/* 마을폰 대회 앱(core/contest.js): 순위판 줄(등수 · 이름 · 점수 · 가르는 값), 나는 노란 줄, 아직 안 한 친구는 흐리게, 다음 대회 카드 */
+.app.contest .app-ico { background: #5aa9d6; }
+.ct-board { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 8px; }
+.ct-row { display: grid; grid-template-columns: 28px 1fr auto; column-gap: 8px; row-gap: 1px; align-items: center; padding: 8px 12px; border-radius: 14px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.ct-row .ct-rank { grid-row: 1 / span 2; color: #b07a16; font-size: 20px; text-align: center; }
+.ct-row .ct-name { font-size: 16px; }
+.ct-row .ct-score { justify-self: end; font-size: 16px; font-weight: 700; }
+.ct-row .ct-tie { grid-column: 2 / span 2; color: var(--ink-soft); font-size: 12px; }
+.ct-row.me { background: var(--butter); }
+.ct-row.yet { opacity: 0.55; }
+.ct-next { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; padding: 12px 14px; border-radius: 16px; background: var(--paper); box-shadow: 0 2px 0 var(--shadow); }
+.ct-next small { color: var(--ink-soft); font-size: 13px; }
 /* 왼쪽 위 칭호 띠(업적 앱에서 단 칭호) */
 .hud-title { padding: 1px 12px 3px; border-radius: 999px; background: #fff2c2; box-shadow: 0 2px 0 #e2c162; color: #6a4a10; font-size: 15px; rotate: 2deg; }
 /* 마을폰 친구 앱: 하트 줄 · 다음 하트까지 · 오늘 한 일 꼬리표 */

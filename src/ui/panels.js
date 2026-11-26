@@ -33,6 +33,7 @@ import { QUESTS, QUEST_ORDER, questState, shortGoal, progressOf, isDone, isActiv
 import { ACH_GROUPS, ACHIEVEMENTS, progressOf as achProgress, titlesOf } from '../core/achieve.js';
 import { achTier, medalSvg, groupIconSvg, TROPHY_SVG } from './achart.js';
 import { dateOf } from '../core/calendar.js';
+import { CONTESTS } from '../core/contest.js';
 import { FRIENDS, friendOf, hearts, MAX_HEARTS } from '../core/friends.js';
 import { charSvg, hasCharArt } from './art.js';
 import { EMBLEM, licenseCardEl } from './licensecard.js';
@@ -65,6 +66,8 @@ const APP_ICON = {
   fishdex: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M29 21l7-6v12z" fill="#fff"/><ellipse cx="18" cy="21" rx="13" ry="8" fill="#fff"/><circle cx="11" cy="19" r="2.2" fill="#4f86b8"/><path d="M20 14q3 7 0 14" fill="none" stroke="#4f86b8" stroke-width="2" stroke-linecap="round"/></svg>',
   // 업적: 리본 달린 메달
   achieve: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 5h6l3 10h-6zM27 5h-6l-3 10h6z" fill="#fff" opacity=".85"/><circle cx="20" cy="24" r="10" fill="#fff"/><path d="M20 17.5l2 4.2 4.6.6-3.3 3.2.8 4.6-4.1-2.2-4.1 2.2.8-4.6-3.3-3.2 4.6-.6z" fill="#e0a830"/></svg>',
+  // 마을 대회: 세 칸 단상과 별
+  contest: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M15 17h10v16H15z" fill="#fff"/><path d="M5 24h10v9H5zM25 27h10v6H25z" fill="#fff" opacity=".85"/><path d="M20 4.5l1.7 3.4 3.7.5-2.7 2.6.7 3.7-3.4-1.8-3.4 1.8.7-3.7-2.7-2.6 3.7-.5z" fill="#fff"/></svg>',
   monsters: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 13l-3-7 8 4zM28 13l3-7-8 4z" fill="#fff"/><circle cx="20" cy="22" r="12" fill="#fff"/><ellipse cx="15.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><ellipse cx="24.5" cy="22" rx="2.2" ry="2.8" fill="#8a6fb0"/><path d="M12 17l6 2M28 17l-6 2" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/><path d="M16 28q4 3 8 0" fill="none" stroke="#8a6fb0" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 /** 몬스터가 사는 곳(안내서 · 도감). */
@@ -221,7 +224,7 @@ function monsterCards(s, withCount) {
 export function createPanels(ui, handlers) {
   let current = null; // { kind, extra, backdrop, panel, phone?, status?, view? }
   // 마을폰 화면들: 폰 하나 안에서 화면 내용만 바뀐다
-  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'achieve', 'fishdex', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
+  const PHONE_APPS = ['settings', 'options', 'saveio', 'licenses', 'map', 'weeds', 'monsters', 'achieve', 'contest', 'fishdex', 'quests', 'friends', 'multi', 'dev', 'devStories', 'search'];
   // 같이 놀기에서 고르는 한마디(자유 입력 대신 정해진 말만)
   const MP_SAYS = ['안녕~!', '같이 놀자!', '고마워!', '이쪽이야!', '잘 가~'];
   // 테스트 도구: 마을폰 제목을 빠르게 다섯 번 누르면 켜진다(이 브라우저에 기억)
@@ -1466,6 +1469,25 @@ export function createPanels(ui, handlers) {
       }
       return out;
     },
+    // 마을폰 '대회' 앱(core/contest.js, 게임 오리지널): 오늘 대회 순위판(등수 · 이름 · 점수 · 가르는 값, 아직 안 한 친구는 흐리게), 아니면 다음 대회 날
+    contest() {
+      const b = handlers.contestBoard?.(), unit = (k) => (k === 'fish' ? '마리' : '점');
+      const out = [appBar('대회', b && b.today ? CONTESTS[b.kind].name : '')];
+      if (!b) return out;
+      if (!b.today) {
+        if (b.next && b.next.kind) out.push(h('div', { class: 'ct-next' }, h('b', {}, '다음 대회'), h('span', {}, `${b.next.date} ${CONTESTS[b.next.kind].name}`),
+          h('small', {}, '토요일은 낚시 대회, 수요일은 풀 뽑기 시합이에요. 오전 9시부터 노동 갑옷 씨에게 접수해요')));
+        else out.push(h('p', { class: 'note' }, '지금 있는 마을은 오늘 대회가 없어요'));
+      } else {
+        out.push(h('p', { class: 'sub' }, b.host ? `${b.host}의 마을 대회` : b.phase === 'open' ? '접수 중이에요(오전 9시 ~ 오후 5시)' : b.phase === 'before' ? '오전 9시부터 접수해요' : '접수가 끝났어요'));
+        const tie = (r) => (b.kind === 'fish' ? (r.t ? `가장 큰 것 ${r.t}cm` : '') : r.t ? `깔끔 ${r.t}` : '');
+        out.push(h('div', { class: 'ct-board' }, ...b.rows.map((r) => h('div', { class: `ct-row${r.me ? ' me' : ''}${r.yet ? ' yet' : ''}` },
+          h('b', { class: 'ct-rank' }, r.yet ? '' : String(r.rank)), h('span', { class: 'ct-name' }, r.name),
+          h('span', { class: 'ct-score' }, r.yet ? '아직' : `${r.s}${unit(b.kind)}`), h('small', { class: 'ct-tie' }, r.yet ? '' : tie(r))))));
+      }
+      if (b.wins) out.push(h('p', { class: 'note' }, `내 1등 기록: 낚시 대회 ${b.wins.fish}번, 풀 뽑기 시합 ${b.wins.weed}번`));
+      return out;
+    },
     // 마을폰 '풀 도감' 앱: 급수별로 풀 그림 · 자라는 곳 · 요령 · 뽑은 수(못 뽑는 급수는 흐리게)
     weeds(s) {
       const log = s.weedLog || {}, grade = s.license.grade;
@@ -1526,6 +1548,7 @@ export function createPanels(ui, handlers) {
           app('multi', APP_ICON.multi, '같이 놀기', () => show('multi')),
           app('monsters', APP_ICON.monsters, '몬스터 도감', () => show('monsters')),
           app('achieve', APP_ICON.achieve, '업적', () => show('achieve')),
+          app('contest', APP_ICON.contest, '대회', () => show('contest')),
           hasTool(s, 'rod') || Object.keys(fishLogOf(s)).length ? app('fishdex', APP_ICON.fishdex, '낚시 도감', () => show('fishdex')) : null,
           handlers.searchApp?.() ? app('search', APP_ICON.search, '검색', () => show('search')) : null,
           devOn() ? app('dev', APP_ICON.dev, '테스트', () => show('dev')) : null,
@@ -1665,6 +1688,7 @@ export function createPanels(ui, handlers) {
     openMap: () => show('map'),
     openWeeds: () => show('weeds'),
     openMonsters: () => show('monsters'),
+    openContest: () => show('contest'),
     openQuests: () => show('quests'),
     openSettings: (extra) => show('settings', extra),
     /** 지금 그 창(kind)이 떠 있으면 다시 그린다(같이 놀기 연결 상태가 바뀌었을 때). */
