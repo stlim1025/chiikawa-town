@@ -130,7 +130,7 @@ import { createFestival } from './world/festival.js';
 import { createContestProps } from './world/contestprops.js';
 import { createContestCeremony } from './stories/contest.js';
 import { CONTESTS, CLOSE_HOUR, OPEN_HOUR, NPC_LAST_START, NPC_PLAY_HOURS, CONTEST_FRIENDS, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
-  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize } from './core/contest.js';
+  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize, guestScoreOk, guestPrize } from './core/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -519,6 +519,12 @@ function boot() {
         hud.toast(e[1].slice(0, 40), 2600, kind ? { icon: faceIcon(kind) } : null);
       }
     }
+    if (Array.isArray(w.w)) { // 1초마다 오는 묶음: 마을 대회 순위판(없으면 오늘 대회 없음)
+      const ct = w.ct && typeof w.ct === 'object' && Object.hasOwn(CONTESTS, w.ct.k) && Array.isArray(w.ct.b) ? w.ct : null;
+      visiting.contest = ct ? { k: ct.k, d: Math.floor(Number(ct.d)) || 0, o: !!ct.o, b: ct.b.slice(0, 12)
+        .filter((r) => Array.isArray(r) && typeof r[0] === 'string' && Number.isFinite(r[1]) && Number.isFinite(r[2]))
+        .map((r) => [r[0].slice(0, 12), Math.max(0, Math.floor(r[1])), Math.max(0, r[2]), ['me', 'npc', 'guest', 'yet'].includes(r[3]) ? r[3] : 'npc', Number.isInteger(r[4]) ? r[4] : 0]) } : null;
+    }
     if (Array.isArray(w.h)) {
       const house = parseHouse(w.h, w.hl), key = JSON.stringify([house.size, house.wall, house.floor, house.placed]);
       if (key !== visiting.houseKey) {
@@ -565,6 +571,14 @@ function boot() {
       const killed = monsters.playerHit(m, { x: a.x, z: a.z, dmg, knock: Math.max(0, Math.min(3, Number(a.knock) || 1)), by: 'mp:' + id });
       hud.floatText({ x: m.x, y: m.mesh.height * 0.85, z: m.z, text: `-${hitNum(m, dmg)}`, kind: 'dmg' });
       if (killed) guestKilled(id, m);
+      return;
+    }
+    if (a.t === 'contest') {
+      // 손님의 마을 대회 한 판(core/contest.js): 오늘 종목이고 3분 한 판에서 나올 수 있는 점수일 때만, 그 손님 가장 좋은 기록을 순위판에
+      const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null, rec = contestOf(state);
+      if (!kind || a.k !== kind || rec.rank != null || rec.got || !guestScoreOk(kind, a.s, a.b)) return;
+      const r = { name: (multi.nameOf(id) || '친구').slice(0, 12), s: a.s, t: a.b }, old = contestGuests.get(id);
+      if (!old || better(r, old)) contestGuests.set(id, r);
       return;
     }
     weedsT = 0; // 바뀐 풀 · 덤불 · 바닥 물건 · 모금은 다음 마을 모습으로 바로
@@ -728,6 +742,7 @@ function boot() {
     } else if (a.t === 'got') takeGot(a);
     else if (a.t === 'star') takeStar(a); // 주인이 별똥별에 소원을 빌었다
     else if (a.t === 'donated') takeDonated(a); // 주인 마을 모금함에 낸 돈을 주인이 받았다
+    else if (a.t === 'prize') takeContestPrize(a); // 주인 마을 대회 등수(상품은 내 저장에)
   }
   /**
    * 모금함 창에 보일 마을: 친구 마을에 놀러 간 동안은 주인 마을의 모금(모인 돈 · 공사 중 · 생김)과 시계로. 낼 돈은 내 돈 그대로.
@@ -1059,6 +1074,8 @@ function boot() {
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
       w.sb = [storyBuilt('starDiner') ? 1 : 0, storyBuilt('bodySwap') ? 1 : 0]; // 이야기 건물(별 세 개 · 게임센터)도 손님 화면에
       w.kp = WORK_IDS.map((id) => [id, workOf(state, id).paid]).filter((r) => r[1] > 0); // 시설마다 모인 돈(손님 모금함 창에 내 마을 금액으로)
+      const ct = contestWire();
+      if (ct) w.ct = ct; // 마을 대회 순위판(손님도 참가한다)
     }
     multi.sendWorld(w);
   }
@@ -3981,8 +3998,10 @@ function boot() {
     commit(settleContest(state, contestGuestList()));
     const c = contestOf(state);
     const entries = [...(before.best ? [{ who: 'me', ...before.best }] : []), ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r }))];
-    const top = rankBoard(entries)[0];
-    if (top && top.s > 0) happen({ type: 'contestWin', who: top.who, item: CONTESTS[c.kind].banner });
+    const board = rankBoard([...entries, ...contestGuestList()]), top = board[0];
+    if (top && top.s > 0 && !top.who.startsWith('mp:')) happen({ type: 'contestWin', who: top.who, item: CONTESTS[c.kind].banner });
+    // 같이 놀기 손님: 아직 내 마을에 있으면 등수를 보낸다(상품은 손님 저장에 — 돌아간 손님은 기록만 남는다)
+    for (const e of board) if (e.who.startsWith('mp:') && multi.players.some((p) => 'mp:' + p.id === e.who)) multi.direct(e.who.slice(3), { t: 'prize', k: c.kind, rank: e.rank });
     return c;
   }
   /**
@@ -4004,7 +4023,7 @@ function boot() {
     }
     if (!kind) return;
     const rec = contestOf(state);
-    if (rec.day !== day || rec.kind !== kind) commit(beginContestDay(state, day, kind));
+    if (rec.day !== day || rec.kind !== kind) { contestGuests.clear(); commit(beginContestDay(state, day, kind)); }
     if (contestUi.morningDay !== day && hour >= 6 && hour < CLOSE_HOUR && mode === 'play' && !sleeping && !fainting && !questScene) {
       contestUi.morningDay = day;
       hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
@@ -4019,6 +4038,25 @@ function boot() {
       const c = settleContestDay();
       if (c.best) hud.toast(`${CONTESTS[kind].name} 결과는 노동 갑옷 씨에게 들어요`, 3200);
     }
+  }
+  /** 주인: 손님에게 보낼 마을 대회 순위판 { k, d, o: 접수 중, b: [[이름, 점수, 가르는 값, 'me' | 'npc' | 'guest' | 'yet', 등수]] }(오늘 대회가 없으면 null). */
+  function contestWire() {
+    const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
+    if (!kind) return null;
+    const b = contestBoard();
+    const rows = b.today ? b.rows.slice(0, 12).map((r) => [String(r.name || '').slice(0, 12), r.yet ? 0 : r.s, r.yet ? 0 : r.t, r.yet ? 'yet' : r.me ? 'me' : r.guest ? 'guest' : 'npc', r.yet ? 0 : r.rank]) : [];
+    return { k: kind, d: state.clock.day, o: contestPhase(hourOf(state.clock), false) === 'open' ? 1 : 0, b: rows };
+  }
+  /** 손님: 주인 마을 대회 등수를 받았다 → 상품은 내 저장에(core/contest.js 의 guestPrize). */
+  function takeContestPrize(a) {
+    if (!Object.hasOwn(CONTESTS, a.k) || !Number.isInteger(a.rank) || a.rank < 1) return;
+    const r = guestPrize(state, a.k, a.rank);
+    if (!r.money) return;
+    commit(r.state);
+    const chips = [{ icon: 'coin', text: `+${won(r.money)}` }];
+    if (r.trophy) chips.push({ text: FURNITURE[r.trophy].name });
+    hud.questDone({ title: a.rank <= 3 ? `${CONTESTS[a.k].name} ${a.rank}등!` : `${CONTESTS[a.k].name} 참가상`, sub: `${multi.hostName || '친구'}네 마을 대회`, chips, ms: 4800 });
+    sound.play('coin');
   }
   /** 마을폰 대회 앱 · 순위판: 오늘 대회면 순위(나 · 친구 · 손님, 아직 안 한 친구는 끝에), 아니면 다음 대회 날. */
   function contestBoard() {
@@ -4098,7 +4136,7 @@ function boot() {
     if (fishing) cancelFish(); // 끝난 뒤에 낚인 물고기가 가방으로 가지 않게
     if (pulling) cancelPull();
     const unit = r.kind === 'fish' ? '마리' : '점';
-    if (r.guest) { if (multi.status === 'visiting') multi.act({ t: 'contest', k: r.kind, s: r.s, t: r.t }); hud.banner(`${r.s}${unit}!`, `${multi.hostName || '친구'}네 순위판에 올렸어요`, 3000); return; }
+    if (r.guest) { if (multi.status === 'visiting') multi.act({ t: 'contest', k: r.kind, s: r.s, b: r.t }); hud.banner(`${r.s}${unit}!`, `${multi.hostName || '친구'}네 순위판에 올렸어요`, 3000); return; } // b: 같을 때 가르는 값(t 는 메시지 종류)
     const prev = contestOf(state).best;
     commit(recordRound(state, r));
     hud.banner(`${r.s}${unit}!`, better(r, prev) ? '오늘 가장 좋은 기록' : `오늘 가장 좋은 기록 ${prev.s}${unit}`, 3000);

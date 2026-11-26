@@ -201,6 +201,20 @@ export function claimContestPrize(state) {
   return { ok: true, state: s, money: p.money, trophy: p.trophy, reason: null };
 }
 
+/**
+ * 같이 놀기 손님: 주인 마을 대회 등수로 받는 상품(내 저장에 — 돈, 1등이면 우승 수, 그 종목 처음 1등이면 트로피).
+ * 내 마을 그날 기록(day · best · rank)은 건드리지 않는다. → { state, money, trophy }
+ */
+export function guestPrize(state, kind, rank) {
+  if (!Object.hasOwn(CONTESTS, kind) || !Number.isInteger(rank) || rank < 1) return { state, money: 0, trophy: null };
+  const c = contestOf(state), money = PRIZE[rank] || PRIZE.join;
+  const wins = rank === 1 ? { ...c.wins, [kind]: c.wins[kind] + 1 } : c.wins;
+  const trophy = rank === 1 && wins[kind] === 1 ? TROPHY[kind] : null;
+  let s = withContest({ ...state, money: state.money + money }, { ...c, wins });
+  if (trophy) s = addTrophy(s, trophy);
+  return { state: s, money, trophy };
+}
+
 /** 손님이 보낸 점수가 3분 한 판에서 나올 수 있는지. */
 export function guestScoreOk(kind, s, t) {
   if (!Object.hasOwn(SCORE_CAP, kind) || !Number.isInteger(s) || s < 0 || s > SCORE_CAP[kind]) return false;

@@ -177,3 +177,26 @@ test('현수막 글: 막대 과자 데이가 먼저', () => {
   assert.equal(C.bannerText(at(7, 23)), '마을 풀 뽑기 시합');
   assert.equal(C.bannerText(at(4, 12)), null);
 });
+
+test('손님 상품: 주인 마을 대회 등수로 내 저장에(1등이면 우승 수, 처음이면 트로피)', () => {
+  const s = fresh({ money: 0 });
+  const a = C.guestPrize(s, 'fish', 1);
+  assert.equal(a.money, 1000);
+  assert.equal(a.trophy, 'fishtrophy');
+  assert.equal(a.state.money, 1000);
+  assert.equal(C.contestOf(a.state).wins.fish, 1);
+  assert.equal(homeOf(a.state).owned.fishtrophy, 1);
+  const b = C.guestPrize(a.state, 'fish', 1);
+  assert.equal(b.trophy, null, '두 번째 1등은 트로피 없음');
+  assert.equal(C.contestOf(b.state).wins.fish, 2);
+  const c = C.guestPrize(s, 'weed', 5);
+  assert.equal(c.money, 150);
+  assert.equal(C.contestOf(c.state).wins.weed, 0);
+  assert.equal(C.guestPrize(s, 'ramen', 1).money, 0, '모르는 종목');
+  assert.equal(C.guestPrize(s, 'fish', 0).money, 0, '등수가 이상하면 없음');
+  // 손님 상품은 내 마을 그날 기록(day, best)을 건드리지 않는다
+  const mine = C.recordRound(C.beginContestDay(fresh(), 3, 'fish'), { s: 4, t: 4 });
+  const after = C.guestPrize(mine, 'weed', 2);
+  assert.deepEqual(C.contestOf(after.state).best, { s: 4, t: 4 });
+  assert.equal(C.contestOf(after.state).day, 3);
+});
