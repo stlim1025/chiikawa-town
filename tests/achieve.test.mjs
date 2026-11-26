@@ -9,23 +9,24 @@ import { MONSTER_ORDER } from '../src/core/combat.js';
 import { WEED_ORDER } from '../src/core/weeding.js';
 import { DEX_FISH } from '../src/core/fishing.js';
 import { HEART_AT } from '../src/core/friends.js';
+import { contestOf, beginContestDay, recordRound, settleContest, claimContestPrize } from '../src/core/contest.js';
 import { QUESTS } from '../src/core/quests.js';
 
 const fresh = () => ({ ...createState({ name: '치이', look: {} }), clock: { day: 5, t: 0.3 } });
 const done = (s, id) => progressOf(s, id).done;
 const SIX = ['chiikawa', 'hachiware', 'usagi', 'kurimanju', 'rakko', 'momonga'];
-const TITLES = ['몬스터 척척박사', '낚시 명인', '마을 도감 박사', '현상금 사냥꾼', '마을의 수호자', '모두의 친구', '아노코 단짝', '풀 뽑기 달인', '마을 가꾸미', '눈사람 장인', '사계절 주민', '바위산의 영웅', '이야기 수집가'];
+const TITLES = ['몬스터 척척박사', '낚시 명인', '마을 도감 박사', '현상금 사냥꾼', '마을의 수호자', '모두의 친구', '아노코 단짝', '풀 뽑기 달인', '마을 가꾸미', '눈사람 장인', '사계절 주민', '바위산의 영웅', '이야기 수집가', '낚시 대회 우승자', '풀 뽑기 시합 우승자'];
 const all = (list, v) => Object.fromEntries(list.map((k) => [k, v]));
 const fullDex = (s) => ({ ...s, hunted: all(MONSTER_ORDER, 1), weedLog: all(WEED_ORDER, 1), fishLog: all(DEX_FISH, { n: 1, best: 10 }) });
 
-test('업적: 32개, 여섯 묶음, 돈 31,700원, 칭호 13개, 기념 가구 셋(가게에서 안 판다)', () => {
-  assert.equal(ACHIEVEMENTS.length, 32);
-  assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, 32);
+test('업적: 34개, 여섯 묶음, 돈 31,700원, 칭호 15개, 기념 가구 셋(가게에서 안 판다)', () => {
+  assert.equal(ACHIEVEMENTS.length, 34);
+  assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, 34);
   assert.deepEqual(ACH_GROUPS.map((g) => g.name), ['도감', '토벌', '친구', '생활', '계절', '이야기']);
   for (const g of ACH_GROUPS) assert.ok(ACHIEVEMENTS.some((a) => a.group === g.id), g.id);
   assert.equal(ACHIEVEMENTS.reduce((n, a) => n + a.money, 0), 31700);
   assert.deepEqual(new Set(ACHIEVEMENTS.filter((a) => a.title).map((a) => a.title)), new Set(TITLES));
-  assert.equal(ACHIEVEMENTS.filter((a) => a.title).length, 13);
+  assert.equal(ACHIEVEMENTS.filter((a) => a.title).length, 15);
   const furn = ACHIEVEMENTS.filter((a) => a.furniture).map((a) => [a.id, a.furniture]);
   assert.deepEqual(furn, [['dexAll', 'dexplaque'], ['bossAll', 'bossshield'], ['friendsAll5', 'friendframe']]);
   for (const [, f] of furn) assert.ok(FURNITURE[f] && FURNITURE[f].gift === true && FURNITURE[f].price === 0, f);
@@ -45,6 +46,31 @@ test('업적: 이야기 수집가는 되풀이 이야기(우사기랑 클럽)를
   // 우사기랑 클럽에 다시 가는 중(되풀이라 완료 표시가 지워진다)에도 진행도는 그대로
   const again = { ...all15, quests: { ...all15.quests, clubNight: { step: 0, base: 0 } } };
   assert.deepEqual(progressOf(again, 'sides'), { have: 15, need: 15, done: true });
+});
+
+test('업적: 마을 대회 우승 둘(돈 없이 칭호만) — 1등 한 수로', () => {
+  const s = fresh();
+  const won = (wins) => ({ ...s, contest: { ...contestOf(s), wins } });
+  assert.equal(done(won({ fish: 1, weed: 0 }), 'contestFish'), true);
+  assert.equal(done(won({ fish: 1, weed: 0 }), 'contestWeed'), false);
+  assert.equal(done(won({ fish: 0, weed: 2 }), 'contestWeed'), true);
+  for (const id of ['contestFish', 'contestWeed']) {
+    const a = ACHIEVEMENTS.find((x) => x.id === id);
+    assert.equal(a.money, 0);
+    assert.equal(a.group, 'life');
+  }
+  assert.equal(ACHIEVEMENTS.find((x) => x.id === 'contestFish').title, '낚시 대회 우승자');
+  assert.equal(ACHIEVEMENTS.find((x) => x.id === 'contestWeed').title, '풀 뽑기 시합 우승자');
+});
+
+test('마을 대회 트로피를 받은 저장도 유효하다(트로피는 가게에서 안 파는 가구)', () => {
+  let s = beginContestDay({ ...fresh(), startDate: '2026-10-01' }, 3, 'fish');
+  s = settleContest(recordRound(s, { s: 20, t: 30 }));
+  const r = claimContestPrize(s);
+  assert.equal(r.trophy, 'fishtrophy');
+  assert.ok(isValidState(r.state));
+  for (const id of ['fishtrophy', 'weedtrophy']) assert.ok(FURNITURE[id] && FURNITURE[id].gift === true && FURNITURE[id].price === 0, id);
+  assert.deepEqual([FURNITURE.fishtrophy.name, FURNITURE.weedtrophy.name], ['낚시 대회 트로피', '풀 뽑기 시합 트로피']);
 });
 
 test('업적: 새 게임은 아무것도 이루지 않았다', () => {

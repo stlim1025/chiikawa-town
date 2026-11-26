@@ -6,6 +6,7 @@ import { bossesOf } from './bosses.js';
 import { tamed } from './anoko.js';
 import { bondHearts } from './anokobond.js';
 import { hasLicense } from './licenses.js';
+import { contestOf } from './contest.js';
 import { housingOf } from './housing.js';
 import { homeOf, sizeOf } from './home.js';
 import { WORK_IDS, workStatus } from './works.js';
@@ -72,6 +73,9 @@ export const ACHIEVEMENTS = [
   { id: 'works7', group: 'life', name: '마을 가꾸미', goal: `마을 가꾸기 ${WORK_IDS.length}곳이 모두 생긴다`, need: WORK_IDS.length, money: 3000, title: '마을 가꾸미', progress: (s) => count(WORK_IDS, (id) => workStatus(s, id) === 'open') },
   { id: 'car', group: 'life', name: '하늘색 자동차', goal: '하늘색 자동차를 산다', need: 1, money: 500, progress: (s) => +hasTool(s, 'car') },
   { id: 'days100', group: 'life', name: '마을 토박이', goal: '마을에서 100일째를 맞는다', need: 100, money: 1000, progress: (s) => (s.clock ? s.clock.day : 0) },
+  // 마을 대회(core/contest.js, 게임 오리지널): 상품과 트로피는 대회에서 받으니 업적은 칭호만
+  { id: 'contestFish', group: 'life', name: '낚시 대회 우승', goal: '마을 낚시 대회에서 1등 한다', need: 1, money: 0, title: '낚시 대회 우승자', progress: (s) => Math.min(1, contestOf(s).wins.fish) },
+  { id: 'contestWeed', group: 'life', name: '풀 뽑기 시합 우승', goal: '마을 풀 뽑기 시합에서 1등 한다', need: 1, money: 0, title: '풀 뽑기 시합 우승자', progress: (s) => Math.min(1, contestOf(s).wins.weed) },
   { id: 'snowmen5', group: 'season', name: '눈사람 장인', goal: '눈사람을 모두 다섯 번 세운다(녹은 것도 센다)', need: 5, money: 500, title: '눈사람 장인', progress: (s) => recordsOf(s).snowmen },
   { id: 'leaves30', group: 'season', name: '단풍잎 서른 장', goal: '단풍잎을 모두 30장 줍는다', need: 30, money: 500, progress: (s) => recordsOf(s).leaves },
   { id: 'loach', group: 'season', name: '비 오는 날의 손님', goal: '미꾸라지를 낚는다', need: 1, money: 300, progress: (s) => +!!fishLogOf(s).loach },

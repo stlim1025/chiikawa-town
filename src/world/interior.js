@@ -343,6 +343,55 @@ export function furnitureModel(id) {
       sub(fr, GEO.dot, '#e5788f', { position: [0, 0.33, 0.02], scale: [0.022, 0.022, 0.02] });
       break;
     }
+    case 'fishtrophy':
+    case 'weedtrophy': {
+      // 마을 대회 트로피(대회 1등 기념, 가구점에서는 팔지 않는다): 짙은 나무 받침 위의 통통한 금빛 우승컵.
+      // 낚시 대회 트로피는 뚜껑 위로 물고기가 뛰어오르고 받침에 물결 무늬, 풀 뽑기 시합 트로피는 뚜껑에 새싹 두 잎이 돋고 받침에 잎 무늬
+      const fish = id === 'fishtrophy', INK = '#2b2224', GOLD = '#fcd95b', DEEP = '#e8b23a', BLUE = '#6fb7e8', LEAF = '#7cc46a';
+      m(GEO.box, '#6b4226', { position: [0, 0.07, 0], scale: [0.54, 0.14, 0.44], shell: true, outline: 0.02 });
+      m(GEO.box, '#8a5a34', { position: [0, 0.18, 0], scale: [0.42, 0.08, 0.34], shell: true, outline: 0.015 });
+      m(GEO.box, GOLD, { position: [0, 0.07, 0.222], scale: [0.28, 0.07, 0.01], outline: false }); // 금빛 이름판
+      // 컵: 굽, 목, 둥근 잔, 테, 뚜껑, 양옆 손잡이
+      m(GEO.cylinder, DEEP, { position: [0, 0.22, 0], scale: [0.12, 0.04, 0.12], outline: 0.012 });
+      m(GEO.cylinder, GOLD, { position: [0, 0.26, 0], scale: [0.045, 0.12, 0.045], outline: 0.01 });
+      m(GEO.sphere, DEEP, { position: [0, 0.36, 0], scale: [0.065, 0.035, 0.065], outline: 0.01 });
+      m(GEO.sphere, GOLD, { position: [0, 0.53, 0], scale: [0.2, 0.17, 0.2], outline: 0.02 });
+      m(GEO.cylinder, GOLD, { position: [0, 0.56, 0], scale: [0.21, 0.1, 0.21], outline: 0.02 });
+      m(GEO.cylinder, DEEP, { position: [0, 0.66, 0], scale: [0.228, 0.03, 0.228], outline: 0.015 });
+      m(GEO.sphere, GOLD, { position: [0, 0.69, 0], scale: [0.2, 0.07, 0.2], outline: 0.015 });
+      [-1, 1].forEach((sd) => m(GEO.sphere, GOLD, { position: [sd * 0.25, 0.55, 0], scale: [0.07, 0.1, 0.03], outline: 0.012 }));
+      m(GEO.dot, '#fff6c8', { position: [-0.08, 0.57, 0.19], scale: [0.03, 0.055, 0.012], rotation: [0, -0.4, 0.2], outline: false }); // 반짝이는 빛
+      if (fish) {
+        // 뛰어오른 물고기: 머리를 위로 든 파란 몸, 금빛 꼬리와 등지느러미, 뚜껑 위에 튄 물방울
+        const fg = new THREE.Group();
+        fg.position.set(0, 0.89, 0);
+        fg.rotation.z = 0.7;
+        g.add(fg);
+        sub(fg, GEO.sphere, BLUE, { scale: [0.13, 0.075, 0.06], outline: 0.012 });
+        sub(fg, GEO.sphere, '#dff2fd', { position: [0.01, -0.03, 0], scale: [0.09, 0.04, 0.05] }); // 밝은 배
+        sub(fg, GEO.cone, GOLD, { position: [-0.22, 0, 0], scale: [0.075, 0.11, 0.025], rotation: [0, 0, -Math.PI / 2], outline: 0.01 });
+        sub(fg, GEO.cone, GOLD, { position: [-0.02, 0.05, 0], scale: [0.04, 0.06, 0.015], rotation: [0, 0, 0.5], outline: 0.008 });
+        [-1, 1].forEach((sd) => {
+          sub(fg, GEO.dot, INK, { position: [0.07, 0.015, sd * 0.048], scale: [0.013, 0.013, 0.008] });
+          sub(fg, GEO.cone, GOLD, { position: [0.0, -0.03, sd * 0.05], scale: [0.025, 0.05, 0.012], rotation: [sd * 0.9, 0, 2.6] }); // 가슴지느러미
+        });
+        [[-0.09, 0.78, 0.05, 0.035], [0.1, 0.77, -0.03, 0.03], [0.02, 0.79, -0.09, 0.025]].forEach(([x, y, z, r]) => m(GEO.dot, '#bfe6fb', { position: [x, y, z], scale: [r, r, r], outline: 0.008 }));
+        // 받침 앞의 물결 무늬
+        [-0.11, 0, 0.11].forEach((x) => m(GEO.dot, BLUE, { position: [x, 0.165, 0.171], scale: [0.055, 0.035, 0.008], outline: false }));
+        [-0.055, 0.055].forEach((x) => m(GEO.dot, '#dff2fd', { position: [x, 0.19, 0.172], scale: [0.02, 0.012, 0.006], outline: false }));
+      } else {
+        // 새싹: 짧은 줄기 끝에서 양옆으로 벌어진 통통한 두 잎
+        m(GEO.cylinder, '#5fae6a', { position: [0, 0.74, 0], scale: [0.022, 0.12, 0.022], outline: 0.008 });
+        [-1, 1].forEach((sd) => {
+          m(GEO.sphere, LEAF, { position: [sd * 0.11, 0.9, 0], scale: [0.13, 0.035, 0.08], rotation: [0, 0, sd * 0.5], outline: 0.012 });
+          m(GEO.box, '#5fae6a', { position: [sd * 0.11, 0.921, 0], scale: [0.17, 0.008, 0.012], rotation: [0, 0, sd * 0.5], outline: false }); // 잎맥
+        });
+        // 받침 앞의 잎 무늬
+        m(GEO.box, '#5fae6a', { position: [0, 0.17, 0.171], scale: [0.012, 0.05, 0.006], outline: false });
+        [-1, 1].forEach((sd) => m(GEO.dot, LEAF, { position: [sd * 0.04, 0.19, 0.172], scale: [0.045, 0.02, 0.008], rotation: [0, 0, sd * 0.5], outline: false }));
+      }
+      break;
+    }
     // ---------- 늘린 가구(게임 오리지널, core/home.js) ----------
     // 침대와 소파
     case 'futon':

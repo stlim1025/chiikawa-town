@@ -12,7 +12,7 @@ test('업적 메달 등급: 칭호를 주면 금, 1,500원 이상이면 은, 나
   assert.equal(achTier(by('hunt500')), 'silver'); // 2,500원
   assert.equal(achTier(by('hunt10')), 'bronze'); // 200원
   const n = (t) => ACHIEVEMENTS.filter((a) => achTier(a) === t).length;
-  assert.equal(n('gold'), 13);
+  assert.equal(n('gold'), 15);
   assert.equal(n('gold') + n('silver') + n('bronze'), ACHIEVEMENTS.length);
   assert.ok(n('silver') > 0 && n('bronze') > 0);
 });
