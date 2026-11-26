@@ -33,7 +33,7 @@ import { openCreator } from './ui/creator.js';
 import { showTitle } from './ui/title.js';
 import { createIntro } from './ui/intro.js';
 import { createState, addMoney, trySpend, useStamina, restoreStamina, sleepStamina, MAX_STAMINA } from './core/state.js';
-import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS } from './core/clock.js';
+import { advance, hourOf, sleepFor, timeLabel, phaseOf, SLEEP_HOURS, DAY_SECONDS } from './core/clock.js';
 import { WEED_KINDS, STAMINA_PER_PULL, startPull, chargePull, releasePull, canPullKind, advanceWeed, gotWeed, pullStamina, kindsOfGrade, josa } from './core/weeding.js';
 import { JOB_TYPES, acceptJob, recordPull, isComplete, payout, isWeedJob, isFishJob } from './core/jobs.js';
 import { gainXp, canTakeExam, startExam, examStep, examCounts, examKinds, promote, PAY_MULT, EXAM_FEE, EXAM_STREAK, payExamFee, NOVICE, gradeName } from './core/license.js';
@@ -128,8 +128,8 @@ import { createHousewarm } from './stories/housewarm.js';
 import { createStickParty } from './stories/stickday.js';
 import { createFestival } from './world/festival.js';
 import { createContestProps } from './world/contestprops.js';
-import { CONTESTS, CLOSE_HOUR, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
-  newRound, roundCatch, roundPull, recordRound, better, canEnter } from './core/contest.js';
+import { CONTESTS, CLOSE_HOUR, OPEN_HOUR, NPC_LAST_START, NPC_PLAY_HOURS, CONTEST_FRIENDS, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
+  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour } from './core/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -3354,6 +3354,7 @@ function boot() {
   let contestRound = null; // 마을 대회 한 판 { kind, s, t, clean, left, guest }(core/contest.js)
   const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 연결 id → { name, s, t }
   const contestUi = { eveDay: 0, morningDay: 0 }; // 전날 저녁 알림 · 당일 아침 배너를 띄운 날
+  const contestNpc = new Map(); // 대회에 나간 친구 kind → { day, until: 끝날 시각 }(중간에 끊겨도 이 시각이 지나면 기록을 올린다)
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
@@ -4002,6 +4003,8 @@ function boot() {
       contestUi.morningDay = day;
       hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
     }
+    // 대회에 나갔다가 이야기 장면 등으로 끊긴 친구: 끝날 시각이 지나면(또는 마감이면) 기록을 대신 올려 준다
+    for (const [k, g] of contestNpc) if (g.day === day && !contestOf(state).npc[k] && (hour >= g.until + 0.5 || hour >= CLOSE_HOUR)) postNpcRecord(k);
     const phase = contestPhase(hour, !!(contestRound && !contestRound.guest));
     const now = contestOf(state);
     if ((phase === 'ceremony' || phase === 'closed') && now.rank == null && !now.got) {
@@ -6249,6 +6252,8 @@ function boot() {
     const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && !friendLeaves(id, left) && canDoJob(state, kind, id)) : [];
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
     if (swapOn && kind === 'usagi') { const prank = swapPrank(n, day, hour, left); if (prank) return prank; } // 몸이 바뀐 동안 우사기(내 몸)의 장난
+    const contest = contestNpcDue(n, hour); // 마을 대회 날: 그 친구 참가 시각이 되면 대회에 나간다(core/contest.js)
+    if (contest) { npcContest(n, contest); return 'contest'; }
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
@@ -6452,6 +6457,38 @@ function boot() {
     steps.push({ do: 'act', anim: 'fish', face: spot.face, time: at + 0.4, beats, quick: true });
     steps.push({ do: 'call', fn: () => restHere(n.kind, 6 + Math.random() * 10) });
     npcs.plan(n, steps);
+  }
+  /** 마을 대회에 나간 친구가 끝나고 하는 한마디(게임 오리지널). */
+  const CONTEST_DONE = { chiikawa: '…해, 했다…!', hachiware: '헤헤, 열심히 했어~!', usagi: '야하!', kurimanju: '하아~ 끝났다~', rakko: '…이 정도군.', momonga: '내가 제일 잘했지? 흥!' };
+  /** 친구 대회 기록을 순위판에 올린다(솜씨표에서 날짜로 정해지는 값 — core/contest.js 의 npcRecord). */
+  function postNpcRecord(kind) {
+    const rec = contestOf(state);
+    if (!rec.kind || rec.day !== state.clock.day || rec.npc[kind]) return;
+    const r = npcRecord(state.startDate, rec.day, rec.kind, kind, state.license ? state.license.grade : NOVICE);
+    commit({ ...state, contest: { ...rec, npc: { ...rec.npc, [kind]: r } } }, false);
+    const n = npcs.byKind(kind);
+    if (n && !n.away && Math.hypot(n.x - player.position.x, n.z - player.position.z) < 16) npcs.say(n, CONTEST_DONE[kind] || '다 했다!');
+  }
+  /** 친구가 대회에 나간다: 낚시면 연못가에서 게임 안 1시간(실제 30초) 낚시, 풀이면 잡초를 뽑으러 다닌다. 끝나면 기록을 올린다. */
+  function npcContest(n, kind) {
+    contestNpc.set(n.kind, { day: state.clock.day, until: hourOf(state.clock) + NPC_PLAY_HOURS });
+    setDoing(n.kind, kind === 'fish' ? 'fish' : 'leaf', '대회 중');
+    const done = { do: 'call', fn: () => { postNpcRecord(n.kind); restHere(n.kind, 6 + Math.random() * 8); } };
+    if (kind === 'fish') {
+      const spot = npcFishSpot('pond') || npcFishSpot('river');
+      if (!spot) { postNpcRecord(n.kind); return; }
+      const secs = (NPC_PLAY_HOURS / 24) * DAY_SECONDS, beats = [];
+      for (let at = 4; at < secs - 1; at += 4 + Math.random() * 3) beats.push({ at, fn: () => (Math.random() < fishMiss(n.kind) ? npcMissFish(n) : npcLandFish(n, spot.water, false)) });
+      npcs.plan(n, [{ do: 'walk', x: spot.x, z: spot.z, near: 0.4 }, { do: 'act', anim: 'fish', face: spot.face, time: secs, beats, quick: true }, done]);
+    } else npcs.plan(n, [{ do: 'weeds', kind: 'weed', left: 5 + Math.floor(Math.random() * 3), onPull: () => tireNpc(n.kind, 1) }, done]);
+  }
+  /** 친구가 지금 대회에 나갈 차례인지(그날 참가 시각이 지났고 아직 안 했고 한가하다). */
+  function contestNpcDue(n, hour) {
+    const kind = contestKindHere();
+    if (!kind || visiting || !CONTEST_FRIENDS.includes(n.kind) || hour < OPEN_HOUR || hour >= NPC_LAST_START) return null;
+    const rec = contestOf(state), started = contestNpc.get(n.kind);
+    if (rec.day !== state.clock.day || rec.npc[n.kind] || (started && started.day === state.clock.day)) return null;
+    return hour >= npcJoinHour(state.startDate, state.clock.day, n.kind) && isFree(n) ? kind : null;
   }
   function npcHobby(n, hour) {
     const kind = n.kind;
