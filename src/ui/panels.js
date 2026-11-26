@@ -1412,7 +1412,7 @@ export function createPanels(ui, handlers) {
               : h('span', { class: 'dp-note' }, `${p.n - got}종 더`));
       })));
       for (const id of DEX_FISH) {
-        const F = FISH[id], rec = log[id], when = F.night ? '밤에만' : F.day ? '낮에만' : F.rain ? '비 오는 날만' : null;
+        const F = FISH[id], rec = log[id], when = F.night ? '밤에만' : F.day ? '낮에만' : F.rain ? '비나 눈 오는 날만' : null;
         out.push(h('div', { class: `row mon-card fish-card${rec ? '' : ' unseen'}` },
           svgSpan('mon-ico', itemSvg(id)),
           h('div', {},

@@ -7,6 +7,7 @@ import { POND, LAKE, BRIDGES, riverZ, isWater } from '../src/core/layout.js';
 import { itemInfo } from '../src/core/inventory.js';
 import { sellPrice } from '../src/core/market.js';
 import { TOOLS } from '../src/core/tools.js';
+import { WEATHER_P } from '../src/core/season.js';
 import '../src/core/combat.js';
 
 test('낚시: 물 종류를 가린다(연못 · 시냇물 · 호수 · 바다, 다리 위와 뭍은 아니다)', () => {
@@ -32,7 +33,7 @@ test('낚시: 물 · 시각마다 잡히는 물고기가 다르다', () => {
   }
 });
 
-test('미꾸라지: 비 오는 날만 시냇물과 연못에서, 중간 크기 10~20cm, 80원', () => {
+test('미꾸라지: 비나 눈 오는 날만 시냇물과 연못에서, 중간 크기 10~20cm, 80원', () => {
   const L = FISH.loach;
   assert.ok(L && L.name === '미꾸라지' && L.rain === true);
   assert.deepEqual([...L.waters].sort(), ['pond', 'river']);
@@ -40,12 +41,18 @@ test('미꾸라지: 비 오는 날만 시냇물과 연못에서, 중간 크기 1
   assert.deepEqual(L.cm, [10, 20]);
   assert.equal(sellPrice('loach'), 80);
   for (const h of [8, 13, 21, 3]) {
-    assert.ok(!fishFor('river', h).includes('loach') && !fishFor('pond', h, 'sunny').includes('loach') && !fishFor('river', h, 'snow').includes('loach'), '비가 아니면 없다');
+    assert.ok(!fishFor('river', h).includes('loach') && !fishFor('pond', h, 'sunny').includes('loach') && !fishFor('river', h, 'cloudy').includes('loach'), '비나 눈이 아니면 없다');
     assert.ok(fishFor('river', h, 'rain').includes('loach') && fishFor('pond', h, 'rain').includes('loach'), '비 오는 날 시냇물과 연못');
+    assert.ok(fishFor('river', h, 'snow').includes('loach') && fishFor('pond', h, 'snow').includes('loach'), '겨울엔 비 대신 눈이 오니 눈 오는 날도');
     assert.ok(!fishFor('lake', h, 'rain').includes('loach') && !fishFor('sea', h, 'rain').includes('loach'));
   }
   for (let i = 0; i < 200; i++) assert.notEqual(pickFish('river', 12, () => i / 200, 'cloudy'), 'loach');
   assert.ok(Array.from({ length: 200 }, (_, i) => pickFish('pond', 12, () => i / 200, 'rain')).includes('loach'), '비 오는 날엔 물 수 있다');
+  assert.ok(Array.from({ length: 200 }, (_, i) => pickFish('river', 12, () => i / 200, 'snow')).includes('loach'), '눈 오는 날에도 물 수 있다');
+  // 어느 계절이든 미꾸라지가 나오는 날씨가 있다(겨울에는 비가 없고 눈이 온다)
+  for (const [season, P] of Object.entries(WEATHER_P)) {
+    assert.ok(Object.entries(P).some(([w, p]) => p > 0 && fishFor('river', 12, w).includes('loach')), `${season}: 미꾸라지가 나오는 날이 있다`);
+  }
 });
 
 test('낚시: 물고기는 가방 물건이고 팔 수 있다, 큰 고기일수록 누를 틈이 짧고 끌어올리기가 어렵다', () => {

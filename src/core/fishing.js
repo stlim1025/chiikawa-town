@@ -24,7 +24,7 @@ export const FISH = {
   puffer: { name: '복어', sell: 120, waters: ['sea'], weight: 2, size: 1, cm: [12, 28], color: '#f2d27a', note: '건드리면 빵빵하게 부푼다.' },
   seabream: { name: '도미', sell: 180, waters: ['sea'], weight: 1.5, size: 2, cm: [30, 55], color: '#f08a8a', note: '분홍빛 바닷물고기. 잔칫상에 오른다.' },
   octopus: { name: '문어', sell: 270, waters: ['sea'], weight: 0.6, size: 2, night: true, cm: [40, 90], color: '#d9645a', note: '밤바다에서 다리 여덟 개로 꽉 붙잡는다.' },
-  loach: { name: '미꾸라지', sell: 80, waters: ['river', 'pond'], weight: 2.5, size: 1, rain: true, cm: [10, 20], color: '#8a7a55', note: '비 오는 날에만 진흙에서 나와 시냇물과 연못을 미끄럽게 돌아다닌다.' }, // 계절과 날씨(게임 오리지널)
+  loach: { name: '미꾸라지', sell: 80, waters: ['river', 'pond'], weight: 2.5, size: 1, rain: true, cm: [10, 20], color: '#8a7a55', note: '비나 눈이 오는 날에만 진흙에서 나와 시냇물과 연못을 미끄럽게 돌아다닌다.' }, // 계절과 날씨(게임 오리지널)
   can: { name: '빈 깡통', sell: 3, waters: ['pond', 'river', 'lake', 'sea'], weight: 0.8, size: 0, junk: true, color: '#b9bec6', note: '누가 버렸담. 물이 깨끗해졌다.' }
 };
 registerItems(Object.fromEntries(Object.entries(FISH).map(([id, f]) => [id, { name: f.name, kind: 'fish', sell: f.sell, note: f.note }])));
@@ -106,11 +106,13 @@ export function waterAt(x, z) {
 }
 
 const isNight = (hour) => hour >= 19 || hour < 5;
-/** 그 물 · 그 시각 · 그날 날씨(core/season.js weatherOf)에 잡힐 수 있는 물고기 id 들. rain 물고기는 비 오는 날만. */
+/** 비 물고기가 나오는 날씨: 비, 그리고 겨울에 비 대신 오는 눈(겨울엔 비가 없어 석 달 내내 못 잡던 것을 2026-11-26 에 고쳤다). */
+const wetDay = (weather) => weather === 'rain' || weather === 'snow';
+/** 그 물 · 그 시각 · 그날 날씨(core/season.js weatherOf)에 잡힐 수 있는 물고기 id 들. rain 물고기는 비나 눈 오는 날만. */
 export function fishFor(water, hour, weather) {
   return Object.keys(FISH).filter((id) => {
     const f = FISH[id];
-    return f.waters.includes(water) && !(f.night && !isNight(hour)) && !(f.day && isNight(hour)) && !(f.rain && weather !== 'rain');
+    return f.waters.includes(water) && !(f.night && !isNight(hour)) && !(f.day && isNight(hour)) && !(f.rain && !wetDay(weather));
   });
 }
 /** 그 물 · 그 시각 · 그날 날씨에 무엇이 물지(잘 잡히는 정도로 고른다). random: 0..1 함수. */
