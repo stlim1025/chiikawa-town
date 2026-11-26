@@ -15,6 +15,7 @@ import { isValidStorage } from './storage.js';
 import { isValidGlowfluff } from './glowfluff.js';
 import { isValidLeaves, isValidSnowmen } from './seasonplay.js';
 import { isValidAchieve, isValidRecords, isValidTitle } from './achieve.js';
+import { cleanContest } from './contest.js';
 import { isValidWardrobe } from './wardrobe.js';
 import { isValidWeapon, isValidHunted } from './combat.js';
 import { isValidQuests, isValidStory, isValidActs, QUESTS, shiftStoryStep, STORY_BOSSES_AT } from './quests.js';
@@ -110,7 +111,9 @@ export function deserialize(text) {
   if (!parsed || typeof parsed !== 'object' || !parsed.data) return { ok: false, reason: 'corrupt' };
   if (parsed.v !== SAVE_VERSION) return { ok: false, reason: 'version' };
   if (!isValidState(parsed.data)) return { ok: false, reason: 'corrupt' };
-  return { ok: true, state: upgradeState(parsed.data) };
+  const st = upgradeState(parsed.data);
+  // 마을 대회 기록은 거부하지 않고 정리만 한다(한 판 도중 저장된 칸 · 모르는 값은 버린다 — core/contest.js)
+  return { ok: true, state: st.contest !== undefined ? { ...st, contest: cleanContest(st.contest) } : st };
 }
 
 /**
