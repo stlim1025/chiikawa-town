@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_SIZES, HOME_CELL, WALLPAPERS, FLOORS, createHome, homeOf, sizeOf, gridOf, nextSize, roomLayout, roomShape, homeCellCenter, expandHome, placeFurniture, moveFurniture, decorOf, hasDecor, useDecor, isValidHome } from '../src/core/home.js';
+import { HOME_SIZES, HOME_CELL, WALLPAPERS, FLOORS, FURNITURE, createHome, homeOf, sizeOf, gridOf, nextSize, roomLayout, roomShape, homeCellCenter, expandHome, placeFurniture, moveFurniture, removeFurniture, rotateFurniture, decorOf, hasDecor, useDecor, isValidHome, isMat, MAT_SIZES, footprint, cellsOf, stackAt, resizeMat } from '../src/core/home.js';
 import { createState } from '../src/core/state.js';
 import { isValidState } from '../src/core/save.js';
 
@@ -102,4 +102,107 @@ test('집 안 모양: 처음 방은 둥근 돔, 넓힌 방은 네모난 집(큰 
     for (const p of [r.WARDROBE, r.CHEST]) assert.ok(Math.abs(p.x) < b.hx && Math.abs(p.x) > b.hx - 0.7, `벽에 붙은 옷장 · 상자 ${size}`);
     if (size > 1) assert.ok(b.hx > roomShape(size - 1).hx && b.z0 < roomShape(size - 1).z0, '클수록 넓다');
   }
+});
+
+// 깔개(러그): 가구 밑에 깔고, 크기를 키운다
+const rugHome = (owned = { rug: 2, squarerug: 1, table: 2 }) => ({ owned, placed: [] }); // 처음 방 5×4
+const put = (home, id, cx, cz) => { const r = placeFurniture(home, id, cx, cz); assert.ok(r.ok, `${id} ${cx},${cz}: ${r.reason}`); return r.home; };
+const spot = (p) => [p.cx, p.cz];
+
+test('깔개: 러그 두 가지만 깔개이고, 깐 칸에 가구를 하나 더 올리거나 가구 밑으로 깐다', () => {
+  assert.deepEqual(Object.keys(FURNITURE).filter(isMat), ['rug', 'squarerug']);
+  let h = put(put(rugHome(), 'rug', 1, 1), 'table', 1, 1);
+  assert.equal(placeFurniture(h, 'table', 1, 1).reason, 'taken', '가구는 칸마다 하나');
+  assert.equal(placeFurniture(h, 'rug', 1, 1).reason, 'taken', '같은 칸에서 시작하는 깔개는 하나');
+  h = put(put(rugHome({ rug: 1, table: 1 }), 'table', 2, 2), 'rug', 2, 2);
+  assert.equal(h.placed.length, 2);
+  assert.ok(isValidHome(h));
+});
+
+test('깔개 크기: 한 칸, 2×2, 3×2로 커졌다가 다시 작아진다', () => {
+  assert.deepEqual(MAT_SIZES, [[1, 1], [2, 2], [3, 2]]);
+  let h = put(rugHome(), 'squarerug', 0, 0);
+  const grow = (step) => { const r = resizeMat(h, 0, 0, step); assert.ok(r.ok, r.reason); h = r.home; return footprint(h.placed[0]); };
+  assert.deepEqual(footprint(h.placed[0]), { w: 1, d: 1 });
+  assert.deepEqual(grow(1), { w: 2, d: 2 });
+  assert.deepEqual(grow(1), { w: 3, d: 2 });
+  assert.equal(resizeMat(h, 0, 0, 1).reason, 'max');
+  assert.deepEqual(grow(-1), { w: 2, d: 2 });
+  assert.deepEqual(grow(-1), { w: 1, d: 1 });
+  assert.equal(resizeMat(h, 0, 0, -1).reason, 'min');
+  assert.equal(resizeMat(h, 3, 3, 1).reason, 'none');
+  assert.deepEqual(footprint({ id: 'table', cx: 0, cz: 0, rot: 1, sz: 2 }), { w: 1, d: 1 }, '가구는 늘 한 칸');
+  assert.ok(isValidHome(h));
+});
+
+test('깔개 크기: 벽 쪽에서 키우면 방 안으로 밀려 들어오고, 덮는 칸은 늘 방 안이다', () => {
+  let r = resizeMat(put(rugHome(), 'rug', 4, 3), 4, 3, 1); // 5×4 방의 맨 끝 칸
+  assert.ok(r.ok);
+  assert.deepEqual(spot(r.home.placed[0]), [3, 2]);
+  r = resizeMat(r.home, 3, 2, 1);
+  assert.deepEqual(spot(r.home.placed[0]), [2, 2]);
+  assert.deepEqual(cellsOf(r.home.placed[0]).map((c) => `${c.cx},${c.cz}`), ['2,2', '3,2', '4,2', '2,3', '3,3', '4,3']);
+});
+
+test('깔개 크기: 밀려 들어갈 칸에서 다른 깔개가 시작하면 못 키운다', () => {
+  const h = put(put(rugHome(), 'rug', 3, 2), 'squarerug', 4, 3);
+  assert.equal(resizeMat(h, 4, 3, 1).reason, 'taken');
+  assert.ok(resizeMat(h, 3, 2, 1).ok, '덮기만 하는 건 괜찮다(작은 깔개 위에 큰 깔개)');
+});
+
+test('깔개 돌리기: 3×2 깔개를 돌리면 2×3이 되고, 방 밖으로 나가지 않게 당겨진다', () => {
+  let h = put(rugHome(), 'squarerug', 2, 2);
+  h = resizeMat(resizeMat(h, 2, 2, 1).home, 2, 2, 1).home;
+  assert.deepEqual(spot(h.placed[0]), [2, 2]);
+  h = rotateFurniture(h, 2, 2, true);
+  const p = h.placed[0];
+  assert.deepEqual(footprint(p), { w: 2, d: 3 });
+  assert.deepEqual(spot(p), [2, 1]);
+  assert.ok(cellsOf(p).every((c) => c.cx < 5 && c.cz < 4));
+});
+
+test('한 칸에 가구와 깔개가 있으면 넣어 두기, 돌리기, 옮기기는 고른 쪽만 한다', () => {
+  const h = put(put(rugHome(), 'rug', 1, 1), 'table', 1, 1);
+  assert.deepEqual(removeFurniture(h, 1, 1).placed.map((p) => p.id), ['rug'], '가구 쪽');
+  assert.deepEqual(removeFurniture(h, 1, 1, true).placed.map((p) => p.id), ['table'], '깔개 쪽');
+  const turned = rotateFurniture(h, 1, 1, true);
+  assert.deepEqual(turned.placed.map((p) => p.rot), [1, 0]);
+  const m = moveFurniture(h, { cx: 1, cz: 1, mat: true }, { cx: 3, cz: 0 });
+  assert.ok(m.ok);
+  assert.deepEqual(m.home.placed.map((p) => [p.id, p.cx, p.cz]), [['rug', 3, 0], ['table', 1, 1]]);
+  assert.ok(moveFurniture(m.home, { cx: 1, cz: 1 }, { cx: 3, cz: 0 }).ok, '가구를 깔개 위로 옮긴다');
+});
+
+test('큰 깔개 옮기기: 벽 너머로 끌면 방 안으로 당기고, 방 밖에 놓으면 안 된다', () => {
+  let h = resizeMat(put(rugHome(), 'squarerug', 0, 0), 0, 0, 1).home; // 2×2
+  const r = moveFurniture(h, { cx: 0, cz: 0, mat: true }, { cx: 4, cz: 3 });
+  assert.ok(r.ok);
+  assert.deepEqual(spot(r.home.placed[0]), [3, 2]);
+  assert.equal(moveFurniture(h, { cx: 0, cz: 0, mat: true }, null).reason, 'outside');
+  assert.equal(moveFurniture(h, { cx: 0, cz: 0 }, { cx: 1, cz: 1 }).reason, 'none', '그 칸에 가구는 없다');
+  assert.equal(moveFurniture(h, { cx: 0, cz: 0, mat: true }, { cx: -1, cz: 0 }).reason, 'same', '당기면 제자리');
+  h = put(h, 'rug', 3, 2);
+  assert.equal(moveFurniture(h, { cx: 0, cz: 0, mat: true }, { cx: 3, cz: 2 }).reason, 'taken');
+});
+
+test('한 칸에 겹친 것들: 가구가 맨 위, 그다음 나중에 깐 깔개부터', () => {
+  let h = resizeMat(put(rugHome(), 'squarerug', 0, 0), 0, 0, 1).home; // (0,0) ~ (1,1)
+  h = put(put(h, 'rug', 1, 1), 'table', 1, 1);
+  assert.deepEqual(stackAt(h, 1, 1).map((p) => p.id), ['table', 'rug', 'squarerug']);
+  assert.deepEqual(stackAt(h, 0, 1).map((p) => p.id), ['squarerug']);
+  assert.deepEqual(stackAt(h, 2, 2), []);
+});
+
+test('집 저장 확인: 깔개 크기 번호는 없거나 MAT_SIZES 안', () => {
+  const h = { owned: { rug: 1 }, placed: [{ id: 'rug', cx: 0, cz: 0, rot: 0 }] };
+  assert.ok(isValidHome(h), '예전 저장(크기 없음)');
+  assert.ok(isValidHome({ ...h, placed: [{ ...h.placed[0], sz: 2 }] }));
+  for (const sz of [3, -1, 1.5, '1']) assert.equal(isValidHome({ ...h, placed: [{ ...h.placed[0], sz }] }), false, String(sz));
+});
+
+test('깔개 돌리기: 돌리면 다른 깔개가 시작하는 칸으로 당겨질 때는 그대로 둔다(같은 집을 돌려준다)', () => {
+  let h = put(rugHome(), 'squarerug', 2, 2);
+  h = resizeMat(resizeMat(h, 2, 2, 1).home, 2, 2, 1).home; // 3×2: (2,2) ~ (4,3)
+  h = put(h, 'rug', 2, 1);
+  assert.equal(rotateFurniture(h, 2, 2, true), h);
 });

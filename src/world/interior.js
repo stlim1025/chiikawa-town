@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh, toonMaterial, GEO } from '../render/toon.js';
 import { buildChibi, buildNpc, animateChibi, showOnlyProp } from '../actors/models.js';
-import { HOME_CELL as CELL, roomLayout, roomShape, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS } from '../core/home.js';
+import { HOME_CELL as CELL, roomLayout, roomShape, homeCellCenter, sizeOf, decorOf, WALLPAPERS, FLOORS, isMat, matSize, footprint } from '../core/home.js';
 import { photoFrameTexture } from './photoframe.js';
 import { buildDoll, dollLook } from '../actors/dolls.js';
 
@@ -97,7 +97,7 @@ function friendPhotoTexture() {
 }
 
 /** 가구 모델. 한 칸(약 1 x 1) 안에 들어가는 크기. 가구점 썸네일(world/thumbs.js)도 이걸로 그린다. */
-export function furnitureModel(id) {
+export function furnitureModel(id, [mw, md] = [1, 1]) { // [mw, md]: 깔개가 덮는 칸 수(돌리기 전, core/home.js MAT_SIZES)
   const g = new THREE.Group();
   const m = (geo, c, o = {}) => { const mesh = toonMesh(geo, c, { shadow: false, ...o }); g.add(mesh); return mesh; };
   // 기울인 묶음(책, 방패, 액자) 안에 넣는 조각: 외곽선은 달라고 할 때만
@@ -119,10 +119,12 @@ export function furnitureModel(id) {
       m(GEO.sphere, '#ffb7cf', { position: [0, 0.1, 0], scale: [0.38, 0.12, 0.38], outline: 0.025 });
       m(GEO.dot, '#e5788f', { position: [0, 0.22, 0], scale: [0.05, 0.03, 0.05], outline: false });
       break;
-    case 'rug':
-      m(GEO.cylinder, '#cdb8f0', { position: [0, 0, 0], scale: [0.5, 0.02, 0.5], outline: 0.02, receive: true });
-      m(GEO.cylinder, '#e6dcff', { position: [0, 0.005, 0], scale: [0.3, 0.025, 0.3], outline: false, receive: true });
+    case 'rug': { // 칸 수만큼 넓어진다(가로세로가 다르면 길쭉한 타원)
+      const rx = (mw * CELL - 0.1) / 2, rz = (md * CELL - 0.1) / 2;
+      m(GEO.cylinder, '#cdb8f0', { position: [0, 0, 0], scale: [rx, 0.02, rz], outline: 0.02, receive: true });
+      m(GEO.cylinder, '#e6dcff', { position: [0, 0.005, 0], scale: [rx * 0.6, 0.025, rz * 0.6], outline: false, receive: true });
       break;
+    }
     case 'plant':
       m(GEO.cylinder, '#d8a47f', { position: [0, 0, 0], scale: [0.18, 0.3, 0.18], outline: 0.02 });
       [[0, 0.5, 0, 0.2], [0.12, 0.42, 0.05, 0.15], [-0.12, 0.44, -0.04, 0.15]].forEach(([x, y, z, r]) => m(GEO.sphere, '#6cc77e', { position: [x, y, z], scale: [r, r, r], outline: 0.02 }));
@@ -578,10 +580,12 @@ export function furnitureModel(id) {
       [[0.12, 1.02, 0.28], [-0.18, 1.16, 0.22], [0.28, 0.9, 0.12], [-0.3, 0.9, 0.12]].forEach(([x, y, z]) => m(GEO.dot, '#e0524f', { position: [x, y, z], scale: [0.05, 0.05, 0.05], outline: false }));
       break;
     // 깔개와 방석
-    case 'squarerug':
-      m(GEO.box, '#f6c6d2', { position: [0, 0.01, 0], scale: [0.96, 0.02, 0.96], outline: 0.015, shell: true, receive: true });
-      m(GEO.box, '#fff4de', { position: [0, 0.016, 0], scale: [0.62, 0.02, 0.62], outline: false, receive: true });
+    case 'squarerug': { // 칸 수만큼 넓어지고, 테두리 폭은 그대로
+      const lx = mw * CELL - 0.14, lz = md * CELL - 0.14;
+      m(GEO.box, '#f6c6d2', { position: [0, 0.01, 0], scale: [lx, 0.02, lz], outline: 0.015, shell: true, receive: true });
+      m(GEO.box, '#fff4de', { position: [0, 0.016, 0], scale: [lx - 0.34, 0.02, lz - 0.34], outline: false, receive: true });
       break;
+    }
     case 'beanbag':
       m(GEO.sphere, '#9fd3c7', { position: [0, 0.22, 0], scale: [0.42, 0.24, 0.42], outline: 0.025 });
       m(GEO.sphere, '#86c2b4', { position: [0, 0.38, -0.1], scale: [0.3, 0.14, 0.24], outline: 0.02 });
@@ -692,8 +696,11 @@ export function createInterior() {
 
   const furniture = new THREE.Group();
   scene.add(furniture);
-  const models = new Map(); // 'cx,cz' → 놓인 가구 모델(끌 때 움직인다)
-  const cellOf = new Map(); // 모델 → 칸 { cx, cz }(가구를 눌렀을 때 어느 칸인지)
+  const models = new Map(); // 'f' | 'm'(깔개) + 'cx,cz' → 놓인 가구 모델(끌 때 움직인다)
+  const keyOf = (cx, cz, mat) => `${mat ? 'm' : 'f'}${cx},${cz}`;
+  const cellOf = new Map(); // 모델 → 칸 { cx, cz, mat }(가구를 눌렀을 때 어느 칸인지)
+  const MAT_STEP = 0.03; // 겹쳐 깐 깔개는 나중 것을 이만큼 위에(바닥이 깜빡이지 않게)
+  const overlaps = (a, b) => { const A = footprint(a), B = footprint(b); return a.cx < b.cx + B.w && b.cx < a.cx + A.w && a.cz < b.cz + B.d && b.cz < a.cz + A.d; };
   let ghostModel = null, ghostId = null; // 목록에서 끌어 오는 가구 미리보기
   let me = null;
   // 집 안을 걷는 내 캐릭터: 자리 · 바라보는 방향 · 걸음
@@ -919,21 +926,35 @@ export function createInterior() {
       furniture.clear();
       models.clear();
       cellOf.clear();
+      const mats = []; // 이미 깐 깔개(겹치면 나중 것이 한 겹 위)
       for (const p of home.placed) {
-        const c = cellCenter(p.cx, p.cz, size), f = furnitureModel(p.id);
-        f.position.set(c.x, 0, c.z);
+        const mat = isMat(p.id), fp = footprint(p);
+        const c = cellCenter(p.cx + (fp.w - 1) / 2, p.cz + (fp.d - 1) / 2, size), f = furnitureModel(p.id, matSize(p)); // 큰 깔개는 덮는 칸들의 가운데
+        let y = 0;
+        if (mat) {
+          const lay = mats.filter((q) => overlaps(q, p)).reduce((n, q) => Math.max(n, q.lay + 1), 0);
+          mats.push({ ...p, lay });
+          y = lay * MAT_STEP;
+        }
+        f.position.set(c.x, y, c.z);
         f.rotation.y = -p.rot * Math.PI / 2;
+        f.userData.rest = { x: c.x, y, z: c.z };
         furniture.add(f);
-        models.set(`${p.cx},${p.cz}`, f);
-        cellOf.set(f, { cx: p.cx, cz: p.cz });
+        models.set(keyOf(p.cx, p.cz, mat), f);
+        cellOf.set(f, { cx: p.cx, cz: p.cz, mat });
       }
     },
-    /** 끌고 있는 가구: 칸 cell 의 가구를 바닥 위 점 { x, z } 로 살짝 들어 옮긴다. point 가 null 이면 제자리로. */
-    drag(cell, point) {
-      const f = cell && models.get(`${cell.cx},${cell.cz}`);
+    /**
+     * 끌고 있는 가구: target { cx, cz, mat } 의 가구를 바닥 위 점 { x, z } 로 살짝 들어 옮긴다. point 가 null 이면 제자리로.
+     * grab: 처음 누른 칸(큰 깔개는 누른 자리가 손가락을 따라오게 그만큼 비켜 든다).
+     */
+    drag(target, point, grab) {
+      const f = target && models.get(keyOf(target.cx, target.cz, target.mat));
       if (!f) return;
-      const c = point || cellCenter(cell.cx, cell.cz, room.size);
-      f.position.set(c.x, point ? 0.25 : 0, c.z);
+      const r = f.userData.rest;
+      if (!point) { f.position.set(r.x, r.y, r.z); return; }
+      const g = grab ? cellCenter(grab.cx, grab.cz, room.size) : r;
+      f.position.set(point.x + r.x - g.x, r.y + 0.25, point.z + r.z - g.z);
     },
     /** 목록에서 끌어 오는 가구 미리보기: 칸 위에 살짝 띄워 보여 준다(id 나 cell 이 null 이면 숨긴다). */
     ghost(id, cell) {
@@ -948,13 +969,17 @@ export function createInterior() {
       ghostModel.position.set(c.x, 0.2, c.z);
       ghostModel.visible = true;
     },
-    /** 화면 좌표(-1..1)에 보이는 가구의 칸. 가구 몸통(탁자 윗면처럼 바닥보다 높이 보이는 곳)을 눌러도 그 가구로 친다. 없으면 null. */
+    /**
+     * 화면 좌표(-1..1)에 보이는 가구의 칸 { cx, cz }. 가구 몸통(탁자 윗면처럼 바닥보다 높이 보이는 곳)을 눌러도 그 가구로 친다. 없으면 null.
+     * 깔개는 바닥처럼 지나친다(누른 바닥 칸은 cellAt — 큰 깔개 위 칸에도 가구를 놓게).
+     */
     pickCell(nx, ny) {
       ray.setFromCamera({ x: nx, y: ny }, camera);
       for (const h of ray.intersectObjects(furniture.children, true)) {
         let o = h.object;
         while (o && o.parent !== furniture) o = o.parent;
-        if (o && cellOf.has(o)) return cellOf.get(o);
+        const c = o && cellOf.get(o);
+        if (c && !c.mat) return { cx: c.cx, cz: c.cz };
       }
       return null;
     },
@@ -1050,8 +1075,11 @@ export function createInterior() {
     /** 옷장을 열 때: 카메라(앞) 쪽을 보고 서서 바뀐 모습이 보이게. */
     faceCamera() { yaw = 0; moving = false; },
     showGrid(on) { tiles.forEach((t) => { t.visible = on; t.material = tileMat; }); },
-    /** 칸 하나를 분홍으로(null 이면 모두 원래대로). */
-    highlight(cell) { tiles.forEach((t) => { t.material = cell && t.userData.cx === cell.cx && t.userData.cz === cell.cz ? hotMat : tileMat; }); },
+    /** 칸 하나나 칸 목록(큰 깔개가 덮는 칸들)을 분홍으로(null 이면 모두 원래대로). */
+    highlight(cell) {
+      const on = !cell ? [] : Array.isArray(cell) ? cell : [cell];
+      tiles.forEach((t) => { t.material = on.some((c) => t.userData.cx === c.cx && t.userData.cz === c.cz) ? hotMat : tileMat; });
+    },
     /** 화면 좌표(-1..1)가 가리키는 바닥 칸. 칸 밖이면 null. */
     cellAt(nx, ny) {
       ray.setFromCamera({ x: nx, y: ny }, camera);

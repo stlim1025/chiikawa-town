@@ -51,7 +51,7 @@ import { openSticker } from './ui/sticker.js';
 import { createInterior } from './world/interior.js';
 import { createRooms } from './world/rooms.js';
 import { createHomeUI } from './ui/homeui.js';
-import { FURNITURE, HOME_SIZES, WALLPAPERS, FLOORS, homeOf, sizeOf, gridOf, decorOf, expandHome, useDecor, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture } from './core/home.js';
+import { FURNITURE, HOME_SIZES, WALLPAPERS, FLOORS, MAT_SIZES, homeOf, sizeOf, gridOf, decorOf, expandHome, useDecor, buyFurniture, placeFurniture, removeFurniture, rotateFurniture, moveFurniture, resizeMat } from './core/home.js';
 import { FRIENDS, CHATS, ptsForHearts, friendOf, hearts, befriend, befriendBy, markDay, rps, canBorrow, loanOptions, borrow, repay, debtOf } from './core/friends.js';
 import { LICENSES, LIQUOR_LESSONS, LIQUOR_MARKS, STUDY, studyProgress, markStudy, liquorQuiz, payFee, grant, revoke, hasLicense, licensesOf, licenseNumber, canWorkRamen, workedRamen } from './core/licenses.js';
 import { ramenQuiz, shiftPay } from './core/ramen.js';
@@ -996,7 +996,7 @@ function boot() {
 
   // 주인 집 구경: 주인이 보낸 가구 배치로 집 안을 그린다(꾸미기 · 침대 · 옷장은 주인만, 손님은 둘러보고 나가기만)
   /**
-   * 손님: 주인이 보낸 가구 [[id, cx, cz, rot]] 와 집 모습 look [크기, 벽지, 바닥] → { size, wall, floor, placed }.
+   * 손님: 주인이 보낸 가구 [[id, cx, cz, rot, 깔개 크기(있으면)]] 와 집 모습 look [크기, 벽지, 바닥] → { size, wall, floor, placed }.
    * 모르는 가구 · 그 크기 방의 칸 밖 · 모르는 벽지 · 바닥은 버린다.
    */
   const parseHouse = (rows, look) => {
@@ -1007,7 +1007,7 @@ function boot() {
       floor: typeof L[2] === 'string' && Object.hasOwn(FLOORS, L[2]) ? L[2] : undefined,
       placed: rows.slice(0, G.cols * G.rows * 2)
         .filter((r) => Array.isArray(r) && Object.hasOwn(FURNITURE, r[0]) && Number.isInteger(r[1]) && Number.isInteger(r[2]) && r[1] >= 0 && r[2] >= 0 && r[1] < G.cols && r[2] < G.rows)
-        .map(([id, cx, cz, rot]) => ({ id, cx, cz, rot: [0, 1, 2, 3].includes(rot) ? rot : 0 }))
+        .map(([id, cx, cz, rot, sz]) => ({ id, cx, cz, rot: [0, 1, 2, 3].includes(rot) ? rot : 0, ...(Number.isInteger(sz) && sz > 0 && MAT_SIZES[sz] ? { sz } : {}) }))
     };
   };
   function enterHostHome() {
@@ -1073,7 +1073,7 @@ function boot() {
       w.w = weeds.snapshot(weedBusy);
       w.b = berries.snapshot();
       w.g = groundOf(state).map((e) => [e.g, e.id, e.n, e.clean || 0, e.weapon ? 1 : 0, r2(e.x), r2(e.z)]); // 바닥 물건(손님도 주울 수 있다)
-      w.h = homeOf(state).placed.map((q) => [q.id, q.cx, q.cz, q.rot || 0]); // 내 집 가구(손님이 구경한다)
+      w.h = homeOf(state).placed.map((q) => (q.sz ? [q.id, q.cx, q.cz, q.rot || 0, q.sz] : [q.id, q.cx, q.cz, q.rot || 0])); // 내 집 가구(손님이 구경한다, 키운 깔개는 크기까지)
       const dc = decorOf(homeOf(state));
       w.hl = [sizeOf(homeOf(state)), dc.wall, dc.floor]; // 내 집 크기 · 벽지 · 바닥
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
@@ -2102,8 +2102,18 @@ function boot() {
       if (r.ok) { commit({ ...state, home: r.home }); interior.setHome(r.home); sound.play('job'); }
       return r;
     },
-    remove(cx, cz) { const home = removeFurniture(homeOf(state), cx, cz); commit({ ...state, home }); interior.setHome(home); sound.play('click'); },
-    rotate(cx, cz) { const home = rotateFurniture(homeOf(state), cx, cz); commit({ ...state, home }); interior.setHome(home); sound.play('click'); },
+    remove(cx, cz, mat) { const home = removeFurniture(homeOf(state), cx, cz, mat); commit({ ...state, home }); interior.setHome(home); sound.play('click'); },
+    rotate(cx, cz, mat) {
+      const before = homeOf(state), home = rotateFurniture(before, cx, cz, mat);
+      if (home === before) return home; // 못 돌렸다(길쭉한 깔개를 돌리면 다른 깔개 자리로 당겨질 때)
+      commit({ ...state, home }); interior.setHome(home); sound.play('click'); return home;
+    },
+    /** 깔개 크게(step 1) · 작게(step -1). */
+    resize(cx, cz, step) {
+      const r = resizeMat(homeOf(state), cx, cz, step);
+      if (r.ok) { commit({ ...state, home: r.home }); interior.setHome(r.home); sound.play('click'); }
+      return r;
+    },
     move(from, to) {
       const r = moveFurniture(homeOf(state), from, to);
       if (r.ok) { commit({ ...state, home: r.home }); sound.play('job'); }
@@ -2155,20 +2165,23 @@ function boot() {
   }
   // 꾸미기 중 바닥: 누르면 그 칸에 놓거나 고르고, 놓인 가구를 끌면 다른 칸으로 옮긴다
   const ndc = (e) => { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -(((e.clientY - r.top) / r.height) * 2 - 1) }; };
-  let drag = null; // { from: 칸, sx, sy: 누른 화면 위치, moved: 끌었는지, can: 끌 수 있는 가구인지 }
+  // { cell: 누른 칸, from: 끌어 옮길 것 { cx, cz, mat } | null, grab: 끄는 기준 칸, sx, sy: 누른 화면 위치, moved: 끌었는지 }
+  let drag = null;
   canvas.addEventListener('pointerdown', (e) => {
     if (mode !== 'home' || !homeUI.decorating) return;
-    const p = ndc(e), from = interior.pickCell(p.x, p.y) || interior.cellAt(p.x, p.y); // 가구를 눌렀으면 그 가구의 칸
-    drag = { from, sx: e.clientX, sy: e.clientY, moved: false, can: homeUI.canDrag(from) };
-    if (drag.can) canvas.setPointerCapture?.(e.pointerId);
+    const p = ndc(e), floor = interior.cellAt(p.x, p.y), cell = interior.pickCell(p.x, p.y) || floor; // 가구를 눌렀으면 그 가구의 칸(깔개는 바닥 칸)
+    const from = homeUI.grab(cell);
+    // 깔개는 손가락 밑 바닥 칸을 기준으로 끈다(위에 놓인 가구 몸통을 눌러 끌어도 놓을 때 바닥 칸과 어긋나지 않게)
+    drag = { cell, from, grab: (from && from.mat && floor) || cell, sx: e.clientX, sy: e.clientY, moved: false };
+    if (drag.from) canvas.setPointerCapture?.(e.pointerId);
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!drag || !drag.can) return;
+    if (!drag || !drag.from) return;
     if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 8) return; // 살짝 떨린 건 누름으로
     drag.moved = true;
     const p = ndc(e);
-    interior.drag(drag.from, interior.pointAt(p.x, p.y));
-    interior.highlight(interior.cellAt(p.x, p.y));
+    interior.drag(drag.from, interior.pointAt(p.x, p.y), drag.grab);
+    interior.highlight(homeUI.dropCells(drag.from, interior.cellAt(p.x, p.y), drag.grab));
   });
   canvas.addEventListener('pointerup', (e) => {
     if (!drag) return;
@@ -2176,8 +2189,8 @@ function boot() {
     drag = null;
     if (mode !== 'home' || !homeUI.decorating) return;
     const p = ndc(e);
-    if (d.moved) homeUI.dropped(d.from, interior.cellAt(p.x, p.y));
-    else homeUI.cellTapped(d.from);
+    if (d.moved) homeUI.dropped(d.from, interior.cellAt(p.x, p.y), d.grab);
+    else homeUI.cellTapped(d.cell);
   });
   canvas.addEventListener('pointercancel', () => {
     if (drag && drag.moved) { interior.drag(drag.from, null); interior.highlight(null); }

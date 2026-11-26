@@ -104,14 +104,14 @@ export const FURNITURE_CATS = [
 ];
 
 /**
- * 살 수 있는 가구. price 는 원, cat 은 가구점 분류(FURNITURE_CATS). 하나가 한 칸이고, 같은 가구를 여러 개 살 수 있다.
+ * 살 수 있는 가구. price 는 원, cat 은 가구점 분류(FURNITURE_CATS). 하나가 한 칸이고(mat 인 깔개는 따로 깔고 키운다 — MAT_SIZES), 같은 가구를 여러 개 살 수 있다.
  * 처음 아홉 가지(침대 ~ 인형) 다음은 게임 오리지널로 늘린 가구: 값을 100원 ~ 15,000원으로 넓게 두어 집을 넓힌 뒤에도 채울 것이 있게 했다.
  */
 export const FURNITURE = {
   bed: { id: 'bed', name: '폭신 침대', price: 300, cat: 'rest' },
   table: { id: 'table', name: '동그란 탁자', price: 120, cat: 'table' },
   cushion: { id: 'cushion', name: '분홍 방석', price: 50, cat: 'floor' },
-  rug: { id: 'rug', name: '동그란 러그', price: 90, cat: 'floor' },
+  rug: { id: 'rug', name: '동그란 러그', price: 90, cat: 'floor', mat: true },
   plant: { id: 'plant', name: '화분', price: 80, cat: 'plant' },
   lamp: { id: 'lamp', name: '스탠드', price: 140, cat: 'light' },
   shelf: { id: 'shelf', name: '책장', price: 180, cat: 'store' },
@@ -157,7 +157,7 @@ export const FURNITURE = {
   bonsai: { id: 'bonsai', name: '분재', price: 2000, cat: 'plant' },
   tree: { id: 'tree', name: '방 안 열매나무', price: 5000, cat: 'plant' },
   // 깔개와 방석
-  squarerug: { id: 'squarerug', name: '네모 러그', price: 250, cat: 'floor' },
+  squarerug: { id: 'squarerug', name: '네모 러그', price: 250, cat: 'floor', mat: true },
   beanbag: { id: 'beanbag', name: '말랑 빈백', price: 900, cat: 'floor' },
   // 장식
   radio: { id: 'radio', name: '빨간 라디오', price: 450, cat: 'deco' },
@@ -198,41 +198,105 @@ export function buyFurniture(state, id) {
   return { ok: true, state: { ...paid.state, home: { ...home, owned: { ...home.owned, [id]: (home.owned[id] || 0) + 1 } } } };
 }
 
-const at = (home, cx, cz) => home.placed.findIndex((p) => p.cx === cx && p.cz === cz);
+/**
+ * 깔개(게임 오리지널): 러그(FURNITURE 의 mat)는 바닥에 따로 깔려서, 깐 칸에 가구를 하나 더 올리거나 가구 밑으로 깔 수 있다.
+ * 크기는 이 차례로 키우고 줄인다(놓인 가구의 sz 가 이 번호, 없으면 한 칸). [가로, 세로] 칸 수이고 돌리면 가로세로가 바뀐다.
+ * 깔개의 (cx, cz) 는 덮는 칸 가운데 왼쪽 안쪽 모서리 칸. 같은 칸에서 시작하는 깔개는 하나지만 덮는 칸은 겹쳐도 된다(큰 러그 위에 작은 러그).
+ */
+export const MAT_SIZES = [[1, 1], [2, 2], [3, 2]];
+/** 깔개인지. */
+export const isMat = (id) => !!(Object.hasOwn(FURNITURE, id) && FURNITURE[id].mat);
+const szOf = (p) => (Number.isInteger(p.sz) && MAT_SIZES[p.sz] ? p.sz : 0);
+/** 놓인 가구의 돌리기 전 [가로, 세로] 칸 수(깔개가 아니면 늘 한 칸). */
+export const matSize = (p) => (isMat(p.id) ? MAT_SIZES[szOf(p)] : MAT_SIZES[0]);
+/** 놓인 가구가 덮는 칸 수 { w, d }(홀수 번 돌렸으면 가로세로가 바뀐다). */
+export function footprint(p) {
+  const [w, d] = matSize(p);
+  return p.rot % 2 ? { w: d, d: w } : { w, d };
+}
+/** 놓인 가구가 덮는 칸들(안쪽 줄부터, 줄마다 왼쪽부터). */
+export function cellsOf(p) {
+  const { w, d } = footprint(p), out = [];
+  for (let z = 0; z < d; z++) for (let x = 0; x < w; x++) out.push({ cx: p.cx + x, cz: p.cz + z });
+  return out;
+}
+const covers = (p, cx, cz) => { const { w, d } = footprint(p); return cx >= p.cx && cz >= p.cz && cx < p.cx + w && cz < p.cz + d; };
+/** 그 칸에 겹친 것들, 위에서부터: 그 칸의 가구, 그다음 그 칸을 덮는 깔개(나중에 깐 것이 위). */
+export function stackAt(home, cx, cz) {
+  const top = home.placed.filter((p) => !isMat(p.id) && p.cx === cx && p.cz === cz);
+  return [...top, ...home.placed.filter((p) => isMat(p.id) && covers(p, cx, cz)).reverse()];
+}
+/** 깔개 p 를 방 안에 들도록 당긴 시작 칸 { cx, cz }(방보다 크면 null). */
+export function fitMat(home, p) {
+  const g = gridOf(home), { w, d } = footprint(p);
+  if (w > g.cols || d > g.rows) return null;
+  return { cx: Math.max(0, Math.min(p.cx, g.cols - w)), cz: Math.max(0, Math.min(p.cz, g.rows - d)) };
+}
 
-/** 빈 칸에 가구를 놓는다. { ok, home, reason: 'none'(남은 게 없음) | 'taken'(이미 놓임) | 'outside'(방 밖) } */
+/** 그 칸에서 시작하는 가구의 번호(mat: 깔개 쪽). */
+const at = (home, cx, cz, mat = false) => home.placed.findIndex((p) => p.cx === cx && p.cz === cz && isMat(p.id) === !!mat);
+
+/**
+ * 빈 칸에 가구를 놓는다. 깔개는 한 칸으로 깔리고, 가구가 놓인 칸에도 깔린다(가구도 깔개 위에 놓인다).
+ * { ok, home, reason: 'none'(남은 게 없음) | 'taken'(이미 놓임) | 'outside'(방 밖) }
+ */
 export function placeFurniture(home, id, cx, cz) {
   if (!inside(home, cx, cz)) return { ok: false, reason: 'outside', home };
   if (spare(home, id) <= 0) return { ok: false, reason: 'none', home };
-  if (at(home, cx, cz) >= 0) return { ok: false, reason: 'taken', home };
+  if (at(home, cx, cz, isMat(id)) >= 0) return { ok: false, reason: 'taken', home };
   return { ok: true, home: { ...home, placed: [...home.placed, { id, cx, cz, rot: 0 }] } };
 }
 
-/** 그 칸의 가구를 넣어 둔다(다시 놓을 수 있게 남는다). */
-export function removeFurniture(home, cx, cz) {
-  const i = at(home, cx, cz);
+/** 그 칸의 가구(mat 이면 그 칸에서 시작하는 깔개)를 넣어 둔다(다시 놓을 수 있게 남는다). */
+export function removeFurniture(home, cx, cz, mat = false) {
+  const i = at(home, cx, cz, mat);
   if (i < 0) return home;
   return { ...home, placed: home.placed.filter((_, k) => k !== i) };
 }
 
-/** 그 칸의 가구를 90도 돌린다. */
-export function rotateFurniture(home, cx, cz) {
-  const i = at(home, cx, cz);
+/** 그 칸의 가구(mat 이면 깔개)를 90도 돌린다. 길쭉한 깔개는 방 안으로 당기고, 당길 칸에서 다른 깔개가 시작하면 그대로 둔다. */
+export function rotateFurniture(home, cx, cz, mat = false) {
+  const i = at(home, cx, cz, mat);
   if (i < 0) return home;
-  return { ...home, placed: home.placed.map((p, k) => (k === i ? { ...p, rot: (p.rot + 1) % 4 } : p)) };
+  let q = { ...home.placed[i], rot: (home.placed[i].rot + 1) % 4 };
+  if (mat) {
+    const to = fitMat(home, q);
+    if (!to || ((to.cx !== cx || to.cz !== cz) && at(home, to.cx, to.cz, true) >= 0)) return home;
+    q = { ...q, ...to };
+  }
+  return { ...home, placed: home.placed.map((p, k) => (k === i ? q : p)) };
 }
 
 /**
- * 놓인 가구를 끌어서 다른 빈 칸으로 옮긴다(돌린 방향은 그대로).
+ * 그 칸에서 시작하는 깔개를 한 단계 키우거나(step 1) 줄인다(step -1). 시작 칸은 그대로 두고, 벽에 닿으면 방 안으로 당긴다.
+ * { ok, home, cell: 바뀐 시작 칸, reason: 'none'(깔개가 없음) | 'max' | 'min' | 'room'(방보다 큼) | 'taken'(당길 칸에서 다른 깔개가 시작) }
+ */
+export function resizeMat(home, cx, cz, step) {
+  const i = at(home, cx, cz, true);
+  if (i < 0) return { ok: false, reason: 'none', home };
+  const p = home.placed[i], sz = szOf(p) + step;
+  if (sz < 0) return { ok: false, reason: 'min', home };
+  if (sz >= MAT_SIZES.length) return { ok: false, reason: 'max', home };
+  const to = fitMat(home, { ...p, sz });
+  if (!to) return { ok: false, reason: 'room', home };
+  if ((to.cx !== cx || to.cz !== cz) && at(home, to.cx, to.cz, true) >= 0) return { ok: false, reason: 'taken', home };
+  return { ok: true, cell: to, home: { ...home, placed: home.placed.map((o, k) => (k === i ? { ...p, sz, ...to } : o)) } };
+}
+
+/**
+ * 놓인 가구를 끌어서 다른 칸으로 옮긴다(돌린 방향, 깔개 크기는 그대로). from: { cx, cz, mat(깔개 쪽) }, to: 새 시작 칸(null 이면 방 밖).
+ * 깔개는 벽 너머로 끌면 방 안으로 당긴다.
  * { ok, home, reason: 'none'(그 칸에 가구가 없음) | 'same'(제자리) | 'outside'(방 밖) | 'taken'(이미 놓임) }
  */
 export function moveFurniture(home, from, to) {
-  const i = at(home, from.cx, from.cz);
+  const mat = !!from.mat, i = at(home, from.cx, from.cz, mat);
   if (i < 0) return { ok: false, reason: 'none', home };
-  if (from.cx === to.cx && from.cz === to.cz) return { ok: false, reason: 'same', home };
-  if (!inside(home, to.cx, to.cz)) return { ok: false, reason: 'outside', home };
-  if (at(home, to.cx, to.cz) >= 0) return { ok: false, reason: 'taken', home };
-  return { ok: true, home: { ...home, placed: home.placed.map((p, k) => (k === i ? { ...p, cx: to.cx, cz: to.cz } : p)) } };
+  const dest = to && (mat ? fitMat(home, { ...home.placed[i], cx: to.cx, cz: to.cz }) : to);
+  if (!dest) return { ok: false, reason: 'outside', home };
+  if (from.cx === dest.cx && from.cz === dest.cz) return { ok: false, reason: 'same', home };
+  if (!inside(home, dest.cx, dest.cz)) return { ok: false, reason: 'outside', home };
+  if (at(home, dest.cx, dest.cz, mat) >= 0) return { ok: false, reason: 'taken', home };
+  return { ok: true, home: { ...home, placed: home.placed.map((p, k) => (k === i ? { ...p, cx: dest.cx, cz: dest.cz } : p)) } };
 }
 
 /** 저장된 집 모양이 맞는지(save.js 검사에서 쓴다). */
@@ -245,5 +309,6 @@ export function isValidHome(h) {
   if (h.floor !== undefined && !Object.hasOwn(FLOORS, h.floor)) return false;
   if (h.walls !== undefined && !(Array.isArray(h.walls) && h.walls.every((id) => Object.hasOwn(WALLPAPERS, id)))) return false;
   if (h.floors !== undefined && !(Array.isArray(h.floors) && h.floors.every((id) => Object.hasOwn(FLOORS, id)))) return false;
-  return h.placed.every((p) => p && FURNITURE[p.id] && Number.isInteger(p.cx) && Number.isInteger(p.cz) && [0, 1, 2, 3].includes(p.rot));
+  return h.placed.every((p) => p && FURNITURE[p.id] && Number.isInteger(p.cx) && Number.isInteger(p.cz) && [0, 1, 2, 3].includes(p.rot)
+    && (p.sz === undefined || (Number.isInteger(p.sz) && p.sz >= 0 && p.sz < MAT_SIZES.length))); // 깔개 크기(예전 저장에는 없다)
 }
