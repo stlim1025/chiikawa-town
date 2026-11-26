@@ -3,6 +3,7 @@ import { toonMaterial, toonMesh, addOutline, GEO } from '../render/toon.js';
 import { WEED_KINDS, stagesOf } from '../core/weeding.js';
 import { regionAt, roadDist, shoreDist, VILLAGE_R, SOUTH_SHORE } from '../core/layout.js';
 import { part, mergeParts } from '../render/merge.js';
+import { WEED_BOOST } from '../core/contest.js';
 
 /**
  * 풀 10종이 자라는 곳. area 는 아래 AREAS 의 자리 고르기 규칙, n 은 그 자리에 동시에 자라는 수.
@@ -33,6 +34,8 @@ const AREAS = {
   shore: { box: [-70, 70, 30, 72], ok: (x, z) => Math.hypot(x, z) > VILLAGE_R + 3 && shoreDist(x, z) > 0.4 && shoreDist(x, z) < 1.8 && SOUTH_SHORE - z > 2 }
 };
 const REGROW_SECONDS = 20;
+/** 풀 뽑기 시합 날(core/contest.js)에 상한을 늘리는 자리: 마을과 들판. */
+const BOOST_AREAS = new Set(['village', 'villageEdge', 'fields']);
 const NEAR_R = 6; // near 규칙: 뽑힌 자리에서 이만큼 안에 먼저 다시 자란다
 /** 이보다 먼 풀은 그리지 않는다(안개 너머). */
 const DRAW_DIST = 50;
@@ -179,7 +182,7 @@ export function weedMesh(kind) {
 export function createWeeds(scene, village, random = Math.random) {
   const list = [];
   const flying = [];
-  let nextId = 1, regrow = 0, cull = 0, nightK = 0;
+  let nextId = 1, regrow = 0, cull = 0, nightK = 0, boost = false; // boost: 풀 뽑기 시합 날(빨리, 더 많이 다시 자란다)
   const pulledAt = new Map(); // near 규칙(종류|자리) → 뽑힌 자리들(다시 자랄 때 먼저 쓴다, 먼저 뽑힌 것부터)
   const nearRule = (kind, area) => (SPAWN[kind] || []).some((r) => r.area === area && r.near);
 
@@ -251,6 +254,8 @@ export function createWeeds(scene, village, random = Math.random) {
 
   return {
     list,
+    /** 풀 뽑기 시합 날: 켜면 WEED_BOOST.regrow 초마다 다시 자라고 마을 · 들판 상한이 WEED_BOOST.cap 배. */
+    setBoost(on) { boost = !!on; },
     /** (x, z) 에서 maxDist 안의 가장 가까운 풀(밤에만 나오는 풀이 숨어 있으면 뺀다). kind 를 주면 그 종류만. */
     nearest(x, z, maxDist, kind = null) {
       let best = null, bd = maxDist;
@@ -409,12 +414,13 @@ export function createWeeds(scene, village, random = Math.random) {
         }
       }
       regrow += dt;
-      if (regrow >= REGROW_SECONDS) {
+      if (regrow >= (boost ? WEED_BOOST.regrow : REGROW_SECONDS)) {
         regrow = 0;
-        // 자리마다 모자란 만큼 하나씩 다시 자란다(near 규칙은 뽑힌 자리 근처부터)
+        // 자리마다 모자란 만큼 하나씩 다시 자란다(near 규칙은 뽑힌 자리 근처부터). 풀 뽑기 시합 날은 마을 · 들판 상한이 늘어난다
         for (const [kind, rules] of Object.entries(SPAWN)) {
           for (const r of rules) {
-            if (list.filter((w) => w.kind === kind && w.area === r.area).length >= r.n) continue;
+            const cap = boost && BOOST_AREAS.has(r.area) ? Math.ceil(r.n * WEED_BOOST.cap) : r.n;
+            if (list.filter((w) => w.kind === kind && w.area === r.area).length >= cap) continue;
             const q = r.near ? pulledAt.get(kind + '|' + r.area) : null;
             spawn(kind, r.area, q && q.length ? q.shift() : null);
           }

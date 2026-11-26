@@ -15,9 +15,17 @@ const FLAG_COLORS = ['#ff9fc0', '#fcd95b', '#8fd3ff', '#8fd16a', '#c9a8ff', '#ff
 const ROPE_Y = 1.55, FLAG_W = 0.26, FLAG_H = 0.3, FLAG_GAP = 0.42;
 const COAT = ['#6b3f26', '#ff9fc0', '#fff4dc']; // 초콜릿 · 딸기 · 화이트
 
+/** 현수막 색(글에 따라): 막대 과자 데이는 분홍, 마을 대회는 낚시 하늘색 · 풀 연두(core/contest.js 의 bannerText). */
+const STICK_TEXT = '막대 과자 데이';
+const BANNER_LOOK = {
+  [STICK_TEXT]: { cloth: '#ffc7d9', wave: '#ff9fc0', dash: '#fff6fa' },
+  '마을 낚시 대회': { cloth: '#cfe8ff', wave: '#8fc3f2', dash: '#f3f9ff' },
+  '마을 풀 뽑기 시합': { cloth: '#d8f2c4', wave: '#9fd37f', dash: '#f6fff0' }
+};
+
 export function createFestival(scene, village) {
-  let root = null;
-  const obs = [];
+  let root = null, sticks = null, text = STICK_TEXT;
+  const obs = [], stickObs = [], redraws = [];
 
   /** 광장 둘레 가로등을 각도 순으로 잇는다(너무 가깝거나 먼 짝은 건너뛴다). */
   function lampPairs() {
@@ -63,20 +71,21 @@ export function createFestival(scene, village) {
     g.add(flagMesh, new THREE.LineSegments(ropeGeo, new THREE.LineBasicMaterial({ color: '#5a4431' })));
     return g;
   }
-  /** 현수막 글씨(분홍 천, 양 끝에 막대 과자 그림). */
-  function bannerTexture() {
+  /** 현수막 글씨(지금 글 text 와 그 색, 막대 과자 데이면 양 끝에 막대 과자 그림). 글이 바뀌면 redraws 로 다시 그린다. */
+  function bannerTexture(edge) {
     const canvas = document.createElement('canvas');
     canvas.width = 640; canvas.height = 136;
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     const draw = () => {
-      const c = canvas.getContext('2d');
-      c.fillStyle = '#ffc7d9';
+      const c = canvas.getContext('2d'), L = BANNER_LOOK[text] || BANNER_LOOK[STICK_TEXT];
+      edge.color.set(L.cloth);
+      c.fillStyle = L.cloth;
       c.fillRect(0, 0, 640, 136);
-      c.fillStyle = '#ff9fc0';
+      c.fillStyle = L.wave;
       for (let x = 0; x < 640; x += 40) { c.beginPath(); c.arc(x + 20, 136, 14, Math.PI, 0); c.fill(); } // 아래 물결 무늬
-      c.strokeStyle = '#fff6fa'; c.lineWidth = 5; c.setLineDash([14, 10]); c.strokeRect(12, 12, 616, 98); c.setLineDash([]);
-      [[60, 1], [580, -1]].forEach(([x, sd]) => { // 양 끝 막대 과자 둘
+      c.strokeStyle = L.dash; c.lineWidth = 5; c.setLineDash([14, 10]); c.strokeRect(12, 12, 616, 98); c.setLineDash([]);
+      if (text === STICK_TEXT) [[60, 1], [580, -1]].forEach(([x, sd]) => { // 양 끝 막대 과자 둘
         c.lineCap = 'round';
         [[-12, '#6b3f26'], [12, '#e0527a']].forEach(([dx, coat]) => {
           c.strokeStyle = '#e9c48a'; c.lineWidth = 10; c.beginPath(); c.moveTo(x + dx, 104); c.lineTo(x + dx + sd * 6, 26); c.stroke();
@@ -86,11 +95,12 @@ export function createFestival(scene, village) {
       c.fillStyle = '#5a4431';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.font = 'bold 76px Gaegu, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-      c.fillText('막대 과자 데이', 320, 64);
+      c.font = `bold ${text.length > 8 ? 64 : 76}px Gaegu, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`;
+      c.fillText(text, 320, 64);
       tex.needsUpdate = true;
     };
     draw();
+    redraws.push(draw);
     document.fonts?.load('bold 76px Gaegu').then(draw, () => {});
     return tex;
   }
@@ -102,7 +112,7 @@ export function createFestival(scene, village) {
       g.add(toonMesh(GEO.sphere, '#fcd95b', { position: [x + sd * 1.55, 2.55, z], scale: [0.12, 0.12, 0.12], outline: 0.015 }));
       obs.push({ x: x + sd * 1.55, z, r: 0.12 });
     });
-    const tex = bannerTexture(), face = new THREE.MeshLambertMaterial({ map: tex }), edge = new THREE.MeshLambertMaterial({ color: '#ffc7d9' });
+    const edge = new THREE.MeshLambertMaterial({ color: '#ffc7d9' }), tex = bannerTexture(edge), face = new THREE.MeshLambertMaterial({ map: tex });
     const cloth = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.64, 0.03), [edge, edge, edge, edge, face, face]);
     cloth.position.set(x, 2.12, z);
     g.add(cloth);
@@ -123,28 +133,37 @@ export function createFestival(scene, village) {
       s.add(toonMesh(GEO.cylinder, COAT[i], { position: [0, 0.5 + i * 0.06, 0], scale: [0.09, 0.8 + i * 0.06, 0.09], outline: 0.015 }));
       g.add(s);
     });
-    root.add(g);
-    obs.push({ x: at.x, z: at.z, r: 0.4 });
+    sticks.add(g);
+    stickObs.push({ x: at.x, z: at.z, r: 0.4 });
   }
   function build() {
     root = new THREE.Group();
+    sticks = new THREE.Group(); // 막대 과자 화분은 막대 과자 데이에만(마을 대회 날에는 깃발과 현수막만)
     root.add(pennants(lampPairs()));
     banner(PLAZA.x, PLAZA.z + PLAZA.r + 1.2); // 남쪽 길목(마을 남문 쪽에서 들어오며 본다)
     banner(PLAZA.x, PLAZA.z - PLAZA.r - 1.2); // 북쪽 길목
     [1, -1].forEach((sx) => [1, -1].forEach((sz) => bigSticks(PLAZA.x + sx * (PLAZA.r + 0.9), PLAZA.z + sz * 1.8))); // 동서 길목 양옆
-    scene.add(root);
+    scene.add(root, sticks);
     batchStatic(root, { cell: 40 });
-    for (const o of obs) village.obstacles.push(o);
-    village.refreshNav();
+    batchStatic(sticks, { cell: 40 });
+    for (const o of [...obs, ...stickObs]) village.obstacles.push(o);
   }
 
   return {
-    /** 장식을 보이거나 숨긴다(처음 보일 때 만든다). */
-    setOn(on) {
-      if (on && !root) { build(); return; }
-      if (!root || root.visible === on) return;
+    /**
+     * 장식을 보이거나 숨긴다(처음 보일 때 만든다). t: 현수막 글(막대 과자 데이 · 마을 대회 이름 — 바뀌면 다시 그린다).
+     * 막대 과자 화분은 글이 막대 과자 데이일 때만 보인다.
+     */
+    setOn(on, t = STICK_TEXT) {
+      if (t !== text) { text = t; redraws.forEach((d) => d()); }
+      if (on && !root) build();
+      if (!root) return;
+      const stickOn = on && text === STICK_TEXT;
+      if (root.visible === on && sticks.visible === stickOn && obs.every((o) => o.off === !on) && stickObs.every((o) => o.off === !stickOn)) return;
       root.visible = on;
+      sticks.visible = stickOn;
       obs.forEach((o) => { o.off = !on; });
+      stickObs.forEach((o) => { o.off = !stickOn; });
       village.refreshNav();
     },
     get on() { return !!root && root.visible; }

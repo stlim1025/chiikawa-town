@@ -349,7 +349,8 @@ export function newsLine(ev, me = '나') {
     playerLicense: () => `${josa(N('me'), '이/가')} ${josa(ev.lic || '자격증', '을/를')} 땄어요`,
     playerWork: () => `${N('me')} 덕분에 마을에 ${josa(ev.work || '새 시설', '이/가')} 생겼어요`,
     playerHome: () => `${josa(N('me'), '이/가')} 집을 ${josa(ev.home || '넓은 방', '으로/로')} 넓혔어요`,
-    playerHouse: () => `${josa(N('me'), '이/가')} 내 집을 마련했어요`
+    playerHouse: () => `${josa(N('me'), '이/가')} 내 집을 마련했어요`,
+    contestWin: () => `${josa(A, '이/가')} ${ev.item || '마을 대회'}에서 1등을 했어요` // 마을 대회(core/contest.js)
   }[ev.type];
   const text = T ? T() : null;
   return text ? { text, kinds: [ev.who, ev.with].filter((k) => k && k !== 'me' && FRIENDS[k]) } : null;

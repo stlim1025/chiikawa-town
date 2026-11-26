@@ -69,6 +69,9 @@ test('마을 소식 문장', () => {
   assert.equal(V.newsLine({ type: 'job', who: 'usagi', title: '잡초 8개 뽑기' }).text, '우사기가 잡초 8개 뽑기를 끝냈어요');
   assert.equal(V.newsLine({ type: 'playerBoss', who: 'me' }, '승택').text, '승택이 왕버섯을 쓰러뜨렸어요');
   assert.deepEqual(V.newsLine({ type: 'comfort', who: 'hachiware', with: 'chiikawa' }).kinds, ['hachiware', 'chiikawa']);
+  // 마을 대회(core/contest.js) 1등
+  assert.equal(V.newsLine({ type: 'contestWin', who: 'rakko', item: '마을 낚시 대회' }).text, '랏코가 마을 낚시 대회에서 1등을 했어요');
+  assert.equal(V.newsLine({ type: 'contestWin', who: 'me', item: '마을 풀 뽑기 시합' }, '승택').text, '승택이 마을 풀 뽑기 시합에서 1등을 했어요');
   // 돈 모으기 목표를 이뤘을 때(core/goals.js 의 goalNews)
   assert.equal(V.newsLine({ type: 'donate', who: 'chiikawa', item: '광장 꽃밭' }).text, '치이카와가 마을 가꾸기 광장 꽃밭에 돈을 보탰어요');
   assert.equal(V.newsLine({ type: 'homeUp', who: 'hachiware', item: '넓은 방' }).text, '하치와레가 돈을 모아 집을 넓은 방으로 넓혔어요');

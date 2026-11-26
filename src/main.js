@@ -127,6 +127,8 @@ import { createPajamaStory } from './stories/pajama.js';
 import { createHousewarm } from './stories/housewarm.js';
 import { createStickParty } from './stories/stickday.js';
 import { createFestival } from './world/festival.js';
+import { createContestProps } from './world/contestprops.js';
+import { CONTESTS, CLOSE_HOUR, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText } from './core/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -3325,6 +3327,10 @@ function boot() {
   let islandTrip = null; // 사이드스토리 '수상한 섬 합숙'(stories/island.js — 아래에서 만든다)
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let housewarm = null, stickParty = null, confetti = null, festival = null; // 마을 이벤트(집들이 · 막대 과자 데이 — 아래에서 만든다)
+  let contestProps = null; // 마을 대회 접수 탁자 · 시상식 단상(world/contestprops.js — 아래에서 만든다)
+  let contestRound = null; // 마을 대회 한 판 { kind, s, t, clean, left, guest }(core/contest.js)
+  const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 연결 id → { name, s, t }
+  const contestUi = { eveDay: 0, morningDay: 0 }; // 전날 저녁 알림 · 당일 아침 배너를 띄운 날
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
@@ -3933,11 +3939,54 @@ function boot() {
     sound.play('job');
     hud.banner('마을이 달라졌어요!', `${josa(due.map((id) => WORKS[id].name).join(', '), '이/가')} 생겼어요`, 4200);
   }
+  /** 마을 대회 손님 기록(순위판 · 등수에 넣는다). */
+  const contestGuestList = () => [...contestGuests].map(([id, g]) => ({ who: 'mp:' + id, name: g.name, s: g.s, t: g.t }));
+  /** 마을 대회가 끝났다: 등수를 정하고 1등을 마을 소식으로. */
+  function settleContestDay() {
+    const before = contestOf(state);
+    commit(settleContest(state, contestGuestList()));
+    const c = contestOf(state);
+    const entries = [...(before.best ? [{ who: 'me', ...before.best }] : []), ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r }))];
+    const top = rankBoard(entries)[0];
+    if (top && top.s > 0) happen({ type: 'contestWin', who: top.who, item: CONTESTS[c.kind].banner });
+    return c;
+  }
+  /**
+   * 마을 대회 날(core/contest.js, 0.3초마다): 광장 현수막(막대 과자 데이가 먼저) · 게시판 옆 접수 탁자 · 풀 뽑기 날 풀 늘리기,
+   * 전날 저녁 6시 알림, 당일 아침 배너, 오후 5시가 지나면 정리(시상식 장면은 startCeremony).
+   */
+  function updateContestDay() {
+    const bt = bannerText(state);
+    festival.setOn(!!bt, bt || undefined);
+    const day = state.clock.day, hour = hourOf(state.clock), ready = state.tutorial === 'done';
+    const kind = ready ? contestKindOn(state.startDate, day) : null;
+    contestProps.setDesk(!!kind && hour >= 6);
+    weeds.setBoost(kind === 'weed');
+    if (!ready) return;
+    const tomorrow = contestKindOn(state.startDate, day + 1);
+    if (tomorrow && hour >= 18 && contestUi.eveDay !== day && mode === 'play' && !sleeping) {
+      contestUi.eveDay = day;
+      hud.toast(`내일은 ${CONTESTS[tomorrow].banner}!`, 3200);
+    }
+    if (!kind) return;
+    const rec = contestOf(state);
+    if (rec.day !== day || rec.kind !== kind) commit(beginContestDay(state, day, kind));
+    if (contestUi.morningDay !== day && hour >= 6 && hour < CLOSE_HOUR && mode === 'play' && !sleeping && !fainting && !questScene) {
+      contestUi.morningDay = day;
+      hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
+    }
+    const phase = contestPhase(hour, !!(contestRound && !contestRound.guest));
+    const now = contestOf(state);
+    if ((phase === 'ceremony' || phase === 'closed') && now.rank == null && !now.got) {
+      const c = settleContestDay();
+      if (c.best) hud.toast(`${CONTESTS[kind].name} 결과는 노동 갑옷 씨에게 들어요`, 3200);
+    }
+  }
   function updateQuests(dt) {
     questT -= dt;
     if (questT > 0 || !state) return;
     questT = 0.3;
-    festival.setOn(isStickFest(state)); // 막대 과자 데이 사흘 동안 광장 장식
+    updateContestDay(); // 막대 과자 데이 · 마을 대회 광장 장식과 대회 날 진행
     checkReady();
     const p = player.position, hour = hourOf(state.clock);
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
@@ -4881,6 +4930,7 @@ function boot() {
   // 마을 이벤트(게임 오리지널): 집들이(stories/housewarm.js) · 막대 과자 데이 광장 파티(stories/stickday.js) · 축제 장식 · 색종이
   confetti = createConfetti(scene);
   festival = createFestival(scene, village);
+  contestProps = createContestProps(scene, village);
   const eventCtx = {
     npcs, village, guide, input, hud, staged, sound, cam, confetti, getPlayer: () => player,
     who: (kind) => whoOf({ kind }), narrator: NARRATOR, fill: (lines) => lines.map(fillName),
@@ -8041,6 +8091,7 @@ function boot() {
     } else if (state && player && mode === 'play' && visiting) {
       guestTick(dt); // 친구 마을에 놀러 간 중
       if (festival.on) festival.setOn(false); // 축제 장식은 내 마을에만
+      contestProps.setDesk(false); // 대회 접수 탁자도
     } else if (state && player && mode === 'play') {
       if (!sleeping) state = { ...state, clock: advance(state.clock, dt) }; // 창(노동 접수 · 가게 · 마을폰 …)을 보는 동안에도 시간은 흐른다
       loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
