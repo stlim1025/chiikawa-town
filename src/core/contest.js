@@ -35,20 +35,27 @@ export const TROPHY = { fish: 'fishtrophy', weed: 'weedtrophy' };
 
 /**
  * 친구 솜씨(3분 한 판의 평균 점수와 들쭉날쭉한 정도). 풀은 견습(급수 NOVICE) 기준이고 내 급수에 맞춰 WEED_GRADE_SCALE 배.
- * clean: 풀을 뽑을 때 깔끔하게 뽑는 비율(같을 때 가르는 값 어림). tests/contestbalance.test.mjs 의 사람 모델로 맞춘다.
+ * clean: 풀을 뽑을 때 깔끔하게 뽑는 비율(같을 때 가르는 값 어림).
+ * tests/contestbalance.test.mjs 의 사람 모델(반응 0.2초 늦음)로 맞췄다: 보통 사람 한 판은 낚시 13.6마리 · 풀 77.6점,
+ * 익숙한 사람은 16.4마리 · 88점쯤. 이 표와 NPC_DAY_SD 로 보통 사람 한 판이 대회 절반쯤 3등 안, 다섯에 하나쯤 1등.
  */
 export const NPC_SKILL = {
   fish: {
-    rakko: { mean: 9, sd: 1.6 }, kurimanju: { mean: 8.5, sd: 1.6 }, hachiware: { mean: 7, sd: 1.6 },
-    usagi: { mean: 7, sd: 3 }, chiikawa: { mean: 5, sd: 1.6 }, momonga: { mean: 4.5, sd: 1.6 }
+    rakko: { mean: 14.6, sd: 1.5 }, kurimanju: { mean: 14.3, sd: 1.5 }, hachiware: { mean: 13.6, sd: 1.5 },
+    usagi: { mean: 13.6, sd: 2.7 }, chiikawa: { mean: 12.1, sd: 1.5 }, momonga: { mean: 11.6, sd: 1.5 }
   },
   weed: {
-    rakko: { mean: 40, sd: 6, clean: 0.85 }, usagi: { mean: 40, sd: 9, clean: 0.7 }, kurimanju: { mean: 32, sd: 6, clean: 0.75 },
-    hachiware: { mean: 30, sd: 6, clean: 0.75 }, chiikawa: { mean: 22, sd: 6, clean: 0.6 }, momonga: { mean: 20, sd: 6, clean: 0.6 }
+    rakko: { mean: 82.6, sd: 7.5, clean: 0.95 }, usagi: { mean: 81.1, sd: 13.5, clean: 0.85 }, kurimanju: { mean: 77.6, sd: 7.5, clean: 0.9 },
+    hachiware: { mean: 77.6, sd: 7.5, clean: 0.9 }, chiikawa: { mean: 65.1, sd: 7.5, clean: 0.8 }, momonga: { mean: 62.6, sd: 7.5, clean: 0.8 }
   }
 };
-/** 내 제초 급수에 따라 친구 풀 솜씨를 이만큼 곱한다(내 급수의 보통 사람 평균 ÷ 견습 평균). */
-export const WEED_GRADE_SCALE = { [NOVICE]: 1, 5: 1, 4: 1, 3: 1, 2: 1, 1: 1 };
+/**
+ * 그날 친구들 컨디션(친구 모두에게 같은 흔들림, 날짜로 정해진다). 친구 기록이 서로 따로 놀면 '다섯에 하나 1등'과 '절반쯤 3등 안'을
+ * 함께 맞출 수 없어서(1등은 여섯을 다 이겨야 한다) 날마다 친구들이 다 같이 잘하거나 다 같이 못하는 날을 둔다.
+ */
+export const NPC_DAY_SD = { fish: 2.5, weed: 12.5 };
+/** 내 제초 급수에 따라 친구 풀 솜씨를 이만큼 곱한다(내 급수의 보통 사람 평균 ÷ 견습 평균 — 잡초는 급수가 높아도 거의 같다). */
+export const WEED_GRADE_SCALE = { [NOVICE]: 1, 5: 1.01, 4: 1, 3: 1, 2: 0.98, 1: 0.98 };
 
 const int0 = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
 const num0 = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
@@ -142,7 +149,8 @@ export function npcRecord(startISO, day, kind, who, myGrade = NOVICE) {
   if (!sk) return { s: 0, t: 0 };
   const rnd = seeded(`${startISO}#${day}#ct#${kind}#${who}`);
   const scale = kind === 'weed' ? WEED_GRADE_SCALE[myGrade] ?? 1 : 1;
-  const s = Math.max(0, Math.min(SCORE_CAP[kind], Math.round(sk.mean * scale + gauss(rnd) * sk.sd * scale)));
+  const form = gauss(seeded(`${startISO}#${day}#ctday#${kind}`)) * NPC_DAY_SD[kind]; // 그날 친구들 컨디션(모두 같다)
+  const s = Math.max(0, Math.min(SCORE_CAP[kind], Math.round((sk.mean + form + gauss(rnd) * sk.sd) * scale)));
   if (kind === 'weed') return { s, t: Math.min(Math.floor(s / 2), Math.round((s * sk.clean) / (1 + sk.clean))) };
   // 낚시: 그 판에 낚았을 법한 물고기들의 가장 큰 크기(마을 연못 한낮)
   let t = 0;
