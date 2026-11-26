@@ -182,6 +182,24 @@ export function settleContest(state, guests = []) {
   const wins = rank === 1 ? { ...c.wins, [c.kind]: c.wins[c.kind] + 1 } : c.wins;
   return withContest(state, { ...c, rank, wins, first: rank === 1 && wins[c.kind] === 1 });
 }
+/** 정리 때 빠진 친구 기록을 채운다(내가 자거나 새로고침한 사이 참가 시각이 지나갔다 — 친구들은 참가했던 것으로). */
+export function fillNpcRecords(state, myGrade = NOVICE) {
+  const c = contestOf(state);
+  if (!c.kind || !state.startDate) return state;
+  const npc = { ...c.npc };
+  for (const k of CONTEST_FRIENDS) if (!npc[k]) npc[k] = npcRecord(state.startDate, c.day, c.kind, k, myGrade);
+  return withContest(state, { ...c, npc });
+}
+/** 정리하지 못한 채 날이 넘어간 지난 대회(오후 5시 전에 집에 들어가 잤다 등)를 정한다 — 상품은 노동 갑옷 씨에게. 오늘이면 그대로. */
+export function settleStale(state, today, myGrade = NOVICE) {
+  const c = contestOf(state);
+  if (!c.kind || c.day >= today || c.rank != null || c.got) return state;
+  return settleContest(c.best ? fillNpcRecords(state, myGrade) : state);
+}
+/** 손님 판은 주인 시각 이때 끝낸다(5시 정리보다 조금 먼저 점수가 닿게). */
+export const GUEST_CUTOFF = 16.9;
+export const guestRoundOver = (hostHour) => hostHour >= GUEST_CUTOFF;
+
 /** 그 기록의 상품 { money, trophy }. */
 export function prizeOf(rec) {
   if (!rec || rec.rank == null) return { money: 0, trophy: null };

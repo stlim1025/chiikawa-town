@@ -200,3 +200,32 @@ test('손님 상품: 주인 마을 대회 등수로 내 저장에(1등이면 우
   assert.deepEqual(C.contestOf(after.state).best, { s: 4, t: 4 });
   assert.equal(C.contestOf(after.state).day, 3);
 });
+
+test('리뷰 고침: 정리 없이 날이 넘어가도 지난 대회 상품을 받을 수 있다', () => {
+  let s = C.recordRound(C.beginContestDay({ ...fresh(), startDate: START }, 3, 'fish'), { s: 5, t: 10 });
+  assert.equal(C.contestOf(C.settleStale(s, 3)).rank, null, '같은 날이면 그대로');
+  s = C.settleStale(s, 4);
+  assert.notEqual(C.contestOf(s).rank, null);
+  assert.equal(Object.keys(C.contestOf(s).npc).length, 6, '빠진 친구 기록도 채워서 정한다');
+  assert.equal(C.claimContestPrize(s).ok, true);
+  const none = C.settleStale(C.beginContestDay({ ...fresh(), startDate: START }, 3, 'fish'), 5);
+  assert.equal(C.contestOf(none).got, true, '안 했으면 끝남 표시만');
+});
+
+test('리뷰 고침: 친구 기록이 빠졌으면 정리 때 채운다(내가 자는 동안 지나간 참가)', () => {
+  let s = C.recordRound(C.beginContestDay({ ...fresh(), startDate: START }, 3, 'fish'), { s: 1, t: 3 });
+  s = { ...s, contest: { ...C.contestOf(s), npc: { rakko: { s: 2, t: 4 } } } };
+  s = C.fillNpcRecords(s, 6);
+  const npc = C.contestOf(s).npc;
+  assert.equal(Object.keys(npc).length, 6);
+  assert.deepEqual(npc.rakko, { s: 2, t: 4 }, '이미 있는 기록은 그대로');
+  assert.deepEqual(npc.usagi, C.npcRecord(START, 3, 'fish', 'usagi', 6));
+  assert.equal(C.contestOf(C.settleContest(s)).rank > 1, true, '한 마리로는 1등이 아니다');
+});
+
+test('리뷰 고침: 손님 판은 주인 시각 16.9시에 끝나 5시 정리 전에 점수가 간다', () => {
+  assert.ok(C.GUEST_CUTOFF > C.GUEST_LAST_START && C.GUEST_CUTOFF < C.CLOSE_HOUR);
+  assert.equal(C.guestRoundOver(16.95), true);
+  assert.equal(C.guestRoundOver(16.8), false);
+  assert.equal(C.guestRoundOver(17.5), true);
+});

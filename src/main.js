@@ -130,7 +130,7 @@ import { createFestival } from './world/festival.js';
 import { createContestProps } from './world/contestprops.js';
 import { createContestCeremony } from './stories/contest.js';
 import { CONTESTS, CLOSE_HOUR, OPEN_HOUR, NPC_LAST_START, NPC_PLAY_HOURS, CONTEST_FRIENDS, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
-  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize, guestScoreOk, guestPrize } from './core/contest.js';
+  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize, guestScoreOk, guestPrize, fillNpcRecords, settleStale, guestRoundOver } from './core/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -3995,7 +3995,7 @@ function boot() {
   /** 마을 대회가 끝났다: 등수를 정하고 1등을 마을 소식으로. */
   function settleContestDay() {
     const before = contestOf(state);
-    commit(settleContest(state, contestGuestList()));
+    commit(settleContest(fillNpcRecords(state, state.license ? state.license.grade : NOVICE), contestGuestList())); // 내가 자는 사이 지나간 친구 참가도 채운다
     const c = contestOf(state);
     const entries = [...(before.best ? [{ who: 'me', ...before.best }] : []), ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r }))];
     const board = rankBoard([...entries, ...contestGuestList()]), top = board[0];
@@ -4016,6 +4016,9 @@ function boot() {
     contestProps.setDesk(!!kind && hour >= 6);
     weeds.setBoost(kind === 'weed');
     if (!ready) return;
+    // 정리 못 한 채 날이 넘어간 지난 대회(5시 전에 집에 들어가 잤다 등): 등수를 정해 두고 상품은 노동 갑옷 씨에게
+    const stale = settleStale(state, day, state.license ? state.license.grade : NOVICE);
+    if (stale !== state) commit(stale);
     const tomorrow = contestKindOn(state.startDate, day + 1);
     if (tomorrow && hour >= 18 && contestUi.eveDay !== day && mode === 'play' && !sleeping) {
       contestUi.eveDay = day;
@@ -4147,7 +4150,7 @@ function boot() {
   function contestTick(dt) {
     if (!contestRound) return;
     if (mode !== 'play' || sleeping || fainting || downed || questScene || contestRound.guest !== !!visiting) { finishRound('stop'); return; }
-    if (contestRound.guest && visiting.clock && hourOf(visiting.clock) >= CLOSE_HOUR) { finishRound('close'); return; } // 주인 시각 5시
+    if (contestRound.guest && visiting.clock && guestRoundOver(hourOf(visiting.clock))) { finishRound('close'); return; } // 주인 시각 5시 조금 전(정리 전에 점수가 닿게)
     contestRound.left -= dt;
     if (contestRound.left <= 0) { finishRound('time'); return; }
     const sec = Math.ceil(contestRound.left), unit = contestRound.kind === 'fish' ? '마리' : '점';
