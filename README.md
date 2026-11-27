@@ -32,5 +32,6 @@ git config core.hooksPath .githooks
 | `src/world` | 마을 · 풀 · 열매 · 몬스터 · 친구 집 안 |
 | `src/actors` | 내 캐릭터 · NPC 움직임(`npcs.js`) · 모델 |
 | `src/ui` | HUD · 창 · 마을폰 · 시험 · 라멘 알바 · 그림 |
+| `src/play` | main.js 에서 떼어 낸 기능 진행(마을 대회 `contest.js`: 대회 날 알림 · 접수 · 한 판 · 친구 참가 · 손님 기록 · 정리 · 시상식 · 순위판) |
 | `src/main.js` | 모든 것을 잇는 곳(마을 살림 · 대화 · 토벌 · 저장) |
 | `tests` | 규칙 단위 테스트 |
