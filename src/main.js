@@ -129,8 +129,8 @@ import { createStickParty } from './stories/stickday.js';
 import { createFestival } from './world/festival.js';
 import { createContestProps } from './world/contestprops.js';
 import { createContestCeremony } from './stories/contest.js';
-import { CONTESTS, CLOSE_HOUR, OPEN_HOUR, NPC_LAST_START, NPC_PLAY_HOURS, CONTEST_FRIENDS, ROUND_SECONDS, ENTRY_STAMINA, contestKindOn, contestPhase, contestOf, beginContestDay, settleContest, rankBoard, bannerText,
-  newRound, roundCatch, roundPull, recordRound, better, canEnter, npcRecord, npcJoinHour, claimContestPrize, guestScoreOk, guestPrize, fillNpcRecords, settleStale, guestRoundOver } from './core/contest.js';
+import { CONTESTS, contestOf } from './core/contest.js';
+import { createContestDay } from './play/contest.js';
 import { createConfetti } from './world/confetti.js';
 import { STICK_SNACK, STICK_FRIENDS, isStickFest, stickNewsDue, markStickNews, stickGiftDue, takeStickGift, stickPartyDue } from './core/stickday.js';
 import { noteHouseBought, housewarmDue, housewarmGuests, finishHousewarm, finishStickParty } from './core/events.js';
@@ -573,19 +573,7 @@ function boot() {
       if (killed) guestKilled(id, m);
       return;
     }
-    if (a.t === 'contest') {
-      // 손님의 마을 대회 한 판(core/contest.js): 오늘 종목이고 3분 한 판에서 나올 수 있는 점수일 때만, 그 손님 가장 좋은 기록을 순위판에
-      const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
-      if (!kind || a.k !== kind || !guestScoreOk(kind, a.s, a.b)) return;
-      // 주인이 오늘 아직 바깥에 안 나왔으면 그날 기록부터 연다(지난 대회 등수 때문에 거절되거나 나중에 지워지지 않게)
-      if (contestOf(state).day !== state.clock.day || contestOf(state).kind !== kind) { contestGuests.clear(); commit(beginContestDay(state, state.clock.day, kind)); }
-      const rec = contestOf(state);
-      if (rec.rank != null || rec.got) return;
-      // 손님은 이름으로 묶는다(다시 접속해 연결 id 가 바뀌어도 한 줄). 상품은 가장 최근 연결로
-      const name = (multi.nameOf(id) || '친구').slice(0, 12), r = { id, name, s: a.s, t: a.b }, old = contestGuests.get(name);
-      contestGuests.set(name, !old || better(r, old) ? r : { ...old, id });
-      return;
-    }
+    if (a.t === 'contest') { contest.guestEntry(id, a); return; } // 손님의 마을 대회 한 판(play/contest.js)
     weedsT = 0; // 바뀐 풀 · 덤불 · 바닥 물건 · 모금은 다음 마을 모습으로 바로
     if (a.t === 'donate') {
       // 손님이 내 마을 모금함에 냈다: 남은 만큼까지만 받아 내 모금에 더하고(내 돈은 그대로), 받은 만큼을 그 손님에게 알린다(손님 돈은 손님 쪽에서 뺀다)
@@ -747,7 +735,7 @@ function boot() {
     } else if (a.t === 'got') takeGot(a);
     else if (a.t === 'star') takeStar(a); // 주인이 별똥별에 소원을 빌었다
     else if (a.t === 'donated') takeDonated(a); // 주인 마을 모금함에 낸 돈을 주인이 받았다
-    else if (a.t === 'prize') takeContestPrize(a); // 주인 마을 대회 등수(상품은 내 저장에)
+    else if (a.t === 'prize') contest.takePrize(a); // 주인 마을 대회 등수(상품은 내 저장에)
   }
   /**
    * 모금함 창에 보일 마을: 친구 마을에 놀러 간 동안은 주인 마을의 모금(모인 돈 · 공사 중 · 생김)과 시계로. 낼 돈은 내 돈 그대로.
@@ -1079,7 +1067,7 @@ function boot() {
       w.k = packWorks(worksView(state)); // 마을 가꾸기 시설(손님 화면에도 보인다)
       w.sb = [storyBuilt('starDiner') ? 1 : 0, storyBuilt('bodySwap') ? 1 : 0]; // 이야기 건물(별 세 개 · 게임센터)도 손님 화면에
       w.kp = WORK_IDS.map((id) => [id, workOf(state, id).paid]).filter((r) => r[1] > 0); // 시설마다 모인 돈(손님 모금함 창에 내 마을 금액으로)
-      const ct = contestWire();
+      const ct = contest.wire();
       if (ct) w.ct = ct; // 마을 대회 순위판(손님도 참가한다)
     }
     multi.sendWorld(w);
@@ -1135,7 +1123,7 @@ function boot() {
   // ---------- 창 ----------
   let appNudge = null; // 새로 생긴 마을폰 앱(지도를 막 샀으면 'map'): 그 앱을 열 때까지 마을폰 버튼 · 앱 아이콘이 빛난다
   const panels = createPanels(ui, {
-    contestBoard: () => contestBoard(), // 마을폰 대회 앱(core/contest.js)
+    contestBoard: () => contest.board(), // 마을폰 대회 앱(core/contest.js)
     getState: () => state,
     // 모금함 창: 친구 마을에 놀러 간 동안은 그 마을 모금(worksPanelState)과 주인 이름
     worksState: () => worksPanelState(),
@@ -2674,9 +2662,9 @@ function boot() {
   /** 물낯 높이: 절벽 앞 만(바다를 아래로 낮춘 곳)만 낮다. */
   const waterY = (x, z) => (z > SOUTH_SHORE && x > CLIFF.cove.x0 && x < CLIFF.cove.x1 ? CLIFF.cove.y : 0) + 0.04;
   function beginFish(spot) {
-    const contest = contestRound && contestRound.kind === 'fish'; // 마을 대회 판 안에서는 기운을 쓰지 않는다(core/contest.js)
-    if (!contest && state.stamina < FISH_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
-    if (!contest) commit(useStamina(state, FISH_STAMINA).state, false);
+    const inContest = contest.round() && contest.round().kind === 'fish'; // 마을 대회 판 안에서는 기운을 쓰지 않는다(core/contest.js)
+    if (!inContest && state.stamina < FISH_STAMINA) { hud.toast('기운이 없어요', 2000); return; }
+    if (!inContest) commit(useStamina(state, FISH_STAMINA).state, false);
     player.face(spot.x, spot.z);
     player.busy = true;
     player.setRod(true);
@@ -2785,15 +2773,15 @@ function boot() {
   function fishCatch() {
     const id = fishing.fish, F = FISH[id], from = bobber.position.clone();
     cancelFish();
-    if (contestRound && contestRound.kind === 'fish') { // 마을 대회: 세기만 하고 놓아준다(가방 · 일감 없이, 도감 기록은 남는다)
+    if (contest.round() && contest.round().kind === 'fish') { // 마을 대회: 세기만 하고 놓아준다(가방 · 일감 없이, 도감 기록은 남는다)
       const cm = F.junk ? null : fishLength(id);
-      contestRound = roundCatch(contestRound, { junk: !!F.junk, cm });
+      const round = contest.catchFish({ junk: !!F.junk, cm });
       if (!F.junk) commit(logFish(state, id, cm).state);
       splash(from, F.junk ? 0.6 : 1.3);
       jumpFish(id, from);
       sound.play(F.junk ? 'can' : 'done');
       if (!F.junk) player.cheerTime = 1.2;
-      fishGame.catchCard({ title: F.junk ? '깡통은 안 쳐요' : `${F.name} +1`, art: itemSvg(id), chips: [cm ? `${cm}cm` : '놓아줬어요', `이번 판 ${contestRound.s}마리`], junk: !!F.junk });
+      fishGame.catchCard({ title: F.junk ? '깡통은 안 쳐요' : `${F.name} +1`, art: itemSvg(id), chips: [cm ? `${cm}cm` : '놓아줬어요', `이번 판 ${round.s}마리`], junk: !!F.junk });
       return;
     }
     // 낚시 일감(core/jobs.js)의 그 물고기면 가방 대신 일감에 센다
@@ -2921,8 +2909,8 @@ function boot() {
     sound.play(step === 'clean' ? 'clean' : step === 'snapped' ? 'snap' : 'none');
     if (step === 'none') { if (weed.guest) multi.act({ t: 'drop', id: weed.id }); pop('조금 더 꾹~', 'tip'); return; }
 
-    const contest = contestRound && contestRound.kind === 'weed'; // 마을 대회 판 안: 기운을 쓰지 않는다
-    let next = contest ? state : useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
+    const inContest = contest.round() && contest.round().kind === 'weed'; // 마을 대회 판 안: 기운을 쓰지 않는다
+    let next = inContest ? state : useStamina(state, Math.min(state.stamina, pullStamina(weed.kind, step))).state; // 독이 튀어도 남은 기운까지만
     if (W.poison && step === 'snapped') pop('윽, 독이 튀었다!', 'snap', 'poison');
     else if (tooLong) pop('너무 오래 당겼다…', 'snap', 'long');
     // 여러 번에 나눠 뽑는 풀: 아직 남았으면 조금 올라온 채로 두고 다시 누르게
@@ -2939,8 +2927,8 @@ function boot() {
     // 끊어진 풀은 못 얻는다(core/weeding.js 의 gotWeed): 일감 개수 · 가방 · 도감(퀘스트도 도감 수로 센다) · 같이 풀 뽑기에 넣지 않는다. 경험치는 조금
     const result = prog.final, got = gotWeed(result);
     const log = state.weedLog || {}, first = got && !log[weed.kind];
-    if (contest) { // 마을 대회: 점수만 세고 놓아준다(가방 · 일감 · 경험치 · 시험 없이, 깔끔하면 도감에만)
-      contestRound = roundPull(contestRound, result);
+    if (inContest) { // 마을 대회: 점수만 세고 놓아준다(가방 · 일감 · 경험치 · 시험 없이, 깔끔하면 도감에만)
+      contest.pullWeed(result);
       state = got ? { ...next, weedLog: { ...log, [weed.kind]: (log[weed.kind] || 0) + 1 } } : next;
       weeds.remove(weed, result);
       if (weed.guest) multi.act({ t: 'weed', id: weed.id, done: result });
@@ -3389,11 +3377,19 @@ function boot() {
   let hachiPit = null; // 사이드스토리 '하치와레가 구덩이에!'(stories/hachipit.js — 아래에서 만든다)
   let housewarm = null, stickParty = null, confetti = null, festival = null; // 마을 이벤트(집들이 · 막대 과자 데이 — 아래에서 만든다)
   let contestProps = null, contestCeremony = null; // 마을 대회 접수 탁자 · 시상식 단상(world/contestprops.js) · 시상식 장면(stories/contest.js) — 아래에서 만든다
-  let contestRound = null; // 마을 대회 한 판 { kind, s, t, clean, left, guest }(core/contest.js)
-  const contestGuests = new Map(); // 주인: 오늘 대회에 참가한 같이 놀기 손님 이름 → { id: 가장 최근 연결 id, name, s, t }
-  const contestUi = { eveDay: 0, morningDay: 0 }; // 전날 저녁 알림 · 당일 아침 배너를 띄운 날
-  const contestPrizeGot = new Set(); // 손님: 받은 주인 마을 대회 상품(주인 · 날 · 종목 — 두 번 오면 한 번만)
-  const contestNpc = new Map(); // 대회에 나간 친구 kind → { day, until: 끝날 시각 }(중간에 끊겨도 이 시각이 지나면 기록을 올린다)
+  // 마을 대회 진행(play/contest.js): 대회 날 알림 · 접수 · 한 판 · 친구 참가 · 손님 기록 · 정리 · 시상식 · 순위판
+  const contest = createContestDay({
+    multi, hud, sound, weeds, npcs, panels, guide,
+    get state() { return state; }, get mode() { return mode; }, get sleeping() { return sleeping; }, get fainting() { return fainting; },
+    get downed() { return downed; }, get questScene() { return questScene; }, get visiting() { return visiting; }, get fishing() { return fishing; },
+    get pulling() { return pulling; }, get swapOn() { return swapOn; }, get player() { return player; },
+    get festival() { return festival; }, get props() { return contestProps; }, get ceremony() { return contestCeremony; },
+    commit: (s, persist) => commit(s, persist), happen: (ev) => happen(ev), funBusy: () => funBusy(), myName: () => myName(), won: (n) => won(n),
+    sayAs: (n, lines, then) => sayAs(n, lines, then), endTalk: () => endTalk(), cancelPull: () => cancelPull(), cancelFish: () => cancelFish(),
+    setDoing: (kind, icon, text) => setDoing(kind, icon, text), restHere: (kind, sec) => restHere(kind, sec), npcFishSpot: (water) => npcFishSpot(water),
+    fishMiss: (kind) => fishMiss(kind), npcMissFish: (n) => npcMissFish(n), npcLandFish: (n, water, keep) => npcLandFish(n, water, keep),
+    tireNpc: (kind, amount) => tireNpc(kind, amount), isFree: (n) => isFree(n)
+  });
   let pajama = null; // 사이드스토리 '잠옷 밤나들이'(stories/pajama.js — 아래에서 만든다)
   let idolStory = null; // 사이드스토리 '파자마 파티즈'(stories/pajamaidol.js — 아래에서 만든다)
   let starDiner = null; // 사이드스토리 '별 세 개 레스토랑'(stories/stardiner.js — 아래에서 만든다)
@@ -3505,7 +3501,7 @@ function boot() {
     if (n.kind === 'kurimanju' && mode !== 'visit') opts.push(hasLicense(state, 'liquor') ? ['drink', '한 잔 하자'] : lessonQuest ? ['lesson', '강의 들으러 왔어'] : ['study', '술 공부하고 싶어']);
     if (n.kind === 'pochette') opts.push(['shop', '포셰트 구경할래']);
     // 노동 갑옷 씨: 마을 대회 접수(core/contest.js) — 대회 날이면 맨 위에
-    if (n.kind === 'labor' && mode === 'play' && contestKindHere()) opts.unshift(contestRound ? ['cquit', '대회 그만할래요'] : ['cjoin', `${CONTESTS[contestKindHere()].name} 나갈래요`], ['cboard', '순위판 보여 주세요']);
+    if (n.kind === 'labor' && mode === 'play' && contest.kindHere()) opts.unshift(contest.round() ? ['cquit', '대회 그만할래요'] : ['cjoin', `${CONTESTS[contest.kindHere()].name} 나갈래요`], ['cboard', '순위판 보여 주세요']);
     if (n.kind === 'labor' && !visiting && contestOf(state).rank != null && !contestOf(state).got) opts.unshift(['cprize', '대회 상품 받으러 왔어요']);
     // 지갑이 있는 친구: 하트를 꽉 채우면 돈을 빌릴 수 있고, 빌렸으면 갚는다. 쫓겨났으면 밤에 하룻밤 재워 달라고 한다.
     if (VILLAGERS[n.kind]) {
@@ -3534,10 +3530,10 @@ function boot() {
       else if (k === 'qstop') sayAs(n, [BUDDY_SAY[n.kind] ? BUDDY_SAY[n.kind].stop : '그래, 다음에 또!'], () => { endTalk(); endBuddy(n.kind); });
       else if (k.startsWith('qhint:')) { const id = k.slice(6); sayAs(n, [`「${QUESTS[id].title}」`, goalLine(id), n.kind === 'momonga' ? '빨리 해 와. 흥!' : '부탁해~!'], endTalk); }
       else if (k === 'help') askHelp(n, '뭐가 궁금해? 뭐든 물어봐~');
-      else if (k === 'cjoin') contestJoin(n);
+      else if (k === 'cjoin') contest.join(n);
       else if (k === 'cboard') { endTalk(); panels.openContest(); }
-      else if (k === 'cprize') sayAs(n, ['기다렸다. 대회 상품이다!'], () => { endTalk(); claimContest(); });
-      else if (k === 'cquit') sayAs(n, ['수고했다. 기록은 남겨 두마.'], () => { endTalk(); finishRound('quit'); });
+      else if (k === 'cprize') sayAs(n, ['기다렸다. 대회 상품이다!'], () => { endTalk(); contest.claim(); });
+      else if (k === 'cquit') sayAs(n, ['수고했다. 기록은 남겨 두마.'], () => { endTalk(); contest.finishRound('quit'); });
       else if (k === 'chat') {
         // 오늘 있었던 일 · 들은 소문 · 내 큰일 이야기가 있으면 먼저(한 번 한 이야기는 다시 안 한다)
         const st = VILLAGERS[n.kind] ? untold(n.kind) : null;
@@ -4009,190 +4005,11 @@ function boot() {
     sound.play('job');
     hud.banner('마을이 달라졌어요!', `${josa(due.map((id) => WORKS[id].name).join(', '), '이/가')} 생겼어요`, 4200);
   }
-  /** 마을 대회 손님 기록(순위판 · 등수에 넣는다). */
-  const contestGuestList = () => [...contestGuests.values()].map((g) => ({ who: 'mp:' + g.id, name: g.name, s: g.s, t: g.t }));
-  /** 마을 대회가 끝났다: 등수를 정하고 1등을 마을 소식으로. */
-  function settleContestDay() {
-    const before = contestOf(state);
-    commit(settleContest(fillNpcRecords(state, state.license ? state.license.grade : NOVICE), contestGuestList())); // 내가 자는 사이 지나간 친구 참가도 채운다
-    const c = contestOf(state);
-    const entries = [...(before.best ? [{ who: 'me', ...before.best }] : []), ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r }))];
-    const board = rankBoard([...entries, ...contestGuestList()]), top = board[0];
-    if (top && top.s > 0 && !top.who.startsWith('mp:')) happen({ type: 'contestWin', who: top.who, item: CONTESTS[c.kind].banner });
-    // 같이 놀기 손님: 아직 내 마을에 있으면 등수를 보낸다(상품은 손님 저장에 — 돌아간 손님은 기록만 남는다)
-    for (const e of board) if (e.who.startsWith('mp:') && multi.players.some((p) => 'mp:' + p.id === e.who)) multi.direct(e.who.slice(3), { t: 'prize', k: c.kind, rank: e.rank, d: c.day });
-    return c;
-  }
-  /**
-   * 마을 대회 날(core/contest.js, 0.3초마다): 광장 현수막(막대 과자 데이가 먼저) · 게시판 옆 접수 탁자 · 풀 뽑기 날 풀 늘리기,
-   * 전날 저녁 6시 알림, 당일 아침 배너, 오후 5시가 지나면 정리(시상식 장면은 startCeremony).
-   */
-  function updateContestDay() {
-    const bt = bannerText(state);
-    festival.setOn(!!bt, bt || undefined);
-    const day = state.clock.day, hour = hourOf(state.clock), ready = state.tutorial === 'done';
-    const kind = ready ? contestKindOn(state.startDate, day) : null;
-    contestProps.setDesk(!!kind && hour >= 6);
-    weeds.setBoost(kind === 'weed');
-    if (!ready) return;
-    // 정리 못 한 채 날이 넘어간 지난 대회(5시 전에 집에 들어가 잤다 등): 등수를 정해 두고 상품은 노동 갑옷 씨에게
-    const stale = settleStale(state, day, state.license ? state.license.grade : NOVICE);
-    if (stale !== state) commit(stale);
-    const tomorrow = contestKindOn(state.startDate, day + 1);
-    if (tomorrow && hour >= 18 && contestUi.eveDay !== day && mode === 'play' && !sleeping) {
-      contestUi.eveDay = day;
-      hud.toast(`내일은 ${CONTESTS[tomorrow].banner}!`, 3200);
-    }
-    if (!kind) return;
-    const rec = contestOf(state);
-    if (rec.day !== day || rec.kind !== kind) { contestGuests.clear(); commit(beginContestDay(state, day, kind)); }
-    if (contestUi.morningDay !== day && hour >= 6 && hour < CLOSE_HOUR && mode === 'play' && !sleeping && !fainting && !questScene) {
-      contestUi.morningDay = day;
-      if (isStickFest(state)) hud.toast(`오늘은 ${CONTESTS[kind].banner}도 열려요! 오전 9시부터 노동 갑옷 씨에게`, 4200); // 막대 과자 데이 배너와 겹치지 않게
-      else hud.banner(CONTESTS[kind].name, '오전 9시부터 노동 갑옷 씨에게 접수해요', 3600);
-    }
-    // 대회에 나갔다가 이야기 장면 등으로 끊긴 친구: 끝날 시각이 지나면(또는 마감이면) 기록을 대신 올려 준다
-    for (const [k, g] of contestNpc) if (g.day === day && !contestOf(state).npc[k] && (hour >= g.until + 0.5 || hour >= CLOSE_HOUR)) postNpcRecord(k);
-    const phase = contestPhase(hour, !!(contestRound && !contestRound.guest));
-    const now = contestOf(state);
-    if ((phase === 'ceremony' || phase === 'closed') && now.rank == null && !now.got) {
-      // 한 판이라도 했으면 광장 시상식(마을 안에서 다른 일이 없을 때 — 막히면 9시까지 기다린다), 아니면 조용히 정리
-      if (phase === 'ceremony' && now.best) { if (canCeremony()) startCeremony(); return; }
-      const c = settleContestDay();
-      if (c.best) hud.toast(`${CONTESTS[kind].name} 결과는 노동 갑옷 씨에게 들어요`, 3200);
-    }
-  }
-  /** 주인: 손님에게 보낼 마을 대회 순위판 { k, d, o: 접수 중, b: [[이름, 점수, 가르는 값, 'me' | 'npc' | 'guest' | 'yet', 등수]] }(오늘 대회가 없으면 null). */
-  function contestWire() {
-    const kind = state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
-    if (!kind) return null;
-    const b = contestBoard();
-    const rows = b.today ? b.rows.slice(0, 12).map((r) => [String(r.name || '').slice(0, 12), r.yet ? 0 : r.s, r.yet ? 0 : r.t, r.yet ? 'yet' : r.me ? 'me' : r.guest ? 'guest' : 'npc', r.yet ? 0 : r.rank, r.guest ? String(r.who).slice(3) : '']) : []; // 마지막: 손님 연결 id(손님이 제 줄을 알아본다)
-    return { k: kind, d: state.clock.day, o: contestPhase(hourOf(state.clock), false) === 'open' ? 1 : 0, b: rows };
-  }
-  /** 손님: 주인 마을 대회 등수를 받았다 → 상품은 내 저장에(core/contest.js 의 guestPrize). */
-  function takeContestPrize(a) {
-    if (!Object.hasOwn(CONTESTS, a.k) || !Number.isInteger(a.rank) || a.rank < 1) return;
-    const key = `${multi.room}|${a.d}|${a.k}`; // 같은 주인 마을 같은 대회 날은 한 번만
-    if (contestPrizeGot.has(key)) return;
-    contestPrizeGot.add(key);
-    const r = guestPrize(state, a.k, a.rank);
-    if (!r.money) return;
-    commit(r.state);
-    const chips = [{ icon: 'coin', text: `+${won(r.money)}` }];
-    if (r.trophy) chips.push({ text: FURNITURE[r.trophy].name });
-    hud.questDone({ title: a.rank <= 3 ? `${CONTESTS[a.k].name} ${a.rank}등!` : `${CONTESTS[a.k].name} 참가상`, sub: `${multi.hostName || '친구'}네 마을 대회`, chips, ms: 4800 });
-    sound.play('coin');
-  }
-  /** 마을폰 대회 앱 · 순위판: 오늘 대회면 순위(나 · 친구 · 손님, 아직 안 한 친구는 끝에), 아니면 다음 대회 날. */
-  function contestBoard() {
-    const rec = contestOf(state);
-    if (visiting) {
-      const v = visiting.contest;
-      if (!v) return { kind: null, today: false, next: null, wins: rec.wins };
-      return { kind: v.k, today: true, phase: v.o ? 'open' : 'ceremony', host: multi.hostName || '친구', wins: rec.wins,
-        rows: v.b.map(([name, s, t, type, rank, gid]) => ({ name, s, t, rank, me: type === 'guest' && !!gid && gid === multi.you, yet: type === 'yet' })) };
-    }
-    const today = contestKindHere();
-    if (today && rec.day === state.clock.day) {
-      const entries = [...(rec.best ? [{ who: 'me', name: myName(), me: true, ...rec.best }] : []), ...Object.entries(rec.npc).map(([k, r]) => ({ who: k, name: FRIENDS[k].name, ...r })), ...contestGuestList().map((g) => ({ ...g, guest: true }))];
-      const yet = CONTEST_FRIENDS.filter((k) => !rec.npc[k]).map((k) => ({ who: k, name: FRIENDS[k].name, yet: true }));
-      return { kind: today, today: true, phase: contestPhase(hourOf(state.clock), !!contestRound), rows: [...rankBoard(entries), ...yet], wins: rec.wins };
-    }
-    let d = state.clock.day + 1;
-    while (!contestKindOn(state.startDate, d) && d < state.clock.day + 8) d++;
-    return { kind: null, today: false, next: { kind: contestKindOn(state.startDate, d), date: dateLabel(state.startDate, d) }, wins: rec.wins };
-  }
-  /** 시상식 장면을 열 수 있는지: 내 마을 바깥(play) 마을 안에서 잠 · 기절 · 이야기 · 창 · 대화가 없을 때. */
-  const canCeremony = () => mode === 'play' && !visiting && !sleeping && !fainting && !downed && !questScene && !funBusy() && !panels.isOpen() && !guide.open
-    && Math.hypot(player.position.x, player.position.z) < VILLAGE_R;
-  /** 오후 5시 광장 시상식: 등수를 정하고 장면을 연 뒤 상품을 받는다. */
-  function startCeremony() {
-    cancelPull();
-    if (fishing) cancelFish();
-    const before = contestOf(state);
-    const c = settleContestDay();
-    const named = (e) => ({ ...e, name: e.who === 'me' ? myName() : FRIENDS[e.who] ? FRIENDS[e.who].name : e.name || '친구' });
-    const top = rankBoard([{ who: 'me', ...before.best }, ...Object.entries(c.npc).map(([who, r]) => ({ who, ...r })), ...contestGuestList()])
-      .filter((e) => e.rank <= 3).slice(0, 3).map(named);
-    contestCeremony.play({ kind: c.kind, top, me: { rank: c.rank, s: before.best.s }, guests: CONTEST_FRIENDS.filter((k) => npcs.byKind(k)) }, () => claimContest());
-  }
-  /** 대회 상품 받기(시상식 뒤 바로, 놓쳤으면 노동 갑옷 씨에게). */
-  function claimContest() {
-    const c = contestOf(state), r = claimContestPrize(state);
-    if (!r.ok) return false;
-    commit(r.state);
-    const chips = [{ icon: 'coin', text: `+${won(r.money)}` }];
-    if (r.trophy) chips.push({ text: FURNITURE[r.trophy].name });
-    hud.questDone({ title: c.rank <= 3 ? `${CONTESTS[c.kind].name} ${c.rank}등!` : `${CONTESTS[c.kind].name} 참가상`, sub: r.trophy ? '트로피는 집 상자에 넣었어요' : '', chips, ms: 4800 });
-    sound.play('coin');
-    return true;
-  }
-  /** 지금 있는 마을의 오늘 대회 종목(내 마을: 튜토리얼 뒤 그날 종목, 친구 마을: 주인이 보낸 것). */
-  function contestKindHere() {
-    if (visiting) return visiting.contest && visiting.contest.o ? visiting.contest.k : null;
-    return state.tutorial === 'done' ? contestKindOn(state.startDate, state.clock.day) : null;
-  }
-  const contestHour = () => hourOf(visiting && visiting.clock ? visiting.clock : state.clock);
-  const CONTEST_NO = {
-    day: '오늘은 대회가 없다.', hour: '접수는 오전 9시부터 오후 5시까지다.', late: '오늘 접수는 끝났다.',
-    swap: '…몸이 바뀐 동안에는 나갈 수 없다.', stamina: `기운이 모자라 보인다. 기운 ${ENTRY_STAMINA}은 있어야 한다.`
-  };
-  /** 노동 갑옷 씨: 대회 나가기 · 그만하기. */
-  function contestJoin(n) {
-    const kind = contestKindHere();
-    const can = canEnter(state, { hour: contestHour(), kind, swapped: swapOn, guest: !!visiting });
-    if (!can.ok) { sayAs(n, [CONTEST_NO[can.reason] || CONTEST_NO.day], endTalk); return; }
-    sayAs(n, [`${CONTESTS[kind].name} 접수 완료! 3분이다. 시작!`], () => { endTalk(); startRound(kind, !!visiting); });
-  }
-  /** 대회 한 판 시작: 기운 10, 내 마을이면 판 동안 시계가 멈춘다(core/contest.js). */
-  function startRound(kind, guest) {
-    commit(useStamina(state, ENTRY_STAMINA).state);
-    contestRound = { ...newRound(kind), left: ROUND_SECONDS, guest };
-    contestTimerKey = '';
-    hud.banner(`${CONTESTS[kind].name} 시작!`, kind === 'fish' ? '3분 동안 많이 낚아요' : '3분 동안 많이 뽑아요', 2200);
-    sound.play('job');
-  }
-  /** 한 판이 끝났다(시간 · 그만하기 · 쓰러짐 · 잠 · 장면 · 다른 곳으로): 내 마을이면 그날 기록에, 손님이면 주인에게. */
-  function finishRound(why) {
-    const r = contestRound;
-    if (!r) return;
-    contestRound = null;
-    hud.setTimer(null);
-    if (fishing) cancelFish(); // 끝난 뒤에 낚인 물고기가 가방으로 가지 않게
-    if (pulling) cancelPull();
-    const unit = r.kind === 'fish' ? '마리' : '점';
-    if (r.guest) { // b: 같을 때 가르는 값(t 는 메시지 종류)
-      if (multi.status === 'visiting') { multi.act({ t: 'contest', k: r.kind, s: r.s, b: r.t }); hud.banner(`${r.s}${unit}!`, `${multi.hostName || '친구'}네 순위판에 올렸어요`, 3000); }
-      else hud.toast('친구 마을과 연결이 끊겨 기록을 보내지 못했어요', 3200);
-      return;
-    }
-    const prev = contestOf(state).best;
-    commit(recordRound(state, r));
-    hud.banner(`${r.s}${unit}!`, better(r, prev) ? '오늘 가장 좋은 기록' : `오늘 가장 좋은 기록 ${prev.s}${unit}`, 3000);
-    if (why !== 'time' && why !== 'quit') hud.toast('대회 판이 끝났어요', 2200);
-  }
-  let contestTimerKey = '';
-  /** 매 프레임: 남은 시간을 줄이고 화면 위에 남은 시간 · 점수 · 그날 가장 좋은 기록. 판을 이어 갈 수 없으면 끝낸다. */
-  function contestTick(dt) {
-    if (!contestRound) return;
-    if (mode !== 'play' || sleeping || fainting || downed || questScene || contestRound.guest !== !!visiting) { finishRound('stop'); return; }
-    if (contestRound.guest && visiting.clock && guestRoundOver(hourOf(visiting.clock))) { finishRound('close'); return; } // 주인 시각 5시 조금 전(정리 전에 점수가 닿게)
-    contestRound.left -= dt;
-    if (contestRound.left <= 0) { finishRound('time'); return; }
-    const sec = Math.ceil(contestRound.left), unit = contestRound.kind === 'fish' ? '마리' : '점';
-    const best = contestRound.guest ? null : contestOf(state).best;
-    const key = `${sec}|${contestRound.s}|${best ? best.s : ''}`;
-    if (key === contestTimerKey) return;
-    contestTimerKey = key;
-    hud.setTimer([CONTESTS[contestRound.kind].name, { icon: ICO.clock, text: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` },
-      { text: `${contestRound.s}${unit}` }, best ? { text: `가장 좋은 기록 ${best.s}${unit}`, narrow: 'hide' } : null].filter(Boolean));
-  }
   function updateQuests(dt) {
     questT -= dt;
     if (questT > 0 || !state) return;
     questT = 0.3;
-    updateContestDay(); // 막대 과자 데이 · 마을 대회 광장 장식과 대회 날 진행
+    contest.updateDay(); // 막대 과자 데이 · 마을 대회 광장 장식과 대회 날 진행
     checkReady();
     const p = player.position, hour = hourOf(state.clock);
     const free = !panels.isOpen() && !guide.open && !sleeping && !funBusy() && !fainting && !questScene && !pulling;
@@ -6373,8 +6190,8 @@ function boot() {
     const jobs = roomForJob ? spec.jobs.filter((id) => left[id] > 0 && !friendLeaves(id, left) && canDoJob(state, kind, id)) : [];
     const hunts = H && roomForJob && licensed(state, kind) ? Object.keys(JOB_TYPES).filter((id) => JOB_TYPES[id].hunt && !JOB_TYPES[id].kind.startsWith('moth') && left[id] > 0) : [];
     if (swapOn && kind === 'usagi') { const prank = swapPrank(n, day, hour, left); if (prank) return prank; } // 몸이 바뀐 동안 우사기(내 몸)의 장난
-    const contest = contestNpcDue(n, hour); // 마을 대회 날: 그 친구 참가 시각이 되면 대회에 나간다(core/contest.js)
-    if (contest) { npcContest(n, contest); return 'contest'; }
+    const entry = contest.npcDue(n, hour); // 마을 대회 날: 그 친구 참가 시각이 되면 대회에 나간다(core/contest.js)
+    if (entry) { contest.npcStart(n, entry); return 'contest'; }
     const p = player.position, canMeet = mode === 'play' && !funBusy() && !panels.isOpen() && !guide.open && !sleeping && !fainting;
     // 목표 값이 다 모였으면 가게가 열린 동안 먼저 사러 간다(core/goals.js)
     if (hour >= 8 && hour < 20 && !tutorialActive(state.tutorial) && canBuy(state, kind, day)) { npcShop(n); return 'shop'; }
@@ -6578,38 +6395,6 @@ function boot() {
     steps.push({ do: 'act', anim: 'fish', face: spot.face, time: at + 0.4, beats, quick: true });
     steps.push({ do: 'call', fn: () => restHere(n.kind, 6 + Math.random() * 10) });
     npcs.plan(n, steps);
-  }
-  /** 마을 대회에 나간 친구가 끝나고 하는 한마디(게임 오리지널). */
-  const CONTEST_DONE = { chiikawa: '…해, 했다…!', hachiware: '헤헤, 열심히 했어~!', usagi: '야하!', kurimanju: '하아~ 끝났다~', rakko: '…이 정도군.', momonga: '내가 제일 잘했지? 흥!' };
-  /** 친구 대회 기록을 순위판에 올린다(솜씨표에서 날짜로 정해지는 값 — core/contest.js 의 npcRecord). */
-  function postNpcRecord(kind) {
-    const rec = contestOf(state);
-    if (!rec.kind || rec.day !== state.clock.day || rec.npc[kind]) return;
-    const r = npcRecord(state.startDate, rec.day, rec.kind, kind, state.license ? state.license.grade : NOVICE);
-    commit({ ...state, contest: { ...rec, npc: { ...rec.npc, [kind]: r } } }, false);
-    const n = npcs.byKind(kind);
-    if (n && !n.away && Math.hypot(n.x - player.position.x, n.z - player.position.z) < 16) npcs.say(n, CONTEST_DONE[kind] || '다 했다!');
-  }
-  /** 친구가 대회에 나간다: 낚시면 연못가에서 게임 안 1시간(실제 30초) 낚시, 풀이면 잡초를 뽑으러 다닌다. 끝나면 기록을 올린다. */
-  function npcContest(n, kind) {
-    contestNpc.set(n.kind, { day: state.clock.day, until: hourOf(state.clock) + NPC_PLAY_HOURS });
-    setDoing(n.kind, kind === 'fish' ? 'fish' : 'leaf', '대회 중');
-    const done = { do: 'call', fn: () => { postNpcRecord(n.kind); restHere(n.kind, 6 + Math.random() * 8); } };
-    if (kind === 'fish') {
-      const spot = npcFishSpot('pond') || npcFishSpot('river');
-      if (!spot) { postNpcRecord(n.kind); return; }
-      const secs = (NPC_PLAY_HOURS / 24) * DAY_SECONDS, beats = [];
-      for (let at = 4; at < secs - 1; at += 4 + Math.random() * 3) beats.push({ at, fn: () => (Math.random() < fishMiss(n.kind) ? npcMissFish(n) : npcLandFish(n, spot.water, false)) });
-      npcs.plan(n, [{ do: 'walk', x: spot.x, z: spot.z, near: 0.4 }, { do: 'act', anim: 'fish', face: spot.face, time: secs, beats, quick: true }, done]);
-    } else npcs.plan(n, [{ do: 'weeds', kind: 'weed', left: 5 + Math.floor(Math.random() * 3), onPull: () => tireNpc(n.kind, 1) }, done]);
-  }
-  /** 친구가 지금 대회에 나갈 차례인지(그날 참가 시각이 지났고 아직 안 했고 한가하다). */
-  function contestNpcDue(n, hour) {
-    const kind = contestKindHere();
-    if (!kind || visiting || !CONTEST_FRIENDS.includes(n.kind) || hour < OPEN_HOUR || hour >= NPC_LAST_START) return null;
-    const rec = contestOf(state), started = contestNpc.get(n.kind);
-    if (rec.day !== state.clock.day || rec.npc[n.kind] || (started && started.day === state.clock.day)) return null;
-    return hour >= npcJoinHour(state.startDate, state.clock.day, n.kind) && isFree(n) ? kind : null;
   }
   function npcHobby(n, hour) {
     const kind = n.kind;
@@ -7307,7 +7092,7 @@ function boot() {
     const fs = fishSpotNear(p, player.yaw);
     if (!fs) return;
     // 마을 대회 낚시 판 안에서는 낚싯대가 없어도 대회 낚싯대로(core/contest.js)
-    if (hasTool(state, 'rod') || (contestRound && contestRound.kind === 'fish')) options.push({ d: fs.front ? 0.6 : 1.2, t: { type: 'fish', spot: fs, label: '낚싯대 펼치기' } });
+    if (hasTool(state, 'rod') || (contest.round() && contest.round().kind === 'fish')) options.push({ d: fs.front ? 0.6 : 1.2, t: { type: 'fish', spot: fs, label: '낚싯대 펼치기' } });
     else options.push({ d: 1.25, t: { type: 'noRod', spot: fs, label: '낚시하기' } });
   }
   /** 같이 놀기: 친구 마을에서도 쓰는 건물(내 돈 · 내 일감 · 내 자격으로. 토벌 실기만 내 마을 검정소에서). 집은 친구 집이라 따로. */
@@ -8327,19 +8112,19 @@ function boot() {
     }
     if (state) ground.sync(visiting ? visiting.ground || [] : groundOf(state), groundKind); // 친구 마을에서는 그 마을 바닥 물건
     ground.update(dt, focus);
-    if (contestRound && mode !== 'play') finishRound('stop'); // 마을 대회 판은 바깥(play)에서만: 집 안 등 다른 곳으로 가면 끝(그곳에서는 시계가 흐른다)
+    if (contest.round() && mode !== 'play') contest.finishRound('stop'); // 마을 대회 판은 바깥(play)에서만: 집 안 등 다른 곳으로 가면 끝(그곳에서는 시계가 흐른다)
     if (state && player && mode === 'intro') {
       player.update(dt, input);
       intro.update(dt);
     } else if (state && player && mode === 'play' && visiting) {
       guestTick(dt); // 친구 마을에 놀러 간 중
-      contestTick(dt); // 주인 마을 대회 판(주인 시계는 멈추지 않는다)
+      contest.tick(dt); // 주인 마을 대회 판(주인 시계는 멈추지 않는다)
       if (festival.on) festival.setOn(false); // 축제 장식은 내 마을에만
       contestProps.setDesk(false); // 대회 접수 탁자도
     } else if (state && player && mode === 'play') {
       // 창(노동 접수 · 가게 · 마을폰 …)을 보는 동안에도 시간은 흐른다. 마을 대회 내 한 판 동안은 멈춘다(실제 3분이 게임 안 6시간이라)
-      if (!sleeping && !(contestRound && !contestRound.guest)) state = { ...state, clock: advance(state.clock, dt) };
-      contestTick(dt);
+      if (!sleeping && !(contest.round() && !contest.round().guest)) state = { ...state, clock: advance(state.clock, dt) };
+      contest.tick(dt);
       loopTick(); // 검은 별똥별: 밤 12시가 지나면 같은 날 아침으로
       panels.tick(state);
       newDayCheck();
